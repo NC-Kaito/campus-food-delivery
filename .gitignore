@@ -1,0 +1,29 @@
+# --- Java / Maven ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+*.class
+*.marshaled
+
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+build/
+ios/.generated/
+android/local.properties
+android/key.properties
+*.freezed.dart
+*.g.dart
+
+# --- IntelliJ / IDE ---
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+.vscode/
+
+# --- System Files ---
+.DS_Store
+Thumbs.db
