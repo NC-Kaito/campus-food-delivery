@@ -1,0 +1,10 @@
+# สั่งให้ GitHub ไม่นับโฟลเดอร์ Platform ของ Flutter มาคิดเปอร์เซ็นต์ภาษา
+flutter_app/android/* linguist-vendored
+flutter_app/ios/* linguist-vendored
+flutter_app/windows/* linguist-vendored
+flutter_app/linux/* linguist-vendored
+flutter_app/macos/* linguist-vendored
+
+# สั่งให้มองข้ามไฟล์ที่ถูกสร้างอัตโนมัติอื่นๆ
+*.html linguist-generated
+*.js linguist-generated
