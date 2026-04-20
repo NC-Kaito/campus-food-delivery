@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/member_model.dart';
+import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/features/member/home_member.dart';
 import 'package:flutter_app/features/member/shared_appbar_member.dart';
 import 'package:flutter_app/features/user/register_member.dart';
 
@@ -10,134 +13,156 @@ class LoginMember extends StatefulWidget {
 }
 
 class _LoginMemberState extends State<LoginMember> {
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final MemberService memberService = MemberService();
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+
+  late final TextEditingController usernameController;
+  late final TextEditingController passwordController;
   bool _isLoading = false;
 
   @override
+  void initState() {
+    usernameController = TextEditingController();
+    passwordController = TextEditingController();
+    super.initState();
+  }
+
+  @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
+    usernameController.dispose();
+    passwordController.dispose();
     super.dispose();
   }
 
-  void _handleLogin() {
-    final username = _usernameController.text;
-    final password = _passwordController.text;
-
-    if (username.isNotEmpty && password.isNotEmpty) {
+  Future<void> doLogin() async {
+    // ตรวจสอบความถูกต้องผ่าน formKey (ต้องครอบ Form ไว้ใน UI ก่อนถึงจะไม่พัง)
+    if (formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
-      Future.delayed(const Duration(seconds: 2), () {
+      try {
+        print("Try to Login");
+        MemberModel member = MemberModel(
+          username: usernameController.text,
+          password: passwordController.text,
+        );
+
+        await memberService.doLoginMember(member);
+
         if (mounted) {
-          // เช็คว่าหน้าจอยังเปิดอยู่ไหมก่อน setState
           setState(() {
             _isLoading = false;
           });
-          print('Login attempts with: $username, $password');
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeMember()),
+            (route) => false,
+          );
         }
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณากรอกข้อมูลให้ครบถ้วน')),
-      );
+      } catch (e) {
+        print("ERROR: $e");
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:
-          const SharedAppBarMember(), // เรียกใช้ตัวที่คุณเพิ่งแก้ preferredSize ไป
+      appBar: const SharedAppBarMember(),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
-        child: Column(
-          children: [
-            const Text(
-              'Campus Food Delivery',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-
-            // Illustration Placeholder
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(15),
+        // --- จุดแก้ไขที่ 1: เพิ่ม Form และใส่ key ---
+        child: Form(
+          key: formKey,
+          child: Column(
+            children: [
+              const Text(
+                'Campus Food Delivery',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              child: const Icon(Icons.image, size: 50, color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
-
-            // Form Container
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFDFDFD),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    spreadRadius: 1,
-                    blurRadius: 5,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
+              const SizedBox(height: 20),
+              Container(
+                height: 180,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: const Icon(Icons.image, size: 50, color: Colors.grey),
               ),
-              child: Column(
-                children: [
-                  // หมายเหตุ: อย่าลืมสร้างคลาส CustomTextField และ PrimaryButton ไว้ในโปรเจกต์ด้วยนะครับ
-                  _buildTextField(
-                    label: 'ชื่อผู้ใช้ (Username)',
-                    hint: 'กรุณากรอกชื่อผู้ใช้',
-                    icon: Icons.person_outline,
-                    controller: _usernameController,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    label: 'รหัสผ่าน (Password)',
-                    hint: 'กรุณากรอกรหัสผ่าน',
-                    icon: Icons.lock_outline,
-                    controller: _passwordController,
-                    isPassword: true,
-                  ),
-                  const SizedBox(height: 30),
-
-                  // ปุ่ม Login
-                  _buildButton(
-                    text: 'เข้าสู่ระบบ',
-                    onPressed: _handleLogin,
-                    color: const Color(0xFF76FF03),
-                    loading: _isLoading,
-                  ),
-                  const SizedBox(height: 15),
-
-                  // ปุ่มสมัครสมาชิก
-                  _buildButton(
-                    text: 'สมัครสมาชิก',
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RegisterMember(),
-                        ),
-                      );
-                    },
-                    color: const Color(0xFF76FF03),
-                  ),
-                ],
+              const SizedBox(height: 30),
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDFDFD),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      spreadRadius: 1,
+                      blurRadius: 5,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildTextField(
+                      label: 'ชื่อผู้ใช้ (Username)',
+                      hint: 'กรุณากรอกชื่อผู้ใช้',
+                      icon: Icons.person_outline,
+                      controller: usernameController,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildTextField(
+                      label: 'รหัสผ่าน (Password)',
+                      hint: 'กรุณากรอกรหัสผ่าน',
+                      icon: Icons.lock_outline,
+                      controller: passwordController,
+                      isPassword: true,
+                    ),
+                    const SizedBox(height: 30),
+                    _buildButton(
+                      text: 'เข้าสู่ระบบ',
+                      onPressed: doLogin,
+                      color: const Color(0xFF76FF03),
+                      loading: _isLoading,
+                    ),
+                    const SizedBox(height: 15),
+                    _buildButton(
+                      text: 'สมัครสมาชิก',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterMember(),
+                          ),
+                        );
+                      },
+                      color: const Color(0xFF76FF03),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ฟังก์ชันช่วยสร้าง TextField แบบง่ายๆ ภายในไฟล์เดียว
   Widget _buildTextField({
     required String label,
     required String hint,
@@ -150,9 +175,16 @@ class _LoginMemberState extends State<LoginMember> {
       children: [
         Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
-        TextField(
+        // --- จุดแก้ไขที่ 2: เพิ่ม validator เพื่อให้การเช็คค่าว่างทำงาน ---
+        TextFormField(
           controller: controller,
           obscureText: isPassword,
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'กรุณากรอก$label';
+            }
+            return null;
+          },
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon),
@@ -165,7 +197,6 @@ class _LoginMemberState extends State<LoginMember> {
     );
   }
 
-  // ฟังก์ชันช่วยสร้างปุ่มแบบง่ายๆ
   Widget _buildButton({
     required String text,
     required VoidCallback onPressed,
@@ -176,6 +207,7 @@ class _LoginMemberState extends State<LoginMember> {
       width: double.infinity,
       height: 50,
       child: ElevatedButton(
+        // ถ้ากำลังโหลด ให้ปุ่มกดไม่ได้ (เป็น null)
         onPressed: loading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
@@ -184,7 +216,14 @@ class _LoginMemberState extends State<LoginMember> {
           ),
         ),
         child: loading
-            ? const CircularProgressIndicator(color: Colors.white)
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.black,
+                  strokeWidth: 2,
+                ),
+              )
             : Text(
                 text,
                 style: const TextStyle(
