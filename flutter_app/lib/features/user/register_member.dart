@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/member_model.dart';
+import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/features/member/login_member.dart';
 // import 'package:flutter_application_1/data/models/member_model.dart';
 // import 'package:flutter_application_1/data/service/member_service.dart';
 // อย่าลืม import SharedAppBar ถ้าคุณแยกไฟล์ไว้
@@ -12,17 +15,27 @@ class RegisterMember extends StatefulWidget {
 }
 
 class _RegisterMemberState extends State<RegisterMember> {
-  // final MemberService memberService = MemberService();
+  final MemberService memberService = MemberService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
-  final TextEditingController usernameController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController firstNameController = TextEditingController();
-  final TextEditingController lastNameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-
   bool _isLoading = false;
+
+  late TextEditingController usernameController;
+  late TextEditingController passwordController;
+  late TextEditingController firstNameController;
+  late TextEditingController lastNameController;
+  late TextEditingController emailController;
+  late TextEditingController phoneController;
+
+  @override
+  void initState() {
+    usernameController = TextEditingController();
+    passwordController = TextEditingController();
+    firstNameController = TextEditingController();
+    lastNameController = TextEditingController();
+    emailController = TextEditingController();
+    phoneController = TextEditingController();
+    super.initState();
+  }
 
   @override
   void dispose() {
@@ -33,6 +46,52 @@ class _RegisterMemberState extends State<RegisterMember> {
     emailController.dispose();
     phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> doRegister() async {
+    if (formKey.currentState!.validate()) {
+      setState(() {
+        _isLoading = true;
+      });
+      try {
+        print("Try to Register");
+        MemberModel member = MemberModel(
+          username: usernameController.text,
+          password: passwordController.text,
+          firstname: firstNameController.text,
+          lastname: lastNameController.text,
+          email: emailController.text,
+          phone: phoneController.text,
+        );
+
+        await memberService.doRegsiterMember(member);
+
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const LoginMember()),
+            (route) => false,
+          );
+        }
+      } catch (e) {
+        print("ERROR: $e ");
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
   }
 
   @override
@@ -162,7 +221,7 @@ class _RegisterMemberState extends State<RegisterMember> {
                             text: "ย้อนกลับ",
                             color: const Color(0xFFE0E0E0),
                             textColor: Colors.black54,
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: doRegister,
                           ),
                         ),
                         const SizedBox(width: 15),
@@ -172,7 +231,7 @@ class _RegisterMemberState extends State<RegisterMember> {
                             color: const Color(0xFF76FF03),
                             textColor: Colors.black87,
                             isLoading: _isLoading,
-                            onPressed: _onRegister,
+                            onPressed: doRegister,
                           ),
                         ),
                       ],

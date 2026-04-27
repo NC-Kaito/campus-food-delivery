@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/login_member.dart';
+import 'package:flutter_app/features/user/home_user.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Campus food Delivery',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.green)),
-      home: LoginMember(),
+      home: HomeUser(),
     );
   }
 }

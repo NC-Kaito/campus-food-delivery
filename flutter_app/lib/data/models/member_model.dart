@@ -7,6 +7,7 @@ class MemberModel {
   String? lastname;
   String? email;
   String? phone;
+  String? profileimg;
   //-----------------------------------------------------------------------
   // Constructor (ตัวสร้าง Object)
   // ใช้สำหรับสร้าง Instance หรือ "ตัวตน" ของข้อมูลสมาชิกขึ้นมาใหม่
@@ -17,10 +18,11 @@ class MemberModel {
     this.lastname,
     this.email,
     this.phone,
+    this.profileimg,
   });
   //-----------------------------------------------------------------------
   // toJson() (แปลง Object เป็น Map/JSON)
-  //ใช้ตอน ส่งข้อมูลออกจาก App (เช่น ส่งไปเก็บใน Database หรือส่งผ่าน API)
+  // เวลา Flutter จะส่งข้อมูลไปยัง API (Spring Boot) จะเรียก toJson() เพื่อให้ได้ Map ที่สามารถ encode เป็น JSON ได้
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
     if (username != null) map["username"] = username;
@@ -30,12 +32,14 @@ class MemberModel {
     map["lastname"] = lastname;
     map["email"] = email;
     map["phone"] = phone;
+    map["profileimg"] = profileimg;
     return map;
   }
 
   //-----------------------------------------------------------------------
   // fromJson() (แปลง JSON เป็น Object)
-  // ใช้ตอน รับข้อมูลเข้ามาใน App (เช่น ดึงข้อมูลมาจาก Server)
+
+  // เวลา Flutter ได้ response จาก API (Spring Boot) จะใช้ MemberModel.fromJson(responseData) เพื่อสร้าง object ที่ใช้งานในแอปได้ทันที
   factory MemberModel.fromJson(Map<String, dynamic> Json) {
     return MemberModel(
       username: Json["username"],
@@ -44,6 +48,7 @@ class MemberModel {
       lastname: Json["lastname"],
       email: Json["email"],
       phone: Json["phone"],
+      profileimg: Json["profileimg"],
     );
   }
 }

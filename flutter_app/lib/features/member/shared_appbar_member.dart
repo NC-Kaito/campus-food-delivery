@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/features/user/home_user.dart';
 
 class SharedAppBarMember extends StatefulWidget implements PreferredSizeWidget {
   const SharedAppBarMember({super.key});
@@ -14,10 +15,15 @@ class _SharedAppBarMemberState extends State<SharedAppBarMember> {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: Colors.lightGreenAccent,
+      backgroundColor: Colors.green,
       leading: IconButton(
         icon: const Icon(Icons.home, color: Colors.deepOrange),
-        onPressed: () {},
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeUser()),
+          );
+        },
       ),
     );
   }

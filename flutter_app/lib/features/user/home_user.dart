@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/features/member/profile_member.dart';
+import 'package:flutter_app/features/member/login_member.dart';
 
-class HomeMember extends StatefulWidget {
-  const HomeMember({super.key});
+class HomeUser extends StatefulWidget {
+  const HomeUser({super.key});
 
   @override
-  State<HomeMember> createState() => _HomeMemberState();
+  State<HomeUser> createState() => _HomeUserState();
 }
 
-class _HomeMemberState extends State<HomeMember> {
+class _HomeUserState extends State<HomeUser> {
   late final TextEditingController searchController;
 
   @override
@@ -105,26 +105,12 @@ class _HomeMemberState extends State<HomeMember> {
                     Text("หน้าหลัก", style: menuTextStyle),
                   ],
                 ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.shopping_basket, color: Colors.green),
-                    Text("ตะกร้าอาหาร", style: menuTextStyle),
-                  ],
-                ),
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.list_alt, color: Colors.green),
-                    Text("คำสั่งซื้อ", style: menuTextStyle),
-                  ],
-                ),
                 InkWell(
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ProfileMember(),
+                        builder: (context) => const LoginMember(),
                       ),
                     );
                   },
@@ -133,7 +119,7 @@ class _HomeMemberState extends State<HomeMember> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(Icons.person, color: Colors.green),
-                      Text("โปรไฟล์", style: menuTextStyle),
+                      Text("เข้าสู่ระบบ", style: menuTextStyle),
                     ],
                   ),
                 ),

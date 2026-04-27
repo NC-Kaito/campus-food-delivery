@@ -13,4 +13,47 @@ class MemberService {
       rethrow;
     }
   }
+
+  Future<void> doRegsiterMember(MemberModel member) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/member/registerMember",
+        data: member.toJson(),
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<MemberModel> getMemberByUsername(MemberModel username) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/member/getMember",
+        data: username.toJson(),
+      );
+      return MemberModel.fromJson(response.data);
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateProfileMember(MemberModel member) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/member/updateProfileMember",
+        data: member.toJson(),
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

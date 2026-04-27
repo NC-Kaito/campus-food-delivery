@@ -4,6 +4,7 @@ import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/features/member/home_member.dart';
 import 'package:flutter_app/features/member/shared_appbar_member.dart';
 import 'package:flutter_app/features/user/register_member.dart';
+import 'package:flutter_app/global_data.dart';
 
 class LoginMember extends StatefulWidget {
   const LoginMember({super.key});
@@ -48,11 +49,11 @@ class _LoginMemberState extends State<LoginMember> {
         );
 
         await memberService.doLoginMember(member);
-
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
+          GlobalData.usernameMember = usernameController.text;
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const HomeMember()),
