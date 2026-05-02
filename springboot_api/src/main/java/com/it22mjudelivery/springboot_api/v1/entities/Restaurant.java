@@ -18,11 +18,9 @@ import java.util.Date;
 @NoArgsConstructor
 @Builder
 public class Restaurant {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int restaurantid;
 
-    @Column(length = 20, nullable = false, unique = true)
+    @Id
+    @Column(length = 20, nullable = false)
     private String username;
 
     @Column(length = 20, nullable = false)
@@ -39,6 +37,9 @@ public class Restaurant {
 
     @Column(nullable = false)
     private LocalTime closetime;
+
+    @Column(nullable = false)
+    private int openDay;
 
     @Column(nullable = false)
     private double latitude;

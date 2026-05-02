@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/login_member.dart';
+import 'package:flutter_app/features/member/test_map.dart';
+import 'package:flutter_app/features/restaurant/agrees_restaurant.dart';
+import 'package:flutter_app/features/restaurant/login_restaurant.dart';
+import 'package:flutter_app/features/restaurant/register_owner_info.dart';
+import 'package:flutter_app/features/restaurant/register_restaurant.dart';
 import 'package:flutter_app/features/user/home_user.dart';
 
 void main() {
@@ -15,7 +20,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Campus food Delivery',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.green)),
-      home: HomeUser(),
+      home: TestMap(),
     );
   }
 }
