@@ -85,7 +85,7 @@ public class MemberController {
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
 
             // สร้างโฟลเดอร์ uploads ถ้ายังไม่มี
-            Path uploadDir = Paths.get("uploads");
+            Path uploadDir = Paths.get("uploads", "member");
             if (!Files.exists(uploadDir)) {
                 Files.createDirectories(uploadDir);
             }
@@ -95,7 +95,7 @@ public class MemberController {
             Files.copy(file.getInputStream(), savePath);
 
             // return URL กลับไป
-            String imageUrl = "http://10.226.43.211:8081/uploads/" + fileName;
+            String imageUrl = "http://10.226.43.211:8081/uploads/member" + fileName;
             return ResponseEntity.ok(Map.of("url", imageUrl));
 
         } catch (Exception e) {

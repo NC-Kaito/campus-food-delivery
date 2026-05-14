@@ -5,8 +5,8 @@ class RestaurantModel {
   String? password;
   String? restaurantName;
   String? restaurantImage;
-  String? openTime; // ส่งเป็น String Format "HH:mm:ss"
-  String? closeTime; // ส่งเป็น String Format "HH:mm:ss"
+  String? openTime;
+  String? closeTime;
   int? openDay;
   double? latitude;
   double? longitude;
@@ -16,7 +16,7 @@ class RestaurantModel {
   String? email;
   String? phone;
   bool? statusOpen;
-  String? typeRestaurant; // ส่งเป็นชื่อ Enum หรือ String ตามที่ Java รับ
+  int? typeId; // ✅ เพิ่มใหม่ เปลี่ยนจาก typeRestaurant
 
   RestaurantModel({
     this.username,
@@ -34,15 +34,14 @@ class RestaurantModel {
     this.email,
     this.phone,
     this.statusOpen,
-    this.typeRestaurant,
+    this.typeId, // ✅ เพิ่มใหม่
   });
 
-  // ฟังก์ชันสำหรับแปลง Model เป็น Map เพื่อส่งออกเป็น JSON
   Map<String, dynamic> toJson() {
     return {
       'username': username,
       'password': password,
-      'restaurantname': restaurantName, // ชื่อ key ต้องตรงกับ Java DTO
+      'restaurantname': restaurantName,
       'restaurantimage': restaurantImage,
       'opentime': openTime,
       'closetime': closeTime,
@@ -54,8 +53,9 @@ class RestaurantModel {
       'ownerlastname': ownerLastName,
       'email': email,
       'phone': phone,
-      'statusopen': statusOpen,
-      'typerestaurant': typeRestaurant,
+      'statusopen': statusOpen ?? false,
+      'verificationstatus': false,
+      'typeid': typeId, // ✅ เพิ่มใหม่
     };
   }
 
@@ -67,7 +67,7 @@ class RestaurantModel {
       restaurantImage: json['restaurantimage'],
       openTime: json['opentime'],
       closeTime: json['closetime'],
-      openDay: json['openday'],
+      openDay: json['openDay'],
       latitude: (json['latitude'] as num?)
           ?.toDouble(), // ป้องกัน error ถ้าส่งมาเป็น int
       longitude: (json['longitude'] as num?)?.toDouble(),
@@ -77,7 +77,9 @@ class RestaurantModel {
       email: json['email'],
       phone: json['phone'],
       statusOpen: json['statusopen'],
-      typeRestaurant: json['typerestaurant'],
+      typeId: json['typerestaurant'] != null
+          ? json['typerestaurant']['typerestaurantId'] as int
+          : null,
     );
   }
 }

@@ -203,14 +203,71 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                 const SizedBox(height: 15),
 
                 _buildLabel("ชื่อผู้ใช้ (Username)"),
-                _buildTextField(""),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade400),
+                  ),
+                  child: TextField(
+                    controller: usernameController,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 10,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
 
                 _buildLabel("รหัสผ่าน (Password)"),
-                _buildTextField("ตัวอย่าง pas012", isPassword: true),
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade400),
+                  ),
+                  child: TextField(
+                    controller: passwordController,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      hintText: "ตัวอย่าง pas012",
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 14,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 10,
+                      ),
+                      border: InputBorder.none,
+                      suffixIcon: Icon(
+                        Icons.visibility_off_outlined,
+                        color: Colors.grey[400],
+                      ),
+                    ),
+                  ),
+                ),
 
                 _buildLabel("ชื่อร้านค้า (Restaurant Name)"),
-                _buildTextField(""),
-
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade400),
+                  ),
+                  child: TextField(
+                    controller: restaurantNameController,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 15,
+                        vertical: 10,
+                      ),
+                      border: InputBorder.none,
+                    ),
+                  ),
+                ),
                 _buildLabel("ประเภทร้านค้า (Restaurant Type)"),
                 _buildDropdown(
                   // ✅ ดึงเฉพาะรายชื่อ (String) จาก Object ใน typeList มาสร้างเป็นลิสต์ใหม่
@@ -392,21 +449,33 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () async {
-                        // ✅ รอรับข้อมูลที่ส่งกลับมาจาก RegisterOwnerInfo
+                        // ✅ validate ก่อนไปหน้าถัดไป
+
                         final result = await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => RegisterOwnerInfo(
-                              // ส่งค่าเดิมไปแสดง
+                              // ข้อมูล owner เดิม
                               initialFirstName: _ownerFirstName,
                               initialLastName: _ownerLastName,
                               initialEmail: _ownerEmail,
                               initialPhone: _ownerPhone,
+                              // ✅ ส่งข้อมูลร้านไปด้วย
+                              username: usernameController.text,
+                              password: passwordController.text,
+                              restaurantName: restaurantNameController.text,
+                              typeId: _selectedTypeId!,
+                              latitude: latilude!,
+                              longitude: longitude!,
+                              openTime: openTimeController.text,
+                              closeTime: closeTimeController.text,
+                              selectedDays: _selectedDays,
+                              restaurantImage: _selectedImage,
+                              leaseImage: _selectedLeaseImage,
                             ),
                           ),
                         );
 
-                        // ✅ ถ้ามีค่าส่งกลับมา ให้เก็บไว้
                         if (result != null) {
                           setState(() {
                             _ownerFirstName = result['ownerFirstName'];

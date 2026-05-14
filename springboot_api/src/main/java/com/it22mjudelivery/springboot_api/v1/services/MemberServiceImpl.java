@@ -12,7 +12,7 @@ public class MemberServiceImpl implements MemberService{
     private final MemberRepository memberRepository;
 
     public Member doLoginMember(String username, String password) {
-             Member member = memberRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+             Member member = memberRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"));
 
              if(!member.getPassword().equals(password)) {
                 throw new RuntimeException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");

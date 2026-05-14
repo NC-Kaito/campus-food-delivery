@@ -16,4 +16,26 @@ class RestaurantService {
       rethrow;
     }
   }
+
+  Future<List<RestaurantModel>> searchRestaurant(String keyword) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/restaurant/searchRestaurant",
+        queryParameters: {"name": keyword},
+      );
+
+      if (response.statusCode == 200) {
+        List data = response.data;
+        return data.map((item) => RestaurantModel.fromJson(item)).toList();
+      } else {
+        return [];
+      }
+    } on DioException catch (e) {
+      print("Search Error: ${e.message}");
+      return [];
+    } catch (e) {
+      print("Error: $e");
+      return [];
+    }
+  }
 }

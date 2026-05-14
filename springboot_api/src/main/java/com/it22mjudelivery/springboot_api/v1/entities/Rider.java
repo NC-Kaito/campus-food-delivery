@@ -18,8 +18,7 @@ import java.util.List;
 @Builder
 public class Rider {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int riderId;
+    private String studentid;
 
     @Column(length = 20, nullable = false)
     private String password;
@@ -39,9 +38,6 @@ public class Rider {
     @Column(length = 15, nullable = false)
     private String phone;
 
-    @Column(length = 10, nullable = false, unique = true)
-    private String studentId;
-
     @Column(nullable = false)
     private String studentCard_Image;
 
@@ -58,7 +54,7 @@ public class Rider {
     private boolean isActive;
 
     @Column(nullable = false)
-    private boolean verificationStatus;
+    private String verificationStatus;
 
     @Column(nullable = false)
     private LocalDate registerDate;

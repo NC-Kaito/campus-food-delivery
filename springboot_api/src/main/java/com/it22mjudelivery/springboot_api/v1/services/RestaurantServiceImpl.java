@@ -4,24 +4,32 @@ import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Member;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
+import com.it22mjudelivery.springboot_api.v1.entities.TypeRestaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.RestaurantRepository;
+import com.it22mjudelivery.springboot_api.v1.repositories.TypeRestaurantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
 public class RestaurantServiceImpl implements RestaurantService{
     private final RestaurantRepository restaurantRepository;
+    private final TypeRestaurantRepository typeRestaurantRepository;
 
     public boolean doRegisterRestaurant(RestaurantDto restaurantDto){
         if (restaurantRepository.existsByUsername(restaurantDto.getUsername())) {
             throw new RuntimeException("ชื่อผู้ใช้งานนี้ถูกใช้ไปแล้ว");
         }
+        TypeRestaurant typeRestaurant = typeRestaurantRepository.findById(restaurantDto.getTypeid())
+                .orElseThrow(() -> new RuntimeException("ไม่พบประเภทร้านค้า"));
+
         Restaurant toSaveRestaurant = Restaurant.builder()
                 .username(restaurantDto.getUsername())
                 .password(restaurantDto.getPassword())
                 .restaurantname(restaurantDto.getRestaurantname())
-                .typerestaurant(restaurantDto.getTyperestaurant())
+                .typerestaurant(typeRestaurant)
                 .latitude(restaurantDto.getLatitude())
                 .longitude(restaurantDto.getLongitude())
                 .restaurantimage(restaurantDto.getRestaurantimage())
@@ -33,6 +41,7 @@ public class RestaurantServiceImpl implements RestaurantService{
                 .ownerlastname(restaurantDto.getOwnerlastname())
                 .email(restaurantDto.getEmail())
                 .phone(restaurantDto.getPhone())
+                .registerdate(LocalDateTime.now())
                 .build();
 
         restaurantRepository.save(toSaveRestaurant);

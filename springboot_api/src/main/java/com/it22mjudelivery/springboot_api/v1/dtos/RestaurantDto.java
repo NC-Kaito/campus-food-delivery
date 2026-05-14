@@ -32,5 +32,5 @@ public class RestaurantDto {
     private boolean statusopen;
     private LocalDateTime registerdate;
     private boolean verificationstatus;
-    private TypeRestaurant typerestaurant;
+    private Integer typeid;
 }

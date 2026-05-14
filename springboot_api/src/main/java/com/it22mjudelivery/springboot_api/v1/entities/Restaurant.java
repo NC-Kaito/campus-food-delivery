@@ -68,8 +68,8 @@ public class Restaurant {
     @Column(nullable = false)
     private LocalDateTime registerdate;
 
-    @Column(nullable = false)
-    private boolean verificationstatus;
+    @Column(nullable = false, length = 10)
+    private String verificationstatus;
 
     @Column(length = 100)
     private String notapprovedetail;
