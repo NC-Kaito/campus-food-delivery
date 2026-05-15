@@ -13,5 +13,7 @@ public interface RestaurantRepository  extends JpaRepository<Restaurant, String>
 
     Optional<Restaurant> findByUsername(String username);
 
+    List<Restaurant> findByVerificationstatus(String status);
+
     List<Restaurant> findByRestaurantnameContainingIgnoreCaseAndVerificationstatusTrue(String restaurantname);
 }
