@@ -1,5 +1,6 @@
-package com.it22mjudelivery.springboot_api.v1.entities;
+package com.it22mjudelivery.springboot_api.v1.RunDATABase;
 
+import com.it22mjudelivery.springboot_api.v1.entities.TypeRestaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.TypeRestaurantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.CommandLineRunner;

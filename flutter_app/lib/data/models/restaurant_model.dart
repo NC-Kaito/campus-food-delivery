@@ -1,7 +1,5 @@
-import 'dart:convert';
-
 class RestaurantModel {
-  String? username;
+  String? username; // เป็น PK ใช้เป็นรหัสร้านค้าได้เลย
   String? password;
   String? restaurantName;
   String? restaurantImage;
@@ -16,7 +14,11 @@ class RestaurantModel {
   String? email;
   String? phone;
   bool? statusOpen;
-  int? typeId; // ✅ เพิ่มใหม่ เปลี่ยนจาก typeRestaurant
+  String? registerDate; // LocalDateTime จาก Java
+  String? verificationStatus;
+  String? notApproveDetail;
+  int? typerestaurantId;
+  String? typerestaurantName;
 
   RestaurantModel({
     this.username,
@@ -34,7 +36,11 @@ class RestaurantModel {
     this.email,
     this.phone,
     this.statusOpen,
-    this.typeId, // ✅ เพิ่มใหม่
+    this.registerDate,
+    this.verificationStatus,
+    this.notApproveDetail,
+    this.typerestaurantId,
+    this.typerestaurantName,
   });
 
   Map<String, dynamic> toJson() {
@@ -53,9 +59,11 @@ class RestaurantModel {
       'ownerlastname': ownerLastName,
       'email': email,
       'phone': phone,
-      'statusopen': statusOpen ?? false,
-      'verificationstatus': false,
-      'typeid': typeId, // ✅ เพิ่มใหม่
+      'statusopen': statusOpen,
+      'registerdate': registerDate,
+      'verificationstatus': verificationStatus,
+      'notapprovedetail': notApproveDetail,
+      'typerestaurantId': typerestaurantId,
     };
   }
 
@@ -63,13 +71,12 @@ class RestaurantModel {
     return RestaurantModel(
       username: json['username'],
       password: json['password'],
-      restaurantName: json['restaurantname'], // ชื่อ key ต้องตรงกับ Java
+      restaurantName: json['restaurantname'],
       restaurantImage: json['restaurantimage'],
       openTime: json['opentime'],
       closeTime: json['closetime'],
-      openDay: json['openDay'],
-      latitude: (json['latitude'] as num?)
-          ?.toDouble(), // ป้องกัน error ถ้าส่งมาเป็น int
+      openDay: json['openday'],
+      latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       leaseAgreementImg: json['lease_agreement_img'],
       ownerFirstName: json['ownerfirstname'],
@@ -77,9 +84,12 @@ class RestaurantModel {
       email: json['email'],
       phone: json['phone'],
       statusOpen: json['statusopen'],
-      typeId: json['typerestaurant'] != null
-          ? json['typerestaurant']['typerestaurantId'] as int
-          : null,
+      registerDate: json['registerdate'],
+      verificationStatus: json['verificationstatus'],
+      notApproveDetail: json['notapprovedetail'],
+      typerestaurantId: json['typerestaurant']['typerestaurantId'] as int,
+      typerestaurantName:
+          json['typerestaurant']['typerestaurantName'] as String,
     );
   }
 }

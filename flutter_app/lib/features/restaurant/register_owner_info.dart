@@ -122,7 +122,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           email: emailController.text,
           phone: phoneController.text,
           statusOpen: false,
-          typeId: widget.typeId,
+          typerestaurantId: widget.typeId,
         );
 
         await restaurantService.doRegisterRestaurant(restaurant);

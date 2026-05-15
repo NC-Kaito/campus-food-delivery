@@ -37,6 +37,17 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    packaging {
+        resources {
+            // สั่งให้หยิบอันแรกที่เจอ ไม่ต้องพยายามรวมไฟล์ (ลดการเรียก packDate)
+            pickFirsts += "META-INF/*"
+            // ข้ามไฟล์ขยะที่มักจะมีปัญหาเรื่อง Timestamp
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "**/LICENSE.md"
+            excludes += "**/LICENSE-notice.md"
+        }
+    }  
 }
 
 flutter {

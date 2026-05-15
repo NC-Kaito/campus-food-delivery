@@ -66,7 +66,7 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
 
     // กรองข้อมูลในฝั่ง Client เพิ่มเติมตามประเภทที่เลือก (ถ้ามีการเลือก)
     if (_selectedTypeId != null) {
-      data = data.where((r) => r.typeId == _selectedTypeId).toList();
+      data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
     }
 
     if (mounted) {

@@ -58,7 +58,7 @@ public class RiderServiceImpl implements RiderService {
                 .vehicle_Image(riderDto.getVehicle_Image())
                 .major(major) // ผูกความสัมพันธ์กับ Major
                 .isActive(false) // เริ่มต้นให้เป็น false รอการตรวจสอบ
-                .verificationStatus(false) // เริ่มต้นให้เป็น false รอการอนุมัติ
+                .verificationStatus("false") // เริ่มต้นให้เป็น false รอการอนุมัติ
                 .registerDate(LocalDate.now()) // บันทึกวันที่สมัครทันที
                 .build();
 
