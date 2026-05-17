@@ -31,6 +31,6 @@ public class RestaurantDto {
     private String phone;
     private boolean statusopen;
     private LocalDateTime registerdate;
-    private boolean verificationstatus;
+    private String verificationstatus;
     private Integer typeid;
 }

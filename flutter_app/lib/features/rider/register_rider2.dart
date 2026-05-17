@@ -122,7 +122,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
         majorId: _selectedMajorId,
         vehiclePlate: _licensePlateController.text,
         isActive: false,
-        verificationStatus: false,
+        verificationStatus: "wait",
       );
 
       // ✅ ส่ง path ของใบขับขี่ไปด้วย (ปรับ Service ให้รับ parameter นี้ด้วยนะเพื่อน)
