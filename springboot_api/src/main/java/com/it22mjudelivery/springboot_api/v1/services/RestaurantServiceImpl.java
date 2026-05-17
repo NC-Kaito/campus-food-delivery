@@ -4,6 +4,7 @@ import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Member;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
+import com.it22mjudelivery.springboot_api.v1.entities.Rider;
 import com.it22mjudelivery.springboot_api.v1.entities.TypeRestaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.RestaurantRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.TypeRestaurantRepository;
@@ -17,6 +18,16 @@ import java.time.LocalDateTime;
 public class RestaurantServiceImpl implements RestaurantService{
     private final RestaurantRepository restaurantRepository;
     private final TypeRestaurantRepository typeRestaurantRepository;
+
+    public Restaurant doLoginRestaurant(String username, String password) {
+        Restaurant restaurant = restaurantRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"));
+
+        if (!restaurant.getPassword().equals(password)) {
+            throw new RuntimeException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+        }
+        return restaurant;
+    }
 
     public boolean doRegisterRestaurant(RestaurantDto restaurantDto){
         if (restaurantRepository.existsByUsername(restaurantDto.getUsername())) {
@@ -42,6 +53,8 @@ public class RestaurantServiceImpl implements RestaurantService{
                 .email(restaurantDto.getEmail())
                 .phone(restaurantDto.getPhone())
                 .registerdate(LocalDateTime.now())
+                .statusopen(false)
+                .verificationstatus("wait")
                 .build();
 
         restaurantRepository.save(toSaveRestaurant);

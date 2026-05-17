@@ -6,12 +6,15 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     
     <application
+        android:usesCleartextTraffic="true"
         android:label="flutter_app"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
+          
 
         <meta-data android:name="com.google.android.geo.API_KEY"
-                   android:value="AIzaSyAAJoBL9NzNZ_3s7KY2bHJtO2me90-g_wg"/>
+                   android:value="AIzaSyAcGFvf4rFZluZ-oWl48YejtJPHRT-WJv0"/>
 
         <activity
             android:name=".MainActivity"

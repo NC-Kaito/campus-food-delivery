@@ -20,7 +20,7 @@ public class RiderServiceImpl implements RiderService {
     @Override
     public Rider doLoginRider(String studentId, String password) {
         Rider rider = riderRepository.findByStudentid(studentId)
-                .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+                .orElseThrow(() -> new RuntimeException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"));
 
         // ⚠️ ในอนาคตอย่าลืมใช้ PasswordEncoder นะเพื่อน ตอนนี้เอาแบบ equals ไปก่อน
         if (!rider.getPassword().equals(password)) {
@@ -58,7 +58,7 @@ public class RiderServiceImpl implements RiderService {
                 .vehicle_Image(riderDto.getVehicle_Image())
                 .major(major) // ผูกความสัมพันธ์กับ Major
                 .isActive(false) // เริ่มต้นให้เป็น false รอการตรวจสอบ
-                .verificationStatus("false") // เริ่มต้นให้เป็น false รอการอนุมัติ
+                .verificationStatus("wait")
                 .registerDate(LocalDate.now()) // บันทึกวันที่สมัครทันที
                 .build();
 

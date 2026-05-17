@@ -58,6 +58,12 @@ class _RegisterRider2State extends State<RegisterRider2> {
   bool _isLoadingMajor = false;
   bool _isRegistering = false;
 
+  // ✅ เพิ่มใน State class
+  String? _studentCardError;
+  String? _drivingLicenseError;
+  String? _vehicleImageError;
+  String? _plateError;
+
   @override
   void initState() {
     super.initState();
@@ -96,13 +102,34 @@ class _RegisterRider2State extends State<RegisterRider2> {
   }
 
   Future<void> _onRegister() async {
-    // ✅ เพิ่มการตรวจสอบว่าแนบรูปใบขับขี่หรือยัง
-    if (_studentCardImage == null ||
-        _drivingLicenseImage == null ||
-        _vehicleImage == null) {
-      _showError("กรุณาแนบรูปภาพให้ครบทั้ง 3 รายการ");
+    final plate = _licensePlateController.text.trim();
+
+    // ✅ validate ทุกอย่างพร้อมกัน แล้ว setState ครั้งเดียว
+    setState(() {
+      _studentCardError = _validateImage(_studentCardImage, "รูปบัตรนักศึกษา");
+      _drivingLicenseError = _validateImage(
+        _drivingLicenseImage,
+        "รูปใบขับขี่",
+      );
+      _vehicleImageError = _validateImage(_vehicleImage, "รูปรถ");
+
+      if (plate.isEmpty)
+        _plateError = "กรุณากรอกเลขทะเบียนรถ";
+      else if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$').hasMatch(plate))
+        _plateError = "ต้องเป็นภาษาไทย อังกฤษ หรือตัวเลขเท่านั้น";
+      else if (plate.length < 5 || plate.length > 30)
+        _plateError = "ความยาว 5-30 ตัวอักษร";
+      else
+        _plateError = null;
+    });
+
+    // ✅ ถ้ามี error ใดๆ หยุด
+    if (_studentCardError != null ||
+        _drivingLicenseError != null ||
+        _vehicleImageError != null ||
+        _plateError != null)
       return;
-    }
+
     if (_selectedMajorId == null) {
       _showError("กรุณาเลือกสาขาวิชา");
       return;
@@ -156,15 +183,41 @@ class _RegisterRider2State extends State<RegisterRider2> {
     }
   }
 
+  // ✅ เพิ่มใน State class
+  String? _validateImage(File? file, String fieldName) {
+    if (file == null) return "กรุณาแนบ$fieldName";
+
+    // เช็คนามสกุลไฟล์
+    final ext = file.path.split('.').last.toLowerCase();
+    if (ext != 'jpg' && ext != 'jpeg' && ext != 'png')
+      return "$fieldName ต้องเป็น .jpg หรือ .png เท่านั้น";
+
+    // เช็คขนาดไฟล์ 100KB - 1MB
+    final sizeInBytes = file.lengthSync();
+    if (sizeInBytes < 100 * 1024)
+      return "$fieldName ต้องมีขนาดไม่ต่ำกว่า 100KB";
+    if (sizeInBytes > 1024 * 1024) return "$fieldName ต้องมีขนาดไม่เกิน 1MB";
+
+    return null;
+  }
+
   // --- UI Helpers ---
   Future<void> _pickImage(int type) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
-        if (type == 0) _studentCardImage = File(image.path);
-        if (type == 1)
-          _drivingLicenseImage = File(image.path); // สำหรับใบขับขี่
-        if (type == 2) _vehicleImage = File(image.path);
+        if (type == 0) {
+          _studentCardImage = File(image.path);
+          _studentCardError = null; // ✅ ล้าง error
+        }
+        if (type == 1) {
+          _drivingLicenseImage = File(image.path);
+          _drivingLicenseError = null; // ✅ ล้าง error
+        }
+        if (type == 2) {
+          _vehicleImage = File(image.path);
+          _vehicleImageError = null; // ✅ ล้าง error
+        }
       });
     }
   }
@@ -205,13 +258,18 @@ class _RegisterRider2State extends State<RegisterRider2> {
                     _buildSectionTitle("ข้อมูลเชิงหลักฐาน"),
 
                     _buildLabel("แนบรูปบัตรนักศึกษา (Student ID Card)"),
-                    _buildImagePicker(_studentCardImage, () => _pickImage(0)),
+                    _buildImagePicker(
+                      _studentCardImage,
+                      () => _pickImage(0),
+                      errorText: _studentCardError,
+                    ),
 
                     // ✅ เพิ่มส่วนการเลือกรูปใบขับขี่
                     _buildLabel("แนบรูปใบขับขี่ (Driving License)"),
                     _buildImagePicker(
                       _drivingLicenseImage,
                       () => _pickImage(1),
+                      errorText: _drivingLicenseError, // ✅
                     ),
 
                     _buildLabel("คณะ (Faculty)"),
@@ -226,10 +284,15 @@ class _RegisterRider2State extends State<RegisterRider2> {
                     _buildTextField(
                       _licensePlateController,
                       "ตัวอย่าง กข 123 เชียงใหม่",
+                      errorText: _plateError,
                     ),
 
                     _buildLabel("แนบรูปรถที่ใช้ (Vehicle Image)"),
-                    _buildImagePicker(_vehicleImage, () => _pickImage(2)),
+                    _buildImagePicker(
+                      _vehicleImage,
+                      () => _pickImage(2),
+                      errorText: _vehicleImageError, // ✅
+                    ),
 
                     const SizedBox(height: 30),
                     Row(
@@ -277,39 +340,94 @@ class _RegisterRider2State extends State<RegisterRider2> {
     );
   }
 
-  Widget _buildTextField(TextEditingController controller, String hint) {
-    return TextField(
-      controller: controller,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+  Widget _buildTextField(
+    TextEditingController controller,
+    String hint, {
+    String? errorText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextField(
+          controller: controller,
+          onChanged: (_) =>
+              setState(() => _plateError = null), // ✅ ล้าง error เมื่อพิมพ์
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: Colors.white,
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: errorText != null ? Colors.red : Colors.transparent,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: errorText != null ? Colors.red : Colors.green,
+                width: 1.5,
+              ),
+            ),
+          ),
         ),
-      ),
+        // ✅ แสดง error ใต้ช่องกรอก
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              errorText,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 
-  Widget _buildImagePicker(File? imageFile, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 120,
-        width: 100,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: imageFile == null
-            ? const Icon(Icons.add, size: 40, color: Colors.grey)
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(15),
-                child: Image.file(imageFile, fit: BoxFit.cover),
+  Widget _buildImagePicker(
+    File? imageFile,
+    VoidCallback onTap, {
+    String? errorText,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 120,
+            width: 100,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              // ✅ border แดงเมื่อ error
+              border: Border.all(
+                color: errorText != null ? Colors.red : Colors.grey.shade300,
+                width: errorText != null ? 1.5 : 1,
               ),
-      ),
+            ),
+            child: imageFile == null
+                ? Icon(
+                    Icons.add,
+                    size: 40,
+                    color: errorText != null ? Colors.red : Colors.grey,
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(15),
+                    child: Image.file(imageFile, fit: BoxFit.cover),
+                  ),
+          ),
+        ),
+        // ✅ แสดง error text ใต้รูป
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              errorText,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
     );
   }
 

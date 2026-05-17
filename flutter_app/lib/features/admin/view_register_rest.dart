@@ -4,6 +4,10 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
 import 'package:flutter_app/features/admin/list_restaurant.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter/foundation.dart';
+import 'dart:html' as html;
+import 'dart:ui_web' as ui;
 
 class View_RegisterRestaurant extends StatefulWidget {
   final RestaurantModel restaurant;
@@ -28,6 +32,23 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
   void initState() {
     super.initState();
     restaurant = widget.restaurant;
+
+    // ✅ Register iframe view สำหรับ Google Maps
+    if (kIsWeb && restaurant.latitude != null && restaurant.longitude != null) {
+      final lat = restaurant.latitude!;
+      final lng = restaurant.longitude!;
+      final viewId = 'map-${restaurant.username}';
+
+      ui.platformViewRegistry.registerViewFactory(viewId, (int id) {
+        final iframe = html.IFrameElement()
+          ..src = 'https://www.google.com/maps?q=$lat,$lng&z=17&output=embed'
+          ..style.border = 'none'
+          ..style.width = '100%'
+          ..style.height = '100%'
+          ..allowFullscreen = true;
+        return iframe;
+      });
+    }
   }
 
   String getOpenDayText(int? openDay) {
@@ -336,7 +357,6 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(34, 24, 34, 34),
                       child: IntrinsicHeight(
-                        // ทำให้เส้นตรงกลางสูงเท่ากับเนื้อหาที่ยาวที่สุด
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -382,18 +402,13 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                     ],
                                   ),
                                   const SizedBox(height: 16),
-                                  // =========================
-                                  // CONTACT INFO
-                                  // =========================
                                   _sectionTitle('ข้อมูลการติดต่อ'),
                                   const SizedBox(height: 14),
 
-                                  // ใช้ Row ใหญ่ครอบทั้งหมดเพื่อให้ alignment ของชื่อ-นามสกุล และที่ตั้ง เริ่มที่บรรทัดเดียวกัน
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // ฝั่งซ้ายของข้อมูลติดต่อ (ชื่อ, อีเมล, เบอร์)
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -417,7 +432,6 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                         ),
                                       ),
 
-                                      // ฝั่งขวาของข้อมูลติดต่อ (แผนที่)
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -431,24 +445,97 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                               ),
                                             ),
                                             const SizedBox(height: 8),
+                                            // ✅ แสดง Google Map จริง
                                             Container(
                                               width: 190,
-                                              height:
-                                                  145, // ปรับความสูงตามความเหมาะสม
+                                              height: 145,
                                               decoration: BoxDecoration(
                                                 border: Border.all(
                                                   color: const Color(
                                                     0xFFD9D9D9,
                                                   ),
                                                 ),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
-                                              child: const Center(
-                                                child: Icon(
-                                                  Icons.map,
-                                                  size: 42,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
+                                              child:
+                                                  (r.latitude != null &&
+                                                      r.longitude != null)
+                                                  ? ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                      child: kIsWeb
+                                                          ? HtmlElementView(
+                                                              viewType:
+                                                                  'map-${r.username}',
+                                                            )
+                                                          : GoogleMap(
+                                                              initialCameraPosition:
+                                                                  CameraPosition(
+                                                                    target: LatLng(
+                                                                      r.latitude!,
+                                                                      r.longitude!,
+                                                                    ),
+                                                                    zoom: 17,
+                                                                  ),
+                                                              markers: {
+                                                                Marker(
+                                                                  markerId:
+                                                                      const MarkerId(
+                                                                        'shop',
+                                                                      ),
+                                                                  position: LatLng(
+                                                                    r.latitude!,
+                                                                    r.longitude!,
+                                                                  ),
+                                                                  infoWindow: InfoWindow(
+                                                                    title:
+                                                                        r.restaurantName ??
+                                                                        'ร้านค้า',
+                                                                  ),
+                                                                ),
+                                                              },
+                                                              zoomControlsEnabled:
+                                                                  false,
+                                                              scrollGesturesEnabled:
+                                                                  false,
+                                                              zoomGesturesEnabled:
+                                                                  false,
+                                                              rotateGesturesEnabled:
+                                                                  false,
+                                                              tiltGesturesEnabled:
+                                                                  false,
+                                                              myLocationButtonEnabled:
+                                                                  false,
+                                                              liteModeEnabled:
+                                                                  true,
+                                                            ),
+                                                    )
+                                                  : const Center(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.location_off,
+                                                            size: 36,
+                                                            color: Colors.grey,
+                                                          ),
+                                                          SizedBox(height: 4),
+                                                          Text(
+                                                            'ไม่มีข้อมูลพิกัด',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color:
+                                                                  Colors.grey,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                             ),
                                           ],
                                         ),
@@ -482,21 +569,22 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                               color: Color(0xFFD9D9D9),
                             ),
 
-                            // RIGHT SIDE (IMAGES CENTERED)
+                            // RIGHT SIDE (✅ ผูกการแสดงผลเข้ากับฟังก์ชันวาดรูปเรียบร้อยแล้ว)
                             Expanded(
                               flex: 1,
                               child: Column(
-                                crossAxisAlignment: CrossAxisAlignment
-                                    .start, // จัดให้อยู่ตรงกลางหน้าจอฝั่งขวา
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   const Text(
                                     'รูปร้านค้า (Restaurant Image)',
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.black87,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   const SizedBox(height: 10),
+                                  // 🎯 เรียกวาดภาพที่ได้จากตัวแปรโมเดลโดยตรง
                                   _imageBox(r.restaurantImage),
                                   const SizedBox(height: 30),
                                   const Text(
@@ -504,9 +592,11 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                     style: TextStyle(
                                       fontSize: 14,
                                       color: Colors.black87,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                   const SizedBox(height: 10),
+                                  // 🎯 เรียกวาดภาพสัญญาเช่าที่ได้จากตัวแปรโมเดลโดยตรง
                                   _imageBox(r.leaseAgreementImg),
                                 ],
                               ),
@@ -531,7 +621,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const ListRestaurant(),
-                      ), // เปลี่ยนชื่อ Class ตามหน้าจริงของคุณ
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -589,35 +679,164 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     );
   }
 
-  Widget _imageBox(String? imagePath) {
-    // 1. ดึงเฉพาะชื่อไฟล์ออกมา (เพราะใน DB ของคุณเก็บ "images/restaurant/rest01.png")
-    // เราต้องการแค่ "rest01.png"
-    final String fileName = imagePath?.split('/').last ?? "";
+  Widget _imageBox(String? imageUrl) {
+    String? encodedUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      final uri = Uri.parse(imageUrl);
+      encodedUrl = uri
+          .replace(
+            path: uri.path
+                .split('/')
+                .map((s) => Uri.encodeComponent(s))
+                .join('/'),
+          )
+          .toString();
+    }
 
-    return Container(
-      width: 180,
-      height: 140,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.black26),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: imagePath != null && fileName.isNotEmpty
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                // 2. ใส่ URL เต็มๆ แล้วตามด้วยตัวแปร fileName
-                "http://10.244.27.84:8081/uploads/restaurant/imageRestaurant/$fileName",
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  // ถ้าโหลดไม่ได้ ให้แสดงไอคอนเสีย
-                  return const Center(
-                    child: Icon(Icons.image_not_supported, color: Colors.grey),
-                  );
-                },
+    return GestureDetector(
+      // ✅ คลิกเพื่อดูรูปใหญ่
+      onTap: encodedUrl != null
+          ? () {
+              showDialog(
+                context: context,
+                builder: (context) => Dialog(
+                  backgroundColor: Colors.transparent,
+                  insetPadding: const EdgeInsets.all(16),
+                  child: Stack(
+                    children: [
+                      // พื้นหลังดำ คลิกเพื่อปิด
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          color: Colors.black87,
+                          width: double.infinity,
+                          height: double.infinity,
+                        ),
+                      ),
+                      // รูปตรงกลาง
+                      Center(
+                        child: InteractiveViewer(
+                          // ✅ zoom ได้ด้วย
+                          minScale: 0.5,
+                          maxScale: 4.0,
+                          child: Image.network(
+                            encodedUrl!,
+                            fit: BoxFit.contain,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Icon(
+                                  Icons.image_not_supported,
+                                  color: Colors.white,
+                                  size: 60,
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                      // ปุ่มปิด มุมบนขวา
+                      Positioned(
+                        top: 8,
+                        right: 8,
+                        child: GestureDetector(
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }
+          : null,
+      child: Container(
+        width: 240,
+        height: 160,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          border: Border.all(color: Colors.black26),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: encodedUrl != null
+            ? ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Stack(
+                  children: [
+                    Image.network(
+                      encodedUrl,
+                      width: 240,
+                      height: 160,
+                      fit: BoxFit.cover,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(child: CircularProgressIndicator());
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                                size: 36,
+                              ),
+                              SizedBox(height: 4),
+                              Text(
+                                "ไม่สามารถโหลดรูปภาพได้",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                    // ✅ icon แว่นขยาย บอกว่าคลิกได้
+                    Positioned(
+                      bottom: 6,
+                      right: 6,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Colors.black45,
+                          shape: BoxShape.circle,
+                        ),
+                        padding: const EdgeInsets.all(4),
+                        child: const Icon(
+                          Icons.zoom_in,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : const Center(
+                child: Icon(Icons.image_outlined, size: 50, color: Colors.grey),
               ),
-            )
-          : const Icon(Icons.image_outlined, size: 50, color: Colors.grey),
+      ),
     );
   }
 

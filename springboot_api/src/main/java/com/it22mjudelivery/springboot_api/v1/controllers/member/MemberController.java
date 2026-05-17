@@ -85,7 +85,7 @@ public class MemberController {
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
 
             // สร้างโฟลเดอร์ uploads ถ้ายังไม่มี
-            Path uploadDir = Paths.get("uploads", "member");
+            Path uploadDir = Paths.get("uploads", "member", "profile");
             if (!Files.exists(uploadDir)) {
                 Files.createDirectories(uploadDir);
             }

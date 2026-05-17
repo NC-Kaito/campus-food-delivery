@@ -126,7 +126,21 @@ class _RegisterRiderState extends State<RegisterRider> {
                   const SizedBox(height: 15),
 
                   _buildLabel("รหัสนักศึกษา (Student ID)"),
-                  _buildTextField(controller: studentIdController, hint: ""),
+                  _buildTextField(
+                    controller: studentIdController,
+                    hint: "6XXXXXXXXX",
+                    keyboardType: TextInputType.number,
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return "กรุณากรอกรหัสนักศึกษา";
+                      if (!RegExp(r'^[0-9]+$').hasMatch(value))
+                        return "ต้องเป็นตัวเลขเท่านั้น";
+                      if (value.length != 10) return "ต้องมี 10 หลักเท่านั้น";
+                      if (!value.startsWith('6'))
+                        return "ต้องขึ้นต้นด้วย 6 เท่านั้น";
+                      return null;
+                    },
+                  ),
 
                   _buildLabel("รหัสผ่าน (Password)"),
                   _buildTextField(
@@ -138,13 +152,75 @@ class _RegisterRiderState extends State<RegisterRider> {
                         : Icons.visibility_outlined,
                     onIconTap: () =>
                         setState(() => _obscureText = !_obscureText),
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return "กรุณากรอกรหัสผ่าน";
+                      if (value.contains(' ')) return "ห้ามมีช่องว่าง";
+                      if (!RegExp(r'^[a-zA-Z0-9!#_.]+$').hasMatch(value))
+                        return "ใช้ได้เฉพาะ a-z, A-Z, 0-9 และ ! # _ .";
+                      if (value.length < 8 || value.length > 20)
+                        return "ความยาว 8-20 ตัวอักษร";
+                      return null;
+                    },
                   ),
 
                   _buildLabel("ชื่อ (Firstname)"),
-                  _buildTextField(controller: firstNameController, hint: ""),
+                  _buildTextField(
+                    controller: firstNameController,
+                    hint: "",
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return "กรุณากรอกชื่อ";
+                      if (value.contains(' ')) return "ห้ามมีช่องว่าง";
+                      if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value))
+                        return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
+                      final hasEng = RegExp(r'[a-zA-Z]').hasMatch(value);
+                      final hasThai = RegExp(
+                        r'[\u0E00-\u0E7F]',
+                      ).hasMatch(value);
+                      if (hasEng && hasThai) return "ห้ามปนภาษาไทยและอังกฤษ";
+                      if (value.length < 3 || value.length > 30)
+                        return "ความยาว 3-30 ตัวอักษร";
+                      return null;
+                    },
+                  ),
 
                   _buildLabel("นามสกุล (Lastname)"),
-                  _buildTextField(controller: lastNameController, hint: ""),
+                  _buildTextField(
+                    controller: lastNameController,
+                    hint: "",
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return "กรุณากรอกนามสกุล";
+                      if (value.contains(' ')) return "ห้ามมีช่องว่าง";
+                      if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value))
+                        return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
+                      final hasEng = RegExp(r'[a-zA-Z]').hasMatch(value);
+                      final hasThai = RegExp(
+                        r'[\u0E00-\u0E7F]',
+                      ).hasMatch(value);
+                      if (hasEng && hasThai) return "ห้ามปนภาษาไทยและอังกฤษ";
+                      // ✅ cross-field เช็คภาษาต้องตรงกับชื่อ
+                      final firstName = firstNameController.text;
+                      if (firstName.isNotEmpty) {
+                        final firstIsEng = RegExp(
+                          r'^[a-zA-Z]+$',
+                        ).hasMatch(firstName);
+                        final firstIsThai = RegExp(
+                          r'^[\u0E00-\u0E7F]+$',
+                        ).hasMatch(firstName);
+                        if (firstIsEng &&
+                            !RegExp(r'^[a-zA-Z]+$').hasMatch(value))
+                          return "นามสกุลต้องเป็นภาษาอังกฤษเหมือนชื่อ";
+                        if (firstIsThai &&
+                            !RegExp(r'^[\u0E00-\u0E7F]+$').hasMatch(value))
+                          return "นามสกุลต้องเป็นภาษาไทยเหมือนชื่อ";
+                      }
+                      if (value.length < 3 || value.length > 30)
+                        return "ความยาว 3-30 ตัวอักษร";
+                      return null;
+                    },
+                  ),
 
                   _buildLabel("วันเดือนปีเกิด (Date of Birth)"),
                   _buildTextField(
@@ -153,6 +229,14 @@ class _RegisterRiderState extends State<RegisterRider> {
                     readOnly: true,
                     icon: Icons.calendar_month_outlined,
                     onTap: () => _selectDate(context),
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return "กรุณาเลือกวันเกิด";
+                      // ✅ ตรวจรูปแบบ MM/dd/yyyy
+                      if (!RegExp(r'^\d{2}/\d{2}/\d{4}$').hasMatch(value))
+                        return "รูปแบบวันที่ไม่ถูกต้อง (mm/dd/yyyy)";
+                      return null;
+                    },
                   ),
 
                   _buildLabel("อีเมล (Email)"),
@@ -160,6 +244,17 @@ class _RegisterRiderState extends State<RegisterRider> {
                     controller: emailController,
                     hint: "ตัวอย่าง xxx@gmail.com",
                     icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return "กรุณากรอกอีเมล";
+                      if (value.contains(' ')) return "ห้ามมีช่องว่าง";
+                      if (!RegExp(
+                        r'^[\w+\-\.]+@([\w\-]+\.)+[a-zA-Z]{2,}$',
+                      ).hasMatch(value))
+                        return "รูปแบบอีเมลไม่ถูกต้อง";
+                      return null;
+                    },
                   ),
 
                   _buildLabel("เบอร์โทรศัพท์ (Phone)"),
@@ -168,6 +263,16 @@ class _RegisterRiderState extends State<RegisterRider> {
                     hint: "ตัวเลข 10 หลัก",
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
+                    validator: (value) {
+                      if (value == null || value.isEmpty)
+                        return "กรุณากรอกเบอร์โทรศัพท์";
+                      if (value.contains(' ')) return "ห้ามมีช่องว่าง";
+                      if (!RegExp(r'^[0-9]+$').hasMatch(value))
+                        return "ต้องเป็นตัวเลขเท่านั้น";
+                      if (value.length < 10 || value.length > 15)
+                        return "ความยาว 10-15 หลัก";
+                      return null;
+                    },
                   ),
 
                   const SizedBox(height: 40),
@@ -263,36 +368,50 @@ class _RegisterRiderState extends State<RegisterRider> {
     VoidCallback? onIconTap,
     bool readOnly = false,
     TextInputType keyboardType = TextInputType.text,
+    String? Function(String?)? validator, // ✅ รับ validator จากข้างนอกได้ด้วย
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade400),
-      ),
-      child: TextFormField(
-        controller: controller,
-        obscureText: isPassword && _obscureText,
-        readOnly: readOnly,
-        onTap: onTap,
-        keyboardType: keyboardType,
-        validator: (val) =>
-            val == null || val.isEmpty ? "กรุณากรอกข้อมูล" : null,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 15,
-            vertical: 12,
-          ),
-          border: InputBorder.none,
-          suffixIcon: icon != null
-              ? InkWell(
-                  onTap: onIconTap,
-                  child: Icon(icon, color: Colors.grey[400], size: 22),
-                )
-              : null,
+    return TextFormField(
+      controller: controller,
+      obscureText: isPassword && _obscureText,
+      readOnly: readOnly,
+      onTap: onTap,
+      keyboardType: keyboardType,
+      autovalidateMode: AutovalidateMode.onUserInteraction, // ✅ realtime
+      validator:
+          validator ??
+          (val) => val == null || val.isEmpty ? "กรุณากรอกข้อมูล" : null,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 15,
+          vertical: 12,
         ),
+        filled: true,
+        fillColor: Colors.white,
+        // ✅ border แบบปกติ
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade400),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Colors.green, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Colors.red),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
+        ),
+        suffixIcon: icon != null
+            ? InkWell(
+                onTap: onIconTap ?? onTap,
+                child: Icon(icon, color: Colors.grey[400], size: 22),
+              )
+            : null,
       ),
     );
   }

@@ -88,7 +88,7 @@ class _LoginRiderState extends State<LoginRider> {
       // แนะนำให้ใช้ AppBar ของ Rider หรือแบบทั่วไป
       appBar: AppBar(
         title: const Text("Rider Login"),
-        backgroundColor: Colors.orange, // ใช้สีส้มเพื่อให้ต่างจาก Member
+        backgroundColor: Colors.green, // ใช้สีส้มเพื่อให้ต่างจาก Member
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 30),
@@ -105,13 +105,13 @@ class _LoginRiderState extends State<LoginRider> {
                 height: 180,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.orange[100],
+                  color: Colors.green,
                   borderRadius: BorderRadius.circular(15),
                 ),
                 child: const Icon(
                   Icons.delivery_dining,
                   size: 80,
-                  color: Colors.orange,
+                  color: Colors.yellow,
                 ),
               ),
               const SizedBox(height: 30),
@@ -149,7 +149,7 @@ class _LoginRiderState extends State<LoginRider> {
                     _buildButton(
                       text: 'เข้าสู่ระบบไรเดอร์',
                       onPressed: doLogin,
-                      color: Colors.orange,
+                      color: Colors.lightGreen,
                       loading: _isLoading,
                     ),
                     const SizedBox(height: 15),
@@ -163,7 +163,7 @@ class _LoginRiderState extends State<LoginRider> {
                           ),
                         );
                       },
-                      color: Colors.orange[200]!,
+                      color: Colors.lightGreen!,
                     ),
                   ],
                 ),

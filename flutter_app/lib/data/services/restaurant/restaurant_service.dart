@@ -3,6 +3,20 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 
 class RestaurantService {
+  Future<void> doLoginRestaurant(String username, String password) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/restaurant/loginRestaurant",
+        data: {"username": username, "password": password},
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> doRegisterRestaurant(RestaurantModel restaurant) async {
     try {
       await DioClient.dio.post(

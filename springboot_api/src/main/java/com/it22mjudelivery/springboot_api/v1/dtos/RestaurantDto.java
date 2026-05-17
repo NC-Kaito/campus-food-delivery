@@ -29,8 +29,8 @@ public class RestaurantDto {
     private String ownerlastname;
     private String email;
     private String phone;
-    private boolean statusopen;
+    private Boolean statusopen;
     private LocalDateTime registerdate;
-    private boolean verificationstatus;
+    private String verificationstatus;
     private Integer typeid;
 }
