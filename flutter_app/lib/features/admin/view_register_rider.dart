@@ -1,57 +1,36 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
-import 'package:flutter_app/features/admin/list_restaurant.dart';
+import 'package:flutter_app/features/admin/list_rider.dart';
 
-class View_RegisterRestaurant extends StatefulWidget {
-  final RestaurantModel restaurant;
+class View_RegisterRider extends StatefulWidget {
+  final RiderModel rider;
   final int index;
 
-  const View_RegisterRestaurant({
+  const View_RegisterRider({
     super.key,
-    required this.restaurant,
+    required this.rider,
     required this.index,
   });
 
   @override
-  State<View_RegisterRestaurant> createState() =>
-      _View_RegisterRestaurantState();
+  State<View_RegisterRider> createState() => _View_RegisterRiderState();
 }
 
-class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
+class _View_RegisterRiderState extends State<View_RegisterRider> {
   final AdminService adminService = AdminService();
-  late RestaurantModel restaurant;
+  late RiderModel rider;
 
   @override
   void initState() {
     super.initState();
-    restaurant = widget.restaurant;
-  }
-
-  String getOpenDayText(int? openDay) {
-    if (openDay == null) return '-';
-    const days = [
-      'อาทิตย์',
-      'จันทร์',
-      'อังคาร',
-      'พุธ',
-      'พฤหัส',
-      'ศุกร์',
-      'เสาร์',
-    ];
-    List<String> open = [];
-    for (int i = 0; i < 7; i++) {
-      if ((openDay >> i) & 1 == 1) {
-        open.add(days[i]);
-      }
-    }
-    return open.isEmpty ? '-' : open.join(' - ');
+    rider = widget.rider;
   }
 
   // ================= API & DIALOGS =================
-  void _showApproveDialog(RestaurantModel r) {
+  void _showApproveDialog(RiderModel r) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -91,7 +70,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                       Colors.white,
                       () async {
                         Navigator.pop(context);
-                        await _approveRestaurant(r);
+                        await _approveRider(r);
                       },
                     ),
                   ),
@@ -104,7 +83,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     );
   }
 
-  void _showRejectDialog(RestaurantModel r) {
+  void _showRejectDialog(RiderModel r) {
     final TextEditingController reasonController = TextEditingController();
     showDialog(
       context: context,
@@ -159,10 +138,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                       Colors.white,
                       () async {
                         Navigator.pop(context);
-                        await _rejectRestaurant(
-                          r,
-                          reasonController.text.trim(),
-                        );
+                        await _rejectRider(r, reasonController.text.trim());
                       },
                     ),
                   ),
@@ -209,13 +185,13 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     );
   }
 
-  Future<void> _approveRestaurant(RestaurantModel r) async {
+  Future<void> _approveRider(RiderModel r) async {
     try {
-      await adminService.approveRestaurant(r.username!);
-      setState(() => restaurant.verificationStatus = "Confirm");
+      await adminService.approveRider(r.studentid!);
+      setState(() => rider.verificationStatus = "Confirm");
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('อนุมัติร้านค้าสำเร็จ'),
+          content: Text('อนุมัติผู้จัดส่งสำเร็จ'),
           backgroundColor: Colors.green,
         ),
       );
@@ -229,13 +205,16 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     }
   }
 
-  Future<void> _rejectRestaurant(RestaurantModel r, String reason) async {
+  Future<void> _rejectRider(RiderModel r, String reason) async {
     try {
-      await adminService.rejectRestaurant(r.username!, reason);
-      setState(() => restaurant.notApproveDetail = reason);
+      await adminService.rejectRider(r.studentid!, reason);
+      setState(() {
+        rider.verificationStatus = "Reject";
+        rider.notApproveDetail = reason;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('ปฏิเสธร้านค้าสำเร็จ'),
+          content: Text('ปฏิเสธผู้จัดส่งสำเร็จ'),
           backgroundColor: Colors.red,
         ),
       );
@@ -253,15 +232,24 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
 
   @override
   Widget build(BuildContext context) {
-    final r = restaurant;
-    Color statusColor = r.verificationStatus == true
+    final r = rider;
+
+    Color statusColor = r.verificationStatus == "Confirm"
         ? const Color(0xFF67E22B)
-        : (r.notApproveDetail != null
-              ? const Color(0xFFFF3B30)
+        : (r.verificationStatus == "Reject" || r.notApproveDetail != null
+              ? const Color(0xFFFF9800)
               : const Color(0xFFFF9800));
-    String statusText = r.verificationStatus == true
+
+    String statusText = r.verificationStatus == "Confirm"
         ? 'อนุมัติแล้ว'
-        : (r.notApproveDetail != null ? 'ปฏิเสธแล้ว' : 'รอดำเนินการ');
+        : (r.verificationStatus == "Reject" || r.notApproveDetail != null
+              ? 'ปฏิเสธแล้ว'
+              : 'รอดำเนินการ');
+
+    if (r.verificationStatus != "Confirm" && r.notApproveDetail == null) {
+      statusColor = const Color(0xFFFF9800);
+      statusText = 'รอดำเนินการ';
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -274,10 +262,10 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
             children: [
               Row(
                 children: const [
-                  Icon(Icons.store, size: 26, color: Colors.black87),
+                  Icon(Icons.delivery_dining, size: 26, color: Colors.black87),
                   SizedBox(width: 8),
                   Text(
-                    'รายละเอียดการสมัครของร้านค้า',
+                    'รายละเอียดการสมัครของผู้จัดส่ง',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -310,7 +298,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                           const SizedBox(width: 34),
                           Expanded(
                             child: Text(
-                              'รายละเอียดร้านค้า ลำดับที่ : ${widget.index}',
+                              'รายละเอียดผู้จัดส่ง ลำดับที่ : ${widget.index}',
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
                               ),
@@ -339,26 +327,26 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // LEFT SIDE (ข้อมูลร้านค้า & ข้อมูลการติดต่อ)
+                            // LEFT SIDE: ข้อมูลส่วนตัว (แก้ปัญหาซ้อนทับและจัดระเบียบใหม่)
                             Expanded(
                               flex: 1,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _sectionTitle('ข้อมูลร้านค้า'),
+                                  _sectionTitle('ข้อมูลส่วนตัว'),
                                   const SizedBox(height: 14),
                                   Row(
                                     children: [
                                       Expanded(
                                         child: _labelValue(
-                                          'ID ร้านค้า',
-                                          r.username ?? '-',
+                                          'รหัสนักศึกษา (Student)',
+                                          r.studentid ?? '-',
                                         ),
                                       ),
                                       Expanded(
                                         child: _labelValue(
-                                          'ชื่อร้าน (Restaurant Name)',
-                                          r.restaurantName ?? '-',
+                                          'เบอร์โทรศัพท์ (Phone)',
+                                          r.phone ?? '-',
                                         ),
                                       ),
                                     ],
@@ -368,77 +356,69 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                     children: [
                                       Expanded(
                                         child: _labelValue(
-                                          'วันที่เปิดทำการ',
-                                          getOpenDayText(r.openDay),
+                                          'ชื่อ - นามสกุล',
+                                          '${r.firstName ?? ''} ${r.lastName ?? ''}',
                                         ),
                                       ),
                                       Expanded(
                                         child: _labelValue(
-                                          'เวลาเปิด - ปิด',
-                                          '${r.openTime ?? '-'} - ${r.closeTime ?? '-'} น.',
+                                          'อีเมล (Email)',
+                                          r.email ?? '-',
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 20),
-                                  _sectionTitle('ข้อมูลการติดต่อ'),
-                                  const SizedBox(height: 14),
+                                  const SizedBox(height: 24),
+
+                                  // จัดกลุ่ม คณะ, สาขา, วันเกิด ไว้ฝั่งซ้าย และรูปบัตรนักศึกษาไว้ฝั่งขวาใน Row เดียวกัน
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
+                                      // ฝั่งซ้าย: ข้อมูลคณะ สาขา และวันเกิด
+                                      // ฝั่งซ้าย: ข้อมูลสถาบันและการศึกษา
                                       Expanded(
+                                        flex: 1,
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             _labelValue(
-                                              'ชื่อ-นามสกุล เจ้าของ',
-                                              '${r.ownerFirstName ?? ''} ${r.ownerLastName ?? ''}',
+                                              'คณะ (Faculty)',
+                                              r.facultyName ??
+                                                  '-', // 👈 เปลี่ยนมาดึงค่า Dynamic จากโมเดลแล้ว!
                                             ),
                                             const SizedBox(height: 24),
                                             _labelValue(
-                                              'อีเมล (Email)',
-                                              r.email ?? '-',
+                                              'สาขาวิชา (Major)',
+                                              r.majorName ??
+                                                  '-', // ดึงค่า Dynamic จากโมเดล
                                             ),
                                             const SizedBox(height: 24),
                                             _labelValue(
-                                              'เบอร์โทรศัพท์ (Phone)',
-                                              r.phone ?? '-',
+                                              'วันเกิด (Birthday)',
+                                              r.birthday ?? '-',
                                             ),
                                           ],
                                         ),
                                       ),
+                                      // ฝั่งขวา: แสดงหัวข้อ และรูปภาพบัตรนักศึกษา
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             const Text(
-                                              'ที่ตั้งร้านค้า (latitude-longitude)',
+                                              'บัตรนักศึกษา (Student Card)',
                                               style: TextStyle(
                                                 fontSize: 13,
                                                 color: Colors.black87,
                                               ),
                                             ),
                                             const SizedBox(height: 8),
-                                            Container(
-                                              width: 190,
-                                              height: 145,
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: const Color(
-                                                    0xFFD9D9D9,
-                                                  ),
-                                                ),
-                                              ),
-                                              child: const Center(
-                                                child: Icon(
-                                                  Icons.map,
-                                                  size: 42,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
+                                            _imageBox(
+                                              r.studentCardImage,
+                                              "studentCard",
                                             ),
                                           ],
                                         ),
@@ -472,56 +452,66 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                               color: Color(0xFFD9D9D9),
                             ),
 
-                            // RIGHT SIDE (ข้อมูลเอกสาร: ปรับปรุงโครงสร้างให้เรียงแนวนอน ซ้าย-ขวา ทรงยาวแนวตั้ง)
+                            // RIGHT SIDE: ข้อมูลยานพาหนะ (แสดงรูปแบบขนาน ซ้าย-ขวา ทรงแนวตั้ง)
                             Expanded(
                               flex: 1,
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _sectionTitle('ข้อมูลเอกสาร'),
+                                  _sectionTitle('ข้อมูลยานพาหนะ'),
                                   const SizedBox(height: 14),
+                                  _labelValue(
+                                    'ทะเบียนรถ (Vehicle Plate)',
+                                    r.vehiclePlate ?? '-',
+                                  ),
+                                  const SizedBox(height: 20),
 
-                                  // ใช้ Row บังคับจัดระเบียบให้ภาพ รูปร้านค้า และ รูปสัญญาเช่า แสดงผลเคียงคู่กัน
+                                  // วางชื่อหัวข้อและภาพเรียงคู่กัน ซ้าย-ขวา
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // ฝั่งรูปร้านค้า
+                                      // ฝั่งรูปยานพาหนะ
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             const Text(
-                                              'รูปร้านค้า (Restaurant Image)',
+                                              'รูปยานพาหนะ (Vehicle image)',
                                               style: TextStyle(
-                                                fontSize: 14,
+                                                fontSize: 13,
                                                 color: Colors.black87,
                                               ),
                                             ),
-                                            const SizedBox(height: 10),
-                                            _imageBox(r.restaurantImage),
+                                            const SizedBox(height: 8),
+                                            _imageBox(
+                                              r.vehicleImage,
+                                              "vehicle",
+                                            ),
                                           ],
                                         ),
                                       ),
-                                      const SizedBox(
-                                        width: 16,
-                                      ), // ระยะเว้นวรรคช่องว่างระหว่างรูป
-                                      // ฝั่งรูปสัญญาเช่า
+                                      const SizedBox(width: 16),
+
+                                      // ฝั่งรูปใบขับขี่
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
                                             const Text(
-                                              'รูปสัญญาเช่า (lease_agreement)',
+                                              'รูปใบขับขี่ ( driving license image)',
                                               style: TextStyle(
-                                                fontSize: 14,
+                                                fontSize: 13,
                                                 color: Colors.black87,
                                               ),
                                             ),
-                                            const SizedBox(height: 10),
-                                            _imageBox(r.leaseAgreementImg),
+                                            const SizedBox(height: 8),
+                                            _imageBox(
+                                              r.drivingLicenseImg,
+                                              "license",
+                                            ),
                                           ],
                                         ),
                                       ),
@@ -538,6 +528,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                 ),
               ),
               const SizedBox(height: 20),
+
               // Buttons Bottom
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -549,7 +540,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ListRestaurant(),
+                        builder: (context) => const ListRider(),
                       ),
                     ),
                   ),
@@ -600,55 +591,97 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
           style: const TextStyle(fontSize: 13, color: Colors.black87),
         ),
         const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-        ),
+        if (value.isNotEmpty)
+          Text(
+            value,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
       ],
     );
   }
 
-  Widget _imageBox(String? imagePath) {
-    final String fileName = imagePath?.split('/').last ?? "";
-    final String fullImageUrl =
-        "http://10.244.27.84:8081/uploads/restaurant/imageRestaurant/$fileName";
+  Widget _imageBox(String? imageUrl, String type) {
+    // ✅ ใช้ URL จาก model โดยตรง + encode space
+    String? encodedUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      final uri = Uri.parse(imageUrl);
+      encodedUrl = uri
+          .replace(
+            path: uri.path
+                .split('/')
+                .map((s) => Uri.encodeComponent(s))
+                .join('/'),
+          )
+          .toString();
+    }
+
+    final double boxWidth = 240;
+    final double boxHeight = (type == "studentCard") ? 145 : 260;
 
     return Container(
-      width: 240, // ขนาดความกว้างกล่องให้สมมาตรกับการวางเรียง Row แนวนอน
-      height:
-          260, // 👈 ปรับสัดส่วนความสูงเป็น 220 พิกเซล เพื่อดึงโครงร่างกรอบให้เป็นแนวตั้งยาวตามสไตล์รูปภาพร้านค้า
+      width: boxWidth,
+      height: boxHeight,
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.black26),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: imagePath != null && fileName.isNotEmpty
+      child: encodedUrl != null
           ? GestureDetector(
-              onTap: () => _showMaximizedImage(context, fullImageUrl),
+              onTap: () => _showMaximizedImage(context, encodedUrl!),
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: Tooltip(
                   message: 'คลิกเพื่อขยายรูป',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      fullImageUrl,
-                      fit: BoxFit
-                          .cover, // ดึงสัดส่วนภาพตัดครอบพอดีกรอบทรงสูงแนวตั้ง
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(
-                            Icons.image_not_supported,
-                            color: Colors.grey,
+                    child: Stack(
+                      children: [
+                        Image.network(
+                          encodedUrl,
+                          width: boxWidth,
+                          height: boxHeight,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
+                        ),
+                        Positioned(
+                          bottom: 6,
+                          right: 6,
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.black45,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.zoom_in,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             )
-          : const Icon(Icons.image_outlined, size: 50, color: Colors.grey),
+          : const Center(
+              child: Icon(Icons.image_outlined, size: 45, color: Colors.grey),
+            ),
     );
   }
 

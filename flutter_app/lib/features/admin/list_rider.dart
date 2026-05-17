@@ -1,9 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
-import 'package:flutter_app/features/admin/view_register_rest.dart';
+import 'package:flutter_app/features/admin/view_register_rider.dart';
 
 class ListRider extends StatefulWidget {
   const ListRider({super.key});
@@ -15,16 +15,16 @@ class ListRider extends StatefulWidget {
 class _ListRiderState extends State<ListRider> {
   final AdminService adminService = AdminService();
 
-  List<RestaurantModel> restaurant = [];
+  List<RiderModel> riderList = []; // เปลี่ยนชื่อตัวแปรให้สื่อความหมาย
   bool isLoading = false;
 
   void fetchAll() async {
     try {
       setState(() => isLoading = true);
-      var restaurantResponse = await adminService.getListRestaurant();
-      setState(() => restaurant = restaurantResponse);
+      var riderResponse = await adminService.getListRider();
+      setState(() => riderList = riderResponse);
     } on DioException catch (e) {
-      print(e);
+      debugPrint(e.toString());
     } finally {
       setState(() => isLoading = false);
     }
@@ -54,10 +54,14 @@ class _ListRiderState extends State<ListRider> {
                 children: [
                   Row(
                     children: const [
-                      Icon(Icons.store, size: 32, color: Colors.black87),
+                      Icon(
+                        Icons.delivery_dining,
+                        size: 32,
+                        color: Colors.black87,
+                      ), // เปลี่ยนเป็นไอคอนรถส่งของให้ตรงบริบท
                       SizedBox(width: 10),
                       Text(
-                        'รายการสมัครของร้านค้า (New Registration Restaurant)',
+                        'รายการสมัครของผู้จัดส่ง (New Registration Rider)',
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -78,10 +82,10 @@ class _ListRiderState extends State<ListRider> {
                           _buildHeaderRow(),
                           const Divider(height: 1, color: Colors.grey),
                           Expanded(
-                            child: restaurant.isEmpty
+                            child: riderList.isEmpty
                                 ? const Center(
                                     child: Text(
-                                      'ไม่มีข้อมูลร้านค้า',
+                                      'ไม่มีข้อมูลผู้สมัครจัดส่ง',
                                       style: TextStyle(
                                         fontSize: 16,
                                         color: Colors.grey,
@@ -89,20 +93,25 @@ class _ListRiderState extends State<ListRider> {
                                     ),
                                   )
                                 : ListView.separated(
-                                    itemCount: restaurant.length,
+                                    itemCount: riderList.length,
                                     separatorBuilder: (_, __) => const Divider(
                                       height: 1,
                                       color: Colors.grey,
                                     ),
                                     itemBuilder: (context, index) {
-                                      final rest = restaurant[index];
+                                      final ri = riderList[index];
 
-                                      // แปลง registerdate (LocalDateTime) → วันที่ และ เวลา
+                                      // --- การจัดการชื่อ-นามสกุล ---
+                                      final fullName =
+                                          '${ri.firstName ?? '-'} ${ri.lastName ?? ''}'
+                                              .trim();
+
+                                      // --- การจัดการวันที่และเวลาสมัคร ---
                                       final dt = DateTime.tryParse(
-                                        rest.registerDate ?? '',
+                                        ri.registerDate ?? '',
                                       );
                                       final registerDate = dt != null
-                                          ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${(dt.year - 543).toString().substring(2)}'
+                                          ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${(dt.year > 2500 ? dt.year : dt.year + 543).toString().substring(2)}'
                                           : '-';
                                       final registerTime = dt != null
                                           ? '${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')} น.'
@@ -110,9 +119,9 @@ class _ListRiderState extends State<ListRider> {
 
                                       return _buildDataRow(
                                         index: index + 1,
-                                        restaurantCode: rest.username ?? '-',
-                                        restaurantName:
-                                            rest.restaurantName ?? '-',
+                                        studentid: ri.studentid ?? '-',
+                                        riderFullName:
+                                            fullName, // ✨ ส่งชื่อที่รวมแล้วไปแสดงผล
                                         registerDate: registerDate,
                                         registerTime: registerTime,
                                         onTap: () {
@@ -120,8 +129,8 @@ class _ListRiderState extends State<ListRider> {
                                             context,
                                             MaterialPageRoute(
                                               builder: (context) =>
-                                                  View_RegisterRestaurant(
-                                                    restaurant: rest,
+                                                  View_RegisterRider(
+                                                    rider: ri,
                                                     index: index + 1,
                                                   ),
                                             ),
@@ -149,8 +158,8 @@ class _ListRiderState extends State<ListRider> {
       child: Row(
         children: const [
           _HeaderCell(text: 'ลำดับ', flex: 1),
-          _HeaderCell(text: 'รหัสร้านค้า', flex: 2),
-          _HeaderCell(text: 'ชื่อร้านค้า', flex: 4),
+          _HeaderCell(text: 'รหัสผู้จัดส่ง', flex: 2),
+          _HeaderCell(text: 'ชื่อ - นามสกุล', flex: 4),
           _HeaderCell(text: 'วันที่สมัคร', flex: 2),
           _HeaderCell(text: 'เวลาสมัคร', flex: 2),
           _HeaderCell(text: 'จัดการ', flex: 2),
@@ -161,8 +170,8 @@ class _ListRiderState extends State<ListRider> {
 
   Widget _buildDataRow({
     required int index,
-    required String restaurantCode,
-    required String restaurantName,
+    required String studentid,
+    required String riderFullName,
     required String registerDate,
     required String registerTime,
     required VoidCallback onTap,
@@ -173,26 +182,39 @@ class _ListRiderState extends State<ListRider> {
       child: Row(
         children: [
           Expanded(flex: 1, child: Text('$index')),
-          Expanded(flex: 2, child: Text(restaurantCode)),
-          Expanded(flex: 4, child: Text(restaurantName)),
+          Expanded(flex: 2, child: Text(studentid)),
+          Expanded(
+            flex: 4,
+            child: Text(
+              riderFullName, // ✨ แสดงผลชื่อและนามสกุล
+              style: const TextStyle(color: Colors.black87),
+            ),
+          ),
           Expanded(flex: 2, child: Text(registerDate)),
           Expanded(flex: 2, child: Text(registerTime)),
           Expanded(
             flex: 2,
-            child: ElevatedButton(
-              onPressed: onTap,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 56, 242, 62),
-                foregroundColor: const Color.fromARGB(255, 0, 0, 0),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF64DD17), // สีเขียวตามต้นแบบ
+                  foregroundColor: Colors.black,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 70,
+                    vertical: 8,
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
+                child: const Text(
+                  'ดูรายละเอียด',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                 ),
               ),
-              child: const Text('ดูรายละเอียด', style: TextStyle(fontSize: 13)),
             ),
           ),
         ],

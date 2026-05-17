@@ -20,6 +20,13 @@ class RegisterRider2 extends StatefulWidget {
   final String? phone;
   final String? birthday;
 
+  final int? savedFacultyId;
+  final int? savedMajorId;
+  final String? savedPlate;
+  final File? savedStudentCard;
+  final File? savedDrivingLicense;
+  final File? savedVehicleImage;
+
   const RegisterRider2({
     super.key,
     this.studentId,
@@ -29,6 +36,12 @@ class RegisterRider2 extends StatefulWidget {
     this.email,
     this.phone,
     this.birthday,
+    this.savedFacultyId,
+    this.savedMajorId,
+    this.savedPlate,
+    this.savedStudentCard,
+    this.savedDrivingLicense,
+    this.savedVehicleImage,
   });
 
   @override
@@ -68,6 +81,21 @@ class _RegisterRider2State extends State<RegisterRider2> {
   void initState() {
     super.initState();
     _loadFaculties();
+
+    // ✅ restore ค่าเดิม
+    _selectedFacultyId = widget.savedFacultyId;
+    _selectedMajorId = widget.savedMajorId;
+    _studentCardImage = widget.savedStudentCard;
+    _drivingLicenseImage = widget.savedDrivingLicense;
+    _vehicleImage = widget.savedVehicleImage;
+
+    if (widget.savedPlate != null) {
+      _licensePlateController.text = widget.savedPlate!;
+    }
+
+    if (widget.savedFacultyId != null) {
+      _loadMajors(widget.savedFacultyId!, restoreMajorId: true); // ✅
+    }
   }
 
   // --- API Functions ---
@@ -83,11 +111,11 @@ class _RegisterRider2State extends State<RegisterRider2> {
     }
   }
 
-  Future<void> _loadMajors(int facultyId) async {
+  Future<void> _loadMajors(int facultyId, {bool restoreMajorId = false}) async {
     setState(() {
       _isLoadingMajor = true;
       _majors = [];
-      _selectedMajorId = null;
+      if (!restoreMajorId) _selectedMajorId = null; // ✅ reset เฉพาะตอนเลือกใหม่
     });
     try {
       final data = await _majorService.getMajorByFaculty(facultyId);
@@ -149,7 +177,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
         majorId: _selectedMajorId,
         vehiclePlate: _licensePlateController.text,
         isActive: false,
-        verificationStatus: false,
+        verificationStatus: "wait",
       );
 
       // ✅ ส่ง path ของใบขับขี่ไปด้วย (ปรับ Service ให้รับ parameter นี้ด้วยนะเพื่อน)
@@ -300,7 +328,14 @@ class _RegisterRider2State extends State<RegisterRider2> {
                         Expanded(
                           child: _buildSecondaryButton(
                             "ย้อนกลับ",
-                            () => Navigator.pop(context),
+                            () => Navigator.pop(context, {
+                              'facultyId': _selectedFacultyId,
+                              'majorId': _selectedMajorId,
+                              'plate': _licensePlateController.text,
+                              'studentCard': _studentCardImage,
+                              'drivingLicense': _drivingLicenseImage,
+                              'vehicleImage': _vehicleImage,
+                            }),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -455,7 +490,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
                 .toList(),
             onChanged: (val) {
               setState(() => _selectedFacultyId = val);
-              if (val != null) _loadMajors(val);
+              if (val != null) _loadMajors(val, restoreMajorId: false);
             },
           );
   }

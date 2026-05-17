@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -59,7 +60,7 @@ public class RiderServiceImpl implements RiderService {
                 .major(major) // ผูกความสัมพันธ์กับ Major
                 .isActive(false) // เริ่มต้นให้เป็น false รอการตรวจสอบ
                 .verificationStatus("wait")
-                .registerDate(LocalDate.now()) // บันทึกวันที่สมัครทันที
+                .registerDate(LocalDateTime.now()) // บันทึกวันที่สมัครทันที
                 .build();
 
         // 4. บันทึกลงฐานข้อมูล

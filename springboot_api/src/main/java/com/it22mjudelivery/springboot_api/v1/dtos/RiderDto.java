@@ -28,7 +28,7 @@ public class RiderDto {
     private String vehiclePlate;
     private String vehicle_Image;
     private boolean isActive;
-    private boolean verificationStatus;
+    private String verificationStatus;
     private LocalDate registerDate;
     private String notApproveDetail;
 

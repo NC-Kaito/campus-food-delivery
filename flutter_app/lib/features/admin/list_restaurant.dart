@@ -182,15 +182,13 @@ class _ListRestaurantState extends State<ListRestaurant> {
             child: ElevatedButton(
               onPressed: onTap,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color.fromARGB(255, 56, 242, 62),
-                foregroundColor: const Color.fromARGB(255, 0, 0, 0),
+                backgroundColor: const Color(0xFF64DD17), // สีเขียวตามต้นแบบ
+                foregroundColor: Colors.black,
+                elevation: 2,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
               ),
               child: const Text('ดูรายละเอียด', style: TextStyle(fontSize: 13)),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/rider/register_rider2.dart';
 import 'package:intl/intl.dart'; // อย่าลืมลงแพ็คเกจ intl ใน pubspec.yaml นะครับ
+import 'dart:io';
 
 class RegisterRider extends StatefulWidget {
   const RegisterRider({super.key});
@@ -20,6 +21,13 @@ class _RegisterRiderState extends State<RegisterRider> {
   late final TextEditingController birthdayController;
   late final TextEditingController emailController;
   late final TextEditingController phoneController;
+
+  int? savedFacultyId;
+  int? savedMajorId;
+  String? savedPlate;
+  File? savedStudentCard;
+  File? savedDrivingLicense;
+  File? savedVehicleImage;
 
   bool _obscureText = true;
 
@@ -298,9 +306,10 @@ class _RegisterRiderState extends State<RegisterRider> {
                       const SizedBox(width: 15),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
                             if (formKey.currentState!.validate()) {
-                              Navigator.push(
+                              // ✅ รับค่ากลับมาจากหน้า 2
+                              final result = await Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => RegisterRider2(
@@ -313,9 +322,29 @@ class _RegisterRiderState extends State<RegisterRider> {
                                     ),
                                     email: emailController.text.trim(),
                                     phone: phoneController.text.trim(),
+                                    // ✅ ส่ง state เดิมไปด้วย
+                                    savedFacultyId: savedFacultyId,
+                                    savedMajorId: savedMajorId,
+                                    savedPlate: savedPlate,
+                                    savedStudentCard: savedStudentCard,
+                                    savedDrivingLicense: savedDrivingLicense,
+                                    savedVehicleImage: savedVehicleImage,
                                   ),
                                 ),
                               );
+
+                              // ✅ รับค่ากลับมาเก็บ
+                              if (result != null && result is Map) {
+                                setState(() {
+                                  savedFacultyId = result['facultyId'];
+                                  savedMajorId = result['majorId'];
+                                  savedPlate = result['plate'];
+                                  savedStudentCard = result['studentCard'];
+                                  savedDrivingLicense =
+                                      result['drivingLicense'];
+                                  savedVehicleImage = result['vehicleImage'];
+                                });
+                              }
                             }
                           },
                           style: ElevatedButton.styleFrom(

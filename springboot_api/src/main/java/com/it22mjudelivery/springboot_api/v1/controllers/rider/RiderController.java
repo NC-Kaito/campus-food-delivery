@@ -84,8 +84,11 @@ public class RiderController {
     private String saveFile(MultipartFile file, String subFolder) throws IOException {
         if (file.isEmpty()) return null;
 
-        // 1. สร้างชื่อไฟล์ไม่ซ้ำกัน
-        String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+        String originalFilename = file.getOriginalFilename() != null
+                ? file.getOriginalFilename()
+                : "file";
+        String safeFilename = originalFilename.replaceAll("\\s+", "");
+        String fileName = UUID.randomUUID() + "_" + safeFilename;
 
         // 2. กำหนด Path (เช่น uploads/rider/studentCard)
         Path uploadDir = Paths.get("uploads", "rider", subFolder);

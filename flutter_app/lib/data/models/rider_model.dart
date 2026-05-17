@@ -11,13 +11,13 @@ class RiderModel {
   String? vehiclePlate;
   String? vehicleImage;
   bool? isActive;
-  bool? verificationStatus;
+  String? verificationStatus;
   String? registerDate;
   String? notApproveDetail;
   int? majorId;
   String? majorName;
+  String? facultyName; // 👈 1. เพิ่มตัวแปรเก็บชื่อคณะตรงนี้
 
-  // --- Constructor ---
   RiderModel({
     this.studentid,
     this.password,
@@ -36,33 +36,9 @@ class RiderModel {
     this.notApproveDetail,
     this.majorId,
     this.majorName,
+    this.facultyName, // 👈 2. เพิ่มใน Constructor
   });
 
-  // --- From JSON (รับข้อมูลจาก API) ---
-  factory RiderModel.fromJson(Map<String, dynamic> json) {
-    return RiderModel(
-      studentid: json['studentid'],
-      // password ปกติจะไม่ถูกส่งกลับมา (เป็น null) แต่ดักไว้เผื่อใช้
-      password: json['password'],
-      firstName: json['firstName'],
-      lastName: json['lastName'],
-      birthday: json['birthday'],
-      email: json['email'],
-      phone: json['phone'],
-      studentCardImage: json['studentCard_Image'],
-      drivingLicenseImg: json['drivingLicenseImg'],
-      vehiclePlate: json['vehiclePlate'],
-      vehicleImage: json['vehicle_Image'],
-      isActive: json['isActive'],
-      verificationStatus: json['verificationStatus'],
-      registerDate: json['registerDate'],
-      notApproveDetail: json['notApproveDetail'],
-      majorId: json['majorId'],
-      majorName: json['majorName'],
-    );
-  }
-
-  // --- To JSON (ส่งข้อมูลไป Register/Login) ---
   Map<String, dynamic> toJson() {
     return {
       'studentid': studentid,
@@ -73,13 +49,53 @@ class RiderModel {
       'email': email,
       'phone': phone,
       'studentCard_Image': studentCardImage,
-      'drivingLicenseImg': drivingLicenseImg ?? '',
+      'drivingLicenseImg': drivingLicenseImg,
       'vehiclePlate': vehiclePlate,
       'vehicle_Image': vehicleImage,
+      'isActive': isActive,
+      'verificationStatus': verificationStatus,
+      'registerDate': registerDate,
+      'notApproveDetail': notApproveDetail,
       'majorId': majorId,
-      // ฟิลด์พวกนี้ปกติจะให้ Server เป็นคนจัดการ แต่ใส่เผื่อไว้กรณี Update
-      'isActive': isActive ?? false,
-      'verificationStatus': verificationStatus ?? false,
+      // ถ้าส่งกลับไป Server ให้ใส่เพิ่ม (ถ้ามี)
     };
+  }
+
+  factory RiderModel.fromJson(Map<String, dynamic> json) {
+    const baseUrl = 'http://10.244.27.211:8081/uploads/';
+
+    return RiderModel(
+      studentid: json['studentid']?.toString(),
+      password: json['password'],
+      firstName: json['firstName'],
+      lastName: json['lastName'],
+      birthday: json['birthday'],
+      email: json['email'],
+      phone: json['phone'],
+
+      // ✅ เติม baseUrl นำหน้า
+      studentCardImage: json['studentCard_Image'] != null
+          ? baseUrl + json['studentCard_Image']
+          : null,
+      drivingLicenseImg: json['drivingLicenseImg'] != null
+          ? baseUrl + json['drivingLicenseImg']
+          : null,
+      vehicleImage: json['vehicle_Image'] != null
+          ? baseUrl + json['vehicle_Image']
+          : null,
+
+      vehiclePlate: json['vehiclePlate'],
+      isActive: json['isActive'] as bool?,
+      verificationStatus: json['verificationStatus'],
+      registerDate: json['registerDate'],
+      notApproveDetail: json['notApproveDetail'],
+      majorId: json['major'] != null ? json['major']['majorid'] as int? : null,
+      majorName: json['major'] != null
+          ? json['major']['majorname'] as String?
+          : null,
+      facultyName: json['major'] != null && json['major']['faculty'] != null
+          ? json['major']['faculty']['facultyname'] as String?
+          : null,
+    );
   }
 }

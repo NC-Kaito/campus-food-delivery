@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 
@@ -53,11 +54,11 @@ public class Rider {
     @Column(nullable = false)
     private boolean isActive;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 10)
     private String verificationStatus;
 
     @Column(nullable = false)
-    private LocalDate registerDate;
+    private LocalDateTime registerDate;
 
     @Column(length = 100)
     private String notApproveDetail;

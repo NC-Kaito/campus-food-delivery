@@ -2,6 +2,7 @@ package com.it22mjudelivery.springboot_api.v1.services;
 
 import com.it22mjudelivery.springboot_api.v1.entities.Admin;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
+import com.it22mjudelivery.springboot_api.v1.entities.Rider;
 import com.it22mjudelivery.springboot_api.v1.repositories.AdminRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -19,6 +20,11 @@ public interface AdminService {
 
     // เพิ่ม Method สำหรับปฏิเสธร้านค้าพร้อมเหตุผล
     void rejectRestaurant(String username, String reason);// เพิ่ม Parameter
+
+    List<Rider> getList_register_rider();
+    Rider getRiderById(String studentId);
+    void  approveRider(String studentId);
+    void  rejectRider(String studentId, String reason);
 
 
 

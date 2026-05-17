@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:flutter_app/data/models/rider_model.dart';
+import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
 
 class HomeAdmin extends StatefulWidget {
@@ -9,111 +12,358 @@ class HomeAdmin extends StatefulWidget {
 }
 
 class _HomeAdminState extends State<HomeAdmin> {
-  // Mock data — replace with real API
-  final int totalShops = 32;
-  final int totalDeliveries = 32;
-  final int newShops = 4;
-  final int newDeliveries = 12;
+  bool isLoading = true;
+
+  // ── เพิ่มตัวแปรเก็บค่าที่นับได้ ─────────────────────────────────────────
+  int _totalRestaurants = 0; // verificationStatus == "true"
+  int _totalRiders = 0; // verificationStatus == "true"
+  int _newRestaurants = 0; // verificationStatus == "wait"
+  int _newRiders = 0; // verificationStatus == "wait"
+
+  final AdminService _adminService = AdminService();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDashboardData();
+  }
+
+  // home_admin.dart
+  Future<void> _fetchDashboardData() async {
+    try {
+      setState(() => isLoading = true);
+      final counts = await _adminService.getDashboardCount();
+      setState(() {
+        _totalRestaurants = counts['totalRestaurant']!;
+        _newRestaurants = counts['newRestaurant']!;
+        _totalRiders = counts['totalRider']!;
+        _newRiders = counts['newRider']!;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: const AdminNavbar(),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Dashboard Title ───────────────────────────────────────
-            _buildTitle(),
+      body: isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+              ),
+            )
+          : RefreshIndicator(
+              onRefresh: _fetchDashboardData,
+              color: Colors.orange,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 28,
+                    vertical: 20,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildTitle(),
+                      const SizedBox(height: 10),
 
-            // ── Overview Section ──────────────────────────────────────
-            _buildSectionHeader(
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/images/bar_chart.png',
-                    width: 40,
-                    height: 40,
-                    errorBuilder: (_, __, ___) => const Icon(
-                      Icons.bar_chart_rounded,
-                      color: Colors.orange,
-                      size: 36,
-                    ),
+                      _buildSectionTitle(
+                        title: 'Overview of Platform Activity',
+                        icon: Icons.bar_chart_rounded,
+                        iconColor: Colors.orange,
+                        iconSize: 24,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildOverviewRow(), // ← ใช้ค่าจาก state
+
+                      const SizedBox(height: 32),
+
+                      _buildSectionTitle(
+                        title: 'รายการใหม่ที่รอการตรวจสอบ',
+                        icon: Icons.fiber_new_rounded,
+                        iconColor: const Color(0xFFD32F2F),
+                        iconSize: 32,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildNewRow(), // ← ใช้ค่าจาก state
+
+                      const SizedBox(height: 32),
+
+                      _buildSectionTitle(
+                        title:
+                            'เกี่ยวกับระบบบริหารจัดการหลังบ้าน (System Overview)',
+                        icon: Icons.info_outline_rounded,
+                        iconColor: Colors.blue,
+                        iconSize: 24,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildSystemDescriptionBox(),
+
+                      const SizedBox(height: 20),
+                    ],
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '-Overview of Platform Activity',
-                    style: TextStyle(fontSize: 15, color: Colors.grey[700]),
-                  ),
-                ],
+                ),
               ),
             ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: _buildOverviewRow(),
-            ),
-
-            const SizedBox(height: 16),
-
-            // ── New Registration Section ───────────────────────────────
-            _buildSectionHeader(
-              child: Row(
-                children: [
-                  _NewBadge(),
-                  const SizedBox(width: 8),
-                  Text(
-                    '-รายการใหม่',
-                    style: TextStyle(fontSize: 15, color: Colors.grey[700]),
-                  ),
-                ],
-              ),
-            ),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: _buildNewRow(),
-            ),
-
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
     );
   }
 
   // ── Title ──────────────────────────────────────────────────────────────────
   Widget _buildTitle() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Center(
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+    return Row(
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
           children: [
-            // Person + gear icon (replicate the emoji-like icon)
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(Icons.person, size: 32, color: Colors.grey[800]),
-                Positioned(
-                  right: -6,
-                  bottom: -2,
-                  child: Icon(
-                    Icons.settings,
-                    size: 16,
-                    color: Colors.grey[800],
-                  ),
-                ),
-              ],
+            Icon(Icons.person, size: 28, color: Colors.grey[800]),
+            Positioned(
+              right: -4,
+              bottom: -2,
+              child: Icon(Icons.settings, size: 14, color: Colors.grey[800]),
             ),
-            const SizedBox(width: 10),
+          ],
+        ),
+        const SizedBox(width: 10),
+        Text(
+          'Dashboard',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[850],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Section Title ──────────────────────────────────────────────────────────
+  Widget _buildSectionTitle({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    double iconSize = 22,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: iconSize, color: iconColor),
+            const SizedBox(width: 8),
             Text(
-              'Dashboard',
+              title,
               style: TextStyle(
-                fontSize: 26,
+                color: Colors.grey[700],
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[850],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Divider(color: Color(0xFFD9D9D9), thickness: 1),
+      ],
+    );
+  }
+
+  // ── Overview Row ── ใช้ค่า _totalRestaurants / _totalRiders ───────────────
+  Widget _buildOverviewRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _OverviewCard(
+            icon: Icons.store_rounded,
+            iconColor: const Color(0xFF4CAF50),
+            iconBg: const Color(0xFFE8F5E9),
+            label: 'จำนวนร้านค้าทั้งหมด',
+            count: _totalRestaurants, // ← ค่าจริงจาก API
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: _OverviewCard(
+            icon: Icons.delivery_dining_rounded,
+            iconColor: const Color(0xFFFF9800),
+            iconBg: const Color(0xFFFFF3E0),
+            label: 'จำนวนผู้จัดส่งทั้งหมด',
+            count: _totalRiders, // ← ค่าจริงจาก API
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── New Registration Row ── ใช้ค่า _newRestaurants / _newRiders ───────────
+  Widget _buildNewRow() {
+    return Row(
+      children: [
+        Expanded(
+          child: _NewRegCard(
+            icon: Icons.tablet_android_rounded,
+            iconColor: const Color(0xFFFF9800),
+            iconBg: const Color(0xFFFFFDE7),
+            label: 'การสมัครร้านค้าใหม่',
+            count: _newRestaurants, // ← ค่าจริงจาก API
+            countColor: const Color(0xFFFF9800),
+          ),
+        ),
+        const SizedBox(width: 20),
+        Expanded(
+          child: _NewRegCard(
+            icon: Icons.assignment_ind_rounded,
+            iconColor: const Color(0xFF2196F3),
+            iconBg: const Color(0xFFFFFDE7),
+            label: 'การสมัครผู้จัดส่งใหม่',
+            count: _newRiders, // ← ค่าจริงจาก API
+            countColor: const Color(0xFF2196F3),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── System Description Box ─────────────────────────────────────────────────
+  Widget _buildSystemDescriptionBox() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildDescriptionLine(
+            '1. ระบบตรวจสอบและอนุมัติร้านค้า (Merchant Verification): ',
+            'ช่องทางคัดกรอง ตรวจสอบเอกสาร และอนุมัติสิทธิ์การเปิดร้านค้าออนไลน์ของพาร์ทเนอร์ภายในมหาวิทยาลัย',
+          ),
+          _buildDescriptionLine(
+            '2. ระบบบริหารจัดการผู้จัดส่งอาหาร (Rider Onboarding Hub): ',
+            'ตรวจสอบข้อมูลส่วนตัว บัตรนักศึกษา และเอกสารยานพาหนะของไรเดอร์เพื่อความปลอดภัยในการให้บริการ',
+          ),
+          _buildDescriptionLine(
+            '3. การแสดงผลสถิติแบบเรียลไทม์ (Real-time Overview): ',
+            'สรุปยอดรวมจำนวนร้านค้าทั้งหมด ไรเดอร์ที่สแตนด์บาย และคำขอสมัครใหม่ที่รอการดำเนินการ',
+          ),
+          _buildDescriptionLine(
+            '4. ระบบคัดกรองและแจ้งเตือนอัจฉริยะ (Pending Alerts): ',
+            'แยกแยะรายการคำสมัครใหม่ที่เพิ่งเข้าสู่ระบบ ช่วยให้แอดมินไม่พลาดทุกการอัปเดตข้อมูล',
+          ),
+          _buildDescriptionLine(
+            '5. ระบบจัดการเหตุผลการปฏิเสธ (Disapproval & Feedback Logging): ',
+            'บันทึกหมายเหตุและระบุเหตุผลอย่างชัดเจนในกรณีที่เอกสารไม่ผ่านเกณฑ์มาตรฐานของระบบ',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDescriptionLine(String title, String desc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            fontSize: 14,
+            height: 1.4,
+            color: Colors.black87,
+          ),
+          children: [
+            TextSpan(
+              text: title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2C3E50),
+              ),
+            ),
+            TextSpan(
+              text: desc,
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Overview Card / New Registration Card (ไม่เปลี่ยนแปลง)
+// ══════════════════════════════════════════════════════════════════════════════
+class _OverviewCard extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String label;
+  final int count;
+
+  const _OverviewCard({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Row(
+          children: [
+            Container(
+              width: 150,
+              height: 95,
+              color: iconBg,
+              child: Icon(icon, size: 40, color: iconColor),
+            ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                        color: iconColor,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -121,316 +371,82 @@ class _HomeAdminState extends State<HomeAdmin> {
       ),
     );
   }
-
-  // ── Section Header (grey bar) ──────────────────────────────────────────────
-  Widget _buildSectionHeader({required Widget child}) {
-    return Container(
-      width: double.infinity,
-      color: Colors.grey[200],
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: child,
-    );
-  }
-
-  // ── Overview Row (2 cards) ─────────────────────────────────────────────────
-  Widget _buildOverviewRow() {
-    return Row(
-      children: [
-        // Shop card
-        Expanded(
-          child: _OverviewCard(
-            iconWidget: const Icon(
-              Icons.store_rounded,
-              size: 56,
-              color: Color(0xFF4CAF50),
-            ),
-            iconBg: const Color(0xFFC8F2C2),
-            label: 'จำนวนร้านค้าทั้งหมด',
-            count: totalShops,
-            statBg: const Color(0xFF4CAF50),
-          ),
-        ),
-        const SizedBox(width: 14),
-        // Delivery card
-        Expanded(
-          child: _OverviewCard(
-            iconWidget: const Icon(
-              Icons.delivery_dining_rounded,
-              size: 56,
-              color: Color(0xFFFF9800),
-            ),
-            iconBg: const Color(0xFFFDE8CC),
-            label: 'จำนวนผู้จัดส่งทั้งหมด',
-            count: totalDeliveries,
-            statBg: const Color(0xFFFF9800),
-          ),
-        ),
-      ],
-    );
-  }
-
-  // ── New Registration Row (2 cards) ────────────────────────────────────────
-  Widget _buildNewRow() {
-    return Row(
-      children: [
-        // New shops
-        Expanded(
-          child: _NewRegCard(
-            iconWidget: const Icon(
-              Icons.tablet_android_rounded,
-              size: 52,
-              color: Color(0xFFFF9800),
-            ),
-            iconBg: const Color(0xFFFFF9C4),
-            label: 'การสมัครร้านค้าใหม่',
-            count: newShops,
-            statBg: const Color(0xFFFFEB3B),
-          ),
-        ),
-        const SizedBox(width: 14),
-        // New deliveries
-        Expanded(
-          child: _NewRegCard(
-            iconWidget: const Icon(
-              Icons.assignment_ind_rounded,
-              size: 52,
-              color: Color(0xFF2196F3),
-            ),
-            iconBg: const Color(0xFFFFF9C4),
-            label: 'การสมัครผู้จัดส่งใหม่',
-            count: newDeliveries,
-            statBg: const Color(0xFFFFEB3B),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
-// ══════════════════════════════════════════════════════════════════════════════
-// Overview Card
-// ══════════════════════════════════════════════════════════════════════════════
-class _OverviewCard extends StatelessWidget {
-  final Widget iconWidget;
-  final Color iconBg;
-  final String label;
-  final int count;
-  final Color statBg;
-
-  const _OverviewCard({
-    required this.iconWidget,
-    required this.iconBg,
-    required this.label,
-    required this.count,
-    required this.statBg,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Row(
-        children: [
-          // Icon side
-          Expanded(
-            flex: 4,
-            child: Container(
-              color: iconBg,
-              padding: const EdgeInsets.symmetric(vertical: 22),
-              child: Center(child: iconWidget),
-            ),
-          ),
-          // Stat side
-          Expanded(
-            flex: 5,
-            child: Container(
-              color: statBg,
-              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 10),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '$count',
-                    style: const TextStyle(
-                      fontSize: 38,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      height: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// New Registration Card
-// ══════════════════════════════════════════════════════════════════════════════
 class _NewRegCard extends StatelessWidget {
-  final Widget iconWidget;
+  final IconData icon;
+  final Color iconColor;
   final Color iconBg;
   final String label;
   final int count;
-  final Color statBg;
+  final Color countColor;
 
   const _NewRegCard({
-    required this.iconWidget,
+    required this.icon,
+    required this.iconColor,
     required this.iconBg,
     required this.label,
     required this.count,
-    required this.statBg,
+    required this.countColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: Row(
-        children: [
-          // Icon side
-          Expanded(
-            flex: 4,
-            child: Container(
-              color: iconBg,
-              padding: const EdgeInsets.symmetric(vertical: 22),
-              child: Center(child: iconWidget),
-            ),
-          ),
-          // Stat side
-          Expanded(
-            flex: 5,
-            child: Container(
-              color: statBg,
-              padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 10),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    label,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '$count',
-                    style: const TextStyle(
-                      fontSize: 38,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                      height: 1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// NEW Badge (red starburst)
-// ══════════════════════════════════════════════════════════════════════════════
-class _NewBadge extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(40, 40),
-      painter: _StarburstPainter(),
-      child: const SizedBox(
-        width: 40,
-        height: 40,
-        child: Center(
-          child: Text(
-            'NEW',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 9,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.3,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Row(
+          children: [
+            Container(
+              width: 150,
+              height: 95,
+              color: iconBg,
+              child: Icon(icon, size: 38, color: iconColor),
             ),
-          ),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey[800],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$count',
+                      style: TextStyle(
+                        fontSize: 30,
+                        fontWeight: FontWeight.bold,
+                        color: countColor,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
-}
-
-class _StarburstPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = const Color(0xFFD32F2F);
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final outerR = size.width / 2;
-    final innerR = size.width * 0.35;
-    const points = 12;
-    final path = Path();
-
-    for (int i = 0; i < points * 2; i++) {
-      final angle = (i * 3.14159265 / points) - 3.14159265 / 2;
-      final r = i.isEven ? outerR : innerR;
-      final x = cx + r * _cos(angle);
-      final y = cy + r * _sin(angle);
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  double _cos(double angle) =>
-      angle == 0 ? 1 : (angle == 3.14159265 ? -1 : _approxCos(angle));
-
-  double _sin(double angle) => _approxSin(angle);
-
-  double _approxCos(double x) {
-    // Taylor series approximation
-    double result = 1;
-    double term = 1;
-    for (int i = 1; i <= 8; i++) {
-      term *= -x * x / ((2 * i - 1) * (2 * i));
-      result += term;
-    }
-    return result;
-  }
-
-  double _approxSin(double x) {
-    double result = x;
-    double term = x;
-    for (int i = 1; i <= 8; i++) {
-      term *= -x * x / ((2 * i) * (2 * i + 1));
-      result += term;
-    }
-    return result;
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
