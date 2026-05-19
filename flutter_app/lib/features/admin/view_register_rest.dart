@@ -4,6 +4,10 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
 import 'package:flutter_app/features/admin/list_restaurant.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter_app/features/admin/map_view_restaurant.dart'
+    if (dart.library.html) 'package:flutter_app/utils/map_view_web.dart';
 
 class View_RegisterRestaurant extends StatefulWidget {
   final RestaurantModel restaurant;
@@ -28,6 +32,14 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
   void initState() {
     super.initState();
     restaurant = widget.restaurant;
+
+    if (restaurant.latitude != null && restaurant.longitude != null) {
+      registerMapView(
+        'map-${restaurant.username}',
+        restaurant.latitude!,
+        restaurant.longitude!,
+      );
+    }
   }
 
   String getOpenDayText(int? openDay) {
@@ -431,14 +443,86 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                                     0xFFD9D9D9,
                                                   ),
                                                 ),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
                                               ),
-                                              child: const Center(
-                                                child: Icon(
-                                                  Icons.map,
-                                                  size: 42,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
+                                              child:
+                                                  (r.latitude != null &&
+                                                      r.longitude != null)
+                                                  ? ClipRRect(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            6,
+                                                          ),
+                                                      child: kIsWeb
+                                                          ? buildMapView(
+                                                              'map-${r.username}',
+                                                            )
+                                                          : GoogleMap(
+                                                              initialCameraPosition:
+                                                                  CameraPosition(
+                                                                    target: LatLng(
+                                                                      r.latitude!,
+                                                                      r.longitude!,
+                                                                    ),
+                                                                    zoom: 17,
+                                                                  ),
+                                                              markers: {
+                                                                Marker(
+                                                                  markerId:
+                                                                      const MarkerId(
+                                                                        'shop',
+                                                                      ),
+                                                                  position: LatLng(
+                                                                    r.latitude!,
+                                                                    r.longitude!,
+                                                                  ),
+                                                                  infoWindow: InfoWindow(
+                                                                    title:
+                                                                        r.restaurantName ??
+                                                                        'ร้านค้า',
+                                                                  ),
+                                                                ),
+                                                              },
+                                                              zoomControlsEnabled:
+                                                                  false,
+                                                              scrollGesturesEnabled:
+                                                                  false,
+                                                              zoomGesturesEnabled:
+                                                                  false,
+                                                              rotateGesturesEnabled:
+                                                                  false,
+                                                              tiltGesturesEnabled:
+                                                                  false,
+                                                              myLocationButtonEnabled:
+                                                                  false,
+                                                              liteModeEnabled:
+                                                                  true,
+                                                            ),
+                                                    )
+                                                  : const Center(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                            Icons.location_off,
+                                                            size: 36,
+                                                            color: Colors.grey,
+                                                          ),
+                                                          SizedBox(height: 4),
+                                                          Text(
+                                                            'ไม่มีข้อมูลพิกัด',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                              color:
+                                                                  Colors.grey,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
                                             ),
                                           ],
                                         ),
@@ -608,47 +692,84 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     );
   }
 
-  Widget _imageBox(String? imagePath) {
-    final String fileName = imagePath?.split('/').last ?? "";
-    final String fullImageUrl =
-        "http://10.244.27.84:8081/uploads/restaurant/imageRestaurant/$fileName";
+  Widget _imageBox(String? imageUrl) {
+    String? encodedUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      final uri = Uri.parse(imageUrl);
+      encodedUrl = uri
+          .replace(
+            path: uri.path
+                .split('/')
+                .map((s) => Uri.encodeComponent(s))
+                .join('/'),
+          )
+          .toString();
+    }
 
     return Container(
-      width: 240, // ขนาดความกว้างกล่องให้สมมาตรกับการวางเรียง Row แนวนอน
-      height:
-          260, // 👈 ปรับสัดส่วนความสูงเป็น 220 พิกเซล เพื่อดึงโครงร่างกรอบให้เป็นแนวตั้งยาวตามสไตล์รูปภาพร้านค้า
+      width: 240,
+      height: 260,
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.black26),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: imagePath != null && fileName.isNotEmpty
+      child: encodedUrl != null
           ? GestureDetector(
-              onTap: () => _showMaximizedImage(context, fullImageUrl),
+              onTap: () => _showMaximizedImage(context, encodedUrl!),
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: Tooltip(
                   message: 'คลิกเพื่อขยายรูป',
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(
-                      fullImageUrl,
-                      fit: BoxFit
-                          .cover, // ดึงสัดส่วนภาพตัดครอบพอดีกรอบทรงสูงแนวตั้ง
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(
-                            Icons.image_not_supported,
-                            color: Colors.grey,
+                    child: Stack(
+                      children: [
+                        Image.network(
+                          encodedUrl,
+                          width: 240,
+                          height: 260,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
+                        ),
+                        Positioned(
+                          bottom: 6,
+                          right: 6,
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Colors.black45,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(4),
+                            child: const Icon(
+                              Icons.zoom_in,
+                              color: Colors.white,
+                              size: 18,
+                            ),
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             )
-          : const Icon(Icons.image_outlined, size: 50, color: Colors.grey),
+          : const Center(
+              child: Icon(Icons.image_outlined, size: 50, color: Colors.grey),
+            ),
     );
   }
 
