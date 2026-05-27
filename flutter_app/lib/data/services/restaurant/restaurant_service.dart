@@ -3,12 +3,16 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 
 class RestaurantService {
-  Future<void> doLoginRestaurant(String username, String password) async {
+  Future<RestaurantModel> doLoginRestaurant(
+    String username,
+    String password,
+  ) async {
     try {
-      await DioClient.dio.post(
+      final response = await DioClient.dio.post(
         "/v1/restaurant/loginRestaurant",
         data: {"username": username, "password": password},
       );
+      return RestaurantModel.fromJson(response.data);
     } on DioException catch (e) {
       final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
       throw errorMessage;
@@ -50,6 +54,46 @@ class RestaurantService {
     } catch (e) {
       print("Error: $e");
       return [];
+    }
+  }
+
+  Future<RestaurantModel> getRestaurantByUsername(String username) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/restaurant/getRestaurantByUsername/$username",
+      );
+      return RestaurantModel.fromJson(response.data);
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    }
+  }
+
+  Future<void> updateProfileRestaurant(RestaurantModel restaurant) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/restaurant/updateProfileRestaurant",
+        data: restaurant.toJson(),
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateStatusOpen(RestaurantModel restaurant) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/restaurant/updateStatusOpen",
+        data: restaurant.toJson(),
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
     }
   }
 }

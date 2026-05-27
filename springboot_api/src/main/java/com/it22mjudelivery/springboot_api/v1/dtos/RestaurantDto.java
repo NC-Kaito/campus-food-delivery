@@ -22,8 +22,8 @@ public class RestaurantDto {
     private LocalTime opentime;
     private LocalTime closetime;
     private int openday;
-    private double latitude;
-    private double longitude;
+    private Double latitude;
+    private Double longitude;
     private String lease_agreement_img;
     private String ownerfirstname;
     private String ownerlastname;

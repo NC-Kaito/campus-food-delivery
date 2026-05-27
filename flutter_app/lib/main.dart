@@ -6,7 +6,8 @@ import 'package:flutter_app/features/member/test_map.dart';
 import 'package:flutter_app/features/restaurant/agrees_restaurant.dart';
 import 'package:flutter_app/features/restaurant/login_restaurant.dart';
 import 'package:flutter_app/features/restaurant/register_owner_info.dart';
-import 'package:flutter_app/features/restaurant/register_restaurant.dart';
+import 'package:flutter_app/features/restaurant/register_restaurant.dart'
+    hide LoginRestaurant;
 import 'package:flutter_app/features/rider/login_rider.dart';
 import 'package:flutter_app/features/user/home_user.dart';
 
@@ -23,7 +24,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Campus food Delivery',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.green)),
-      home: LoginAdmin(),
+      home: LoginRestaurant(),
     );
   }
 }
