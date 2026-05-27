@@ -18,4 +18,6 @@ public interface RestaurantRepository  extends JpaRepository<Restaurant, String>
     long countByVerificationstatus(String verificationStatus);
 
     List<Restaurant> findByRestaurantnameContainingIgnoreCaseAndVerificationstatus(String name, String status);
+
+    List<Restaurant> findByRestaurantnameContainingIgnoreCaseAndVerificationstatusTrue(String restaurantname);
 }

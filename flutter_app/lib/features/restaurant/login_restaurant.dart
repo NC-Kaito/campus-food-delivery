@@ -3,6 +3,7 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/agrees_restaurant.dart';
 import 'package:flutter_app/features/restaurant/home_restaurant.dart';
+import 'package:flutter_app/features/restaurant/wait_approve.dart';
 import 'package:flutter_app/global_data.dart';
 
 class LoginRestaurant extends StatefulWidget {
@@ -13,7 +14,6 @@ class LoginRestaurant extends StatefulWidget {
 }
 
 class _LoginRestaurantState extends State<LoginRestaurant> {
-  // ✅ เพิ่ม
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   late final TextEditingController usernameController;
   late final TextEditingController passwordController;
@@ -40,24 +40,29 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
         _isLoading = true;
       });
       try {
-        await RestaurantService().doLoginRestaurant(
+        final restaurant = await RestaurantService().doLoginRestaurant(
           usernameController.text,
           passwordController.text,
         );
-
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
-
-          // ✅ เก็บข้อมูลลง GlobalData (ปรับชื่อตัวแปรตามที่คุณมี)
           GlobalData.usernameRestaurant = usernameController.text;
-
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeRestaurant()),
-            (route) => false,
-          );
+          final status = restaurant.verificationStatus;
+          if (status == 'true') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => HomeRestaurant()),
+              (route) => false,
+            );
+          } else {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const WaitApprove()),
+              (route) => false,
+            );
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -78,195 +83,302 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
 
   @override
   Widget build(BuildContext context) {
+    // สีฟ้าเริ่มต้นที่ offset นี้ (ครึ่งล่างของ header)
+    const double blueStartOffset = 290;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 80),
-          child: Form(
-            key: formKey, // ✅
-            autovalidateMode: AutovalidateMode.onUserInteraction, // ✅
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
+        child: Form(
+          key: formKey,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height, // ← เพิ่มตรงนี้
+            ),
+            child: Stack(
               children: [
-                const Icon(
-                  Icons.restaurant_menu,
-                  size: 80,
-                  color: Colors.green,
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'ยินดีต้อนรับ',
-                  style: TextStyle(
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                // ── Layer 0 (หลังสุด): container สีฟ้า ──────────────────────
+                // วางก่อนใน Stack = อยู่ด้านหลัง ไม่บังอะไร
+                Positioned(
+                  top: blueStartOffset,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Container(
+                    color: const Color.fromARGB(255, 219, 219, 219),
                   ),
                 ),
-                const Text(
-                  'เข้าสู่ระบบร้านค้า MJU Delivery',
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
-                const SizedBox(height: 40),
 
-                // ✅ ช่องกรอก Username พร้อม validator
-                TextFormField(
-                  controller: usernameController,
-                  validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return "กรุณากรอกชื่อผู้ใช้";
-                    if (value.contains(' '))
-                      return "ชื่อผู้ใช้ต้องไม่มีช่องว่าง";
-                    if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value))
-                      return "ต้องเป็นภาษาอังกฤษหรือตัวเลขเท่านั้น";
-                    if (value.length < 6 || value.length > 20)
-                      return "ต้องมีความยาว 6-20 ตัวอักษร";
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person_outline),
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: "กรุณากรอกชื่อผู้ใช้",
-                    labelText: "ชื่อผู้ใช้ (Username)",
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: const BorderSide(
-                        color: Colors.green,
-                        width: 1.5,
-                      ),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: const BorderSide(color: Colors.red),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: const BorderSide(
-                        color: Colors.red,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-
-                // ✅ ช่องกรอก Password พร้อม validator
-                TextFormField(
-                  controller: passwordController,
-                  obscureText: _obscureText,
-                  validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return "กรุณากรอกรหัสผ่าน";
-                    if (value.contains(' ')) return "รหัสผ่านต้องไม่มีช่องว่าง";
-                    if (value.length < 8)
-                      return "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
-                    return null;
-                  },
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.lock_outline),
-                    filled: true,
-                    fillColor: Colors.white,
-                    hintText: "กรุณากรอกรหัสผ่าน",
-                    labelText: "รหัสผ่าน (Password)",
-                    labelStyle: const TextStyle(fontWeight: FontWeight.w600),
-                    // ✅ ปุ่มแสดง/ซ่อนรหัสผ่าน
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscureText ? Icons.visibility_off : Icons.visibility,
-                        color: Colors.grey,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscureText = !_obscureText),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: const BorderSide(
-                        color: Colors.green,
-                        width: 1.5,
-                      ),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: const BorderSide(color: Colors.red),
-                    ),
-                    focusedErrorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      borderSide: const BorderSide(
-                        color: Colors.red,
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-
-                // ✅ ปุ่มเข้าสู่ระบบ เรียก doLogin
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                      ),
-                      elevation: 2,
-                    ),
-                    onPressed: _isLoading ? null : doLogin, // ✅
-                    child: _isLoading
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text(
-                            "เข้าสู่ระบบ",
+                // ── Layer 1 (หน้าสุด): ข้อความ + รูป + form ─────────────────
+                // วางทีหลังใน Stack = อยู่ด้านหน้า ทับสีฟ้า
+                Column(
+                  children: [
+                    // ข้อความบนพื้นขาว
+                    Container(
+                      color: Colors.white,
+                      width: double.infinity,
+                      padding: const EdgeInsets.only(top: 60, bottom: 10),
+                      child: const Column(
+                        children: [
+                          Text(
+                            'Restaurant',
                             style: TextStyle(
-                              fontSize: 18,
+                              fontSize: 26,
                               fontWeight: FontWeight.bold,
+                              color: Color(0xFF2ECC40),
                             ),
                           ),
-                  ),
-                ),
-                const SizedBox(height: 15),
-
-                // ปุ่มสมัครสมาชิก เหมือนเดิม
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.green),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
+                          Text(
+                            'Campus Food Delivery',
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF2ECC40),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => AgreesRestaurant()),
+                    // รูป banner ลอยอยู่เหนือสีฟ้า
+                    Image.asset(
+                      'assets/images/restaurant_banner.png',
+                      width: double.infinity,
+                      fit: BoxFit.fitWidth,
                     ),
-                    child: const Text(
-                      "สมัครสมาชิก",
-                      style: TextStyle(fontSize: 18, color: Colors.green),
+                    const SizedBox(height: 30),
+                    // ── Form card ──────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color.fromARGB(255, 219, 219, 219),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color.fromARGB(
+                                255,
+                                0,
+                                0,
+                                0,
+                              ).withOpacity(0.05),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            RichText(
+                              text: const TextSpan(
+                                text: 'ชื่อผู้ใช้ (Username) ',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: '*',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            _buildTextFormField(
+                              controller: usernameController,
+                              icon: Icons.person_outline,
+                              obscure: false,
+                              validator: (value) {
+                                if (value == null || value.isEmpty)
+                                  return "กรุณากรอกชื่อผู้ใช้";
+                                if (value.contains(' '))
+                                  return "ชื่อผู้ใช้ต้องไม่มีช่องว่าง";
+                                if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(value))
+                                  return "ต้องเป็นภาษาอังกฤษหรือตัวเลขเท่านั้น";
+                                if (value.length < 6 || value.length > 20)
+                                  return "ต้องมีความยาว 6-20 ตัวอักษร";
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            RichText(
+                              text: const TextSpan(
+                                text: 'รหัสผ่าน (Password) ',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black87,
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text: '*',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _buildTextFormField(
+                              controller: passwordController,
+                              icon: Icons.lock_outline,
+                              obscure: _obscureText,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscureText
+                                      ? Icons.visibility_off
+                                      : Icons.visibility,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () => setState(
+                                  () => _obscureText = !_obscureText,
+                                ),
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty)
+                                  return "กรุณากรอกรหัสผ่าน";
+                                if (value.contains(' '))
+                                  return "รหัสผ่านต้องไม่มีช่องว่าง";
+                                if (value.length < 8)
+                                  return "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร";
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 28),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color.fromARGB(
+                                    255,
+                                    51,
+                                    255,
+                                    0,
+                                  ),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  elevation: 2,
+                                ),
+                                onPressed: _isLoading ? null : doLogin,
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'เข้าสู่ระบบ',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 14),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color.fromARGB(
+                                    255,
+                                    51,
+                                    255,
+                                    0,
+                                  ),
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                  elevation: 2,
+                                ),
+                                onPressed: () => Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const AgreesRestaurant(),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'สมัครสมาชิก',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTextFormField({
+    required TextEditingController controller,
+    required IconData icon,
+    required bool obscure,
+    Widget? suffixIcon,
+    String? Function(String?)? validator,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 219, 219, 219),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscure,
+        validator: validator,
+        decoration: InputDecoration(
+          prefixIcon: Icon(icon, color: Colors.grey[600], size: 22),
+          suffixIcon: suffixIcon,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Colors.red),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: const BorderSide(color: Colors.red, width: 1.5),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),
     );

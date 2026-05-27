@@ -28,9 +28,9 @@ public class MemberController {
     private MenuaddongroupRepository menuaddongroupRepo;
 
     @PostMapping("/loginMember")
-    public ResponseEntity<?> doLoginMember(@RequestBody MemberDto memberDio){
+    public ResponseEntity<?> doLoginMember(@RequestBody MemberDto memberDto){
         try {
-            Member member = memberService.doLoginMember(memberDio.getUsername(), memberDio.getPassword());
+            Member member = memberService.doLoginMember(memberDto.getUsername(), memberDto.getPassword());
             return ResponseEntity.ok(member);
         }catch (RuntimeException e){
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());

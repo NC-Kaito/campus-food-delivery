@@ -1,6 +1,8 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.restaurant;
 
+import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
+import com.it22mjudelivery.springboot_api.v1.entities.Member;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.RestaurantRepository;
 import com.it22mjudelivery.springboot_api.v1.services.RestaurantService;
@@ -93,4 +95,59 @@ public class RestaurantController {
     public ResponseEntity<List<Restaurant>> searchRestaurant(@RequestParam String name) {
         return ResponseEntity.ok(restaurantRepository.findByRestaurantnameContainingIgnoreCaseAndVerificationstatus(name, "true"));
     }
+
+    //------Restaurant---------------------------------------------------------------------
+    @GetMapping("/getRestaurantByUsername/{username}")
+    public ResponseEntity<?> getRestaurantByUsername(@PathVariable String username) {
+        Restaurant rest = restaurantService.getRestaurantByUsername(username);
+        if (rest != null) {
+            return ResponseEntity.ok(rest);
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ไม่พบข้อมูลร้านค้า");
+        }
+    }
+
+    @PostMapping("/updateStatusOpen")
+    public ResponseEntity<?> updateStatusOpen(@RequestBody RestaurantDto restaurantDto) {
+        try {
+            boolean isResult = restaurantService.updateStatusOpen(restaurantDto.getUsername(),restaurantDto.getStatusopen());
+            if (isResult) {
+                return ResponseEntity.ok("updateStatusOpen สำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("updateStatusOpen ไม่สำเร็จ ข้อมูลไม่ถูกต้อง");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    @PostMapping("/updateProfileRestaurant")
+    public ResponseEntity<?> updateProfileRestaurant(@RequestBody RestaurantDto restaurantDto){
+        try {
+            boolean isResult = restaurantService.updateProfileRestaurant(
+                    restaurantDto.getUsername(),restaurantDto.getRestaurantname(),restaurantDto.getRestaurantimage(),restaurantDto.getTypeid(),
+                    //restaurantDto.getLatitude(),restaurantDto.getLongitude(),
+                    restaurantDto.getOpentime(),
+                    restaurantDto.getClosetime(),restaurantDto.getOpenday(),restaurantDto.getOwnerfirstname(),
+                    restaurantDto.getOwnerlastname(),restaurantDto.getEmail(),restaurantDto.getPhone());
+            if (isResult) {
+                return ResponseEntity.ok("updateProfileRestaurant สำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("updateProfileRestaurant ไม่สำเร็จ ข้อมูลไม่ถูกต้อง");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+
 }
+
+
+
+
+

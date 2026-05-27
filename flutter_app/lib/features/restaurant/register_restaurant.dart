@@ -181,7 +181,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
       return "$fieldName ต้องเป็น .jpg หรือ .png";
     }
     final size = file.lengthSync();
-    if (size < 100 * 1024) return "ขนาดต่ำกว่า 100KB";
     if (size > 1024 * 1024) return "ขนาดเกิน 1MB";
     return null;
   }

@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Service
 @RequiredArgsConstructor
@@ -60,4 +61,45 @@ public class RestaurantServiceImpl implements RestaurantService{
         restaurantRepository.save(toSaveRestaurant);
         return true;
     }
+
+    public Restaurant getRestaurantByUsername(String username){
+        Restaurant restaurant = restaurantRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+        return restaurant;
+    }
+
+    public boolean updateStatusOpen(String username, boolean statusopen){
+        Restaurant restaurant = restaurantRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+        restaurant.setStatusopen(statusopen);
+        restaurantRepository.save(restaurant);
+        return true;
+    }
+
+    public boolean updateProfileRestaurant(String username, String restaurantname, String restaurantimage,
+                                           int typeid,
+                                           //double latitude, double longitude,
+                                           LocalTime opentime,
+                                           LocalTime closetime, int openday, String ownerfirstname,
+                                           String ownerlastname, String email, String phone) {
+
+        Restaurant restaurant = restaurantRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+        TypeRestaurant typeRestaurant = typeRestaurantRepository.findById(typeid)
+                .orElseThrow(() -> new RuntimeException("ไม่พบประเภทร้านค้าที่ระบุ"));
+
+        restaurant.setRestaurantname(restaurantname);
+        restaurant.setTyperestaurant(typeRestaurant);
+//        restaurant.setLatitude(latitude);
+//        restaurant.setLongitude(longitude);
+        restaurant.setOpentime(opentime);
+        restaurant.setClosetime(closetime);
+        restaurant.setOpenDay(openday);
+        restaurant.setOwnerfirstname(ownerfirstname);
+        restaurant.setOwnerlastname(ownerlastname);
+        restaurant.setEmail(email);
+        restaurant.setPhone(phone);
+
+        restaurantRepository.save(restaurant);
+        return true;
+    }
+
 }
