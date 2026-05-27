@@ -219,8 +219,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
 
     // เช็คขนาดไฟล์ 100KB - 1MB
     final sizeInBytes = file.lengthSync();
-    if (sizeInBytes < 100 * 1024)
-      return "$fieldName ต้องมีขนาดไม่ต่ำกว่า 100KB";
     if (sizeInBytes > 1024 * 1024) return "$fieldName ต้องมีขนาดไม่เกิน 1MB";
 
     return null;
