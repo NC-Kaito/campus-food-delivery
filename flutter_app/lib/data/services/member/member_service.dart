@@ -28,11 +28,11 @@ class MemberService {
     }
   }
 
-  Future<MemberModel> getMemberByUsername(MemberModel username) async {
+  Future<MemberModel> getMemberByUsername(String username) async {
     try {
       final response = await DioClient.dio.get(
         "/v1/member/getMember",
-        data: username.toJson(),
+        queryParameters: {'username': username},
       );
       return MemberModel.fromJson(response.data);
     } on DioException catch (e) {

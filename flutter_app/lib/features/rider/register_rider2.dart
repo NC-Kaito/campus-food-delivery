@@ -1,8 +1,5 @@
 import 'dart:io';
-import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_app/data/models/faculty_model.dart';
 import 'package:flutter_app/data/models/major_model.dart';

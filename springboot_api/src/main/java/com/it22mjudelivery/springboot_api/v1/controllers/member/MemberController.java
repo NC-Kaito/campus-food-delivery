@@ -2,6 +2,8 @@ package com.it22mjudelivery.springboot_api.v1.controllers.member;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Member;
+import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
+import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddongroupRepository;
 import com.it22mjudelivery.springboot_api.v1.services.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,6 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -20,6 +24,8 @@ import java.util.UUID;
 @RequestMapping("/v1/member")
 public class MemberController {
     private final MemberService memberService;
+
+    private MenuaddongroupRepository menuaddongroupRepo;
 
     @PostMapping("/loginMember")
     public ResponseEntity<?> doLoginMember(@RequestBody MemberDto memberDio){
@@ -52,8 +58,8 @@ public class MemberController {
     }
 
     @GetMapping("/getMember")
-    public ResponseEntity<?> getMemberByUsername(@RequestBody MemberDto memberDto) {
-        Member member = memberService.getMemberByUsername(memberDto.getUsername());
+    public ResponseEntity<?> getMemberByUsername(@RequestParam("username") String username) {
+        Member member = memberService.getMemberByUsername(username);
         if(member != null){
             return ResponseEntity.ok(member);
         }else {
@@ -84,22 +90,37 @@ public class MemberController {
             // สร้างชื่อไฟล์ไม่ซ้ำกัน
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
 
-            // สร้างโฟลเดอร์ uploads ถ้ายังไม่มี
+            // 🎯 จุดที่ 1: ตรวจเช็คให้มั่นใจว่าพิกัดโฟลเดอร์เก็บไฟล์จริงเอาไว้ที่ไหน
+            // แนะนำให้ยิงตรงเข้าโฟลเดอร์ member/ เพื่อความง่ายและสั้นในการจัดพาร์ทครับ
             Path uploadDir = Paths.get("uploads", "member", "profile");
             if (!Files.exists(uploadDir)) {
                 Files.createDirectories(uploadDir);
             }
 
-            // บันทึกไฟล์
+            // บันทึกไฟล์ลงเซิร์ฟเวอร์จริง
             Path savePath = uploadDir.resolve(fileName);
             Files.copy(file.getInputStream(), savePath);
 
-            // return URL กลับไป
-            String imageUrl = "http://10.226.43.211:8081/uploads/member" + fileName;
+            // 🎯 จุดที่ 2: เปลี่ยนมาส่งโครงสร้าง URL แบบเต็มสาย ชี้เข้าพาร์ทโฟลเดอร์เสมือน (Static Resource) ให้ตรงกับที่บันทึกจริง
+            // เติมเครื่องหมาย / คั่นท้ายโฟลเดอร์ member/ ให้ถูกต้องด้วยครับ
+            String imageUrl = "http://10.244.27.211:8081/uploads/member/profile/" + fileName;
+
             return ResponseEntity.ok(Map.of("url", imageUrl));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("อัปโหลดไม่สำเร็จ: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/v1/menu-addons/{menuId}")
+    public ResponseEntity<?> getMenuAddons(@PathVariable Long menuId) {
+
+        List<Menuaddongroup> addonGroups = menuaddongroupRepo.findByMenuId(menuId);
+
+        if (addonGroups.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList()); // ถ้าไม่มีส่งกล่องเปล่าไปให้ Flutter เช็ค
+        }
+
+        return ResponseEntity.ok(addonGroups);
     }
 }

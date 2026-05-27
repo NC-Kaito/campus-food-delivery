@@ -3,17 +3,26 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
-import 'package:flutter_app/features/user/view_restaurant_user.dart';
+import 'package:flutter_app/features/member/view_restaurant_member.dart';
+import 'package:flutter_app/features/user/view_restaurant_user.dart'; // หรือใช้ของฝั่ง member ถ้ามี
 
-class SearchRestaurantUser extends StatefulWidget {
+class SearchRestaurantMember extends StatefulWidget {
   final String keyword;
-  const SearchRestaurantUser({super.key, required this.keyword});
+  final int? initialTypeId;
+  final String? initialTypeName;
+
+  const SearchRestaurantMember({
+    super.key,
+    required this.keyword,
+    this.initialTypeId,
+    this.initialTypeName,
+  });
 
   @override
-  State<SearchRestaurantUser> createState() => _SearchRestaurantUserState();
+  State<SearchRestaurantMember> createState() => _SearchRestaurantMemberState();
 }
 
-class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
+class _SearchRestaurantMemberState extends State<SearchRestaurantMember> {
   final RestaurantService _service = RestaurantService();
   final TypeRestaurantService _typeService = TypeRestaurantService();
   final TextEditingController _searchController = TextEditingController();
@@ -22,7 +31,6 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
   List<TypeRestaurantModel> _typeList = [];
 
   bool _isLoading = true;
-  bool _isShowingFallback = false;
   String _currentKeyword = "";
 
   String? _selectedTypeName;
@@ -33,6 +41,11 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
     super.initState();
     _currentKeyword = widget.keyword;
     _searchController.text = widget.keyword;
+
+    // 🎯 รับวิชาส่งต่อค่าเริ่มต้นมาจากหน้า Home
+    _selectedTypeId = widget.initialTypeId;
+    _selectedTypeName = widget.initialTypeName;
+
     _initData();
   }
 
@@ -56,6 +69,7 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
 
     var data = await _service.searchRestaurant(keyword);
 
+    // คัดกรองประเภทร้านค้าเพิ่มเติมกรณีมีการกดเลือก Dropdown
     if (_selectedTypeId != null) {
       data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
     }
@@ -63,7 +77,6 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
     if (mounted) {
       setState(() {
         _results = data;
-        _isShowingFallback = false;
         _isLoading = false;
       });
     }
@@ -106,13 +119,13 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
         foregroundColor: Colors.white,
         centerTitle: true,
         title: const Text(
-          "ค้นหาร้านอาหาร",
+          "ผลการค้นหาร้านค้า",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
         ),
       ),
       body: Column(
         children: [
-          // Header: Search + Dropdown
+          // กล่อง Header ค้นหาด้านบน
           Container(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
             color: Colors.green,
@@ -199,7 +212,7 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
             ),
           ),
 
-          // สถานะผลลัพธ์
+          // แสดงจำนวนแถวผลลัพธ์
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.all(16),
@@ -209,7 +222,7 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      "พบร้านค้า ${_results.length} แห่ง สำหรับ '$_currentKeyword'",
+                      "พบร้านค้า ${_results.length} แห่ง สำหรับข้อมูล '$_currentKeyword'",
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Colors.black54,
@@ -220,14 +233,19 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
               ),
             ),
 
-          // รายชื่อร้านค้า
+          // รายการการ์ดแสดงร้านค้า
           Expanded(
             child: _isLoading
                 ? const Center(
                     child: CircularProgressIndicator(color: Colors.green),
                   )
                 : _results.isEmpty
-                ? const Center(child: Text("ไม่พบข้อมูลร้านค้า"))
+                ? const Center(
+                    child: Text(
+                      "ไม่พบข้อมูลร้านค้าที่ตรงเงื่อนไข",
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.only(bottom: 20),
                     itemCount: _results.length,
@@ -242,7 +260,6 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
   }
 
   Widget _buildRestaurantCard(BuildContext context, RestaurantModel item) {
-    // ✅ ใช้ URL จาก model โดยตรง + encode space
     final String imageUrl = item.restaurantImage != null
         ? Uri.encodeFull(item.restaurantImage!)
         : '';
@@ -262,18 +279,20 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
+        // 🎯 แก้ไขคำสั่งข้ามสายในไฟล์ SearchRestaurantMember.dart ตรงเหตุการณ์ onTap:
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ViewRestaurantUser(restaurant: item),
+              builder: (context) => ViewRestaurantMember(
+                restaurant: item,
+              ), // 👈 เรียกใช้งานคลาสตัวนี้แทนครับ
             ),
           );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // รูปภาพร้าน
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
@@ -282,19 +301,8 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
                 aspectRatio: 16 / 9,
                 child: imageUrl.isNotEmpty
                     ? Image.network(
-                        imageUrl, // ✅ URL จาก model โดยตรง
+                        imageUrl,
                         fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.grey[200],
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.green,
-                              ),
-                            ),
-                          );
-                        },
                         errorBuilder: (context, error, stackTrace) => Container(
                           color: Colors.grey[200],
                           child: const Icon(
@@ -314,7 +322,6 @@ class _SearchRestaurantUserState extends State<SearchRestaurantUser> {
                       ),
               ),
             ),
-            // รายละเอียด
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

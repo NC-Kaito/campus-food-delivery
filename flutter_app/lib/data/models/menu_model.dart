@@ -1,3 +1,5 @@
+import 'package:flutter_app/data/models/restaurant_model.dart';
+
 class MenuModel {
   int? menuId;
   String? menuName;
@@ -9,6 +11,8 @@ class MenuModel {
   int? typeMenuId;
   String? typeMenuName; // สำหรับนำมาแสดงผลหมวดหมู่ใน UI
 
+  RestaurantModel? restaurant;
+
   MenuModel({
     this.menuId,
     this.menuName,
@@ -19,6 +23,7 @@ class MenuModel {
     this.restaurantId,
     this.typeMenuId,
     this.typeMenuName,
+    this.restaurant,
   });
 
   factory MenuModel.fromJson(Map<String, dynamic> json) {
@@ -43,6 +48,10 @@ class MenuModel {
           : null,
       typeMenuName: json['typemenu'] != null
           ? json['typemenu']['typemenuName']
+          : null,
+
+      restaurant: json['restaurant'] != null
+          ? RestaurantModel.fromJson(json['restaurant'])
           : null,
     );
   }

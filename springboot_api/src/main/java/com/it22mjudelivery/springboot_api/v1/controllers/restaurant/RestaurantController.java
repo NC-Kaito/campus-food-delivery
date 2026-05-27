@@ -91,6 +91,6 @@ public class RestaurantController {
 
     @GetMapping("/searchRestaurant")
     public ResponseEntity<List<Restaurant>> searchRestaurant(@RequestParam String name) {
-        return ResponseEntity.ok(restaurantRepository.findByRestaurantnameContainingIgnoreCaseAndVerificationstatusTrue(name));
+        return ResponseEntity.ok(restaurantRepository.findByRestaurantnameContainingIgnoreCaseAndVerificationstatus(name, "true"));
     }
 }

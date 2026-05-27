@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
-import 'package:flutter_app/features/member/login_member.dart';
+import 'package:flutter_app/features/member/add_order_member.dart';
 
-class ListMenuUser extends StatefulWidget {
-  final RestaurantModel restaurantModel;
-  const ListMenuUser({super.key, required this.restaurantModel});
+class ListMenuMember extends StatefulWidget {
+  final RestaurantModel
+  restaurantModel; // 🎯 รับข้อมูลร้านค้าต่อสายมาจากหน้า ViewRestaurantMember
+  const ListMenuMember({super.key, required this.restaurantModel});
 
   @override
-  State<ListMenuUser> createState() => _ListMenuUserState();
+  State<ListMenuMember> createState() => _ListMenuMemberState();
 }
 
-class _ListMenuUserState extends State<ListMenuUser> {
+class _ListMenuMemberState extends State<ListMenuMember> {
   List<MenuModel> _menus = [];
   bool _isLoading = true;
 
@@ -42,83 +43,15 @@ class _ListMenuUserState extends State<ListMenuUser> {
     }
   }
 
-  // 🎯 ฟังก์ชันสำหรับแสดง Popup แจ้งเตือนความปลอดภัยแบบสวยงาม
-  void _showLoginWarningDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.lock_outline, color: Colors.orange, size: 28),
-              SizedBox(width: 10),
-              Text(
-                "เข้าสู่ระบบเพื่อสั่งอาหาร",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
-              ),
-            ],
-          ),
-          content: const Text(
-            "กรุณาเข้าสู่ระบบสมาชิกก่อน เพื่อสัมผัสความอร่อยและเริ่มสั่งอาหารกับทางเราได้ทันที",
-            style: TextStyle(fontSize: 15, color: Colors.black87, height: 1.4),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "ไว้ทีหลัง",
-                style: TextStyle(
-                  color: Colors.grey,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (context) => const LoginMember()),
-                  (route) => false,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 8,
-                ),
-              ),
-              child: const Text(
-                "เข้าสู่ระบบ",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     const String baseIp = "10.244.27.211";
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[50], // ปรับสีพื้นหลังให้อ่อนลงดูสบายตา
       appBar: AppBar(
         title: Text(
-          "เมนูของ ${widget.restaurantModel.restaurantName ?? 'ร้านค้า'}",
+          "สั่งอาหาร: ${widget.restaurantModel.restaurantName ?? 'ร้านค้า'}",
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -160,13 +93,20 @@ class _ListMenuUserState extends State<ListMenuUser> {
                           horizontal: 15,
                           vertical: 8,
                         ),
-                        elevation: 2,
+                        elevation: 1,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(15),
                         ),
                         child: InkWell(
-                          // 🎯 จุดที่ 1: เมื่อกดที่ตัว Card เมนูใดๆ ให้เด้งแสดงกล่องข้อความเตือนล็อกอิน
-                          onTap: _showLoginWarningDialog,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    AddOrderMember(menuModel: menu),
+                              ),
+                            );
+                          },
                           borderRadius: BorderRadius.circular(15),
                           child: ListTile(
                             contentPadding: const EdgeInsets.all(12),
@@ -178,12 +118,10 @@ class _ListMenuUserState extends State<ListMenuUser> {
                                       width: 70,
                                       height: 70,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print(
-                                          "❌ โหลดรูปภาพเมนูไม่ขึ้นจากพาร์ท: $safeImageUrl",
-                                        );
-                                        return _buildPlaceholderIcon();
-                                      },
+                                      errorBuilder:
+                                          (context, error, stackTrace) {
+                                            return _buildPlaceholderIcon();
+                                          },
                                     )
                                   : _buildPlaceholderIcon(),
                             ),
@@ -221,12 +159,20 @@ class _ListMenuUserState extends State<ListMenuUser> {
                               ),
                             ),
                             trailing: IconButton(
-                              // 🎯 จุดที่ 2: ครอบปุ่มไอคอนบวกให้กดเตือนขึ้นมาด้วยเช่นกันป้องกันการกดพลาด
-                              onPressed: _showLoginWarningDialog,
+                              // 🎯 ปุ่มไอคอนบวกกดสั่งงานลงตระกร้าจริงเช่นกัน
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) =>
+                                        AddOrderMember(menuModel: menu),
+                                  ),
+                                );
+                              },
                               icon: const Icon(
                                 Icons.add_circle,
                                 color: Colors.green,
-                                size: 36,
+                                size: 38,
                               ),
                             ),
                           ),

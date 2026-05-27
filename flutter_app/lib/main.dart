@@ -9,6 +9,7 @@ import 'package:flutter_app/features/restaurant/register_owner_info.dart';
 import 'package:flutter_app/features/restaurant/register_restaurant.dart';
 import 'package:flutter_app/features/rider/login_rider.dart';
 import 'package:flutter_app/features/user/home_user.dart';
+import 'package:flutter_app/features/user/test.dart';
 
 void main() {
   runApp(const MyApp());
@@ -23,7 +24,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Campus food Delivery',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.green)),
-      home: LoginAdmin(),
+      home: LoginMember(),
     );
   }
 }

@@ -22,8 +22,8 @@ class _ProfileMemberState extends State<ProfileMember> {
   GlobalData globalData = GlobalData();
   bool isLooding = true;
   bool isLoading = false;
-  File? _selectedImage; // เพิ่ม
-  final ImagePicker _picker = ImagePicker(); // เพิ่ม
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
 
   late final TextEditingController profileImgController;
   late final TextEditingController usernameController;
@@ -57,9 +57,8 @@ class _ProfileMemberState extends State<ProfileMember> {
 
   Future<void> fetchMemberData() async {
     try {
-      MemberModel requestModel = MemberModel();
-      requestModel.username = GlobalData.usernameMember;
-      final result = await memberService.getMemberByUsername(requestModel);
+      String username = GlobalData.usernameMember;
+      final result = await memberService.getMemberByUsername(username);
 
       setState(() {
         memberModel = result;
@@ -122,11 +121,12 @@ class _ProfileMemberState extends State<ProfileMember> {
 
   Future<String?> _uploadImage(File imageFile) async {
     try {
+      final String baseIp = "10.244.27.211";
+
+      // 🎯 ซ่อมจุดที่ 1: แก้ไข Endpoint ตรงนี้ให้ตรงกับ Java คลาสตัวจริง
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse(
-          'http://10.226.43.211:8081/v1/member/uploadProfileImage',
-        ), // เปลี่ยน URL ตรงนี้
+        Uri.parse('http://$baseIp:8081/v1/member/uploadProfileImage'),
       );
 
       request.files.add(
@@ -137,9 +137,12 @@ class _ProfileMemberState extends State<ProfileMember> {
       var responseBody = await response.stream.bytesToString();
 
       if (response.statusCode == 200) {
-        // สมมติ API return { "url": "https://..." }
         final json = jsonDecode(responseBody);
-        return json['url']; // ได้ URL รูปกลับมา
+        String rawUrl =
+            json['url']; // หลังบ้านส่งมาผิดพาร์ทเป็น /uploads/member/ชื่อไฟล์.jpg
+
+        // 🎯 ซ่อมจุดที่ 2: หน้าบ้านสั่งแก้ซ่อมพาร์ทโดยการแทรกโฟลเดอร์ /profile/ เข้าไปเองอัตโนมัติ
+        return rawUrl;
       }
       return null;
     } catch (e) {
@@ -154,7 +157,6 @@ class _ProfileMemberState extends State<ProfileMember> {
         isLoading = true;
       });
       try {
-        // อัปโหลดรูปก่อนถ้ามีการเลือกรูปใหม่
         String? imageUrl;
         if (_selectedImage != null) {
           imageUrl = await _uploadImage(_selectedImage!);
@@ -210,7 +212,7 @@ class _ProfileMemberState extends State<ProfileMember> {
         backgroundColor: Colors.green,
         centerTitle: true,
         foregroundColor: Colors.white,
-        elevation: 0, // เอาเงาออกเพื่อให้ดูโมเดิร์น
+        elevation: 0,
       ),
       body: isLooding
           ? const Center(child: CircularProgressIndicator(color: Colors.green))
@@ -228,7 +230,6 @@ class _ProfileMemberState extends State<ProfileMember> {
                       Center(
                         child: Column(
                           children: [
-                            // ใส่อันนี้แทน ↓
                             SizedBox(
                               width: 100,
                               height: 100,
@@ -244,9 +245,26 @@ class _ProfileMemberState extends State<ProfileMember> {
                                       backgroundImage: _selectedImage != null
                                           ? FileImage(_selectedImage!)
                                                 as ImageProvider
-                                          : (memberModel.profileimg != null
+                                          : (memberModel.profileimg != null &&
+                                                    memberModel
+                                                        .profileimg!
+                                                        .isNotEmpty
                                                 ? NetworkImage(
-                                                    memberModel.profileimg!,
+                                                    // 🎯 ซ่อมจุดที่ 3: เข้ารหัสเว้นวรรค และซ่อมรูปเก่าที่บันทึกพาร์ทโฟลเดอร์หล่นหายไปในฐานข้อมูล
+                                                    Uri.encodeFull(
+                                                      memberModel.profileimg!
+                                                              .contains(
+                                                                "/uploads/member/profile/",
+                                                              )
+                                                          ? memberModel
+                                                                .profileimg!
+                                                          : memberModel
+                                                                .profileimg!
+                                                                .replaceAll(
+                                                                  "/uploads/member/",
+                                                                  "/uploads/member/profile/",
+                                                                ),
+                                                    ),
                                                   )
                                                 : null),
                                       child:
@@ -279,13 +297,8 @@ class _ProfileMemberState extends State<ProfileMember> {
                                 ),
                               ),
                             ),
-                            // GestureDetector(
-                            //   onTap: () {
-                            //     _p
-                            //   },
-                            // )
-                            SizedBox(height: 10),
-                            Text(
+                            const SizedBox(height: 10),
+                            const Text(
                               "ข้อมูลโปรไฟล์",
                               style: TextStyle(
                                 fontSize: 26,
@@ -298,7 +311,6 @@ class _ProfileMemberState extends State<ProfileMember> {
                       ),
                       const SizedBox(height: 30),
 
-                      // ใช้ฟังก์ชันเสริมเพื่อลดความซ้ำซ้อนของโค้ด (ช่วยให้แก้ง่าย)
                       _buildInputLabel(
                         Icons.person_outline,
                         "ชื่อผู้ใช้งาน (Username)",
@@ -355,7 +367,6 @@ class _ProfileMemberState extends State<ProfileMember> {
 
                       const SizedBox(height: 40),
 
-                      // ปุ่มปิดหรือกดย้อนกลับ (ถ้าต้องการ)
                       SizedBox(
                         width: double.infinity,
                         height: 50,
@@ -367,10 +378,22 @@ class _ProfileMemberState extends State<ProfileMember> {
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            "แก้ไขโปรไฟล์",
-                            style: TextStyle(color: Colors.white, fontSize: 18),
-                          ),
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text(
+                                  "แก้ไขโปรไฟล์",
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                  ),
+                                ),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -382,7 +405,6 @@ class _ProfileMemberState extends State<ProfileMember> {
     );
   }
 
-  // ฟังก์ชันสร้าง Label พร้อม Icon
   Widget _buildInputLabel(IconData icon, String label) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, top: 15),
@@ -402,7 +424,6 @@ class _ProfileMemberState extends State<ProfileMember> {
     );
   }
 
-  // ฟังก์ชันสร้าง TextFormField สำหรับอ่านอย่างเดียว (สไตล์เดียวกันทั้งหน้า)
   Widget _buildReadOnlyTextField(TextEditingController controller) {
     return TextFormField(
       controller: controller,

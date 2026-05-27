@@ -1,0 +1,209 @@
+// features/member/list_order_member.dart
+import 'package:flutter/material.dart';
+import 'package:flutter_app/features/member/cart_manager_member.dart';
+import 'package:flutter_app/features/member/view_order_member.dart';
+
+class ListOrderMember extends StatefulWidget {
+  const ListOrderMember({super.key});
+
+  @override
+  State<ListOrderMember> createState() => _ListOrderMemberState();
+}
+
+class _ListOrderMemberState extends State<ListOrderMember> {
+  late Map<String, List<CartItem>> _groupedCart;
+
+  @override
+  void initState() {
+    super.initState();
+    // สมมติว่า getGroupedByStore() ของคุณคืนค่า Key เป็น storeUsername (หรือไอดีร้านที่ใช้เชื่อมระบบ)
+    _groupedCart = CartManager().getGroupedByStore();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.home_outlined, color: Colors.green, size: 28),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          "ตะกร้ารายการอาหาร",
+          style: TextStyle(
+            color: Colors.green,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.shopping_cart,
+              color: Colors.green,
+              size: 28,
+            ),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.account_circle_outlined,
+              color: Colors.green,
+              size: 28,
+            ),
+            onPressed: () {},
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: _groupedCart.isEmpty
+          ? const Center(
+              child: Text(
+                "ไม่มีรายการอาหารในตะกร้า",
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 15.0,
+              ),
+              itemCount: _groupedCart.keys.length,
+              itemBuilder: (context, index) {
+                // 🎯 จุดแก้ไขที่ 1: ดึง username ออกมาจากคีย์หลักของกลุ่มตะกร้า
+                String storeUsername = _groupedCart.keys.elementAt(index);
+                List<CartItem> storeItems = _groupedCart[storeUsername]!;
+
+                // 🎯 จุดแก้ไขที่ 2: ดึง "ชื่อร้านภาษาไทย/ชื่อจริง" จากโมเดลความสัมพันธ์ของรายการอาหารตัวแรก
+                String storeName =
+                    storeItems.first.menu.restaurant?.restaurantName ??
+                    storeUsername;
+
+                // 🎯 ส่งพารามิเตอร์ให้ครบ 3 ตัวตามโครงสร้างฟังก์ชัน _buildStoreCartCardด้านล่าง
+                return _buildStoreCartCard(
+                  storeUsername,
+                  storeName,
+                  storeItems,
+                );
+              },
+            ),
+    );
+  }
+
+  // 🎯 จุดแก้ไขที่ 3: จัดการลบ คอมมาที่เขียนซ้ำกันสองตัว (,,) ตรงจุด onTap ออกให้แล้วครับ
+  Widget _buildStoreCartCard(
+    String storeUsername,
+    String storeName,
+    List<CartItem> storeItems,
+  ) {
+    // คำนวณจำนวนชิ้นทั้งหมดในร้านนี้
+    int totalItemsInStore = 0;
+    for (var item in storeItems) {
+      totalItemsInStore += item.quantity;
+    }
+
+    // ดึงรูปโปรไฟล์ของร้านค้า
+    String? rawRestaurantImage =
+        storeItems.first.menu.restaurant?.restaurantImage;
+
+    const String baseIp = "10.244.27.211";
+    String safeImageUrl = "";
+
+    if (rawRestaurantImage != null && rawRestaurantImage.isNotEmpty) {
+      safeImageUrl = rawRestaurantImage
+          .replaceAll("10.226.43.211", baseIp)
+          .replaceAll("10.0.2.2", baseIp);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20.0),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE8FCD0),
+        borderRadius: BorderRadius.circular(16.0),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.15),
+            spreadRadius: 1,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16.0),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ViewOrderMember(
+                storeUsername:
+                    storeUsername, // 🎯 ส่งค่า Username ตัวย่อ/ไอดีที่ใช้ค้นหาในหลังบ้าน
+                storeName: storeName, // ส่งชื่อร้านภาษาไทยไปโชว์สวยๆ บนหน้าบิล
+                storeItems: storeItems, // รายการอาหารสั่งจริง
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12.0),
+                child: safeImageUrl.isNotEmpty
+                    ? Image.network(
+                        Uri.encodeFull(safeImageUrl),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildPlaceholderIcon(),
+                      )
+                    : _buildPlaceholderIcon(),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      storeName, // แสดงชื่อร้านค้า
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      "จำนวน $totalItemsInStore รายการ",
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey[800],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderIcon() {
+    return Container(
+      width: 80,
+      height: 80,
+      color: Colors.orange[50],
+      child: const Icon(Icons.store, color: Colors.orange, size: 40),
+    );
+  }
+}

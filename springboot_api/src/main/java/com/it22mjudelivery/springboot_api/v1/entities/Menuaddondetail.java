@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,10 +24,12 @@ public class Menuaddondetail {
     @Column(nullable = false)
     private double addonprice;
 
-    @ManyToMany(mappedBy = "menuaddondetails")
-    private Set<OrderDetail> orderDetails = new HashSet<>();
+    @JsonIgnore
+    @OneToMany(mappedBy = "menuaddondetail", fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<Orderdetailaddon> orderdetailaddons = new HashSet<>();
 
-
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "addongroupid", nullable = false)
     private Menuaddongroup menuaddongroup;

@@ -38,13 +38,9 @@ public class OrderDetail {
     @JoinColumn(name = "menu_id", nullable = false)
     private Menu menu;
 
-    @ManyToMany(cascade = {CascadeType.ALL})
-    @JoinTable(
-            name="orderdetail_addon",
-            joinColumns = @JoinColumn(name = "orderdetailid"),
-            inverseJoinColumns = @JoinColumn(name = "addondetailid")
-    )
-    private Set<Menuaddondetail> menuaddondetails = new HashSet<>();
+    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<Orderdetailaddon> orderDetailAddons = new HashSet<>();
 
 }
 
