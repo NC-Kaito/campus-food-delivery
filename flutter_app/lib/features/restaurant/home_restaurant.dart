@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
-// นำเข้าไฟล์ Navbar ของคุณ
+import 'package:flutter_app/features/restaurant/list_menu_restaurant.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/global_data.dart';
 
@@ -61,14 +61,12 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
       appBar: const RestaurantNavbar(title: ""),
-
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- ส่วนหัวรูปภาพและแผงควบคุมด้านบน ---
+            // --- ส่วนหัวรูปภาพ ---
             Stack(
               children: [
-                // 1. รูปภาพพื้นหลังร้านค้า
                 Container(
                   height: 290,
                   width: double.infinity,
@@ -106,7 +104,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
               ],
             ),
 
-            // --- ส่วนเนื้อหาข้อมูลด้านล่าง ---
+            // --- ส่วนเนื้อหาด้านล่าง ---
             Transform.translate(
               offset: const Offset(0, -25),
               child: Container(
@@ -124,7 +122,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                   children: [
                     const SizedBox(height: 15),
 
-                    // ชื่อร้านค้า และ ปุ่มแก้ไข
+                    // ชื่อร้านค้า
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
@@ -153,7 +151,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                     ),
                     const SizedBox(height: 10),
 
-                    // การ์ดเมนูแนะนำ (คะน้าหมูกรอบ)
+                    // การ์ดเมนูแนะนำ
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -214,7 +212,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                     ),
                     const SizedBox(height: 25),
 
-                    // ตัวจุดนำทางไข่ปลา
+                    // ตัวจุดนำทาง
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -248,18 +246,102 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                     ),
                     const SizedBox(height: 25),
 
-                    // ปุ่มแท็บ (ยอดขาย, เมนู, ดูรีวิว)
+                    // ปุ่มแท็บ
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        _buildTabButton("ยอดขาย", true),
-                        _buildTabButton("เมนู", true),
-                        _buildTabButton("ดูรีวิว", true),
+                        SizedBox(
+                          width: 120,
+                          height: 40,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF5DF232),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            onPressed: () {
+                              // Navigator.push(
+                              //   context,
+                              //   MaterialPageRoute(
+                              //     builder: (_) => const SalesPage(),
+                              //   ),
+                              // );
+                            },
+                            child: const Text(
+                              "ยอดขาย",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 120,
+                          height: 40,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF5DF232),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const ListMenuRestaurant(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "เมนู",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 120,
+                          height: 40,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF5DF232),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            onPressed: () {
+                              // Navigator.push(
+                              //   context,
+                              //   MaterialPageRoute(
+                              //     builder: (_) => const ReviewPage(),
+                              //   ),
+                              // );
+                            },
+                            child: const Text(
+                              "ดูรีวิว",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 30),
 
-                    // ตารางข้อมูลรายละเอียดหน้าร้าน
+                    // ตารางข้อมูลรายละเอียดร้าน
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -300,7 +382,6 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                                 "ประเภทร้านค้า",
                                 typerestaurantName ?? "-",
                               ),
-
                               const SizedBox(height: 20),
                               _buildInfoRow(
                                 Icons.access_time,
@@ -318,34 +399,6 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabButton(String title, bool isActive) {
-    return SizedBox(
-      width: 105,
-      height: 40,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isActive
-              ? const Color(0xFF5DF232)
-              : const Color.fromARGB(255, 167, 242, 146).withOpacity(0.7),
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          padding: EdgeInsets.zero,
-        ),
-        onPressed: () {},
-        child: Text(
-          title,
-          style: const TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
         ),
       ),
     );
