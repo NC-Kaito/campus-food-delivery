@@ -32,12 +32,10 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
     setState(() {
       if (rest != null) {
         restaurantModel = rest;
-        if (rest.restaurantImage != null) {
-          restaurantimage = rest.restaurantImage!.replaceAll(
-            '10.244.27.211',
-            '10.244.27.84',
-          );
-        }
+
+        // ✅ แก้ไขจุดที่ 1: ดึง URL ตรงๆ จากหลังบ้าน ไม่ใช้คำสั่ง .replaceAll สับขาหลอกไอพีตัวเองแล้ว
+        restaurantimage = rest.restaurantImage;
+
         restaurantname = rest.restaurantName;
         openday = rest.openDay;
         phone = rest.phone;
@@ -81,24 +79,16 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                       bottomLeft: Radius.circular(0),
                       bottomRight: Radius.circular(0),
                     ),
-                    child: restaurantimage != null
+                    child:
+                        restaurantimage != null && restaurantimage!.isNotEmpty
                         ? Image.network(
                             Uri.encodeFull(restaurantimage!),
                             fit: BoxFit.cover,
+                            // ✅ แก้ไขจุดที่ 2: ถ้าเกิดเหตุสุดวิสัยโหลดรูปออนไลน์ไม่ได้ เปลี่ยนให้วาดกล่องไอคอนสีแดงแทนการดึง Asset ผี เพื่อตัดปัญหาเรื่องพ่น Error โหลดของไม่เจอพังหน้าจอ
                             errorBuilder: (context, error, stackTrace) =>
-                                Image.asset(
-                                  'assets/images/default_restaurant.png',
-                                  fit: BoxFit.cover,
-                                ),
+                                _buildPlaceholderBackground(),
                           )
-                        : Container(
-                            color: const Color(0xFFD92D2D),
-                            child: const Icon(
-                              Icons.image_outlined,
-                              size: 80,
-                              color: Colors.white,
-                            ),
-                          ),
+                        : _buildPlaceholderBackground(),
                   ),
                 ),
               ],
@@ -261,14 +251,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                             ),
-                            onPressed: () {
-                              // Navigator.push(
-                              //   context,
-                              //   MaterialPageRoute(
-                              //     builder: (_) => const SalesPage(),
-                              //   ),
-                              // );
-                            },
+                            onPressed: () {},
                             child: const Text(
                               "ยอดขาย",
                               style: TextStyle(
@@ -319,14 +302,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                                 borderRadius: BorderRadius.circular(20),
                               ),
                             ),
-                            onPressed: () {
-                              // Navigator.push(
-                              //   context,
-                              //   MaterialPageRoute(
-                              //     builder: (_) => const ReviewPage(),
-                              //   ),
-                              // );
-                            },
+                            onPressed: () {},
                             child: const Text(
                               "ดูรีวิว",
                               style: TextStyle(
@@ -437,6 +413,14 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
           ),
         ),
       ],
+    );
+  }
+
+  // ✅ ฟังก์ชันช่วยสร้างพื้นหลังดีฟอลต์ที่ปลอดภัย ไม่โหลด Asset ให้เสี่ยงพัง
+  Widget _buildPlaceholderBackground() {
+    return Container(
+      color: const Color(0xFFD92D2D),
+      child: const Icon(Icons.image_outlined, size: 80, color: Colors.white),
     );
   }
 
