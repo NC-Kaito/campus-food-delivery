@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
+import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
@@ -53,12 +54,7 @@ class _HomeMemberState extends State<HomeMember> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("CAMPUS EAT"),
-        backgroundColor: Colors.green,
-        centerTitle: true, // ปรับชื่อแอปให้อยู่ตรงกลาง
-        foregroundColor: Colors.white,
-      ),
+      appBar: const NavbarMember(title: ""),
       body: Padding(
         padding: const EdgeInsets.all(15.0),
         child: Column(

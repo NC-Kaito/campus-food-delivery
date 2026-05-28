@@ -39,6 +39,26 @@ class CartManager {
     _items.clear();
   }
 
+  // 🎯 1. ฟังก์ชันลบไอเทมนี้ออกจากตะกร้าทันที (เช่น กดปุ่มถังขยะ)
+  void removeFromCart(CartItem item) {
+    _items.remove(item);
+  }
+
+  // 🎯 2. ฟังก์ชันลดจำนวน (ถ้าเหลือ 1 แล้วกดลดอีก ให้ลบออกจากตะกร้าอัตโนมัติ)
+  void decreaseQuantity(CartItem item) {
+    if (item.quantity > 1) {
+      item.quantity--;
+    } else {
+      // ถ้าจำนวนเหลือ 1 แล้วกดลด ให้ลบออกจากตะกร้าเลย
+      removeFromCart(item);
+    }
+  }
+
+  // 🎯 3. ฟังก์ชันเพิ่มจำนวน (สำหรับกดปุ่ม + ในหน้าดูรายละเอียดออเดอร์)
+  void increaseQuantity(CartItem item) {
+    item.quantity++;
+  }
+
   Map<String, List<CartItem>> getGroupedByStore() {
     Map<String, List<CartItem>> grouped = {};
     for (var item in _items) {

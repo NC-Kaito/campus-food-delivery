@@ -94,7 +94,6 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     );
   }
 
-  // 🎯 จุดแก้ไขที่ 3: จัดการลบ คอมมาที่เขียนซ้ำกันสองตัว (,,) ตรงจุด onTap ออกให้แล้วครับ
   Widget _buildStoreCartCard(
     String storeUsername,
     String storeName,
@@ -135,18 +134,24 @@ class _ListOrderMemberState extends State<ListOrderMember> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16.0),
-        onTap: () {
-          Navigator.push(
+        // 🎯 แก้ไขจุดวิกฤต: เปลี่ยนตรงนี้ให้เป็น async เพื่อดักรอขากลับจากหน้า ViewOrderMember
+        onTap: () async {
+          await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ViewOrderMember(
-                storeUsername:
-                    storeUsername, // 🎯 ส่งค่า Username ตัวย่อ/ไอดีที่ใช้ค้นหาในหลังบ้าน
-                storeName: storeName, // ส่งชื่อร้านภาษาไทยไปโชว์สวยๆ บนหน้าบิล
-                storeItems: storeItems, // รายการอาหารสั่งจริง
+                storeUsername: storeUsername,
+                storeName: storeName,
+                storeItems: storeItems,
               ),
             ),
           );
+
+          // 🚀 เมื่อผู้ใช้กด ย้อนกลับ หรือ Pop ดีดกลับมาจากหน้า ViewOrderMember
+          // สั่งให้รีเฟรชข้อมูลตะกร้าอาหารที่จัดกลุ่มตามร้านใหม่ล่าสุดทันที
+          setState(() {
+            _groupedCart = CartManager().getGroupedByStore();
+          });
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -172,7 +177,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      storeName, // แสดงชื่อร้านค้า
+                      storeName,
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,

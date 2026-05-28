@@ -3,6 +3,7 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/features/member/add_order_member.dart';
+import 'package:flutter_app/features/member/navbar_member.dart';
 
 class ListMenuMember extends StatefulWidget {
   final RestaurantModel
@@ -49,18 +50,7 @@ class _ListMenuMemberState extends State<ListMenuMember> {
 
     return Scaffold(
       backgroundColor: Colors.grey[50], // ปรับสีพื้นหลังให้อ่อนลงดูสบายตา
-      appBar: AppBar(
-        title: Text(
-          "สั่งอาหาร: ${widget.restaurantModel.restaurantName ?? 'ร้านค้า'}",
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.green,
-        centerTitle: true,
-        elevation: 0,
-      ),
+      appBar: const NavbarMember(title: ""),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.green))
           : _menus.isEmpty

@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Campus food Delivery',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.green)),
-      home: LoginRestaurant(),
+      home: LoginMember(),
     );
   }
 }

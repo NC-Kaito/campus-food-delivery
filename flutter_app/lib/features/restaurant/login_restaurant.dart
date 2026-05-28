@@ -97,8 +97,6 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
             ),
             child: Stack(
               children: [
-                // ── Layer 0 (หลังสุด): container สีฟ้า ──────────────────────
-                // วางก่อนใน Stack = อยู่ด้านหลัง ไม่บังอะไร
                 Positioned(
                   top: blueStartOffset,
                   left: 0,
@@ -109,8 +107,6 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                   ),
                 ),
 
-                // ── Layer 1 (หน้าสุด): ข้อความ + รูป + form ─────────────────
-                // วางทีหลังใน Stack = อยู่ด้านหน้า ทับสีฟ้า
                 Column(
                   children: [
                     // ข้อความบนพื้นขาว

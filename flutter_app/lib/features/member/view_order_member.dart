@@ -6,6 +6,7 @@ import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
+import 'package:flutter_app/features/member/edit_order_member.dart';
 import 'package:flutter_app/features/member/location_order_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -85,7 +86,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     );
   }
 
-  Widget _buildOrderItemCard(CartItem item, String baseIp) {
+  Widget _buildOrderItemCard(CartItem item, String baseIp, int index) {
     String? rawMenuImage = item.menu.menuImage;
     String safeImageUrl = "";
     if (rawMenuImage != null && rawMenuImage.isNotEmpty) {
@@ -94,13 +95,11 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
           .replaceAll("10.0.2.2", baseIp);
     }
 
-    // คำนวณราคารวมทั้งหมดของ Add-on ที่เลือกมาในไอเทมชิ้นนี้ (คำนวณต่อชิ้น)
     int totalAddonPricePerUnit = 0;
     for (var addon in item.selectedAddons) {
       totalAddonPricePerUnit += addon.addonPrice?.toInt() ?? 0;
     }
 
-    // เอาราคาอาหารตั้งต้น มาบวกผสมกับราคาท็อปปิ้งเสริมทั้งหมด ได้เป็นราคาต่อหน่วยที่แท้จริง
     int baseMenuPrice = item.menu.price?.toInt() ?? 0;
     int finalPricePerUnit = baseMenuPrice + totalAddonPricePerUnit;
 
@@ -109,85 +108,134 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
         .where((name) => name.isNotEmpty)
         .join(", ");
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
-        borderRadius: BorderRadius.circular(16),
-        border: const Border(left: BorderSide(color: Colors.green, width: 4)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: safeImageUrl.isNotEmpty
-                  ? Image.network(
-                      Uri.encodeFull(safeImageUrl),
-                      width: 65,
-                      height: 65,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildPlaceholderIcon(),
-                    )
-                  : _buildPlaceholderIcon(),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        item.menu.menuName ?? "ไม่มีชื่อเมนู",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+    return InkWell(
+      onTap: () async {
+        // 🚀 1. เปิดหน้าแก้ไขรายการอาหารตามปกติ
+        final dynamic result = await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EditOrderMember(cartItem: item),
+          ),
+        );
+
+        // 🚀 2. ตรวจสอบสถานะขากลับเมื่อหน้า Edit ปิดสนิทลงแล้ว
+        // 🚀 2. ดักเช็กข้อมูลขากลับเมื่อหน้า Edit ปิดสนิทลงแล้ว
+        if (result != null) {
+          setState(() {
+            if (result == "REMOVE") {
+              // 🎯 จุดแก้ไขวิกฤต: สั่งลบไอเทมตัวนี้ออกจากตะกร้ากลาง (CartManager) จริงๆ ด้วยครับ!
+              CartManager().removeFromCart(item);
+
+              // จากนั้นค่อยลบออกจาก List จำลองที่วาดบนหน้านี้
+              widget.storeItems.removeAt(index);
+
+              // ดักเช็กถ้าของเกลี้ยงตะกร้าแล้ว ให้เคลียร์คิวถอยฉากกลับหน้าแรกทันที
+              if (widget.storeItems.isEmpty) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                });
+              }
+            } else if (result is CartItem) {
+              // กรณีแก้ไขเพิ่มลดจำนวนหรือแอนออนปกติ -> เขียนทับตัวแปรแถวเดิม
+              widget.storeItems[index] = result;
+
+              // 💡 ทริคเสริม: เพื่อความเนี๊ยบของระบบ ถ้าเขากดบันทึกแก้ไขจำนวนหรือแอดออนมาใหม่
+              // เราก็ต้องอัปเดตไอเทมชิ้นนั้นกลับเข้าตะกร้าหลักในเครื่องด้วยเช่นกันครับ
+              final int mainCartIndex = CartManager().items.indexOf(item);
+              if (mainCartIndex != -1) {
+                CartManager().items[mainCartIndex] = result;
+              }
+            }
+          });
+        }
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F5F5),
+          borderRadius: BorderRadius.circular(16),
+          border: const Border(left: BorderSide(color: Colors.green, width: 4)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: safeImageUrl.isNotEmpty
+                    ? Image.network(
+                        Uri.encodeFull(safeImageUrl),
+                        width: 65,
+                        height: 65,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            _buildPlaceholderIcon(),
+                      )
+                    : _buildPlaceholderIcon(),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          item.menu.menuName ?? "ไม่มีชื่อเมนู",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      Text(
-                        "แก้ไข",
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "ราคา $finalPricePerUnit บาท",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
+                        Text(
+                          "แก้ไข",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.green[700],
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  if (addonText.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
-                      "ตัวเลือกเสริม: $addonText",
+                      "ราคา $finalPricePerUnit บาท",
                       style: const TextStyle(
-                        fontSize: 13,
-                        color: Colors.orange,
+                        fontSize: 14,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      "จำนวน ${item.quantity}",
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+                    if (addonText.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        "ตัวเลือกเสริม: $addonText",
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Colors.orange,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        "จำนวน ${item.quantity}",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -452,7 +500,8 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
               itemCount: widget.storeItems.length,
               itemBuilder: (context, index) {
                 final item = widget.storeItems[index];
-                return _buildOrderItemCard(item, baseIp);
+                // 🎯 จุดปรับปรุง: ส่งพารามิเตอร์ index พ่วงท้ายเข้าไปเพื่อให้ลูปจำตำแหน่งการแก้ไขได้
+                return _buildOrderItemCard(item, baseIp, index);
               },
             ),
             const SizedBox(height: 16),

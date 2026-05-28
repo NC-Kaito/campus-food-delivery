@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -204,16 +205,7 @@ class _ProfileMemberState extends State<ProfileMember> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        title: const Text(
-          "CAMPUS EAT",
-          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
-        ),
-        backgroundColor: Colors.green,
-        centerTitle: true,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      appBar: const NavbarMember(title: ""),
       body: isLooding
           ? const Center(child: CircularProgressIndicator(color: Colors.green))
           : Form(
