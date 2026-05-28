@@ -9,4 +9,7 @@ import java.util.List;
 @Repository
 public interface MenuRepository extends JpaRepository<Menu, Integer> {
     List<Menu> findByRestaurant_username(String username);
+
+    // สำหรับ filter ตาม typeMenu (ถ้าต้องการทำ server-side filter ในอนาคต)
+    List<Menu> findByRestaurant_usernameAndTypemenu_typemenuId(String username, Integer typeMenuId);
 }

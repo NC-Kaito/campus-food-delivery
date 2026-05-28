@@ -16,12 +16,12 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class menuDto {
-    private int menuid;
+    private Integer menuid; // เปลี่ยนจาก int -> Integer
     private String menuname;
     private String description;
     private String imageurl;
-    private double price;
+    private Double price;   // เปลี่ยนจาก double -> Double (แก้ตรงนี้จะหายพัง)
     private boolean status;
     private String restaurantid;
-    private int typeMenuId;
+    private Integer typeMenuId; // เปลี่ยนจาก int -> Integer
 }

@@ -36,7 +36,7 @@
 //    @Transactional
 //    public void run(String... args) throws Exception {
 //
-//    String restaurantTarget = "user9999";
+//    String restaurantTarget = "naree1234";
 //    List<Menu> menus = menuRepository.findByRestaurant_username(restaurantTarget);
 //    System.out.println("Menus = "+ menus.size());
 //
@@ -49,6 +49,7 @@
 //        Addonmenu addonmenu2 = Addonmenu.builder()
 //                .addonname("ธรรมดา")
 //                .build();
+//
 ////        Addonmenu addonmenu3 = Addonmenu.builder()
 ////                .addonname("ไก่กรอบ")
 ////                .build();

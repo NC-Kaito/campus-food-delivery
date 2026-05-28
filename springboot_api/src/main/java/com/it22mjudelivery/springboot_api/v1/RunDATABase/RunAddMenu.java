@@ -20,16 +20,16 @@ public class RunAddMenu implements CommandLineRunner {
     public void run(String... args) throws Exception {
 
         // ดึง Restaurant username = user3333
-        Restaurant restaurant = entityManager.find(Restaurant.class, "user9999");
+        Restaurant restaurant = entityManager.find(Restaurant.class, "naree1234");
         if (restaurant == null) {
-            System.out.println("❌ ไม่พบร้านค้า username = user9999");
+            System.out.println("❌ ไม่พบร้านค้า username = naree1234");
             return;
         }
 
         // เช็คว่ามีเมนูอยู่แล้วไหม
         Long count = (Long) entityManager
                 .createQuery("SELECT COUNT(m) FROM Menu m WHERE m.restaurant.username = :username")
-                .setParameter("username", "user9999")
+                .setParameter("username", "naree1234")
                 .getSingleResult();
 
         if (count > 0) {
