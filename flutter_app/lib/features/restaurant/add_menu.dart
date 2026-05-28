@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
-import 'package:flutter_app/data/models/typemenu_model.dart';
+import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/models/addon_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
+import 'package:flutter_app/data/services/menu/type_menu_service.dart';
 import 'package:flutter_app/global_data.dart';
 
 class CustomAddonItem {
@@ -36,6 +38,10 @@ class AddMenu extends StatefulWidget {
 
 class _AddMenuState extends State<AddMenu> {
   final MenuService menuService = MenuService();
+
+  final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
+  final TypeMenuService typeMenuService = TypeMenuService();
+
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   final TextEditingController menuNameController = TextEditingController();
@@ -86,14 +92,12 @@ class _AddMenuState extends State<AddMenu> {
 
   Future<void> fetchTypeMenus() async {
     try {
-      final types = await menuService.getTypeMenuByRestaurant(
-        GlobalData.usernameRestaurant,
-      );
+      final types = await typeMenuService.getAllTypeMenu();
       setState(() {
         typeMenuList = types;
       });
     } catch (e) {
-      print("ไม่สามารถโหลดประเภทอาหารได้: $e");
+      print("ไม่สามารถโหลดประเภทอาหารจาก /v1/typemenu ได้: $e");
     }
   }
 
@@ -245,7 +249,6 @@ class _AddMenuState extends State<AddMenu> {
     );
   }
 
-  // ✅ ฟังก์ชันบันทึก ลอกสไตล์ doRegister() ของร้านค้าเป๊ะ
   Future<void> _doSaveMenu() async {
     final isFormValid = formKey.currentState!.validate();
 
@@ -265,23 +268,21 @@ class _AddMenuState extends State<AddMenu> {
     setState(() => _isLoading = true);
 
     try {
-      // ✅ 1. อัปโหลดรูปก่อน — วิธีเดียวกับ uploadImage() ของร้านค้า
       final String? imageUrl = await menuService.uploadMenuImage(
         _selectedImage,
       );
 
-      // ✅ 2. สร้าง request body
+      // ✅ แก้ไขตรงนี้: ปรับตัวแปรคีย์ "imageurl" -> "imageUrl" ให้ตรงสเปกดีทีโอฝั่งจาวาแล้ว
       final Map<String, dynamic> requestData = {
         "menuname": menuNameController.text.trim(),
         "description": descriptionController.text.trim(),
         "price": double.parse(priceController.text),
         "status": true,
-        "imageurl": imageUrl ?? "",
+        "imageUrl": imageUrl ?? "",
         "restaurantId": GlobalData.usernameRestaurant,
         "typeMenuId": _selectedTypeMenuId,
       };
 
-      // ✅ 3. แนบ addonGroups ถ้าเปิดใช้งาน
       if (isAddonOn) {
         requestData["addonGroups"] = addonGroups.map((group) {
           return {
@@ -302,7 +303,6 @@ class _AddMenuState extends State<AddMenu> {
         }).toList();
       }
 
-      // ✅ 4. ส่งไป Spring Boot
       await menuService.saveMenuWithAddons(requestData);
 
       if (mounted) {
@@ -397,7 +397,6 @@ class _AddMenuState extends State<AddMenu> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // --- รูปอาหาร ---
                   _buildLabel("รูปอาหาร"),
                   const SizedBox(height: 5),
                   Center(
@@ -442,7 +441,6 @@ class _AddMenuState extends State<AddMenu> {
                     ),
                   const SizedBox(height: 10),
 
-                  // --- ชื่อเมนู ---
                   _buildLabel("ชื่อเมนู (Menu Name)"),
                   TextFormField(
                     controller: menuNameController,
@@ -453,21 +451,51 @@ class _AddMenuState extends State<AddMenu> {
                     decoration: _inputDecoration(hint: "เช่น กระเพราหมูกรอบ"),
                   ),
 
-                  // --- ประเภทเมนู ---
                   _buildLabel("ประเภทเมนู (MenuType)"),
-                  _buildDropdown(
-                    typeMenuList.map((e) => e.typemenuName ?? "").toList(),
-                    _selectedTypeMenuName,
-                    (val) {
-                      setState(() {
-                        _selectedTypeMenuName = val;
-                        _selectedTypeMenuId = typeMenuList
-                            .firstWhere((e) => e.typemenuName == val)
-                            .typemenuId;
-                        _typeMenuError = null;
-                      });
-                    },
-                  ),
+                  typeMenuList.isEmpty
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 15,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade400),
+                          ),
+                          child: const Row(
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                              SizedBox(width: 10),
+                              Text(
+                                "กำลังโหลดประเภทหมวดหมู่...",
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _buildDropdown(
+                          typeMenuList
+                              .map((e) => e.typemenuName ?? "")
+                              .toList(),
+                          _selectedTypeMenuName,
+                          (val) {
+                            setState(() {
+                              _selectedTypeMenuName = val;
+                              _selectedTypeMenuId = typeMenuList
+                                  .firstWhere((e) => e.typemenuName == val)
+                                  .typemenuId;
+                              _typeMenuError = null;
+                            });
+                          },
+                        ),
                   if (_typeMenuError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6, left: 4),
@@ -477,7 +505,6 @@ class _AddMenuState extends State<AddMenu> {
                       ),
                     ),
 
-                  // --- รายละเอียด ---
                   _buildLabel("รายละเอียด (description)"),
                   TextFormField(
                     controller: descriptionController,
@@ -487,7 +514,6 @@ class _AddMenuState extends State<AddMenu> {
                     ),
                   ),
 
-                  // --- ราคา ---
                   _buildLabel("ราคาปกติ (price)"),
                   TextFormField(
                     controller: priceController,
@@ -519,7 +545,6 @@ class _AddMenuState extends State<AddMenu> {
                     child: Divider(thickness: 1),
                   ),
 
-                  // --- ตัวเลือกเสริม Add-on ---
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -573,7 +598,6 @@ class _AddMenuState extends State<AddMenu> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // ชื่อกลุ่ม
                                 Row(
                                   children: [
                                     const Text(
@@ -608,7 +632,6 @@ class _AddMenuState extends State<AddMenu> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                // จำนวนสูงสุด
                                 Row(
                                   children: [
                                     const Text(
@@ -648,7 +671,6 @@ class _AddMenuState extends State<AddMenu> {
                                 ),
                                 const SizedBox(height: 12),
 
-                                // บังคับเลือก
                                 Row(
                                   children: [
                                     const Text(
@@ -683,7 +705,6 @@ class _AddMenuState extends State<AddMenu> {
                                 const SizedBox(height: 10),
                                 const Divider(),
 
-                                // ช่องค้นหา
                                 SizedBox(
                                   height: 40,
                                   child: TextField(
@@ -707,7 +728,6 @@ class _AddMenuState extends State<AddMenu> {
                                 ),
                                 const SizedBox(height: 8),
 
-                                // รายการจาก DB
                                 Container(
                                   height: 110,
                                   decoration: BoxDecoration(
@@ -734,7 +754,7 @@ class _AddMenuState extends State<AddMenu> {
                                         child: ListTile(
                                           dense: true,
                                           title: Text(
-                                            "${index + 1}.  ${item.addonName ?? ""}",
+                                            "${index + 1}.   ${item.addonName ?? ""}",
                                           ),
                                           trailing: IconButton(
                                             icon: const Icon(
@@ -757,7 +777,6 @@ class _AddMenuState extends State<AddMenu> {
                                 ),
                                 const SizedBox(height: 8),
 
-                                // แถวช้อยส์
                                 ListView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
@@ -835,7 +854,6 @@ class _AddMenuState extends State<AddMenu> {
                                 ),
                                 const SizedBox(height: 10),
 
-                                // ปุ่มล่างกรอบกลุ่ม
                                 Row(
                                   children: [
                                     Expanded(
@@ -889,7 +907,6 @@ class _AddMenuState extends State<AddMenu> {
                       },
                     ),
 
-                    // ปุ่มเพิ่มกลุ่ม
                     Center(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.add),
@@ -910,11 +927,9 @@ class _AddMenuState extends State<AddMenu> {
 
                   const SizedBox(height: 20),
 
-                  // --- ปุ่มบันทึก ---
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      // ✅ disable ระหว่าง loading เหมือน doRegister()
                       onPressed: _isLoading ? null : _doSaveMenu,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF5DF232),
@@ -979,6 +994,10 @@ class _AddMenuState extends State<AddMenu> {
     String? value,
     Function(String?) onChanged,
   ) {
+    final String? safeValue = (value != null && items.contains(value))
+        ? value
+        : null;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
@@ -988,15 +1007,15 @@ class _AddMenuState extends State<AddMenu> {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
-          value: value,
+          value: safeValue,
           isExpanded: true,
           hint: const Text(
             "---เลือกประเภท---",
             style: TextStyle(fontSize: 14, color: Colors.black54),
           ),
-          items: items
-              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-              .toList(),
+          items: items.toSet().map((String e) {
+            return DropdownMenuItem<String>(value: e, child: Text(e));
+          }).toList(),
           onChanged: onChanged,
         ),
       ),

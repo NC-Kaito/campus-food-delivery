@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 class DioClient {
   static final Dio dio = Dio(
     BaseOptions(
-      // baseUrl: "http://10.244.27.211:8081",
-      baseUrl: "http://10.244.27.84:8081", //เครื่องนารี
+      baseUrl: "http://10.244.27.211:8081",
+      // baseUrl: "http://10.244.27.84:8081", //เครื่องนารี
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 10),
       headers: {"Content-Type": "application/json"},
