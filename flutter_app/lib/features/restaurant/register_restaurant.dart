@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/features/member/test_map.dart';
-import 'package:flutter_app/features/restaurant/agrees_restaurant.dart';
 import 'package:flutter_app/features/restaurant/register_owner_info.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';

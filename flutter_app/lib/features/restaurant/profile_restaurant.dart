@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
+import 'package:flutter_app/features/restaurant/login_restaurant.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/global_data.dart';
@@ -966,101 +967,348 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
 
                         // ── ปุ่มควบคุม ────────────────────────────────────────
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 24),
-                          child: _isEditable
-                              ? Row(
-                                  children: [
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 50,
-                                        child: ElevatedButton(
-                                          onPressed: () {
-                                            setState(() {
-                                              _isEditable = false;
-                                              _selectedImage =
-                                                  null; // คืนค่ารูปที่เลือกค้างไว้
-                                            });
-                                            _fetchRestaurantProfile();
-                                          },
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.grey[300],
-                                            foregroundColor: Colors.black,
-                                            elevation: 0,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
+                          padding: const EdgeInsets.only(top: 24, bottom: 40),
+                          child: Column(
+                            children: [
+                              _isEditable
+                                  ? Row(
+                                      children: [
+                                        Expanded(
+                                          child: SizedBox(
+                                            height: 50,
+                                            child: ElevatedButton(
+                                              onPressed: () {
+                                                setState(() {
+                                                  _isEditable = false;
+                                                  _selectedImage = null;
+                                                });
+                                                _fetchRestaurantProfile();
+                                              },
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    Colors.grey[300],
+                                                foregroundColor: Colors.black,
+                                                elevation: 0,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(30),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                "ยกเลิก",
+                                                style: TextStyle(fontSize: 16),
+                                              ),
                                             ),
-                                          ),
-                                          child: const Text(
-                                            "ยกเลิก",
-                                            style: TextStyle(fontSize: 16),
                                           ),
                                         ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 15),
-                                    Expanded(
-                                      child: SizedBox(
-                                        height: 50,
-                                        child: ElevatedButton(
-                                          onPressed: isLoadingAction
-                                              ? null
-                                              : doUpdateRestaurant,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor:
-                                                Colors.greenAccent[400],
-                                            foregroundColor: Colors.white,
-                                            elevation: 5,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(30),
+                                        const SizedBox(width: 15),
+                                        Expanded(
+                                          child: SizedBox(
+                                            height: 50,
+                                            child: ElevatedButton(
+                                              onPressed: isLoadingAction
+                                                  ? null
+                                                  : doUpdateRestaurant,
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    Colors.greenAccent[400],
+                                                foregroundColor: Colors.white,
+                                                elevation: 5,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(30),
+                                                ),
+                                              ),
+                                              child: isLoadingAction
+                                                  ? const SizedBox(
+                                                      height: 20,
+                                                      width: 20,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            color: Colors.white,
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    )
+                                                  : const Text(
+                                                      "บันทึกข้อมูล",
+                                                      style: TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
                                             ),
                                           ),
-                                          child: isLoadingAction
-                                              ? const SizedBox(
-                                                  height: 20,
-                                                  width: 20,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Colors.white,
-                                                        strokeWidth: 2,
+                                        ),
+                                      ],
+                                    )
+                                  : Column(
+                                      children: [
+                                        SizedBox(
+                                          width: double.infinity,
+                                          height: 50,
+                                          child: ElevatedButton(
+                                            onPressed: () => setState(
+                                              () => _isEditable = true,
+                                            ),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  Colors.greenAccent[400],
+                                              foregroundColor: Colors.white,
+                                              elevation: 5,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(30),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              "แก้ไขข้อมูล",
+                                              style: TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          height: 50,
+                                          child: OutlinedButton(
+                                            onPressed: () async {
+                                              final confirm = await showDialog<bool>(
+                                                context: context,
+                                                barrierColor: Colors.black
+                                                    .withOpacity(0.4),
+                                                builder: (context) => Dialog(
+                                                  insetPadding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 40,
+                                                        vertical: 24,
                                                       ),
-                                                )
-                                              : const Text(
-                                                  "บันทึกข้อมูล",
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          16,
+                                                        ),
+                                                  ),
+                                                  elevation: 0,
+                                                  backgroundColor: Colors.white,
+                                                  child: Padding(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          28,
+                                                        ),
+                                                    child: Column(
+                                                      mainAxisSize:
+                                                          MainAxisSize.min,
+                                                      children: [
+                                                        // ── Icon สีแดงเตือน ──
+                                                        Container(
+                                                          width: 64,
+                                                          height: 64,
+                                                          decoration:
+                                                              const BoxDecoration(
+                                                                color: Color(
+                                                                  0xFFFFEBEE,
+                                                                ),
+                                                                shape: BoxShape
+                                                                    .circle,
+                                                              ),
+                                                          child: const Icon(
+                                                            Icons
+                                                                .logout_rounded,
+                                                            color: Color(
+                                                              0xFFE53935,
+                                                            ),
+                                                            size: 32,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 20,
+                                                        ),
+                                                        // ── Title ──
+                                                        const Text(
+                                                          'ออกจากระบบ',
+                                                          style: TextStyle(
+                                                            fontSize: 18,
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            color: Color(
+                                                              0xFF1A1A2E,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 10,
+                                                        ),
+                                                        // ── Subtitle ──
+                                                        const Text(
+                                                          'คุณต้องการออกจากระบบใช่หรือไม่?',
+                                                          textAlign:
+                                                              TextAlign.center,
+                                                          style: TextStyle(
+                                                            fontSize: 16,
+                                                            color:
+                                                                Colors.black54,
+                                                            height: 1.5,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          height: 28,
+                                                        ),
+                                                        // ── ปุ่มกดยืนยัน / ยกเลิก ──
+                                                        Row(
+                                                          children: [
+                                                            Expanded(
+                                                              child: OutlinedButton(
+                                                                onPressed: () =>
+                                                                    Navigator.pop(
+                                                                      context,
+                                                                      false,
+                                                                    ),
+                                                                style: OutlinedButton.styleFrom(
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        vertical:
+                                                                            14,
+                                                                      ),
+                                                                  side: BorderSide(
+                                                                    color: Colors
+                                                                        .grey
+                                                                        .shade300,
+                                                                  ),
+                                                                  shape: RoundedRectangleBorder(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          10,
+                                                                        ),
+                                                                  ),
+                                                                ),
+                                                                child: Text(
+                                                                  'ยกเลิก',
+                                                                  style: TextStyle(
+                                                                    fontSize:
+                                                                        16,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                    color: Colors
+                                                                        .grey[700],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 12,
+                                                            ),
+                                                            Expanded(
+                                                              child: ElevatedButton(
+                                                                onPressed: () =>
+                                                                    Navigator.pop(
+                                                                      context,
+                                                                      true,
+                                                                    ),
+                                                                style: ElevatedButton.styleFrom(
+                                                                  backgroundColor:
+                                                                      const Color(
+                                                                        0xFFE53935,
+                                                                      ),
+                                                                  padding:
+                                                                      const EdgeInsets.symmetric(
+                                                                        vertical:
+                                                                            14,
+                                                                      ),
+                                                                  elevation: 0,
+                                                                  shape: RoundedRectangleBorder(
+                                                                    borderRadius:
+                                                                        BorderRadius.circular(
+                                                                          10,
+                                                                        ),
+                                                                  ),
+                                                                ),
+                                                                child: const Text(
+                                                                  'ออกจากระบบ',
+                                                                  style: TextStyle(
+                                                                    fontSize:
+                                                                        16,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                    color: Colors
+                                                                        .white,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+
+                                              if (confirm == true) {
+                                                if (context.mounted) {
+                                                  GlobalData
+                                                          .usernameRestaurant =
+                                                      "";
+
+                                                  Navigator.pushAndRemoveUntil(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          const LoginRestaurant(),
+                                                    ),
+                                                    (route) => false,
+                                                  );
+                                                }
+                                              }
+                                            },
+                                            style: OutlinedButton.styleFrom(
+                                              side: const BorderSide(
+                                                color: Colors.red,
+                                                width: 1.5,
+                                              ),
+                                              foregroundColor:
+                                                  const Color.fromARGB(
+                                                    255,
+                                                    255,
+                                                    255,
+                                                    255,
+                                                  ),
+                                              backgroundColor:
+                                                  const Color.fromARGB(
+                                                    255,
+                                                    244,
+                                                    80,
+                                                    80,
+                                                  ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(30),
+                                              ),
+                                            ),
+                                            child: const Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Text(
+                                                  "ออกจากระบบ",
                                                   style: TextStyle(
                                                     fontSize: 16,
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
+                                              ],
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                  ],
-                                )
-                              : SizedBox(
-                                  width: double.infinity,
-                                  height: 50,
-                                  child: ElevatedButton(
-                                    onPressed: () =>
-                                        setState(() => _isEditable = true),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.greenAccent[400],
-                                      foregroundColor: Colors.white,
-                                      elevation: 5,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      "แก้ไขข้อมูล",
-                                      style: TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
