@@ -50,16 +50,23 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
           });
           GlobalData.usernameRestaurant = usernameController.text;
           final status = restaurant.verificationStatus;
+          // ── ค้นหาท่อน if-else ด้านล่างนี้ในฟังก์ชัน doLogin แล้วเปลี่ยนเป็นชุดนี้ครับ ──
           if (status == 'true') {
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => HomeRestaurant()),
+              MaterialPageRoute(builder: (context) => const HomeRestaurant()),
               (route) => false,
             );
           } else {
+            // มั่นใจว่าส่งค่าทั้ง 2 ตัวข้ามไปหน้า WaitApprove ไม่ว่าจะ wait หรือ false
             Navigator.pushAndRemoveUntil(
               context,
-              MaterialPageRoute(builder: (context) => const WaitApprove()),
+              MaterialPageRoute(
+                builder: (context) => WaitApprove(
+                  verificationStatus: status ?? 'wait',
+                  notApproveDetail: restaurant.notApproveDetail,
+                ),
+              ),
               (route) => false,
             );
           }

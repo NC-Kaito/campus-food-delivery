@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/features/member/list_menu_member.dart';
-import 'package:flutter_app/features/user/list_menu_user.dart'; // เรียกใช้หน้าแสดงผลเมนูอาหาร
 
 class ViewRestaurantMember extends StatefulWidget {
-  final RestaurantModel
-  restaurant; // 🎯 รับข้อมูลร้านค้าส่งต่อข้ามหน้าจอมาจากหน้าค้นหา
+  final RestaurantModel restaurant; // 🎯 รับข้อมูลร้านค้าส่งต่อมาจากหน้าค้นหา
   const ViewRestaurantMember({super.key, required this.restaurant});
 
   @override
@@ -13,83 +11,89 @@ class ViewRestaurantMember extends StatefulWidget {
 }
 
 class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
-  // 🎯 ฟังก์ชันคำนวณแปลงค่าระบบ Bitwise เป็นข้อความวันเปิดให้บริการระดับเกรด A
-  String _getOpenDayText(int? bitwiseValue) {
-    if (bitwiseValue == null || bitwiseValue == 0) return "ไม่ระบุวันเปิด";
-    if (bitwiseValue == 127) return "เปิดทุกวัน";
-    List<String> days = [];
-    final dayMap = {
-      1: "อา.",
-      2: "จ.",
-      4: "อ.",
-      8: "พ.",
-      16: "พฤ.",
-      32: "ศ.",
-      64: "ส.",
-    };
-    dayMap.forEach((key, value) {
-      if ((bitwiseValue & key) != 0) days.add(value);
-    });
-    return days.join(', ');
+  // 🎯 แปลงค่าระบบ Bitwise เป็นข้อความวันทำการเหมือนหน้า HomeRestaurant
+  String _parseOpenDays(int? dayMask) {
+    if (dayMask == null) return "จันทร์ - เสาร์";
+    if (dayMask == 127) return "เปิดทุกวัน";
+    if (dayMask == 126) return "จันทร์ - เสาร์";
+    if (dayMask == 62) return "จันทร์ - ศุกร์";
+    return "จันทร์ - เสาร์";
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🎯 กำหนดเลข IP ฐานประวัติโปรเจกต์คงที่ เพื่อล้างบั๊กสลับวง Wi-Fi อัตโนมัติ
-    const String baseIp = "10.244.27.211";
+    // 🎯 กำหนดเลข IP ฐานประวัติโปรเจกต์คงที่ เพื่อล้างบั๊กสลับวง Wi-Fi
+    const String baseIp = "10.244.27.84";
 
-    // เคลียร์และเข้ารหัสตัวแปร URL รูปแบนเนอร์ร้านค้าให้ปลอดภัยสูงสุด
-    String safeImageUrl = "";
-    if (widget.restaurant.restaurantImage != null &&
-        widget.restaurant.restaurantImage!.isNotEmpty) {
-      safeImageUrl = widget.restaurant.restaurantImage!
-          .replaceAll("10.226.43.211", baseIp)
-          .replaceAll("10.0.2.2", baseIp);
+    // จัดการสลับ IP รูปแบนเนอร์ร้านค้าให้ทำงานได้สมบูรณ์
+    String? restaurantimage;
+    if (widget.restaurant.restaurantImage != null) {
+      restaurantimage = widget.restaurant.restaurantImage!.replaceAll(
+        '10.244.27.211',
+        baseIp,
+      );
     }
 
     return Scaffold(
       backgroundColor: Colors.white,
+      extendBodyBehindAppBar:
+          true, // ดึงให้รูปแบนเนอร์ทะลุขึ้นไปด้านบนสุดเหมือนกัน 100%
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // --- ส่วนรูปภาพ Banner และปุ่ม Back ย้อนกลับ ---
+            // ─── ส่วนหัวรูปภาพ (Stack โดนแกะโครงสร้างมาจาก HomeRestaurant 100%) ───
             Stack(
               children: [
-                safeImageUrl.isNotEmpty
-                    ? Image.network(
-                        Uri.encodeFull(
-                          safeImageUrl,
-                        ), // 🎯 เข้ารหัสช่องว่างแปลงรหัสอักขระพิเศษพาร์ทรูปภาพ
-                        width: double.infinity,
-                        height: 280,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            _buildPlaceholderBanner(),
-                      )
-                    : _buildPlaceholderBanner(),
-
-                // ไล่ระดับเงา Gradient สีดำด้านล่างรูปเพื่อให้ตัวหนังสืออ่านง่ายขึ้น
                 Container(
-                  height: 280,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.black.withOpacity(0.35),
-                        Colors.transparent,
-                      ],
+                  height: 290,
+                  width: double.infinity,
+                  decoration: const BoxDecoration(
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(0),
+                      bottomRight: Radius.circular(0),
                     ),
                   ),
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      bottomLeft: Radius.circular(0),
+                      bottomRight: Radius.circular(0),
+                    ),
+                    child: restaurantimage != null
+                        ? Image.network(
+                            Uri.encodeFull(restaurantimage),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Image.asset(
+                                  'assets/images/default_restaurant.png',
+                                  fit: BoxFit.cover,
+                                ),
+                          )
+                        : Container(
+                            color: const Color(
+                              0xFFD92D2D,
+                            ), // สีแดงแบรนด์กรณีไม่มีรูปภาพ
+                            child: const Icon(
+                              Icons.image_outlined,
+                              size: 80,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
                 ),
-                // ปุ่มลอยเด้งย้อนกลับสไตล์โมเดิร์น
+
+                // ปุ่มย้อนกลับลอยตัวสไตล์โมเดิร์น (คงไว้เพื่อให้ฝั่งผู้ใช้กดถอยกลับได้ง่าย)
                 Positioned(
                   top: 45,
                   left: 15,
                   child: CircleAvatar(
-                    backgroundColor: Colors.white.withOpacity(0.9),
+                    backgroundColor: Colors.white.withOpacity(0.85),
+                    radius: 20,
                     child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.green),
+                      icon: const Icon(
+                        Icons.arrow_back_ios_new,
+                        color: Colors.black87,
+                        size: 18,
+                      ),
                       onPressed: () => Navigator.pop(context),
                     ),
                   ),
@@ -97,136 +101,245 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
               ],
             ),
 
-            Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ชื่อร้านค้าตัวจริงจากฐานข้อมูล
-                  Text(
-                    widget.restaurant.restaurantName ??
-                        "ร้านอาหารของมหาวิทยาลัย",
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+            // ─── ส่วนเนื้อหาข้อมูล (ใช้โครงสร้าง Transform.translate ดันหัวโค้ดขึ้นมาทับแบนเนอร์ 100%) ───
+            Transform.translate(
+              offset: const Offset(0, -25),
+              child: Container(
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(30),
+                    topRight: Radius.circular(30),
                   ),
-                  const SizedBox(height: 10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 15),
 
-                  // ป้ายแท็กสถานะร้านอาหารเปิดให้บริการแบบโมเดิร์น
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green[50],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      "● กำลังเปิดให้บริการ",
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 25),
-
-                  // 🎯 ปุ่มนำทางดึงส่งข้อมูลร้านเปิดหน้าเมนูอาหารของร้านค้านั้น
-                  SizedBox(
-                    width: double.infinity,
-                    height: 55,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ListMenuMember(
-                              restaurantModel: widget.restaurant,
+                    // ชื่อร้านค้าจริงขยับใหญ่เต็มตา 32px ตาม HomeRestaurant
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            widget.restaurant.restaurantName ?? "-",
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
                             ),
                           ),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.restaurant_menu,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 5),
+
+                    // หัวข้อเมนูแนะนำ
+                    const Text(
+                      "เมนูแนะนำ",
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // การ์ดเมนูแนะนำถอดสไตล์การลงเงา BoxShadow 100%
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
                         color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      label: const Text(
-                        "ดูเมนูอาหารทั้งหมด",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(15),
-                        ),
+                      child: Row(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(15),
+                            child: Image.network(
+                              'https://images.unsplash.com/photo-1617093727343-374698b1b08d?q=80&w=200',
+                              width: 100,
+                              height: 100,
+                              fit: BoxFit.cover,
+                              errorBuilder: (c, e, s) => Container(
+                                width: 100,
+                                height: 100,
+                                color: Colors.grey[200],
+                                child: const Icon(
+                                  Icons.fastfood,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "คะน้าหมูกรอบ",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              SizedBox(height: 5),
+                              Text(
+                                "ราคา 40 บาท",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 25),
 
-                  const SizedBox(height: 30),
-                  const Divider(thickness: 1),
-                  const SizedBox(height: 15),
-
-                  // --- ส่วนข้อมูลรายละเอียดร้านค้า ---
-                  const Text(
-                    "รายละเอียดร้านค้า",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+                    // ตัวจุดนำทางสามจุดล่างการ์ดแนะนำ
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.black,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.greenAccent,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: Colors.black,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 20),
+                    const SizedBox(height: 25),
 
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInfoItem(
-                          Icons.phone,
-                          "เบอร์โทรศัพท์",
-                          widget.restaurant.phone ?? "ไม่ระบุเบอร์ติดต่อ",
+                    // 🎯 ปุ่มแถบสีเขียวสดปลดล็อกเปิดหน้าเมนูอาหารสำหรับฝั่งผู้ใช้งาน
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 400, // ปรับขยายความกว้างให้อ่านข้อความง่ายขึ้น
+                          height: 40,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(
+                                0xFF5DF232,
+                              ), // สีเขียวสะท้อนแสงสว่างเด่น
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ListMenuMember(
+                                    restaurantModel: widget.restaurant,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "เมนู",
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                      Expanded(
-                        child: _buildInfoItem(
-                          Icons.category,
-                          "ประเภทร้าน",
-                          widget.restaurant.typerestaurantName ?? "อาหารทั่วไป",
+                      ],
+                    ),
+                    const SizedBox(height: 30),
+
+                    // ─── ตารางข้อมูลรายละเอียดร้านแบบแบ่งฝั่งเส้นคั่นตรงกลาง 100% ───
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildInfoRow(
+                                Icons.storefront,
+                                "ชื่อร้านค้า",
+                                widget.restaurant.restaurantName ?? "-",
+                              ),
+                              const SizedBox(height: 20),
+                              _buildInfoRow(
+                                Icons.shopping_cart_outlined,
+                                "วันทำการ",
+                                _parseOpenDays(widget.restaurant.openDay),
+                              ),
+                              const SizedBox(height: 20),
+                              _buildInfoRow(
+                                Icons.phone_in_talk_outlined,
+                                "เบอร์โทรศัพท์",
+                                widget.restaurant.phone ?? "-",
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 25),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildInfoItem(
-                          Icons.calendar_month,
-                          "วันทำการ",
-                          _getOpenDayText(widget.restaurant.openDay),
+                        Container(
+                          width: 2,
+                          height: 190,
+                          color: Colors.grey[300],
                         ),
-                      ),
-                      Expanded(
-                        child: _buildInfoItem(
-                          Icons.access_time_filled,
-                          "เวลาเปิด - ปิด",
-                          "${widget.restaurant.openTime?.substring(0, 5) ?? '00:00'} - ${widget.restaurant.closeTime?.substring(0, 5) ?? '00:00'} น.",
+                        const SizedBox(width: 15),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildInfoRow(
+                                Icons.restaurant_menu,
+                                "ประเภทร้านค้า",
+                                widget.restaurant.typerestaurantName ??
+                                    "อาหารตามสั่ง",
+                              ),
+                              const SizedBox(height: 20),
+                              _buildInfoRow(
+                                Icons.access_time,
+                                "เวลาเปิด - ปิด",
+                                "${widget.restaurant.openTime?.substring(0, 5) ?? '00:00'} - ${widget.restaurant.closeTime?.substring(0, 5) ?? '00:00'} น.",
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                ],
+                      ],
+                    ),
+                    const SizedBox(height: 40),
+                  ],
+                ),
               ),
             ),
           ],
@@ -235,20 +348,13 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
     );
   }
 
-  // ตัวช่วยสร้างกล่องแสดงผลข้อมูลพร้อมไอคอนวงกลมสีเขียวพาสเทล
-  Widget _buildInfoItem(IconData icon, String label, String value) {
+  // ฟังก์ชันสร้างแถวข้อมูลรายละเอียดแบบเดียวกับในต้นบ้านเป๊ะ
+  Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.green[50],
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 20, color: Colors.green[700]),
-        ),
-        const SizedBox(width: 12),
+        Icon(icon, size: 28, color: Colors.black),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -256,34 +362,26 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Color.fromARGB(255, 0, 0, 0),
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 2),
               Text(
                 value,
                 style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
             ],
           ),
         ),
       ],
-    );
-  }
-
-  // ฟังก์ชันวาดภาพจำลองกรณีเชื่อมต่อเซิร์ฟเวอร์ดึงรูปต้นทางล้มเหลว
-  Widget _buildPlaceholderBanner() {
-    return Container(
-      width: double.infinity,
-      height: 280,
-      color: Colors.grey[200],
-      child: const Icon(Icons.restaurant, size: 80, color: Colors.grey),
     );
   }
 }
