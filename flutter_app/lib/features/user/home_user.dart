@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/login_member.dart';
+import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
+import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
-import 'package:flutter_app/features/user/search_restaurant_user.dart';
+import 'package:flutter_app/features/user/view_restaurant_user.dart';
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});
@@ -12,34 +14,16 @@ class HomeUser extends StatefulWidget {
 }
 
 class _HomeUserState extends State<HomeUser> {
-  late final TextEditingController searchController;
+  final TextEditingController searchController = TextEditingController();
+  final RestaurantService _restaurantService = RestaurantService();
+  final TypeRestaurantService _typeRestaurantService = TypeRestaurantService();
 
-  final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
+  List<RestaurantModel> _results = [];
+  List<TypeRestaurantModel> typeList = [];
 
-  int? _selectedTypeId;
+  bool _isLoading = true;
   String? selectedType;
-
-  // 2. รายการประเภทอาหาร
-  final List<String> restaurantTypes = [
-    'ทั้งหมด',
-    'อาหารตามสั่ง',
-    'ก๋วยเตี๋ยว',
-    'เครื่องดื่ม',
-    'ของหวาน',
-  ];
-
-  @override
-  void initState() {
-    searchController = TextEditingController();
-    fetchTypes();
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    searchController.dispose();
-    super.dispose();
-  }
+  int? _selectedTypeId;
 
   // ปรับสไตล์เมนูให้ดูพอดีกับไอคอน
   final menuTextStyle = TextStyle(
@@ -48,159 +32,250 @@ class _HomeUserState extends State<HomeUser> {
     color: Colors.green[700],
   );
 
-  List<TypeRestaurantModel> typeList = [];
+  @override
+  void initState() {
+    super.initState();
+    _initData();
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  // โหลดข้อมูลประเภทร้านค้าและรายชื่อร้านค้าทั้งหมดมาสแตนด์บายรอบแรก
+  Future<void> _initData() async {
+    await fetchTypes();
+    await _loadResults(""); // ส่งค่าว่างเพื่อให้ดึงร้านค้าทั้งหมดขึ้นมาก่อน
+  }
 
   Future<void> fetchTypes() async {
     try {
-      final types = await typeRestaurantService.getAllTypeRestaurant();
+      final types = await _typeRestaurantService.getAllTypeRestaurant();
       setState(() {
         typeList = types;
       });
     } catch (e) {
-      print("เกิดข้อผิดพลาด ไม่สามารถโหลดข้อมูลประเภทร้านค้าได้");
+      print("เกิดข้อผิดพลาด ไม่สามารถโหลดข้อมูลประเภทร้านค้าได้: $e");
     }
+  }
+
+  // ฟังก์ชันค้นหาและกรองร้านค้าหลักของระบบแบบเบ็ดเสร็จในหน้าเดียว
+  Future<void> _loadResults(String keyword) async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    // ยิง API ค้นหาชื่อร้านค้าจากระบบหลังบ้าน
+    var data = await _restaurantService.searchRestaurant(keyword);
+
+    // ถ้ามีการเลือกประเภทจาก Dropdown ให้คัดกรองกรองไอดีประเภทซ้ำอีกชั้นในแอป
+    if (_selectedTypeId != null) {
+      data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
+    }
+
+    if (mounted) {
+      setState(() {
+        _results = data;
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _getOpenDayText(int? bitwiseValue) {
+    if (bitwiseValue == null || bitwiseValue == 0) return "ไม่ระบุวันเปิด";
+    if (bitwiseValue == 127) return "เปิดทุกวัน";
+
+    final dayMap = {
+      1: "อา.",
+      2: "จ.",
+      4: "อ.",
+      8: "พ.",
+      16: "พฤ.",
+      32: "ศ.",
+      64: "ส.",
+    };
+
+    List<String> days = [];
+    dayMap.forEach((key, value) {
+      if ((bitwiseValue & key) != 0) days.add(value);
+    });
+
+    return "เปิดวัน: ${days.join(', ')}";
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
         title: const Text("CAMPUS EAT"),
         backgroundColor: Colors.green,
-        centerTitle: true, // ปรับชื่อแอปให้อยู่ตรงกลาง
+        centerTitle: true,
         foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(15.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(width: double.infinity),
-            Text(
-              "Campus Food Delivery",
-              style: TextStyle(
-                color: Colors.green[800],
-                fontSize: 24,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ใช้ Row เพื่อวางปุ่มไว้ข้างๆ ช่องค้นหา
-            Row(
+      body: Column(
+        children: [
+          // ── ส่วนกล่องค้นหาข้อมูลด้านบน (Header สีเขียว) ──
+          Container(
+            padding: const EdgeInsets.fromLTRB(16, 15, 16, 20),
+            color: Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: searchController,
-                    decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, color: Colors.green),
-                      labelText: "ค้นหาร้านค้า",
-                      hintText: "กรุณากรอกชื่อร้านค้า",
-                      labelStyle: const TextStyle(
-                        color: Colors.green,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(color: Colors.green),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20),
-                        borderSide: const BorderSide(
-                          color: Colors.deepOrange,
-                          width: 2,
+                Text(
+                  "Campus Food Delivery",
+                  style: TextStyle(
+                    color: Colors.green[800],
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // แถวป้อนคำค้นหา (Search TextField)
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: searchController,
+                        onFieldSubmitted: (value) => _loadResults(value),
+                        decoration: InputDecoration(
+                          prefixIcon: const Icon(
+                            Icons.search,
+                            color: Colors.green,
+                          ),
+                          labelText: "ค้นหาร้านค้า",
+                          hintText: "กรุณากรอกชื่อร้านค้า",
+                          labelStyle: const TextStyle(
+                            color: Colors.green,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(color: Colors.green),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: const BorderSide(
+                              color: Colors.deepOrange,
+                              width: 2,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(width: 10),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.green,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: IconButton(
+                        onPressed: () => _loadResults(searchController.text),
+                        icon: const Icon(Icons.search, color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 10), // เว้นระยะห่างระหว่างช่องกับปุ่ม
-                // เพิ่มปุ่มค้นหา
-                // ในหน้า HomeUser ส่วนของ IconButton ค้นหา
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.green,
-                    borderRadius: BorderRadius.circular(15),
+                const SizedBox(height: 12),
+
+                // ช่องเลือกหมวดหมู่ประเภทอาหาร Dropdown
+                DropdownButtonFormField<String>(
+                  value: selectedType,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.category, color: Colors.green),
+                    labelText: "ประเภทธุรกิจ/ร้านค้า",
+                    labelStyle: const TextStyle(
+                      color: Colors.green,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: const BorderSide(color: Colors.green),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: const BorderSide(
+                        color: Colors.green,
+                        width: 2,
+                      ),
+                    ),
                   ),
-                  child: IconButton(
-                    onPressed: () {
-                      // 1. ตรวจสอบก่อนว่ามีการกรอกข้อความไหม
-                      if (searchController.text.trim().isNotEmpty) {
-                        // 2. ใช้ Navigator.push เพื่อเปิดหน้าใหม่
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => SearchRestaurantUser(
-                              keyword: searchController
-                                  .text, // ส่งค่าจาก Controller ไปยังหน้า Search
-                            ),
-                          ),
-                        );
-                      } else {
-                        // แจ้งเตือนกรณีไม่ได้กรอกข้อความ (ถ้าต้องการ)
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              "กรุณากรอกชื่อร้านค้าที่ต้องการค้นหา",
-                            ),
-                          ),
-                        );
+                  hint: const Text("เลือกประเภทอาหาร"),
+                  items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text("ทั้งหมด"),
+                    ),
+                    ...typeList.map((TypeRestaurantModel type) {
+                      return DropdownMenuItem<String>(
+                        value: type.name,
+                        child: Text(type.name ?? "ไม่ระบุ"),
+                      );
+                    }),
+                  ],
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      selectedType = newValue;
+                      try {
+                        _selectedTypeId = typeList
+                            .firstWhere((e) => e.name == newValue)
+                            .id;
+                      } catch (e) {
+                        _selectedTypeId = null;
                       }
-                    },
-                    icon: const Icon(Icons.search, color: Colors.white),
-                  ),
+                    });
+                    // รันค้นหากรองข้อมูลใหม่ทันทีที่เปลี่ยนประเภทหมวดหมู่
+                    _loadResults(searchController.text);
+                  },
                 ),
               ],
             ),
-            SizedBox(height: 15), // ระยะห่างระหว่าง Search กับ Dropdown
-            // --- ส่วน Dropdown ที่เพิ่มใหม่ ---
-            DropdownButtonFormField<String>(
-              value: selectedType,
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.category, color: Colors.green),
-                labelText: "ประเภทธุรกิจ/ร้านค้า",
-                labelStyle: const TextStyle(
-                  color: Colors.green,
-                  fontWeight: FontWeight.bold,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: const BorderSide(color: Colors.green),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: const BorderSide(color: Colors.green, width: 2),
-                ),
+          ),
+
+          // ── ส่วนการแสดงผลสถานะจำนวนผลลัพธ์ร้านค้าล่าสุด ──
+          if (!_isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  const Icon(Icons.manage_search, size: 20, color: Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      searchController.text.trim().isEmpty &&
+                              selectedType == null
+                          ? "ร้านค้าทั้งหมดในระบบ มีจำนวน ${_results.length} แห่ง"
+                          : "พบร้านค้า ${_results.length} แห่ง จากการกรองข้อมูลล่าสุด",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              hint: const Text("เลือกประเภทอาหาร"),
-
-              // ✅ ใช้ข้อมูลจาก typeList ที่โหลดมา
-              items: typeList.map((TypeRestaurantModel type) {
-                return DropdownMenuItem<String>(
-                  value: type.name, // หรือใช้ ID ก็ได้ถ้าต้องการ
-                  child: Text(type.name ?? "ไม่ระบุ"),
-                );
-              }).toList(),
-
-              onChanged: (String? newValue) {
-                setState(() {
-                  selectedType = newValue;
-
-                  // ✅ หา ID ของประเภทที่เลือก เพื่อเตรียมส่งไป API ตอนค้นหา
-                  try {
-                    _selectedTypeId = typeList
-                        .firstWhere((e) => e.name == newValue)
-                        .id;
-                  } catch (e) {
-                    _selectedTypeId = null;
-                  }
-                });
-                print("เลือกประเภท: $selectedType (ID: $_selectedTypeId)");
-              },
             ),
-          ],
-        ),
+
+          // ── ลิสต์รายการการ์ดแสดงรายชื่อร้านค้าด้านล่าง ──
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.green),
+                  )
+                : _results.isEmpty
+                ? const Center(child: Text("ไม่พบข้อมูลร้านค้า"))
+                : ListView.builder(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    itemCount: _results.length,
+                    itemBuilder: (context, index) {
+                      return _buildRestaurantCard(context, _results[index]);
+                    },
+                  ),
+          ),
+        ],
       ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -242,6 +317,149 @@ class _HomeUserState extends State<HomeUser> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRestaurantCard(BuildContext context, RestaurantModel item) {
+    final String imageUrl = item.restaurantImage != null
+        ? Uri.encodeFull(item.restaurantImage!)
+        : '';
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ViewRestaurantUser(restaurant: item),
+            ),
+          );
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // รูปภาพหน้าร้านค้า
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(16),
+              ),
+              child: AspectRatio(
+                aspectRatio: 16 / 9,
+                child: imageUrl.isNotEmpty
+                    ? Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: Colors.green,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: Colors.grey[200],
+                          child: const Icon(
+                            Icons.restaurant,
+                            color: Colors.grey,
+                            size: 40,
+                          ),
+                        ),
+                      )
+                    : Container(
+                        color: Colors.grey[200],
+                        child: const Icon(
+                          Icons.restaurant,
+                          color: Colors.grey,
+                          size: 40,
+                        ),
+                      ),
+              ),
+            ),
+            // รายละเอียดชื่อร้านและเวลาเปิดปิด
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.restaurantName ?? "ร้านอาหาร",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_month,
+                        size: 16,
+                        color: Colors.orange,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          _getOpenDayText(item.openDay),
+                          style: TextStyle(
+                            color: Colors.grey[700],
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time_filled,
+                        size: 16,
+                        color: Colors.green,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "${item.openTime?.substring(0, 5)} - ${item.closeTime?.substring(0, 5)} น.",
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        "• เปิดอยู่",
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
