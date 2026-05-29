@@ -12,8 +12,9 @@ class TypeMenuModel {
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
 
-    map["typemenu_id"] = typemenuId;
-    map["typemenu_name"] = typemenuName;
+    // ✅ ปรับแก้ Key ให้ตรงกับฝั่ง Java Spring Boot (ไม่มีตัวขีดล่าง _)
+    map["typemenuId"] = typemenuId;
+    map["typemenuName"] = typemenuName;
 
     return map;
   }
@@ -21,8 +22,9 @@ class TypeMenuModel {
   // ==========================================================
   factory TypeMenuModel.fromJson(Map<String, dynamic> json) {
     return TypeMenuModel(
-      typemenuId: json["typemenu_id"],
-      typemenuName: json["typemenu_name"],
+      // ✅ ปรับแก้ Key ให้ดึงตามค่าจริงจากหลังบ้าน
+      typemenuId: json["typemenuId"],
+      typemenuName: json["typemenuName"],
     );
   }
 }

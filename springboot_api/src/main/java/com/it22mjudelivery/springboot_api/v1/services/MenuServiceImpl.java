@@ -40,29 +40,37 @@ public class MenuServiceImpl implements MenuService {
     @Transactional // บังคับทำธุรกรรมฐานข้อมูล หากขั้นตอนไหนพังจะ Rollback ข้อมูลให้ปลอดภัยทันที
     public boolean saveMenuWithAddons(Map<String, Object> requestData) {
         try {
-            // 1. ตรวจสอบและดึงข้อมูลร้านค้าและประเภทเมนูหลัก
             String restaurantId = (String) requestData.get("restaurantId");
             Integer typeMenuId = (Integer) requestData.get("typeMenuId");
-
 
             Restaurant restaurant = restaurantRepository.findByUsername(restaurantId)
                     .orElseThrow(() -> new RuntimeException("ไม่พบข้อมูลร้านค้า"));
             TypeMenu typeMenu = typeMenuRepository.findById(typeMenuId)
                     .orElseThrow(() -> new RuntimeException("ไม่พบประเภทเมนู"));
 
-            // 2. เซฟข้อมูลพื้นฐานลงตาราง Menu ก่อนเป็นอันดับแรก เพื่อสร้างไอดีเมนู (menuid) หลัก
+            // 🌟 แกะค่าพาร์ท URL รูปภาพที่ได้จาก Flutter (รองรับทั้งกรณีพิมพ์เล็กพิมพ์ใหญ่)
+            String finalImageUrl = "";
+            if (requestData.containsKey("imageUrl")) {
+                finalImageUrl = (String) requestData.get("imageUrl");
+            } else if (requestData.containsKey("imageurl")) {
+                finalImageUrl = (String) requestData.get("imageurl");
+            }
+
+            // 2. เซฟข้อมูลพื้นฐานลงตาราง Menu
             Menu menu = Menu.builder()
                     .menuname((String) requestData.get("menuname"))
                     .description((String) requestData.get("description"))
                     .price(Double.parseDouble(requestData.get("price").toString()))
-                    .imageurl("") // ใส่ค่าว่างไว้ก่อน หรือใส่ตามระเบียบระบบจัดการอัปโหลดภาพของคุณ
+
+                    // ✅ ดึงรูปภาพจากตัวแปรที่เราสกัดไว้มาเซฟลง DB จริงแทนค่าว่างของเดิม
+                    .imageurl(finalImageUrl)
+
                     .status((boolean) requestData.get("status"))
                     .restaurant(restaurant)
                     .typemenu(typeMenu)
                     .build();
 
             menuRepository.save(menu);
-
             // 3. เซฟข้อมูลกลุ่มตัวเลือกเสริมลงตาราง Menuaddongroup (หากร้านค้าเปิดใช้งาน On)
             if (requestData.containsKey("addonGroups")) {
                 List<Map<String, Object>> groupsData = (List<Map<String, Object>>) requestData.get("addonGroups");

@@ -4,7 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/addon_menu_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/typemenu_model.dart';
+import 'package:flutter_app/data/models/type_menu_model.dart';
 
 class MenuService {
   Future<List<MenuModel>> getMenusByRestaurant(
@@ -155,11 +155,10 @@ class MenuService {
           imageFile.path,
           filename: imageFile.path.split('/').last,
         ),
-        'type': 'menu', // → เซฟลง uploads/restaurant/menu/
       });
 
       final response = await DioClient.dio.post(
-        '/v1/restaurant/uploadImage',
+        '/v1/menu/uploadMenuImage',
         data: formData,
       );
 

@@ -76,7 +76,7 @@ public class RestaurantServiceImpl implements RestaurantService{
 
     public boolean updateProfileRestaurant(String username, String restaurantname, String restaurantimage,
                                            int typeid,
-                                           //double latitude, double longitude,
+                                           double latitude, double longitude,
                                            LocalTime opentime,
                                            LocalTime closetime, int openday, String ownerfirstname,
                                            String ownerlastname, String email, String phone) {
@@ -88,8 +88,10 @@ public class RestaurantServiceImpl implements RestaurantService{
 
         restaurant.setRestaurantname(restaurantname);
         restaurant.setTyperestaurant(typeRestaurant);
-//        restaurant.setLatitude(latitude);
-//        restaurant.setLongitude(longitude);
+
+        restaurant.setRestaurantimage(restaurantimage);
+        restaurant.setLatitude(latitude);
+        restaurant.setLongitude(longitude);
         restaurant.setOpentime(opentime);
         restaurant.setClosetime(closetime);
         restaurant.setOpenDay(openday);

@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/features/admin/login_admin.dart';
-
+import 'package:flutter_app/features/member/login_member.dart';
+import 'package:flutter_app/features/member/test_map.dart';
+import 'package:flutter_app/features/restaurant/agrees_restaurant.dart';
+import 'package:flutter_app/features/restaurant/login_restaurant.dart';
+import 'package:flutter_app/features/restaurant/register_owner_info.dart';
+import 'package:flutter_app/features/restaurant/register_restaurant.dart';
+import 'package:flutter_app/features/rider/login_rider.dart';
+import 'package:flutter_app/features/user/home_user.dart';
+import 'package:flutter_app/features/user/test.dart';
 import 'package:flutter_app/select_role.dart';
 
 void main() {
@@ -17,8 +26,6 @@ class MyApp extends StatelessWidget {
       title: 'Campus food Delivery',
       theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.green)),
       home: SelectRolePage(),
-
-      // home: LoginAdmin(),
     );
   }
 }

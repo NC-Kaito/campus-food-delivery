@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
-import 'package:flutter_app/data/models/typemenu_model.dart';
+import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart';
@@ -16,7 +16,6 @@ class ListMenuRestaurant extends StatefulWidget {
   State<ListMenuRestaurant> createState() => _ListMenuRestaurantState();
 }
 
-// --- ✅ แก้ไขจุดนี้: เปลี่ยนจาก SingleTickerProviderStateMixin เป็น TickerProviderStateMixin เพื่อให้โหลดซ้ำสร้าง Tab ใหม่ได้ไม่จำกัด ---
 class _ListMenuRestaurantState extends State<ListMenuRestaurant>
     with TickerProviderStateMixin {
   final RestaurantService restaurantService = RestaurantService();
@@ -53,12 +52,8 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
     if (rest != null) {
       restaurantModel = rest;
 
-      if (rest.restaurantImage != null) {
-        restaurantimage = rest.restaurantImage!.replaceAll(
-          '10.244.27.211',
-          '10.244.27.84',
-        );
-      }
+      // ✅ แก้ไขจุดที่ 1: ดึง URL รูปหน้าร้านตรงๆ ไม่ต้องใช้ .replaceAll สับขาหลอกไอพีแล้ว
+      restaurantimage = rest.restaurantImage;
 
       restaurantname = rest.restaurantName;
       await loadTypeMenus();
@@ -266,6 +261,7 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                         ),
                                       ),
                                       onPressed: () async {
+                                        // 🌟 พอกลับมาจากหน้าเพิ่มเมนู ให้โหลดข้อมูลหมวดหมู่และลิสต์ใหม่เพื่อความชัวร์
                                         await Navigator.push(
                                           context,
                                           MaterialPageRoute(
@@ -418,12 +414,9 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                             height: 110,
                                             child: menu.menuImage != null
                                                 ? Image.network(
+                                                    // ✅ แก้ไขจุดที่ 2: ดึงผ่านไอพีตรงๆ จาก DB ไม่ต้องสั่งสลับตัวเลขไอพีขัดขาตัวเองแล้ว
                                                     Uri.encodeFull(
-                                                      menu.menuImage!
-                                                          .replaceAll(
-                                                            '10.244.27.211',
-                                                            '10.244.27.84',
-                                                          ),
+                                                      menu.menuImage!,
                                                     ),
                                                     fit: BoxFit.cover,
                                                     errorBuilder:

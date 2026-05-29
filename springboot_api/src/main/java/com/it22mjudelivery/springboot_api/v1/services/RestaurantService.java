@@ -14,7 +14,7 @@ public interface RestaurantService {
 
     boolean updateProfileRestaurant(
             String username, String restaurantname, String restaurantimage, int typeid,
-            //double latitude, double longitude,
+            double latitude, double longitude,
             LocalTime opentime, LocalTime closetime, int openday, String ownerfirstname,
             String ownerlastname, String email, String phone
     );

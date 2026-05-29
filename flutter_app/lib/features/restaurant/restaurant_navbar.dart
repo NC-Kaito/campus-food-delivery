@@ -5,7 +5,6 @@ import 'package:flutter_app/features/restaurant/home_restaurant.dart';
 import 'package:flutter_app/features/restaurant/profile_restaurant.dart';
 import 'package:flutter_app/global_data.dart';
 
-// 1. เปลี่ยนจาก StatelessWidget เป็น StatefulWidget
 class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
   final String title;
 
@@ -34,12 +33,9 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
       setState(() {
         if (rest != null) {
           restaurantModel = rest;
-          if (rest.restaurantImage != null) {
-            restaurantimage = rest.restaurantImage!.replaceAll(
-              '10.244.27.211',
-              '10.244.27.84',
-            );
-          }
+
+          // ✅ แก้ไขจุดตาย: ดึง URL รูปโปรไฟล์ตรงๆ จากไอพีเครื่องจริง (.211) ไม่ต้องใช้ .replaceAll ขัดขาตัวเองแล้ว
+          restaurantimage = rest.restaurantImage;
         }
       });
     }
@@ -68,7 +64,7 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => HomeRestaurant()),
+            MaterialPageRoute(builder: (context) => const HomeRestaurant()),
           );
         },
       ),
@@ -101,6 +97,7 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
         ),
         const SizedBox(width: 20),
 
+        // รูปโปรไฟล์หน้าร้าน (CircleAvatar)
         Padding(
           padding: const EdgeInsets.only(right: 20),
           child: GestureDetector(
@@ -121,7 +118,9 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
                   : null,
               onBackgroundImageError:
                   (restaurantimage != null && restaurantimage!.isNotEmpty)
-                  ? (_, __) {}
+                  ? (_, __) {
+                      print("โหลดรูปโปรไฟล์บน Navbar จากเซิร์ฟเวอร์ไม่สำเร็จ");
+                    }
                   : null,
               child: (restaurantimage == null || restaurantimage!.isEmpty)
                   ? const Icon(
