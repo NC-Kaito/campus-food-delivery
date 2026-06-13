@@ -62,8 +62,6 @@ class RiderModel {
   }
 
   factory RiderModel.fromJson(Map<String, dynamic> json) {
-    const baseUrl = 'http://10.244.27.211:8081/uploads/';
-
     return RiderModel(
       studentid: json['studentid']?.toString(),
       password: json['password'],
@@ -73,16 +71,10 @@ class RiderModel {
       email: json['email'],
       phone: json['phone'],
 
-      // ✅ เติม baseUrl นำหน้า
-      studentCardImage: json['studentCard_Image'] != null
-          ? baseUrl + json['studentCard_Image']
-          : null,
-      drivingLicenseImg: json['drivingLicenseImg'] != null
-          ? baseUrl + json['drivingLicenseImg']
-          : null,
-      vehicleImage: json['vehicle_Image'] != null
-          ? baseUrl + json['vehicle_Image']
-          : null,
+      // ✅ เก็บ path ดิบๆ จาก DB เลย ไม่ต้องเติม baseUrl ที่นี่
+      studentCardImage: json['studentCard_Image'],
+      drivingLicenseImg: json['drivingLicenseImg'],
+      vehicleImage: json['vehicle_Image'],
 
       vehiclePlate: json['vehiclePlate'],
       isActive: json['isActive'] as bool?,

@@ -1,6 +1,8 @@
+// features/member/view_restaurant_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/features/member/list_menu_member.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตตัวแปรกลางเพื่อดึงข้อมูลสลักไอพีล่าสุดมาสวมพาร์ทรูปภาพ
 
 class ViewRestaurantMember extends StatefulWidget {
   final RestaurantModel restaurant; // 🎯 รับข้อมูลร้านค้าส่งต่อมาจากหน้าค้นหา
@@ -20,19 +22,26 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
     return "จันทร์ - เสาร์";
   }
 
+  // 🎯 ฟังก์ชันช่วยต่อหัวเชื่อมต่อรูปภาพให้สมบูรณ์ ป้องกันลิงก์ติดกันจนพังหน้าจอ
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http'))
+      return rawPath; // รองรับข้อมูลเก่าที่เป็นลิงก์เต็มสาย
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 🎯 กำหนดเลข IP ฐานประวัติโปรเจกต์คงที่ เพื่อล้างบั๊กสลับวง Wi-Fi
-    const String baseIp = "10.244.27.84";
-
-    // จัดการสลับ IP รูปแบนเนอร์ร้านค้าให้ทำงานได้สมบูรณ์
-    String? restaurantimage;
-    if (widget.restaurant.restaurantImage != null) {
-      restaurantimage = widget.restaurant.restaurantImage!.replaceAll(
-        '10.244.27.211',
-        baseIp,
-      );
-    }
+    // 🎯 แปลงชื่อไฟล์รูปภาพสั้นจาก Model ให้เป็น URL ตัวเต็มที่สวมไอพีปัจจุบันเรียบร้อย
+    final String finalImageUrl = _getFinalImageUrl(
+      widget.restaurant.restaurantImage,
+    );
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -58,26 +67,16 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
                       bottomLeft: Radius.circular(0),
                       bottomRight: Radius.circular(0),
                     ),
-                    child: restaurantimage != null
+                    child: finalImageUrl.isNotEmpty
                         ? Image.network(
-                            Uri.encodeFull(restaurantimage),
+                            Uri.encodeFull(
+                              finalImageUrl,
+                            ), // ✅ เรียกใช้งานผ่าน URL ตัวจบสากล
                             fit: BoxFit.cover,
                             errorBuilder: (context, error, stackTrace) =>
-                                Image.asset(
-                                  'assets/images/default_restaurant.png',
-                                  fit: BoxFit.cover,
-                                ),
+                                _buildPlaceholderBackground(),
                           )
-                        : Container(
-                            color: const Color(
-                              0xFFD92D2D,
-                            ), // สีแดงแบรนด์กรณีไม่มีรูปภาพ
-                            child: const Icon(
-                              Icons.image_outlined,
-                              size: 80,
-                              color: Colors.white,
-                            ),
-                          ),
+                        : _buildPlaceholderBackground(),
                   ),
                 ),
 
@@ -248,13 +247,14 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         SizedBox(
-                          width: 400, // ปรับขยายความกว้างให้อ่านข้อความง่ายขึ้น
-                          height: 40,
+                          width: 340, // ปรับความกว้างให้ได้สมดุลสวยงามพอดีจอ
+                          height: 44,
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(
                                 0xFF5DF232,
                               ), // สีเขียวสะท้อนแสงสว่างเด่น
+                              foregroundColor: Colors.black,
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
@@ -271,9 +271,8 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
                               );
                             },
                             child: const Text(
-                              "เมนู",
+                              "ดูเมนูอาหารทั้งหมด",
                               style: TextStyle(
-                                color: Colors.black,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -286,7 +285,7 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
 
                     // ─── ตารางข้อมูลรายละเอียดร้านแบบแบ่งฝั่งเส้นคั่นตรงกลาง 100% ───
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
                           child: Column(
@@ -311,6 +310,7 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 10),
                         Container(
                           width: 2,
                           height: 190,
@@ -382,6 +382,16 @@ class _ViewRestaurantMemberState extends State<ViewRestaurantMember> {
           ),
         ),
       ],
+    );
+  }
+
+  // วิดเจ็ตสแตนด์บายกรณีรูปแบนเนอร์หลักโหลดไม่สำเร็จ
+  Widget _buildPlaceholderBackground() {
+    return Container(
+      color: const Color(0xFFD92D2D), // สีแดงแบรนด์กรณีไม่มีรูปภาพ
+      child: const Center(
+        child: Icon(Icons.image_outlined, size: 80, color: Colors.white),
+      ),
     );
   }
 }

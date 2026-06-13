@@ -1,3 +1,4 @@
+// features/member/home_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/features/member/view_restaurant_member.dart';
 import 'package:flutter_app/features/user/view_restaurant_user.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตตัวแปรกลางเพื่อดึงข้อมูลสลักไอพีล่าสุด
 
 class HomeMember extends StatefulWidget {
   const HomeMember({super.key});
@@ -28,7 +30,6 @@ class _HomeMemberState extends State<HomeMember> {
   String? selectedType;
   int? _selectedTypeId;
 
-  // ปรับสไตล์เมนูให้ดูพอดีกับไอคอน
   final menuTextStyle = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.bold,
@@ -50,9 +51,7 @@ class _HomeMemberState extends State<HomeMember> {
   // 📥 โหลดข้อมูลเริ่มต้นทั้งหมดขึ้นจอ
   Future<void> _initData() async {
     await fetchTypes();
-    await _loadResults(
-      "",
-    ); // ยิงส่งค่าว่างรอบแรก เพื่อดึงรายชื่อร้านค้าใน ม. ทั้งหมดมาโชว์ตัว
+    await _loadResults("");
   }
 
   Future<void> fetchTypes() async {
@@ -64,15 +63,13 @@ class _HomeMemberState extends State<HomeMember> {
     }
   }
 
-  // 🔍 ฟังก์ชันกรองค้นหาและอัปเดตลิสต์ร้านค้าภายในหน้าเดียว Dynamic จบๆ
+  // 🔍 ฟังก์ชันกรองค้นหาและอัปเดตลิสต์ร้านค้าภายในหน้าเดียว Dynamic
   Future<void> _loadResults(String keyword) async {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
-    // ยิงไปเซิร์ฟเวอร์หาชื่อร้าน
     var data = await _restaurantService.searchRestaurant(keyword);
 
-    // ทำการคัดกรองกรองผ่านไอดีประเภทอาหารซ้ำอีกชั้นในฝั่ง Flutter หน้าบ้าน
     if (_selectedTypeId != null) {
       data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
     }
@@ -105,6 +102,18 @@ class _HomeMemberState extends State<HomeMember> {
     });
 
     return "เปิดวัน: ${days.join(', ')}";
+  }
+
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   @override
@@ -225,7 +234,6 @@ class _HomeMemberState extends State<HomeMember> {
                         _selectedTypeId = null;
                       }
                     });
-                    // สั่งอัปเดตรีเฟรชผลลัพธ์ใหม่ทันทีที่จิ้มเปลี่ยนประเภท Dropdown
                     _loadResults(searchController.text);
                   },
                 ),
@@ -394,9 +402,8 @@ class _HomeMemberState extends State<HomeMember> {
   }
 
   Widget _buildRestaurantCard(BuildContext context, RestaurantModel item) {
-    final String imageUrl = item.restaurantImage != null
-        ? Uri.encodeFull(item.restaurantImage!)
-        : '';
+    // 🎯 แปลงชื่อไฟล์รูปภาพสั้นให้เป็น URL ตัวเต็มที่สวมไอพีศูนย์กลางอย่างสมบูรณ์แบบ
+    final String finalImageUrl = _getFinalImageUrl(item.restaurantImage);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -431,9 +438,9 @@ class _HomeMemberState extends State<HomeMember> {
               ),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: imageUrl.isNotEmpty
+                child: finalImageUrl.isNotEmpty
                     ? Image.network(
-                        imageUrl,
+                        finalImageUrl, // 🌟 รันแสดงผลภาพจริงผ่านโครงสร้าง URL ตัวกลาง
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;

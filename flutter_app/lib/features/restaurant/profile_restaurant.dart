@@ -1,3 +1,4 @@
+// features/restaurant/profile_restaurant.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
@@ -9,8 +10,8 @@ import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:dio/dio.dart'
+    as dio_package; // 🎯 นำเข้า dio สำหรับอัปโหลดไฟล์รูปภาพ
 
 class ProfileRestaurant extends StatefulWidget {
   const ProfileRestaurant({super.key});
@@ -31,7 +32,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
 
   String? restaurantimage;
 
-  // ตัวแปรสำหรับคุมพิกัดของร้านค้าบนแผนที่
   LatLng? _restaurantLatLng;
 
   bool _obscurePassword = true;
@@ -125,11 +125,10 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
         restaurantModel = result;
         restaurantimage = result.restaurantImage;
 
-        // ดึงค่าพิกัดละติจูด / ลองจิจูดเดิมจากฐานข้อมูลเข้ามาพรีวิวรอไว้ในตัวแปร
         if (result.latitude != null && result.longitude != null) {
           _restaurantLatLng = LatLng(result.latitude!, result.longitude!);
         } else {
-          _restaurantLatLng = null; // คืนค่าเซ็ตว่างกรณีไม่มีข้อมูลพิกัด
+          _restaurantLatLng = null;
         }
 
         usernameController.text = result.username ?? "";
@@ -245,24 +244,25 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     );
   }
 
+  // 🎯 ปรับปรุงส่วนอัปโหลดรูปภาพร้านค้า: ยิงตรงผ่าน DioClient ยึดไอพีตัวแปรกลางสากล
   Future<String?> _uploadImage(File imageFile) async {
     try {
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('http://10.244.27.211:8081/v1/restaurant/uploadImage'),
-      );
+      String fileName = imageFile.path.split('/').last;
+      dio_package.FormData formData = dio_package.FormData.fromMap({
+        "image": await dio_package.MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+        "type": "restaurant",
+      });
 
-      request.files.add(
-        await http.MultipartFile.fromPath('image', imageFile.path),
+      var response = await DioClient.dio.post(
+        '/v1/restaurant/uploadImage',
+        data: formData,
       );
-      request.fields['type'] = 'restaurant';
-
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(responseBody);
-        return json['url'];
+        return response.data['url']; // ได้รับพาธสั้นสากลกลับมาทันที
       }
       return null;
     } catch (e) {
@@ -312,13 +312,11 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
             ),
           );
 
-          // 🌟 จุดเด็ดขาด: ล้างรูปภาพที่เลือกค้างไว้ สลัด editable ทิ้ง และยิงรีเฟรชโปรไฟล์สดๆ จาก DB ทันที
           setState(() {
             _isEditable = false;
             _selectedImage = null;
           });
 
-          // โหลดข้อมูลล่าสุดจากเซิร์ฟเวอร์มาทับหน้าจอทันที
           await _fetchRestaurantProfile();
         }
       } catch (e) {
@@ -334,6 +332,19 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
       } finally {
         if (mounted) setState(() => isLoadingAction = false);
       }
+    }
+  }
+
+  // 🎯 ฟังก์ชันเชื่อมสายพาร์ทรูปภาพ: ตรวจจับและคั่นสแลชกลางให้เรียบร้อยป้องกันปัญหาลิงก์ติดกันรูปพัง
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
     }
   }
 
@@ -432,6 +443,9 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
 
   @override
   Widget build(BuildContext context) {
+    // ดึงค่า URL ภาพที่ผ่านการเชื่อมไอพีส่วนกลางเรียบร้อยมาเตรียมรอวาดขึ้นจอ
+    final String finalProfileUrl = _getFinalImageUrl(restaurantimage);
+
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
@@ -460,15 +474,13 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   image: _selectedImage != null
                                       ? FileImage(_selectedImage!)
                                             as ImageProvider
-                                      : (restaurantimage != null
-                                                ? NetworkImage(
-                                                    Uri.encodeFull(
-                                                      restaurantimage!,
-                                                    ),
-                                                  )
-                                                : const AssetImage(
-                                                    'assets/images/default.png',
-                                                  ))
+                                      : finalProfileUrl.isNotEmpty
+                                      ? NetworkImage(
+                                          Uri.encodeFull(finalProfileUrl),
+                                        )
+                                      : const AssetImage(
+                                              'assets/images/default.png',
+                                            )
                                             as ImageProvider,
                                   fit: BoxFit.cover,
                                   onError: (_, __) {},
@@ -539,7 +551,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   }
                                 } catch (e) {
                                   print("Update Status Error: $e");
-
                                   if (mounted) {
                                     setState(
                                       () => _isStoreOpen = previousStatus,
@@ -662,32 +673,14 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                               _buildLabel("ชื่อร้านค้า (Restaurant Name)"),
                               TextFormField(
                                 controller: restaurantnameController,
-                                enabled: _isEditable,
-                                validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.isEmpty) {
-                                          return "กรุณากรอกชื่อร้านค้า";
-                                        }
-                                        if (!RegExp(
-                                          r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$',
-                                        ).hasMatch(v)) {
-                                          return "ต้องเป็นภาษาไทย อังกฤษ หรือตัวเลขเท่านั้น";
-                                        }
-                                        if (v.length < 3 || v.length > 50) {
-                                          return "ความยาว 3-50 ตัวอักษร";
-                                        }
-                                        return null;
-                                      }
-                                    : null,
-                                decoration: _inputDecoration(
-                                  enabled: _isEditable,
-                                ),
+                                enabled:
+                                    false, // บล็อกฟิลด์ไม่ให้คีย์ตามบรีฟโปรไฟล์
+                                decoration: _inputDecoration(enabled: false),
                               ),
 
                               _buildLabel("ประเภทร้านค้า (Restaurant Type)"),
                               _buildDropdown(),
 
-                              // ส่วนกล่อง Preview แผนที่นำทางในรั้ว ม.
                               _buildLabel("ปักหมุดที่อยู่ร้านค้า"),
                               InkWell(
                                 onTap: _isEditable
@@ -899,20 +892,16 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 enabled: _isEditable,
                                 validator: _isEditable
                                     ? (v) {
-                                        if (v == null || v.trim().isEmpty) {
+                                        if (v == null || v.trim().isEmpty)
                                           return "กรุณากรอกชื่อจริง";
-                                        }
-                                        if (v.contains(' ')) {
+                                        if (v.contains(' '))
                                           return "ต้องไม่มีเว้นวรรค";
-                                        }
                                         if (!RegExp(
                                           r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v)) {
+                                        ).hasMatch(v))
                                           return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
-                                        }
-                                        if (v.length < 3 || v.length > 30) {
+                                        if (v.length < 3 || v.length > 30)
                                           return "ความยาว 3-30 ตัวอักษร";
-                                        }
                                         return null;
                                       }
                                     : null,
@@ -927,20 +916,16 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 enabled: _isEditable,
                                 validator: _isEditable
                                     ? (v) {
-                                        if (v == null || v.trim().isEmpty) {
+                                        if (v == null || v.trim().isEmpty)
                                           return "กรุณากรอกนามสกุล";
-                                        }
-                                        if (v.contains(' ')) {
+                                        if (v.contains(' '))
                                           return "ต้องไม่มีเว้นวรรค";
-                                        }
                                         if (!RegExp(
                                           r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v)) {
+                                        ).hasMatch(v))
                                           return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
-                                        }
-                                        if (v.length < 3 || v.length > 30) {
+                                        if (v.length < 3 || v.length > 30)
                                           return "ความยาว 3-30 ตัวอักษร";
-                                        }
                                         return null;
                                       }
                                     : null,
@@ -956,17 +941,14 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 keyboardType: TextInputType.emailAddress,
                                 validator: _isEditable
                                     ? (v) {
-                                        if (v == null || v.trim().isEmpty) {
+                                        if (v == null || v.trim().isEmpty)
                                           return "กรุณากรอกอีเมล";
-                                        }
-                                        if (v.contains(' ')) {
+                                        if (v.contains(' '))
                                           return "ต้องไม่มีช่องว่าง";
-                                        }
                                         if (!RegExp(
                                           r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                        ).hasMatch(v)) {
+                                        ).hasMatch(v))
                                           return "รูปแบบอีเมลไม่ถูกต้อง";
-                                        }
                                         return null;
                                       }
                                     : null,
@@ -986,15 +968,12 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 keyboardType: TextInputType.phone,
                                 validator: _isEditable
                                     ? (v) {
-                                        if (v == null || v.trim().isEmpty) {
+                                        if (v == null || v.trim().isEmpty)
                                           return "กรุณากรอกเบอร์โทรศัพท์";
-                                        }
-                                        if (!RegExp(r'^[0-9]+$').hasMatch(v)) {
+                                        if (!RegExp(r'^[0-9]+$').hasMatch(v))
                                           return "ต้องเป็นตัวเลขเท่านั้น";
-                                        }
-                                        if (v.length < 10 || v.length > 15) {
+                                        if (v.length < 10 || v.length > 15)
                                           return "ความยาว 10-15 หลัก";
-                                        }
                                         return null;
                                       }
                                     : null,

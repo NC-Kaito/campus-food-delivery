@@ -1,3 +1,4 @@
+// features/restaurant/register_restaurant.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
@@ -22,14 +23,13 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
   String? _locationError;
   String? _restaurantImageError;
-  String? _leaseImageError;
+  String? _ownerImageError; // 🎯 ตัวแปรเก็บ Error รูปหน้าเจ้าของร้าน
   String? _typeError;
   String? _openDayError;
   bool _obscureText = true;
 
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
-  final GlobalKey<FormState> formKey =
-      GlobalKey<FormState>(); // <--- ตัวนี้จะทำงานได้แล้ว
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   late final TextEditingController usernameController;
   late final TextEditingController passwordController;
@@ -75,7 +75,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   String? _selectedType;
   String? _selectedLocation;
   File? _selectedImage;
-  File? _selectedLeaseImage;
+  File? _selectedOwnerImage; // 🎯 ตัวแปรเก็บไฟล์รูปหน้าเจ้าของร้าน
 
   Future<void> fetchTypes() async {
     try {
@@ -138,8 +138,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                       _selectedImage = File(image.path);
                       _restaurantImageError = null;
                     } else {
-                      _selectedLeaseImage = File(image.path);
-                      _leaseImageError = null;
+                      _selectedOwnerImage = File(image.path);
+                      _ownerImageError = null;
                     }
                   });
                 }
@@ -160,8 +160,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                       _selectedImage = File(image.path);
                       _restaurantImageError = null;
                     } else {
-                      _selectedLeaseImage = File(image.path);
-                      _leaseImageError = null;
+                      _selectedOwnerImage = File(image.path);
+                      _ownerImageError = null;
                     }
                   });
                 }
@@ -228,7 +228,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
           ),
         ),
       ),
-      // ✅ แก้ไขจุดที่ 1: นำ Form ครอบ SingleChildScrollView เอาไว้ตรวจสอบค่าความถูกต้องภายในทั้งหมด
       body: Form(
         key: formKey,
         child: SingleChildScrollView(
@@ -249,7 +248,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                   ),
                   const SizedBox(height: 15),
 
-                  // ✅ Username
                   _buildLabel("ชื่อผู้ใช้ (Username)"),
                   TextFormField(
                     controller: usernameController,
@@ -268,7 +266,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                     decoration: _inputDecoration(hint: ""),
                   ),
 
-                  // ✅ Password
                   _buildLabel("รหัสผ่าน (Password)"),
                   TextFormField(
                     controller: passwordController,
@@ -300,7 +297,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                     ),
                   ),
 
-                  // ✅ Restaurant Name
                   _buildLabel("ชื่อร้านค้า (Restaurant Name)"),
                   TextFormField(
                     controller: restaurantNameController,
@@ -320,7 +316,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                     decoration: _inputDecoration(hint: ""),
                   ),
 
-                  // ✅ Restaurant Type
                   _buildLabel("ประเภทร้านค้า (Restaurant Type)"),
                   _buildDropdown(
                     typeList.map((e) => e.name).toList(),
@@ -344,7 +339,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                       ),
                     ),
 
-                  // ✅ Location
                   _buildLabel("ที่ตั้งร้านค้า (location)"),
                   InkWell(
                     onTap: () async {
@@ -380,7 +374,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                         children: [
                           Text(
                             _selectedLocation ??
-                                "--- แตะเพื่อเลือกตำแหน่งบนแผนที่ ---",
+                                "--- แแตะเพื่อเลือกตำแหน่งบนแผนที่ ---",
                             style: TextStyle(
                               color: _selectedLocation == null
                                   ? Colors.grey[400]
@@ -403,7 +397,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                   const SizedBox(height: 15),
 
-                  // ✅ แก้ไขจุดที่ 2: จัดระเบียบการจัดวางกล่องรูปภาพและ Error ใหม่ไม่ให้ทับซ้อนกันใน Row
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -435,16 +428,17 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // 🎯 แก้เลเบลการแสดงผลกล่องอัปโหลดรูปภาพใบหน้าที่สองตามเงื่อนไขของอาจารย์
                             _buildUploadBox(
-                              "รูปสัญญาเช่า (lease_agreement)",
-                              _selectedLeaseImage,
+                              "รูปภาพหน้าเจ้าของร้านค้า",
+                              _selectedOwnerImage,
                               () => pickImage(false),
                             ),
-                            if (_leaseImageError != null)
+                            if (_ownerImageError != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 4, left: 4),
                                 child: Text(
-                                  _leaseImageError!,
+                                  _ownerImageError!,
                                   style: const TextStyle(
                                     color: Colors.red,
                                     fontSize: 12,
@@ -459,7 +453,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                   const SizedBox(height: 15),
 
-                  // ✅ เวลาเปิด-ปิด
                   Row(
                     children: [
                       Expanded(
@@ -516,7 +509,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                     ],
                   ),
 
-                  // ✅ วันที่เปิดร้าน
                   _buildLabel("วันที่เปิดร้าน (Open Date)"),
                   const SizedBox(height: 10),
                   Row(
@@ -566,7 +558,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                   const SizedBox(height: 30),
 
-                  // ✅ ปุ่มถัดไป
                   Center(
                     child: SizedBox(
                       width: double.infinity,
@@ -585,9 +576,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                               _selectedImage,
                               "รูปร้านค้า",
                             );
-                            _leaseImageError = _validateImage(
-                              _selectedLeaseImage,
-                              "รูปสัญญาเช่า",
+                            _ownerImageError = _validateImage(
+                              _selectedOwnerImage,
+                              "รูปหน้าเจ้าของร้านค้า",
                             );
                             _openDayError = _selectedDays.every((d) => !d)
                                 ? "กรุณาเลือกวันเปิดร้านอย่างน้อย 1 วัน"
@@ -598,7 +589,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                               _typeError != null ||
                               _locationError != null ||
                               _restaurantImageError != null ||
-                              _leaseImageError != null ||
+                              _ownerImageError != null ||
                               _openDayError != null) {
                             return;
                           }
@@ -621,7 +612,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                 closeTime: closeTimeController.text,
                                 selectedDays: _selectedDays,
                                 restaurantImage: _selectedImage,
-                                leaseImage: _selectedLeaseImage,
+                                ownerImage: _selectedOwnerImage,
                               ),
                             ),
                           );
@@ -662,8 +653,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
       ),
     );
   }
-
-  // --- Widget Builders ---
 
   Widget _buildLabel(String text) {
     return Padding(

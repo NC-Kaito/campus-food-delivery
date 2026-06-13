@@ -1,3 +1,4 @@
+// features/user/home_user.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dar
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/features/user/view_restaurant_user.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 มั่นใจว่าอิมพอร์ตดึงตัวแปรกลาง DioClient เข้ามาสวมไอพีรูปภาพ
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});
@@ -25,7 +27,6 @@ class _HomeUserState extends State<HomeUser> {
   String? selectedType;
   int? _selectedTypeId;
 
-  // ปรับสไตล์เมนูให้ดูพอดีกับไอคอน
   final menuTextStyle = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.bold,
@@ -44,10 +45,9 @@ class _HomeUserState extends State<HomeUser> {
     super.dispose();
   }
 
-  // โหลดข้อมูลประเภทร้านค้าและรายชื่อร้านค้าทั้งหมดมาสแตนด์บายรอบแรก
   Future<void> _initData() async {
     await fetchTypes();
-    await _loadResults(""); // ส่งค่าว่างเพื่อให้ดึงร้านค้าทั้งหมดขึ้นมาก่อน
+    await _loadResults("");
   }
 
   Future<void> fetchTypes() async {
@@ -61,15 +61,12 @@ class _HomeUserState extends State<HomeUser> {
     }
   }
 
-  // ฟังก์ชันค้นหาและกรองร้านค้าหลักของระบบแบบเบ็ดเสร็จในหน้าเดียว
   Future<void> _loadResults(String keyword) async {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
-    // ยิง API ค้นหาชื่อร้านค้าจากระบบหลังบ้าน
     var data = await _restaurantService.searchRestaurant(keyword);
 
-    // ถ้ามีการเลือกประเภทจาก Dropdown ให้คัดกรองกรองไอดีประเภทซ้ำอีกชั้นในแอป
     if (_selectedTypeId != null) {
       data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
     }
@@ -104,6 +101,19 @@ class _HomeUserState extends State<HomeUser> {
     return "เปิดวัน: ${days.join(', ')}";
   }
 
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http'))
+      return rawPath; // รองรับลิงก์เต็มรูปแบบกรณีข้อมูลเก่าค้างตู้ DB
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -133,7 +143,6 @@ class _HomeUserState extends State<HomeUser> {
                 ),
                 const SizedBox(height: 16),
 
-                // แถวป้อนคำค้นหา (Search TextField)
                 Row(
                   children: [
                     Expanded(
@@ -181,7 +190,6 @@ class _HomeUserState extends State<HomeUser> {
                 ),
                 const SizedBox(height: 12),
 
-                // ช่องเลือกหมวดหมู่ประเภทอาหาร Dropdown
                 DropdownButtonFormField<String>(
                   value: selectedType,
                   decoration: InputDecoration(
@@ -227,7 +235,6 @@ class _HomeUserState extends State<HomeUser> {
                         _selectedTypeId = null;
                       }
                     });
-                    // รันค้นหากรองข้อมูลใหม่ทันทีที่เปลี่ยนประเภทหมวดหมู่
                     _loadResults(searchController.text);
                   },
                 ),
@@ -235,7 +242,6 @@ class _HomeUserState extends State<HomeUser> {
             ),
           ),
 
-          // ── ส่วนการแสดงผลสถานะจำนวนผลลัพธ์ร้านค้าล่าสุด ──
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -259,7 +265,6 @@ class _HomeUserState extends State<HomeUser> {
               ),
             ),
 
-          // ── ลิสต์รายการการ์ดแสดงรายชื่อร้านค้าด้านล่าง ──
           Expanded(
             child: _isLoading
                 ? const Center(
@@ -323,9 +328,8 @@ class _HomeUserState extends State<HomeUser> {
   }
 
   Widget _buildRestaurantCard(BuildContext context, RestaurantModel item) {
-    final String imageUrl = item.restaurantImage != null
-        ? Uri.encodeFull(item.restaurantImage!)
-        : '';
+    // 🎯 แปลงพาร์ทรูปสั้นให้กลายเป็น URL ลิงก์รูปภาพตัวเต็มที่ผูกติดไอพีศูนย์กลาง
+    final String finalImageUrl = _getFinalImageUrl(item.restaurantImage);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -353,16 +357,15 @@ class _HomeUserState extends State<HomeUser> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // รูปภาพหน้าร้านค้า
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(16),
               ),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
-                child: imageUrl.isNotEmpty
+                child: finalImageUrl.isNotEmpty
                     ? Image.network(
-                        imageUrl,
+                        finalImageUrl, // 🌟 ยิงโหลดตรงผ่านลิงก์รูปภาพประกอบเสร็จสมบูรณ์
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
@@ -394,7 +397,6 @@ class _HomeUserState extends State<HomeUser> {
                       ),
               ),
             ),
-            // รายละเอียดชื่อร้านและเวลาเปิดปิด
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

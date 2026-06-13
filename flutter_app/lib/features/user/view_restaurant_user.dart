@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/features/user/list_menu_user.dart';
 // import 'package:flutter_app/features/menu/list_menu_restaurant.dart'; // แก้ Path ตามจริง
@@ -32,8 +33,24 @@ class _ViewRestaurantUserState extends State<ViewRestaurantUser> {
     return days.join(', ');
   }
 
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath; // ดักรองรับกรณีข้อมูลเก่า
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final String finalImageUrl = _getFinalImageUrl(
+      widget.restaurant.restaurantImage,
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
@@ -43,7 +60,7 @@ class _ViewRestaurantUserState extends State<ViewRestaurantUser> {
             Stack(
               children: [
                 Image.network(
-                  Uri.encodeFull(widget.restaurant.restaurantImage ?? ''),
+                  Uri.encodeFull(finalImageUrl),
                   width: double.infinity,
                   height: 280,
                   fit: BoxFit.cover,

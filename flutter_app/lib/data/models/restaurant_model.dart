@@ -8,7 +8,7 @@ class RestaurantModel {
   int? openDay;
   double? latitude;
   double? longitude;
-  String? leaseAgreementImg;
+  String? ownerImage;
   String? ownerFirstName;
   String? ownerLastName;
   String? email;
@@ -31,7 +31,7 @@ class RestaurantModel {
     this.openDay,
     this.latitude,
     this.longitude,
-    this.leaseAgreementImg,
+    this.ownerImage,
     this.ownerFirstName,
     this.ownerLastName,
     this.email,
@@ -56,7 +56,7 @@ class RestaurantModel {
       'openday': openDay,
       'latitude': latitude,
       'longitude': longitude,
-      'lease_agreement_img': leaseAgreementImg,
+      'ownerimage': ownerImage,
       'ownerfirstname': ownerFirstName,
       'ownerlastname': ownerLastName,
       'email': email,
@@ -81,7 +81,7 @@ class RestaurantModel {
       openDay: json['openday'] ?? json['openDay'],
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
-      leaseAgreementImg: json['lease_agreement_img'],
+      ownerImage: json['ownerimage'],
       ownerFirstName: json['ownerfirstname'] ?? json['ownerFirstName'],
       ownerLastName: json['ownerlastname'] ?? json['ownerLastName'],
       email: json['email'],

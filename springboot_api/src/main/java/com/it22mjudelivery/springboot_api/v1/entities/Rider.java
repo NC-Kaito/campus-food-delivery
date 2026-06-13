@@ -8,7 +8,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Date;
 import java.util.List;
 
 @Entity
@@ -33,7 +32,7 @@ public class Rider {
     @Column(nullable = false)
     private LocalDate birthday;
 
-    @Column(length = 100, nullable = false,unique = true)
+    @Column(length = 100, nullable = false, unique = true)
     private String email;
 
     @Column(length = 15, nullable = false)
@@ -62,6 +61,10 @@ public class Rider {
 
     @Column(length = 100)
     private String notApproveDetail;
+
+
+    @Column(nullable = false)
+    private LocalDate expiryDate;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "majorId", nullable = false)

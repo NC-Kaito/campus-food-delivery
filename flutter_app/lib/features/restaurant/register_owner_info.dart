@@ -1,3 +1,4 @@
+// features/restaurant/register_owner_info.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'dart:io';
@@ -21,7 +22,7 @@ class RegisterOwnerInfo extends StatefulWidget {
   final String closeTime;
   final List<bool> selectedDays;
   final File? restaurantImage;
-  final File? leaseImage;
+  final File? ownerImage;
 
   const RegisterOwnerInfo({
     super.key,
@@ -39,7 +40,7 @@ class RegisterOwnerInfo extends StatefulWidget {
     required this.closeTime,
     required this.selectedDays,
     this.restaurantImage,
-    this.leaseImage,
+    this.ownerImage,
   });
 
   @override
@@ -104,18 +105,22 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     if (formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
+        // อัปโหลดรูปร้านค้าเข้าโฟลเดอร์ฝั่งเซิร์ฟเวอร์หลังบ้านตามปกติ
         final restaurantImageUrl = await uploadImage(
           widget.restaurantImage,
           'restaurant',
         );
-        final leaseImageUrl = await uploadImage(widget.leaseImage, 'lease');
+
+        // 🎯 แก้ไขจุดวิกฤต: สลับมาส่งประเภทเป็น 'owner' แทนคำว่า 'lease' เพื่อให้ฝั่ง Java จัดระเบียบแยกโฟลเดอร์รูปใบหน้าได้ถูกต้อง
+        final ownerImageUrl = await uploadImage(widget.ownerImage, 'owner');
 
         RestaurantModel restaurant = RestaurantModel(
           username: widget.username,
           password: widget.password,
           restaurantName: widget.restaurantName,
           restaurantImage: restaurantImageUrl,
-          leaseAgreementImg: leaseImageUrl,
+          ownerImage:
+              ownerImageUrl, // 🎯 แมปค่าพาธสั้นสากลที่อัปโหลดเสร็จเก็บเข้าสู่ตัวแปรเจ้าของร้านค้า
           openTime: widget.openTime,
           closeTime: widget.closeTime,
           openDay: convertDaysToInt(widget.selectedDays),
@@ -165,7 +170,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     return result;
   }
 
-  // สไตล์กลางสำหรับช่องกรอกข้อมูล (เพื่อให้ขอบ Error สีแดงแสดงผลถูกต้อง)
   InputDecoration _inputDecoration({String hint = "", Widget? suffixIcon}) {
     return InputDecoration(
       hintText: hint,
@@ -231,7 +235,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ✅ 1. ชื่อจริง (ownerFirstName)
                   _buildLabel("ชื่อจริง (FirstName)"),
                   TextFormField(
                     controller: ownerFirstNameController,
@@ -253,7 +256,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                     decoration: _inputDecoration(hint: "กรอกชื่อจริง"),
                   ),
 
-                  // ✅ 2. นามสกุล (ownerLastName)
                   _buildLabel("นามสกุล (Lastname)"),
                   TextFormField(
                     controller: ownerLastnameController,
@@ -275,7 +277,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                     decoration: _inputDecoration(hint: "กรอกนามสกุล"),
                   ),
 
-                  // ✅ 3. อีเมล (Email)
                   _buildLabel("อีเมล (Email)"),
                   TextFormField(
                     controller: emailController,
@@ -287,13 +288,11 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                       if (value.contains(' '))
                         return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
 
-                      // คัดกรองรูปแบบ xxx@xxx.xx เบื้องต้นตามมาตรฐานสากล
                       if (!RegExp(
                         r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
                       ).hasMatch(value)) {
                         return "รูปแบบอีเมลไม่ถูกต้อง";
                       }
-                      // ตรวจสอบความยาวของชื่อเมลด้านหน้าตามที่คุณกำหนด (8-20 ตัวอักษร)
                       final parts = value.split('@');
                       if (parts.isNotEmpty) {
                         final localPart = parts[0];
@@ -315,7 +314,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                     ),
                   ),
 
-                  // ✅ 4. เบอร์โทรศัพท์ (Phone)
                   _buildLabel("เบอร์โทรศัพท์ (Phone)"),
                   TextFormField(
                     controller: phoneController,
@@ -343,7 +341,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
 
                   const SizedBox(height: 30),
 
-                  // ปุ่ม ย้อนกลับ และ สมัครสมาชิก
                   Row(
                     children: [
                       Expanded(

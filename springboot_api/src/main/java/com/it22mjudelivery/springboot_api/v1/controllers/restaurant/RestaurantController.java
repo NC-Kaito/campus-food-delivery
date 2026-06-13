@@ -70,8 +70,8 @@
 
                 // ตรวจสอบเงื่อนไขแยกประเภทโฟลเดอร์ตามหน้าบ้านส่งคำสั่งมา
                 String targetSubFolder = "imageRestaurant";
-                if ("lease".equalsIgnoreCase(type)) {
-                    targetSubFolder = "imgLeaseAgreement";
+                if ("ownerimage".equalsIgnoreCase(type)) {
+                    targetSubFolder = "ownerimage";
                 }
 
                 Path uploadDir = Paths.get("uploads", "restaurant", targetSubFolder);
@@ -82,8 +82,7 @@
                 Path savePath = uploadDir.resolve(fileName);
                 Files.copy(file.getInputStream(), savePath);
 
-                // ต่อ String คืนค่า URL ที่มีเครื่องหมาย / คั่นพาร์ทถูกต้องสมบูรณ์กลับไป
-                String imageUrl = "http://10.244.27.211:8081/uploads/restaurant/" + targetSubFolder + "/" + fileName;
+                String imageUrl = "uploads/restaurant/" + targetSubFolder + "/" + fileName;
                 return ResponseEntity.ok(Map.of("url", imageUrl));
 
             } catch (Exception e) {

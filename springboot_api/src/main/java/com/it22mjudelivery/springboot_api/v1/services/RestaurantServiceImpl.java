@@ -45,7 +45,7 @@ public class RestaurantServiceImpl implements RestaurantService{
                 .latitude(restaurantDto.getLatitude())
                 .longitude(restaurantDto.getLongitude())
                 .restaurantimage(restaurantDto.getRestaurantimage())
-                .lease_agreement_img(restaurantDto.getLease_agreement_img())
+                .ownerimage(restaurantDto.getOwnerimage())
                 .opentime(restaurantDto.getOpentime())
                 .closetime(restaurantDto.getClosetime())
                 .openDay(restaurantDto.getOpenday())

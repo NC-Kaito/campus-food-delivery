@@ -1,11 +1,12 @@
+// features/restaurant/update_register_fields.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/features/member/test_map.dart';
-import 'package:flutter_app/features/restaurant/update_register_owner.dart'; // สั่งเชื่อมไปหน้าที่ 2
-import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/features/restaurant/update_register_owner.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 เรียกใช้งานไอพีกลาง
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
@@ -43,11 +44,12 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
   String? _selectedType;
   int? _selectedTypeId;
   File? _selectedImage;
-  File? _selectedLeaseImage;
+  File?
+  _selectedOwnerImage; // 🎯 เปลี่ยนชื่อตัวแปรเก็บไฟล์ให้สื่อถึงรูปเจ้าของร้าน
 
-  // URL รูปภาพเก่าจาก Server ที่แปลง IP แล้ว
+  // URL รูปภาพเก่าจาก Server ที่แปลงผูกไอพีกลางแล้ว
   String? restaurantImageNetwork;
-  String? leaseImageNetwork;
+  String? ownerImageNetwork; // 🎯 ตัวแปรเก็บเครือข่ายรูปหน้าเจ้าของร้าน
 
   final List<String> _days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
   final List<bool> _selectedDays = List.generate(7, (index) => false);
@@ -103,6 +105,19 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
     }
   }
 
+  // 🎯 ฟังก์ชันดักจับคั่นกลางเครื่องหมายสแลช / ป้องกันลิงก์ชิดติดกันจนพัง
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
+  }
+
   Future<void> _fetchRestaurantProfile() async {
     try {
       final result = await restaurantService.getRestaurantByUsername(
@@ -112,32 +127,30 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
       setState(() {
         restaurantModel = result;
 
-        // ดึงข้อมูลเก่าลงฟอร์ม
+        // ดึงข้อมูลลงฟอร์ม
         usernameController.text = result.username ?? "";
         passwordController.text = result.password ?? "";
         restaurantNameController.text = result.restaurantName ?? "";
         openTimeController.text = result.openTime ?? "";
         closeTimeController.text = result.closeTime ?? "";
 
-        // จัดการสลับ IP รูปภาพร้านค้า
-        if (result.restaurantImage != null) {
-          restaurantImageNetwork = result.restaurantImage!.replaceAll(
-            '10.244.27.211',
-            '10.244.27.84',
-          );
-        } else {
-          restaurantImageNetwork = null;
+        if (result.latitude != null && result.longitude != null) {
+          _selectedLocation = "${result.latitude}, ${result.longitude}";
+          latitude = result.latitude;
+          longitude = result.longitude;
         }
 
-        // 🟢 เปลี่ยนมาใช้ leaseAgreementImg ตามที่ประกาศไว้ในโมเดล
-        if (result.leaseAgreementImg != null) {
-          leaseImageNetwork = result.leaseAgreementImg!.replaceAll(
-            '10.244.27.211',
-            '10.244.27.84',
-          );
-        } else {
-          leaseImageNetwork = null;
-        }
+        // 🎯 สลัดตรรกะ .replaceAll ทิ้งอย่างถาวร แล้วสวมฟังก์ชันผูกไอพีกลางแทน
+        restaurantImageNetwork =
+            result.restaurantImage != null && result.restaurantImage!.isNotEmpty
+            ? _getFinalImageUrl(result.restaurantImage)
+            : null;
+
+        // 🎯 สลัดคราบสัญญาเช่าผี เปลี่ยนมาดึงฟังก์ชันเซ็ตหัวไอพีรูปใบหน้าเจ้าของร้านค้าแทน
+        ownerImageNetwork =
+            result.ownerImage != null && result.ownerImage!.isNotEmpty
+            ? _getFinalImageUrl(result.ownerImage)
+            : null;
 
         // จับคู่ประเภทร้านค้า
         final matched = typeList
@@ -190,7 +203,9 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
         if (isRestaurantImage)
           _selectedImage = File(image.path);
         else
-          _selectedLeaseImage = File(image.path);
+          _selectedOwnerImage = File(
+            image.path,
+          ); // 🎯 นำค่าไฟล์เก็บเข้าสู่ตัวแปรเจ้าของร้านค้า
       });
     }
   }
@@ -250,7 +265,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'ข้อมูลร้านค้า',
+                        'textอาหารแนะนำ',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -357,9 +372,10 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                           const SizedBox(width: 15),
                           Expanded(
                             child: _buildUploadBox(
-                              "รูปสัญญาเช่า",
-                              _selectedLeaseImage,
-                              leaseImageNetwork, // 🟢 ได้รับการแก้ไขให้ดึงค่าจาก DB รูปภาพจึงโชว์ขึ้นตามภาพ Totoro แล้วครับ
+                              // 🎯 แก้ไขคำกำกับหัวข้อและจัดสรรตัวแปรสกรีนภาพถ่ายหน้าเจ้าของร้านค้าแทนที่ของเดิม
+                              "รูปหน้าเจ้าของร้านค้า",
+                              _selectedOwnerImage,
+                              ownerImageNetwork,
                               () => pickImage(false),
                               enabled: _isEditable,
                             ),
@@ -512,7 +528,6 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
     }
   }
 
-  // ── แก้ไขฟังก์ชัน _navigateToNextPage ในหน้าแรก เพื่อส่งข้อมูลที่พึ่งแก้ต่อมาหน้า 2 ──
   Future<void> _navigateToNextPage() async {
     final result = await Navigator.push<String>(
       context,
@@ -522,7 +537,6 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
           restaurantData: restaurantModel,
           isFormFieldsEditable: _isEditable,
 
-          // 🟢 ส่งค่าที่ป้อนอยู่ปัจจุบันไปหน้าที่ 2 ด้วย
           updatedRestaurantName: restaurantNameController.text,
           updatedTypeId: _selectedTypeId,
           updatedLatitude: latitude,
@@ -531,7 +545,8 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
           updatedCloseTime: closeTimeController.text,
           updatedSelectedDays: _selectedDays,
           updatedImage: _selectedImage,
-          updatedLeaseImage: _selectedLeaseImage,
+          updatedOwnerImage:
+              _selectedOwnerImage, // 🎯 แมปส่งรูปหน้าเจ้าของร้านตัวแปรใหม่ไปหน้าที่สอง
         ),
       ),
     );

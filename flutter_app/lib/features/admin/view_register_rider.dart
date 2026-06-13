@@ -1,9 +1,12 @@
+// features/admin/view_register_rider.dart
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
 import 'package:flutter_app/features/admin/list_rider.dart';
+
+import 'package:flutter_app/core/network/dio_client.dart';
 
 class View_RegisterRider extends StatefulWidget {
   final RiderModel rider;
@@ -27,6 +30,20 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
   void initState() {
     super.initState();
     rider = widget.rider;
+  }
+
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http://') || rawPath.startsWith('https://'))
+      return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    print("BASE URL: ${DioClient.dio.options.baseUrl}");
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   // ================= API & DIALOGS =================
@@ -237,7 +254,7 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
     Color statusColor = r.verificationStatus == "Confirm"
         ? const Color(0xFF67E22B)
         : (r.verificationStatus == "Reject" || r.notApproveDetail != null
-              ? const Color(0xFFFF9800)
+              ? const Color(0xFFFF3B30)
               : const Color(0xFFFF9800));
 
     String statusText = r.verificationStatus == "Confirm"
@@ -327,7 +344,7 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // LEFT SIDE: ข้อมูลส่วนตัว (แก้ปัญหาซ้อนทับและจัดระเบียบใหม่)
+                            // LEFT SIDE: ข้อมูลส่วนตัว
                             Expanded(
                               flex: 1,
                               child: Column(
@@ -370,13 +387,11 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                                   ),
                                   const SizedBox(height: 24),
 
-                                  // จัดกลุ่ม คณะ, สาขา, วันเกิด ไว้ฝั่งซ้าย และรูปบัตรนักศึกษาไว้ฝั่งขวาใน Row เดียวกัน
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
                                       // ฝั่งซ้าย: ข้อมูลคณะ สาขา และวันเกิด
-                                      // ฝั่งซ้าย: ข้อมูลสถาบันและการศึกษา
                                       Expanded(
                                         flex: 1,
                                         child: Column(
@@ -385,14 +400,12 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                                           children: [
                                             _labelValue(
                                               'คณะ (Faculty)',
-                                              r.facultyName ??
-                                                  '-', // 👈 เปลี่ยนมาดึงค่า Dynamic จากโมเดลแล้ว!
+                                              r.facultyName ?? '-',
                                             ),
                                             const SizedBox(height: 24),
                                             _labelValue(
                                               'สาขาวิชา (Major)',
-                                              r.majorName ??
-                                                  '-', // ดึงค่า Dynamic จากโมเดล
+                                              r.majorName ?? '-',
                                             ),
                                             const SizedBox(height: 24),
                                             _labelValue(
@@ -452,7 +465,7 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                               color: Color(0xFFD9D9D9),
                             ),
 
-                            // RIGHT SIDE: ข้อมูลยานพาหนะ (แสดงรูปแบบขนาน ซ้าย-ขวา ทรงแนวตั้ง)
+                            // RIGHT SIDE: ข้อมูลยานพาหนะ
                             Expanded(
                               flex: 1,
                               child: Column(
@@ -466,7 +479,6 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                                   ),
                                   const SizedBox(height: 20),
 
-                                  // วางชื่อหัวข้อและภาพเรียงคู่กัน ซ้าย-ขวา
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -528,7 +540,6 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                 ),
               ),
               const SizedBox(height: 20),
-
               // Buttons Bottom
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
@@ -600,20 +611,14 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
     );
   }
 
+  // 🎯 ปรับปรุงเสถียรภาพกล่องโหลดรูปภาพ: ใช้ระบบ Encode สากลแก้ปัญหารูปเก่าและอักขระพิเศษพังหน้าจอ
   Widget _imageBox(String? imageUrl, String type) {
-    // ✅ ใช้ URL จาก model โดยตรง + encode space
-    String? encodedUrl;
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      final uri = Uri.parse(imageUrl);
-      encodedUrl = uri
-          .replace(
-            path: uri.path
-                .split('/')
-                .map((s) => Uri.encodeComponent(s))
-                .join('/'),
-          )
-          .toString();
-    }
+    final String finalUrl = _getFinalImageUrl(imageUrl);
+
+    // ครอบด้วย Uri.encodeFull เพียงชั้นเดียวเพื่อความแม่นยำและเสถียรในการถอดสัญกรณ์อักขระ
+    final String encodedUrl = finalUrl.isNotEmpty
+        ? Uri.encodeFull(finalUrl)
+        : "";
 
     final double boxWidth = 240;
     final double boxHeight = (type == "studentCard") ? 145 : 260;
@@ -626,9 +631,9 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
         border: Border.all(color: Colors.black26),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: encodedUrl != null
+      child: encodedUrl.isNotEmpty
           ? GestureDetector(
-              onTap: () => _showMaximizedImage(context, encodedUrl!),
+              onTap: () => _showMaximizedImage(context, encodedUrl),
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: Tooltip(
@@ -638,14 +643,16 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                     child: Stack(
                       children: [
                         Image.network(
-                          encodedUrl,
+                          encodedUrl, // ✅ เรียกใช้งานผ่าน URL ที่แปลงพาร์ทสแตนด์บายเรียบร้อย
                           width: boxWidth,
                           height: boxHeight,
                           fit: BoxFit.cover,
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
                             return const Center(
-                              child: CircularProgressIndicator(),
+                              child: CircularProgressIndicator(
+                                color: Colors.green,
+                              ),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {

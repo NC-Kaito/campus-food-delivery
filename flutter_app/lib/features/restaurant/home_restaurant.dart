@@ -1,9 +1,11 @@
+// features/restaurant/home_restaurant.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/list_menu_restaurant.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/global_data.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 มั่นใจว่าเปิดอิมพอร์ตตัวแปรกลาง DioClient ไว้ตรงนี้
 
 class HomeRestaurant extends StatefulWidget {
   const HomeRestaurant({super.key});
@@ -33,7 +35,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
       if (rest != null) {
         restaurantModel = rest;
 
-        // ✅ แก้ไขจุดที่ 1: ดึง URL ตรงๆ จากหลังบ้าน ไม่ใช้คำสั่ง .replaceAll สับขาหลอกไอพีตัวเองแล้ว
+        // ดึงค่าพาธรูปภาพสั้น ๆ จาก Database (เช่น "uploads/restaurant/...") มาเก็บไว้ในตัวแปร
         restaurantimage = rest.restaurantImage;
 
         restaurantname = rest.restaurantName;
@@ -53,8 +55,25 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
     loadRestaurantData();
   }
 
+  // 🎯 ฟังก์ชันประกอบร่างพาร์ทรูปภาพ: ดักใส่เครื่องหมายสแลชกลางสไตล์โมเดิร์น
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http'))
+      return rawPath; // รองรับข้อมูลเก่าที่เป็นลิงก์เต็มสาย
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 🎯 แปลงชื่อไฟล์รูปภาพสั้นให้เป็น URL ตัวเต็มที่สวมไอพีปัจจุบันเรียบร้อยแล้ว
+    final String finalImageUrl = _getFinalImageUrl(restaurantimage);
+
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
@@ -79,12 +98,12 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                       bottomLeft: Radius.circular(0),
                       bottomRight: Radius.circular(0),
                     ),
-                    child:
-                        restaurantimage != null && restaurantimage!.isNotEmpty
+                    child: finalImageUrl.isNotEmpty
                         ? Image.network(
-                            Uri.encodeFull(restaurantimage!),
+                            Uri.encodeFull(
+                              finalImageUrl,
+                            ), // ✅ เรียกใช้งานผ่าน URL ที่ประกอบร่างเสร็จสมบูรณ์
                             fit: BoxFit.cover,
-                            // ✅ แก้ไขจุดที่ 2: ถ้าเกิดเหตุสุดวิสัยโหลดรูปออนไลน์ไม่ได้ เปลี่ยนให้วาดกล่องไอคอนสีแดงแทนการดึง Asset ผี เพื่อตัดปัญหาเรื่องพ่น Error โหลดของไม่เจอพังหน้าจอ
                             errorBuilder: (context, error, stackTrace) =>
                                 _buildPlaceholderBackground(),
                           )
@@ -319,7 +338,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
 
                     // ตารางข้อมูลรายละเอียดร้าน
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Expanded(
                           child: Column(
@@ -344,6 +363,7 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                             ],
                           ),
                         ),
+                        const SizedBox(width: 10),
                         Container(
                           width: 2,
                           height: 190,
@@ -416,7 +436,6 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
     );
   }
 
-  // ✅ ฟังก์ชันช่วยสร้างพื้นหลังดีฟอลต์ที่ปลอดภัย ไม่โหลด Asset ให้เสี่ยงพัง
   Widget _buildPlaceholderBackground() {
     return Container(
       color: const Color(0xFFD92D2D),

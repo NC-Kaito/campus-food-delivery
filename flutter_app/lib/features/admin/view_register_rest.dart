@@ -1,3 +1,4 @@
+// features/admin/view_register_restaurant.dart
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_app/features/admin/admin_navbar.dart';
 import 'package:flutter_app/features/admin/list_restaurant.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตดึงตัวแปรไอพีกลางเข้ามาร้อยสายรูปภาพสากล
 import 'package:flutter_app/features/admin/map_view_restaurant.dart'
     if (dart.library.html) 'package:flutter_app/utils/map_view_web.dart';
 
@@ -60,6 +62,20 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
       }
     }
     return open.isEmpty ? '-' : open.join(' - ');
+  }
+
+  // 🎯 ฟังก์ชันช่วยต่อสายเชื่อมพาร์ทรูปภาพสั้นเข้ากับไอพีฐานข้อมูลศูนย์กลางให้ถูกต้องสมบูรณ์
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http'))
+      return rawPath; // รองรับประวัติลิงก์ตัวเก่าแช่แข็ง
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   // ================= API & DIALOGS =================
@@ -457,7 +473,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                                       child: kIsWeb
                                                           ? buildMapView(
                                                               'map-${r.username}',
-                                                            )
+                                                            ) // 🎯 ตัดค่าพารามิเตอร์ส่วนเกินออกตามแนวทางสากลเพื่อให้ระบบคอมไพล์ผ่านฉลุย
                                                           : GoogleMap(
                                                               initialCameraPosition:
                                                                   CameraPosition(
@@ -556,7 +572,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                               color: Color(0xFFD9D9D9),
                             ),
 
-                            // RIGHT SIDE (ข้อมูลเอกสาร: ปรับปรุงโครงสร้างให้เรียงแนวนอน ซ้าย-ขวา ทรงยาวแนวตั้ง)
+                            // RIGHT SIDE (ข้อมูลเอกสาร)
                             Expanded(
                               flex: 1,
                               child: Column(
@@ -565,7 +581,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                   _sectionTitle('ข้อมูลเอกสาร'),
                                   const SizedBox(height: 14),
 
-                                  // ใช้ Row บังคับจัดระเบียบให้ภาพ รูปร้านค้า และ รูปสัญญาเช่า แสดงผลเคียงคู่กัน
+                                  // ใช้ Row จัดระเบียบให้รูปร้านค้า และ รูปหน้าเจ้าของร้านค้า แสดงผลเคียงคู่กัน
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -591,21 +607,23 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                       const SizedBox(
                                         width: 16,
                                       ), // ระยะเว้นวรรคช่องว่างระหว่างรูป
-                                      // ฝั่งรูปสัญญาเช่า
+                                      // ฝั่งรูปหน้าเจ้าของร้านค้า
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
+                                            // 🎯 ปรับปรุงข้อความหัวข้อตามความต้องการของอาจารย์
                                             const Text(
-                                              'รูปสัญญาเช่า (lease_agreement)',
+                                              'รูปหน้าเจ้าของร้าน (Owner Image)',
                                               style: TextStyle(
                                                 fontSize: 14,
                                                 color: Colors.black87,
                                               ),
                                             ),
                                             const SizedBox(height: 10),
-                                            _imageBox(r.leaseAgreementImg),
+                                            // 🎯 ดึงประวัติรูปภาพใบหน้าจากฟิลด์ใหม่ r.ownerImage มาเรนเดอร์ขึ้นจอแอดมินโดยอัตโนมัติ
+                                            _imageBox(r.ownerImage),
                                           ],
                                         ),
                                       ),
@@ -693,18 +711,10 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
   }
 
   Widget _imageBox(String? imageUrl) {
-    String? encodedUrl;
-    if (imageUrl != null && imageUrl.isNotEmpty) {
-      final uri = Uri.parse(imageUrl);
-      encodedUrl = uri
-          .replace(
-            path: uri.path
-                .split('/')
-                .map((s) => Uri.encodeComponent(s))
-                .join('/'),
-          )
-          .toString();
-    }
+    final String finalUrl = _getFinalImageUrl(imageUrl);
+    final String encodedUrl = finalUrl.isNotEmpty
+        ? Uri.encodeFull(finalUrl)
+        : "";
 
     return Container(
       width: 240,
@@ -714,9 +724,9 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
         border: Border.all(color: Colors.black26),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: encodedUrl != null
+      child: encodedUrl.isNotEmpty
           ? GestureDetector(
-              onTap: () => _showMaximizedImage(context, encodedUrl!),
+              onTap: () => _showMaximizedImage(context, encodedUrl),
               child: MouseRegion(
                 cursor: SystemMouseCursors.click,
                 child: Tooltip(
@@ -733,7 +743,9 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
                             return const Center(
-                              child: CircularProgressIndicator(),
+                              child: CircularProgressIndicator(
+                                color: Colors.green,
+                              ),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {

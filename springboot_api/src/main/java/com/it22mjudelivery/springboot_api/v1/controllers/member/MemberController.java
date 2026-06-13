@@ -87,7 +87,6 @@ public class MemberController {
     @PostMapping("/uploadProfileImage")
     public ResponseEntity<?> uploadProfileImage(@RequestParam("image") MultipartFile file) {
         try {
-            // สร้างชื่อไฟล์ไม่ซ้ำกัน
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
 
             // 🎯 จุดที่ 1: ตรวจเช็คให้มั่นใจว่าพิกัดโฟลเดอร์เก็บไฟล์จริงเอาไว้ที่ไหน
@@ -101,9 +100,7 @@ public class MemberController {
             Path savePath = uploadDir.resolve(fileName);
             Files.copy(file.getInputStream(), savePath);
 
-            // 🎯 จุดที่ 2: เปลี่ยนมาส่งโครงสร้าง URL แบบเต็มสาย ชี้เข้าพาร์ทโฟลเดอร์เสมือน (Static Resource) ให้ตรงกับที่บันทึกจริง
-            // เติมเครื่องหมาย / คั่นท้ายโฟลเดอร์ member/ ให้ถูกต้องด้วยครับ
-            String imageUrl = "http://10.244.27.211:8081/uploads/member/profile/" + fileName;
+            String imageUrl = "uploads/member/profile/" + fileName;
 
             return ResponseEntity.ok(Map.of("url", imageUrl));
 

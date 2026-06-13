@@ -1,8 +1,10 @@
+// features/restaurant/update_register_owner.dart
+import 'package:dio/dio.dart'
+    as dio_package; // 🎯 ดึง dio_package มาใช้อัปโหลดไฟล์แทน http ตัวเก่า
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
-import 'package:flutter_app/data/services/restaurant/restaurant_service.dart'; // import เพิ่มเข้ามา
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตตัวแปรไอพีกลาง
 import 'dart:io';
 
 class UpdateRegisterOwner extends StatefulWidget {
@@ -10,7 +12,6 @@ class UpdateRegisterOwner extends StatefulWidget {
   final RestaurantModel? restaurantData;
   final bool isFormFieldsEditable;
 
-  // เพิ่มการรับค่าข้อมูลที่มีการเปลี่ยนแปลงจากหน้าแรก (ถ้ามี) มาอัปเดตร่วมกัน
   final String? updatedRestaurantName;
   final int? updatedTypeId;
   final double? updatedLatitude;
@@ -19,7 +20,8 @@ class UpdateRegisterOwner extends StatefulWidget {
   final String? updatedCloseTime;
   final List<bool>? updatedSelectedDays;
   final File? updatedImage;
-  final File? updatedLeaseImage;
+  final File?
+  updatedOwnerImage; // รูปหน้าเจ้าของร้านที่มีการเลือกปรับเปลี่ยนใหม่จากหน้าแรก
 
   const UpdateRegisterOwner({
     super.key,
@@ -34,7 +36,7 @@ class UpdateRegisterOwner extends StatefulWidget {
     this.updatedCloseTime,
     this.updatedSelectedDays,
     this.updatedImage,
-    this.updatedLeaseImage,
+    this.updatedOwnerImage,
   });
 
   @override
@@ -43,8 +45,7 @@ class UpdateRegisterOwner extends StatefulWidget {
 
 class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-  final RestaurantService restaurantService =
-      RestaurantService(); // เรียกใช้ Service สำหรับอัปเดต
+  final RestaurantService restaurantService = RestaurantService();
 
   bool _isLoadingAction = false;
 
@@ -80,7 +81,6 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
     super.dispose();
   }
 
-  // ฟังก์ชันสลับรายการวันเปิดร้าน (Boolean List) ให้กลับมาเป็นตัวเลข Int ส่งไปหาฐานข้อมูล
   int _convertDaysToInt(List<bool> days) {
     int result = 0;
     for (int i = 0; i < days.length; i++) {
@@ -89,24 +89,25 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
     return result;
   }
 
-  // ฟังก์ชันอัปโหลดรูปภาพใบใหม่ขึ้นเซิร์ฟเวอร์
-  Future<String?> _uploadImage(File imageFile) async {
+  // 🎯 ปรับฟังก์ชันอัปโหลดรูปภาพใหม่ผ่าน DioClient: มั่นคง ปลอดภัย รองรับการสลับไอพีเราเตอร์กลาง
+  Future<String?> _uploadImage(File imageFile, String type) async {
     try {
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('http://10.244.27.84:8081/v1/restaurant/uploadImage'),
-      );
-      request.files.add(
-        await http.MultipartFile.fromPath('image', imageFile.path),
-      );
-      request.fields['type'] = 'restaurant';
+      String fileName = imageFile.path.split('/').last;
+      dio_package.FormData formData = dio_package.FormData.fromMap({
+        'image': await dio_package.MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+        'type': type,
+      });
 
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
+      var response = await DioClient.dio.post(
+        '/v1/restaurant/uploadImage',
+        data: formData,
+      );
 
-      if (response.statusCode == 200) {
-        final json = jsonDecode(responseBody);
-        return json['url'];
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data['url'];
       }
       return null;
     } catch (e) {
@@ -120,18 +121,25 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
     if (formKey.currentState!.validate()) {
       setState(() => _isLoadingAction = true);
       try {
-        // 1. ตรวจสอบและอัปโหลดรูปภาพใหม่ (ถ้ามี)
+        // 1. ตรวจสอบและอัปโหลดรูปภาพใหม่เข้าสู่ระบบปลายทางหลังบ้าน
         String? newRestaurantImageUrl;
-        String? newLeaseImageUrl;
+        String? newOwnerImageUrl;
 
         if (widget.updatedImage != null) {
-          newRestaurantImageUrl = await _uploadImage(widget.updatedImage!);
+          newRestaurantImageUrl = await _uploadImage(
+            widget.updatedImage!,
+            'restaurant',
+          );
         }
-        if (widget.updatedLeaseImage != null) {
-          newLeaseImageUrl = await _uploadImage(widget.updatedLeaseImage!);
+        if (widget.updatedOwnerImage != null) {
+          // 🎯 ปรับเปลี่ยนฟิลด์ประเภทการยิงเซฟรูปจาก 'lease' เดิม สลับให้เป็นหมวดภาพ 'owner' ตามคำสั่งอาจารย์
+          newOwnerImageUrl = await _uploadImage(
+            widget.updatedOwnerImage!,
+            'owner',
+          );
         }
 
-        // 2. มัดรวมข้อมูลจากทั้งสองหน้ามาประกอบร่างเป็น Model ตัวใหม่เพื่อทำการเซฟทับ
+        // 2. มัดรวมข้อมูลประกอบร่างเซฟทับตาราง PostgreSQL หลังบ้าน
         RestaurantModel updatedModel = RestaurantModel(
           username: widget.restaurantData?.username,
           password: widget.restaurantData?.password,
@@ -140,8 +148,10 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
               widget.restaurantData?.restaurantName,
           restaurantImage:
               newRestaurantImageUrl ?? widget.restaurantData?.restaurantImage,
-          leaseAgreementImg:
-              newLeaseImageUrl ?? widget.restaurantData?.leaseAgreementImg,
+
+          // 🎯 แก้ไขจุดสำคัญ: ถอด leaseAgreementImg เก่าทิ้ง แล้วส่งค่าอัปเดตรูปใหม่เข้าตัวแปร ownerImage แทน
+          ownerImage: newOwnerImageUrl ?? widget.restaurantData?.ownerImage,
+
           openTime: widget.updatedOpenTime ?? widget.restaurantData?.openTime,
           closeTime:
               widget.updatedCloseTime ?? widget.restaurantData?.closeTime,
@@ -166,7 +176,7 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
           notApproveDetail: widget.restaurantData?.notApproveDetail,
         );
 
-        // 3. ยิงข้อมูลอัปเดตผ่าน Service ฝั่งหลังบ้าน
+        // 3. ยิงข้อมูลอัปเดตผ่าน Service
         await restaurantService.updateProfileRestaurant(updatedModel);
 
         if (mounted) {
@@ -176,7 +186,6 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
               backgroundColor: Colors.green,
             ),
           );
-          // ส่งค่า 'success' กลับไปบอกหน้าแรกให้ทำการล็อกฟอร์มและดึงข้อมูลใหม่มาโชว์คู่กัน
           Navigator.pop(context, 'success');
         }
       } catch (e) {
@@ -357,7 +366,6 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
             ),
             const SizedBox(height: 12),
 
-            // ปุ่มบันทึกการแก้ไขผูกโครงสร้าง Logic doUpdateRegisterData เรียบร้อยแล้วครับ
             _buildButton(
               _isLoadingAction ? "กำลังบันทึก..." : "บันทึกการแก้ไข",
               const Color(0xFF55FF33),

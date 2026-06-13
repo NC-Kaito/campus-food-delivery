@@ -1,11 +1,13 @@
+// features/member/profile_member.dart
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/features/member/home_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class ProfileMember extends StatefulWidget {
@@ -66,17 +68,6 @@ class _ProfileMemberState extends State<ProfileMember> {
         lastnameController.text = memberModel.lastname ?? "";
         emailController.text = memberModel.email ?? "";
         phoneController.text = memberModel.phone ?? "";
-
-        // 🟢 แก้ไขเพื่อซ่อมอาการรูปไม่ขึ้น: ทำการสลับ IP จาก 211 เป็น 84 ให้ตรงกับเครื่องปัจจุบัน
-        // และใช้ค่าพาร์ทเต็มตรง ๆ จากที่ฐานข้อมูลพ่นมาได้เลยครับ ไม่ต้องทำการหนีบแทรกพาร์ทโฟลเดอร์ซ้ำซ้อน
-        if (memberModel.profileimg != null &&
-            memberModel.profileimg!.isNotEmpty) {
-          memberModel.profileimg = memberModel.profileimg!.replaceAll(
-            '10.244.27.211',
-            '10.244.27.84',
-          );
-        }
-        print("profileimg (แก้ไขสลับ IP แล้ว) = ${memberModel.profileimg}");
       });
     } catch (e) {
       setState(() {
@@ -129,22 +120,21 @@ class _ProfileMemberState extends State<ProfileMember> {
 
   Future<String?> _uploadImage(File imageFile) async {
     try {
-      final String baseIp = "10.244.27.84";
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse('http://$baseIp:8081/v1/member/uploadProfileImage'),
-      );
+      String fileName = imageFile.path.split('/').last;
+      FormData formData = FormData.fromMap({
+        "image": await MultipartFile.fromFile(
+          imageFile.path,
+          filename: fileName,
+        ),
+      });
 
-      request.files.add(
-        await http.MultipartFile.fromPath('image', imageFile.path),
+      var response = await DioClient.dio.post(
+        '/v1/member/uploadProfileImage',
+        data: formData,
       );
-
-      var response = await request.send();
-      var responseBody = await response.stream.bytesToString();
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(responseBody);
-        return json['url'];
+        return response.data['url'];
       }
       return null;
     } catch (e) {
@@ -208,8 +198,28 @@ class _ProfileMemberState extends State<ProfileMember> {
     }
   }
 
+  // 🎯 ฟังก์ชันดักประกอบร่างสวมหัวขยับไอพีรูปโปรไฟล์ให้ถูกต้องสมบูรณ์ร้อยเปอร์เซ็นต์
+  String _getFinalProfileImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http'))
+      return rawPath; // กรณีข้อมูลเก่ามีแช่หัวเว็บไว้
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+
+    // ถ้ารูปเก็บแบบไม่มีสแลชนำหน้า (เช่น "uploads/member/...") ให้สวมเครื่องหมาย / แทรกกลาง
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final String finalProfileUrl = _getFinalProfileImageUrl(
+      memberModel.profileimg,
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: isLooding
@@ -298,22 +308,16 @@ class _ProfileMemberState extends State<ProfileMember> {
                                                   _selectedImage != null
                                                   ? FileImage(_selectedImage!)
                                                         as ImageProvider
-                                                  : (memberModel.profileimg !=
-                                                                null &&
-                                                            memberModel
-                                                                .profileimg!
-                                                                .isNotEmpty
-                                                        ? NetworkImage(
-                                                            Uri.encodeFull(
-                                                              memberModel
-                                                                  .profileimg!,
-                                                            ),
-                                                          ) // 🟢 ดึงข้อมูลตัวแปรสลับ IP สำเร็จรูปได้ทันที
-                                                        : null),
+                                                  : finalProfileUrl.isNotEmpty
+                                                  ? NetworkImage(
+                                                      Uri.encodeFull(
+                                                        finalProfileUrl,
+                                                      ),
+                                                    )
+                                                  : null,
                                               child:
                                                   (_selectedImage == null &&
-                                                      memberModel.profileimg ==
-                                                          null)
+                                                      finalProfileUrl.isEmpty)
                                                   ? const Icon(
                                                       Icons.person,
                                                       size: 55,
@@ -434,7 +438,6 @@ class _ProfileMemberState extends State<ProfileMember> {
                                     ),
                                     child: ElevatedButton(
                                       onPressed: () {
-                                        // เด้งเคลียร์กลับไปหน้าหลักของสมาชิก
                                         Navigator.pushAndRemoveUntil(
                                           context,
                                           MaterialPageRoute(

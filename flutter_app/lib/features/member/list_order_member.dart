@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/view_order_member.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตตัวแปรกลางเพื่อดึงข้อมูลสลักไอพีล่าสุด
 
 class ListOrderMember extends StatefulWidget {
   const ListOrderMember({super.key});
@@ -16,8 +17,22 @@ class _ListOrderMemberState extends State<ListOrderMember> {
   @override
   void initState() {
     super.initState();
-    // สมมติว่า getGroupedByStore() ของคุณคืนค่า Key เป็น storeUsername (หรือไอดีร้านที่ใช้เชื่อมระบบ)
+    // ดึงข้อมูลรายการอาหารในตะกร้าที่จัดกลุ่มตามร้านค้า
     _groupedCart = CartManager().getGroupedByStore();
+  }
+
+  // 🎯 ฟังก์ชันช่วยต่อหัวเชื่อมต่อรูปภาพร้านค้า ป้องกันลิงก์ชิดติดกันจนพังหน้าจอ
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http'))
+      return rawPath; // รองรับข้อมูลเก่าที่เป็นลิงก์เต็มสาย
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   @override
@@ -74,16 +89,15 @@ class _ListOrderMemberState extends State<ListOrderMember> {
               ),
               itemCount: _groupedCart.keys.length,
               itemBuilder: (context, index) {
-                // 🎯 จุดแก้ไขที่ 1: ดึง username ออกมาจากคีย์หลักของกลุ่มตะกร้า
+                // ดึง username ออกมาจากคีย์หลักของกลุ่มตะกร้า
                 String storeUsername = _groupedCart.keys.elementAt(index);
                 List<CartItem> storeItems = _groupedCart[storeUsername]!;
 
-                // 🎯 จุดแก้ไขที่ 2: ดึง "ชื่อร้านภาษาไทย/ชื่อจริง" จากโมเดลความสัมพันธ์ของรายการอาหารตัวแรก
+                // ดึงชื่อร้านจากโมเดลความสัมพันธ์ของรายการอาหารตัวแรก
                 String storeName =
                     storeItems.first.menu.restaurant?.restaurantName ??
                     storeUsername;
 
-                // 🎯 ส่งพารามิเตอร์ให้ครบ 3 ตัวตามโครงสร้างฟังก์ชัน _buildStoreCartCardด้านล่าง
                 return _buildStoreCartCard(
                   storeUsername,
                   storeName,
@@ -105,18 +119,12 @@ class _ListOrderMemberState extends State<ListOrderMember> {
       totalItemsInStore += item.quantity;
     }
 
-    // ดึงรูปโปรไฟล์ของร้านค้า
+    // ดึงรูปโปรไฟล์ของร้านค้าจากไอเทมแรกในตะกร้า
     String? rawRestaurantImage =
         storeItems.first.menu.restaurant?.restaurantImage;
 
-    const String baseIp = "10.244.27.211";
-    String safeImageUrl = "";
-
-    if (rawRestaurantImage != null && rawRestaurantImage.isNotEmpty) {
-      safeImageUrl = rawRestaurantImage
-          .replaceAll("10.226.43.211", baseIp)
-          .replaceAll("10.0.2.2", baseIp);
-    }
+    // 🎯 ประกอบร่างพาร์ทรูปสั้นให้เป็น URL ตัวเต็มที่สวมไอพีปัจจุบันผ่านฟังก์ชันกลาง
+    final String finalImageUrl = _getFinalImageUrl(rawRestaurantImage);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20.0),
@@ -134,7 +142,6 @@ class _ListOrderMemberState extends State<ListOrderMember> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16.0),
-        // 🎯 แก้ไขจุดวิกฤต: เปลี่ยนตรงนี้ให้เป็น async เพื่อดักรอขากลับจากหน้า ViewOrderMember
         onTap: () async {
           await Navigator.push(
             context,
@@ -147,8 +154,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
             ),
           );
 
-          // 🚀 เมื่อผู้ใช้กด ย้อนกลับ หรือ Pop ดีดกลับมาจากหน้า ViewOrderMember
-          // สั่งให้รีเฟรชข้อมูลตะกร้าอาหารที่จัดกลุ่มตามร้านใหม่ล่าสุดทันที
+          // เมื่อผู้ใช้กด ย้อนกลับ กลับมาจากหน้า ViewOrderMember ให้รีเฟรชตะกร้าใหม่ล่าสุด
           setState(() {
             _groupedCart = CartManager().getGroupedByStore();
           });
@@ -159,9 +165,11 @@ class _ListOrderMemberState extends State<ListOrderMember> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12.0),
-                child: safeImageUrl.isNotEmpty
+                child: finalImageUrl.isNotEmpty
                     ? Image.network(
-                        Uri.encodeFull(safeImageUrl),
+                        Uri.encodeFull(
+                          finalImageUrl,
+                        ), // ✅ เรียกใช้งานผ่าน URL ที่สลับไอพีได้อิสระ
                         width: 80,
                         height: 80,
                         fit: BoxFit.cover,

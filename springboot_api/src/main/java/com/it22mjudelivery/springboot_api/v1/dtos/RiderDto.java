@@ -12,9 +12,6 @@ import java.time.LocalDate;
 public class RiderDto {
     private String studentid;
 
-    // ใช้ access = JsonProperty.Access.WRITE_ONLY
-    // เพื่อให้ส่ง Password มาจาก Flutter ได้ (เช่นตอน Register/Login)
-    // แต่ Spring จะไม่ส่งฟิลด์นี้กลับไปใน JSON (เช่นตอน Get Profile)
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private String password;
 

@@ -66,9 +66,6 @@ public class RiderController {
             String vehicleImagePath = saveFile(vehicleFile, "vehicleImage");
             String drivingLicensePath = saveFile(drivingLicenseFile, "drivingLicenseImg");
 
-            // ตรงนี้เพื่อนก็เอา studentCardPath และ vehicleImagePath
-            // ไป save ลง Database ใน Table Rider ได้เลยครับ
-
             Map<String, String> response = new HashMap<>();
             response.put("studentCardUrl", studentCardPath);
             response.put("vehicleImageUrl", vehicleImagePath);
@@ -102,7 +99,7 @@ public class RiderController {
         Path savePath = uploadDir.resolve(fileName);
         Files.copy(file.getInputStream(), savePath);
 
-        // 5. คืนค่า Path เพื่อเอาไปเก็บลง Database (เช่น rider/studentCard/filename.jpg)
-        return "rider/" + subFolder + "/" + fileName;
+        // 5. คืนค่า Path เพื่อเอาไปเก็บลง Database
+        return "uploads/rider/" + subFolder + "/" + fileName;
     }
 }

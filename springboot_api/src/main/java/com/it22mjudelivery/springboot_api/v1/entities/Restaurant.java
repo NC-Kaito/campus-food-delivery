@@ -47,14 +47,14 @@ public class Restaurant {
     @Column(nullable = false)
     private double longitude;
 
-    @Column(length = 200, nullable = false)
-    private String lease_agreement_img;
-
     @Column(length = 50, nullable = false)
     private String ownerfirstname;
 
     @Column(length = 50, nullable = false)
     private String ownerlastname;
+
+    @Column(length = 200, nullable = false)
+    private String ownerimage;
 
     @Column(length = 100, nullable = false, unique = true)
     private String email;
