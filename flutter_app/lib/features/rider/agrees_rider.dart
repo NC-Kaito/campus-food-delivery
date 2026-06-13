@@ -1,3 +1,4 @@
+// features/rider/agrees_rider.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/rider/register_rider.dart';
 
@@ -9,9 +10,10 @@ class AgreesRider extends StatefulWidget {
 }
 
 class _AgreesRiderState extends State<AgreesRider> {
-  List<bool?> _agreements = List.generate(5, (index) => null);
-  bool _agreeAll = false;
+  // 🎯 ปรับเหลือตัวแปรจับสถานะการยอมรับข้อตกลงไรเดอร์เพียงค่าเดียวสากล
+  bool _isAccepted = false;
 
+  // หัวข้อและรายละเอียดข้อตกลงสำหรับผู้จัดส่ง (Rider)
   final List<Map<String, String>> _content = [
     {
       "title": "1. คุณสมบัติของผู้เข้าร่วมโครงการ",
@@ -36,18 +38,9 @@ class _AgreesRiderState extends State<AgreesRider> {
     {
       "title": "5. การสิ้นสุดข้อตกลง",
       "desc":
-          "รับทราบว่าหากพ้นสภาพการเป็นนักศึกษาหรือมีการร้องเรียนเกี่ยวกับพฤติกรรมที่ไม่เหมาะสมทีมงานมีสิทธิ์ระงับการเข้าถึงระบบได้ทันทีโดยไม่ต้องแจ้งให้ทราบล่วงหน้า",
+          "รับทราบว่าหากพ้นสภาพการเป็นนักศึกษาหรือมีการร้องเรียนเกี่ยวกับพฤทีพฤติกรรมที่ไม่เหมาะสมทีมงานมีสิทธิ์ระงับการเข้าถึงระบบได้ทันทีโดยไม่ต้องแจ้งให้ทราบล่วงหน้า",
     },
   ];
-
-  void _handleAgreeAll(bool? value) {
-    setState(() {
-      _agreeAll = value ?? false;
-      for (int i = 0; i < _agreements.length; i++) {
-        _agreements[i] = _agreeAll ? true : null;
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +57,7 @@ class _AgreesRiderState extends State<AgreesRider> {
       ),
       body: Column(
         children: [
+          // ส่วนแสดงรายละเอียดเงื่อนไขและข้อตกลงทั้งหมดของไรเดอร์
           Expanded(
             child: Container(
               margin: const EdgeInsets.all(16),
@@ -85,22 +79,16 @@ class _AgreesRiderState extends State<AgreesRider> {
                           fontSize: 16,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
                         _content[index]['desc']!,
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
+                          height: 1.4,
                         ),
                       ),
-                      Row(
-                        children: [
-                          _buildChoice(index, true, "ยินยอม"),
-                          const SizedBox(width: 20),
-                          _buildChoice(index, false, "ไม่ยินยอม"),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 20), // ระยะห่างระหว่างข้อ
                     ],
                   );
                 },
@@ -108,31 +96,44 @@ class _AgreesRiderState extends State<AgreesRider> {
             ),
           ),
 
-          // ส่วนล่าง (ยินยอมทั้งหมด และ ปุ่ม)
+          // 🎯 ส่วนแผงควบคุมด้านล่าง: ติ๊กเลือกยอมรับอันเดียวเดี่ยว ๆ และปุ่มนำทางไปฟอร์มลงทะเบียน
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _agreeAll,
-                      onChanged: _handleAgreeAll,
-                      activeColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isAccepted = !_isAccepted;
+                    });
+                  },
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _isAccepted,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            _isAccepted = value ?? false;
+                          });
+                        },
+                        activeColor: Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
-                    ),
-                    const Text(
-                      "ยินยอมทั้งหมด",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      const Expanded(
+                        child: Text(
+                          "ฉันยอมรับข้อตกลงและเงื่อนไขทั้งหมดข้างต้น",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
@@ -148,7 +149,7 @@ class _AgreesRiderState extends State<AgreesRider> {
                         onPressed: () => Navigator.pop(context),
                         child: const Text(
                           "ย้อนกลับ",
-                          style: TextStyle(color: Colors.black),
+                          style: TextStyle(color: Colors.black, fontSize: 16),
                         ),
                       ),
                     ),
@@ -158,20 +159,19 @@ class _AgreesRiderState extends State<AgreesRider> {
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: Colors.greenAccent[400],
-                          elevation: 0,
+                          elevation: _isAccepted ? 3 : 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
                         ),
-                        onPressed:
-                            _agreements.contains(null) ||
-                                _agreements.contains(false)
-                            ? null // ปิดปุ่มถ้ายังเลือกไม่ครบ หรือมีข้อที่ไม่ยินยอม
+                        // 🎯 ปลดล็อกให้กดถัดไปได้ต่อเมื่อผู้ใช้กดยอมรับติ๊กถูกเรียบร้อยแล้วเท่านั้น
+                        onPressed: !_isAccepted
+                            ? null
                             : () {
                                 Navigator.of(context).pushReplacement(
                                   MaterialPageRoute(
                                     builder: (BuildContext buildContext) {
-                                      return const RegisterRider(); // ไปที่หน้าสมัครสมาชิก Rider
+                                      return const RegisterRider();
                                     },
                                   ),
                                 );
@@ -181,6 +181,7 @@ class _AgreesRiderState extends State<AgreesRider> {
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
                       ),
@@ -192,32 +193,6 @@ class _AgreesRiderState extends State<AgreesRider> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildChoice(int index, bool value, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Checkbox(
-          value: _agreements[index] == value,
-          onChanged: (bool? newValue) {
-            setState(() {
-              if (newValue == true) {
-                _agreements[index] = value;
-              } else {
-                _agreements[index] = null;
-              }
-              // เช็คว่าถ้าติ๊กยินยอมทุกข้อ ให้ติ๊ก "ยินยอมทั้งหมด" อัตโนมัติ
-              _agreeAll =
-                  !_agreements.contains(null) && !_agreements.contains(false);
-            });
-          },
-          activeColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-        Text(label),
-      ],
     );
   }
 }

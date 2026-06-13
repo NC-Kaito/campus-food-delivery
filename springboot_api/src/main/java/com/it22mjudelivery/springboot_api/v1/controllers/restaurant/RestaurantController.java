@@ -70,8 +70,8 @@
 
                 // ตรวจสอบเงื่อนไขแยกประเภทโฟลเดอร์ตามหน้าบ้านส่งคำสั่งมา
                 String targetSubFolder = "imageRestaurant";
-                if ("ownerimage".equalsIgnoreCase(type)) {
-                    targetSubFolder = "ownerimage";
+                if ("ownerImage".equalsIgnoreCase(type)) {
+                    targetSubFolder = "ownerImage";
                 }
 
                 Path uploadDir = Paths.get("uploads", "restaurant", targetSubFolder);

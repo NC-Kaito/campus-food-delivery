@@ -1,3 +1,4 @@
+// features/admin/register_rider2.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -58,8 +59,8 @@ class _RegisterRider2State extends State<RegisterRider2> {
 
   int? _selectedFacultyId;
   int? _selectedMajorId;
+  String? _selectedProvince; // 🎯 ตัวแปรเก็บจังหวัดที่ไรเดอร์เลือก
 
-  // ✅ เพิ่มตัวแปรเก็บไฟล์ใบขับขี่
   File? _studentCardImage;
   File? _drivingLicenseImage;
   File? _vehicleImage;
@@ -68,30 +69,128 @@ class _RegisterRider2State extends State<RegisterRider2> {
   bool _isLoadingMajor = false;
   bool _isRegistering = false;
 
-  // ✅ เพิ่มใน State class
   String? _studentCardError;
   String? _drivingLicenseError;
   String? _vehicleImageError;
   String? _plateError;
+  String? _provinceError; // 🎯 เก็บแจ้งเตือนกรณีลืมเลือกจังหวัด
+
+  // 🎯 รายชื่อ 77 จังหวัดประเทศไทยสำหรับ Dropdown ตัวเลือกไรเดอร์
+  final List<String> _provinces = [
+    "กรุงเทพมหานคร",
+    "กระบี่",
+    "กาญจนบุรี",
+    "กาฬสินธุ์",
+    "กำแพงเพชร",
+    "ขอนแก่น",
+    "จันทบุรี",
+    "ฉะเชิงเทรา",
+    "ชลบุรี",
+    "ชัยนาท",
+    "ชัยภูมิ",
+    "ชุมพร",
+    "เชียงราย",
+    "เชียงใหม่",
+    "ตรัง",
+    "ตราด",
+    "ตาก",
+    "นครนายก",
+    "นครปฐม",
+    "นครพนม",
+    "นครราชสีมา",
+    "นครศรีธรรมราช",
+    "นครสวรรค์",
+    "นนทบุรี",
+    "นราธิวาส",
+    "น่าน",
+    "บึงกาฬ",
+    "บุรีรัมย์",
+    "ปทุมธานี",
+    "ประจวบคีรีขันธ์",
+    "ปราจีนบุรี",
+    "ปัตตานี",
+    "พระนครศรีอยุธยา",
+    "พะเยา",
+    "พังงา",
+    "พัทลุง",
+    "พิจิตร",
+    "พิษณุโลก",
+    "เพชรบุรี",
+    "เพชรบูรณ์",
+    "แพร่",
+    "ภูเก็ต",
+    "มหาสารคาม",
+    "มุกดาหาร",
+    "แม่ฮ่องสอน",
+    "ยโสธร",
+    "ยะลา",
+    "ร้อยเอ็ด",
+    "ระนอง",
+    "ระยอง",
+    "ราชบุรี",
+    "ลพบุรี",
+    "ลำปาง",
+    "ลำพูน",
+    "เลย",
+    "ศรีสะเกษ",
+    "สกลนคร",
+    "สงขลา",
+    "สตูล",
+    "สมุทรปราการ",
+    "สมุทรสงคราม",
+    "สมุทรสาคร",
+    "สระแก้ว",
+    "สระบุรี",
+    "สิงห์บุรี",
+    "สุโขทัย",
+    "สุพรรณบุรี",
+    "สุราษฎร์ธานี",
+    "สุรินทร์",
+    "หนองคาย",
+    "หนองบัวลำภู",
+    "อ่างทอง",
+    "อำนาจเจริญ",
+    "อุดรธานี",
+    "อุตรดิตถ์",
+    "อุทัยธานี",
+    "อุบลราชธานี",
+  ];
 
   @override
   void initState() {
     super.initState();
     _loadFaculties();
 
-    // ✅ restore ค่าเดิม
     _selectedFacultyId = widget.savedFacultyId;
     _selectedMajorId = widget.savedMajorId;
     _studentCardImage = widget.savedStudentCard;
     _drivingLicenseImage = widget.savedDrivingLicense;
     _vehicleImage = widget.savedVehicleImage;
 
-    if (widget.savedPlate != null) {
-      _licensePlateController.text = widget.savedPlate!;
+    // ตรวจสอบและแกะค่าแยก เลขทะเบียน และ จังหวัด ออกจากข้อมูลเก่า (ถ้ามีบันทึกมา)
+    if (widget.savedPlate != null && widget.savedPlate!.isNotEmpty) {
+      final oldPlate = widget.savedPlate!;
+      String detectedProvince = "";
+
+      for (var province in _provinces) {
+        if (oldPlate.endsWith(" $province") || oldPlate.endsWith("$province")) {
+          detectedProvince = province;
+          break;
+        }
+      }
+
+      if (detectedProvince.isNotEmpty) {
+        _selectedProvince = detectedProvince;
+        _licensePlateController.text = oldPlate
+            .replaceAll(detectedProvince, "")
+            .trim();
+      } else {
+        _licensePlateController.text = oldPlate;
+      }
     }
 
     if (widget.savedFacultyId != null) {
-      _loadMajors(widget.savedFacultyId!, restoreMajorId: true); // ✅
+      _loadMajors(widget.savedFacultyId!, restoreMajorId: true);
     }
   }
 
@@ -112,7 +211,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
     setState(() {
       _isLoadingMajor = true;
       _majors = [];
-      if (!restoreMajorId) _selectedMajorId = null; // ✅ reset เฉพาะตอนเลือกใหม่
+      if (!restoreMajorId) _selectedMajorId = null;
     });
     try {
       final data = await _majorService.getMajorByFaculty(facultyId);
@@ -127,33 +226,41 @@ class _RegisterRider2State extends State<RegisterRider2> {
   }
 
   Future<void> _onRegister() async {
-    final plate = _licensePlateController.text.trim();
+    final plateNumber = _licensePlateController.text.trim();
 
-    // ✅ validate ทุกอย่างพร้อมกัน แล้ว setState ครั้งเดียว
     setState(() {
       _studentCardError = _validateImage(_studentCardImage, "รูปบัตรนักศึกษา");
       _drivingLicenseError = _validateImage(
         _drivingLicenseImage,
         "รูปใบขับขี่",
       );
-      _vehicleImageError = _validateImage(_vehicleImage, "รูปรถ");
+      _vehicleImageError = _validateImage(_vehicleImage, "รูปรัด");
 
-      if (plate.isEmpty)
+      // ตรวจสอบความถูกต้องของจังหวัด
+      _provinceError = _selectedProvince == null
+          ? "กรุณาเลือกจังหวัดทะเบียนรถ"
+          : null;
+
+      if (plateNumber.isEmpty) {
         _plateError = "กรุณากรอกเลขทะเบียนรถ";
-      else if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$').hasMatch(plate))
+      } else if (!RegExp(
+        r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$',
+      ).hasMatch(plateNumber)) {
         _plateError = "ต้องเป็นภาษาไทย อังกฤษ หรือตัวเลขเท่านั้น";
-      else if (plate.length < 5 || plate.length > 30)
-        _plateError = "ความยาว 5-30 ตัวอักษร";
-      else
+      } else if (plateNumber.length < 2 || plateNumber.length > 15) {
+        _plateError = "ความยาวทะเบียนรถไม่ถูกต้อง";
+      } else {
         _plateError = null;
+      }
     });
 
-    // ✅ ถ้ามี error ใดๆ หยุด
     if (_studentCardError != null ||
         _drivingLicenseError != null ||
         _vehicleImageError != null ||
-        _plateError != null)
+        _plateError != null ||
+        _provinceError != null) {
       return;
+    }
 
     if (_selectedMajorId == null) {
       _showError("กรุณาเลือกสาขาวิชา");
@@ -163,6 +270,9 @@ class _RegisterRider2State extends State<RegisterRider2> {
     setState(() => _isRegistering = true);
 
     try {
+      // 🎯 ประกบรวมร่างข้อความ: "[เลขทะเบียน] [จังหวัด]" ส่งเข้าฟิลด์รถตามมาตรฐานโครงสร้างเดิม
+      final finalVehiclePlate = "$plateNumber $_selectedProvince";
+
       RiderModel rider = RiderModel(
         studentid: widget.studentId,
         password: widget.password,
@@ -172,22 +282,20 @@ class _RegisterRider2State extends State<RegisterRider2> {
         email: widget.email,
         phone: widget.phone,
         majorId: _selectedMajorId,
-        vehiclePlate: _licensePlateController.text,
+        vehiclePlate: finalVehiclePlate,
         isActive: false,
         verificationStatus: "wait",
       );
 
-      // ✅ ส่ง path ของใบขับขี่ไปด้วย (ปรับ Service ให้รับ parameter นี้ด้วยนะเพื่อน)
       final imagePaths = await riderService.doRegisterRiderWithImages(
         rider: rider,
         studentCardPath: _studentCardImage!.path,
-        drivingLicensePath: _drivingLicenseImage!.path, // เพิ่มตัวนี้
+        drivingLicensePath: _drivingLicenseImage!.path,
         vehicleImagePath: _vehicleImage!.path,
       );
 
       rider.studentCardImage = imagePaths['studentCardUrl'];
-      rider.drivingLicenseImg =
-          imagePaths['drivingLicenseUrl']; // แมพค่าใบขับขี่
+      rider.drivingLicenseImg = imagePaths['drivingLicenseUrl'];
       rider.vehicleImage = imagePaths['vehicleImageUrl'];
 
       await riderService.doRegsiterRider(rider);
@@ -208,38 +316,35 @@ class _RegisterRider2State extends State<RegisterRider2> {
     }
   }
 
-  // ✅ เพิ่มใน State class
   String? _validateImage(File? file, String fieldName) {
     if (file == null) return "กรุณาแนบ$fieldName";
 
-    // เช็คนามสกุลไฟล์
     final ext = file.path.split('.').last.toLowerCase();
-    if (ext != 'jpg' && ext != 'jpeg' && ext != 'png')
+    if (ext != 'jpg' && ext != 'jpeg' && ext != 'png') {
       return "$fieldName ต้องเป็น .jpg หรือ .png เท่านั้น";
+    }
 
-    // เช็คขนาดไฟล์ 100KB - 1MB
     final sizeInBytes = file.lengthSync();
     if (sizeInBytes > 1024 * 1024) return "$fieldName ต้องมีขนาดไม่เกิน 1MB";
 
     return null;
   }
 
-  // --- UI Helpers ---
   Future<void> _pickImage(int type) async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       setState(() {
         if (type == 0) {
           _studentCardImage = File(image.path);
-          _studentCardError = null; // ✅ ล้าง error
+          _studentCardError = null;
         }
         if (type == 1) {
           _drivingLicenseImage = File(image.path);
-          _drivingLicenseError = null; // ✅ ล้าง error
+          _drivingLicenseError = null;
         }
         if (type == 2) {
           _vehicleImage = File(image.path);
-          _vehicleImageError = null; // ✅ ล้าง error
+          _vehicleImageError = null;
         }
       });
     }
@@ -287,12 +392,11 @@ class _RegisterRider2State extends State<RegisterRider2> {
                       errorText: _studentCardError,
                     ),
 
-                    // ✅ เพิ่มส่วนการเลือกรูปใบขับขี่
                     _buildLabel("แนบรูปใบขับขี่ (Driving License)"),
                     _buildImagePicker(
                       _drivingLicenseImage,
                       () => _pickImage(1),
-                      errorText: _drivingLicenseError, // ✅
+                      errorText: _drivingLicenseError,
                     ),
 
                     _buildLabel("คณะ (Faculty)"),
@@ -303,35 +407,45 @@ class _RegisterRider2State extends State<RegisterRider2> {
                     const Divider(height: 40),
 
                     _buildSectionTitle("ข้อมูลยานพาหนะ"),
+
+                    // 🎯 ประกอบโครงสร้างกล่องข้อความ ทะเบียน และดรอปดาวน์จังหวัดให้อยู่ในชุดเดียวกัน
                     _buildLabel("เลขทะเบียนรถ (License Plate)"),
                     _buildTextField(
                       _licensePlateController,
-                      "ตัวอย่าง กข 123 เชียงใหม่",
+                      "กรอกเฉพาะหมวดอักษรและตัวเลข เช่น 1กข 1234",
                       errorText: _plateError,
                     ),
+
+                    _buildLabel("จังหวัดทะเบียนรถ (Province)"),
+                    _buildProvinceDropdown(),
 
                     _buildLabel("แนบรูปรถที่ใช้ (Vehicle Image)"),
                     _buildImagePicker(
                       _vehicleImage,
                       () => _pickImage(2),
-                      errorText: _vehicleImageError, // ✅
+                      errorText: _vehicleImageError,
                     ),
 
                     const SizedBox(height: 30),
                     Row(
                       children: [
                         Expanded(
-                          child: _buildSecondaryButton(
-                            "ย้อนกลับ",
-                            () => Navigator.pop(context, {
+                          child: _buildSecondaryButton("ย้อนกลับ", () {
+                            final currentPlateStr = _licensePlateController.text
+                                .trim();
+                            final fullPlateWithProv = _selectedProvince != null
+                                ? "$currentPlateStr $_selectedProvince"
+                                : currentPlateStr;
+
+                            Navigator.pop(context, {
                               'facultyId': _selectedFacultyId,
                               'majorId': _selectedMajorId,
-                              'plate': _licensePlateController.text,
+                              'plate': fullPlateWithProv,
                               'studentCard': _studentCardImage,
                               'drivingLicense': _drivingLicenseImage,
                               'vehicleImage': _vehicleImage,
-                            }),
-                          ),
+                            });
+                          }),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -349,7 +463,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
     );
   }
 
-  // --- Widgets ย่อยคงเดิม ---
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15),
@@ -380,16 +493,16 @@ class _RegisterRider2State extends State<RegisterRider2> {
       children: [
         TextField(
           controller: controller,
-          onChanged: (_) =>
-              setState(() => _plateError = null), // ✅ ล้าง error เมื่อพิมพ์
+          onChanged: (_) => setState(() => _plateError = null),
           decoration: InputDecoration(
             hintText: hint,
+            hintStyle: TextStyle(color: Colors.grey[400], fontSize: 13),
             filled: true,
             fillColor: Colors.white,
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: errorText != null ? Colors.red : Colors.transparent,
+                color: errorText != null ? Colors.red : Colors.grey.shade400,
               ),
             ),
             focusedBorder: OutlineInputBorder(
@@ -401,12 +514,65 @@ class _RegisterRider2State extends State<RegisterRider2> {
             ),
           ),
         ),
-        // ✅ แสดง error ใต้ช่องกรอก
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 4),
             child: Text(
               errorText,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // 🎯 วิดเจ็ต Dropdown เลือกจังหวัด 77 จังหวัดสลักขอบขนานสวยงาม
+  Widget _buildProvinceDropdown() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        DropdownButtonFormField<String>(
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: _provinceError != null
+                    ? Colors.red
+                    : Colors.grey.shade400,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: _provinceError != null ? Colors.red : Colors.green,
+                width: 1.5,
+              ),
+            ),
+          ),
+          value: _selectedProvince,
+          hint: const Text("----เลือกจังหวัดป้ายทะเบียน----"),
+          items: _provinces
+              .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+              .toList(),
+          onChanged: (val) {
+            setState(() {
+              _selectedProvince = val;
+              _provinceError =
+                  null; // เคลียร์พาร์ทสีแดงแจ้งเตือนเมื่อกดยืนยันเลือก
+            });
+          },
+        ),
+        if (_provinceError != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 4),
+            child: Text(
+              _provinceError!,
               style: const TextStyle(color: Colors.red, fontSize: 12),
             ),
           ),
@@ -430,7 +596,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(15),
-              // ✅ border แดงเมื่อ error
               border: Border.all(
                 color: errorText != null ? Colors.red : Colors.grey.shade300,
                 width: errorText != null ? 1.5 : 1,
@@ -448,7 +613,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
                   ),
           ),
         ),
-        // ✅ แสดง error text ใต้รูป
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 4),
@@ -468,9 +632,17 @@ class _RegisterRider2State extends State<RegisterRider2> {
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white,
-              border: OutlineInputBorder(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+                borderSide: BorderSide(color: Colors.grey.shade400),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.green, width: 1.5),
               ),
             ),
             value: _selectedFacultyId,
@@ -497,9 +669,17 @@ class _RegisterRider2State extends State<RegisterRider2> {
             decoration: InputDecoration(
               filled: true,
               fillColor: Colors.white,
-              border: OutlineInputBorder(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 10,
+              ),
+              enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
+                borderSide: BorderSide(color: Colors.grey.shade400),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.green, width: 1.5),
               ),
             ),
             value: _selectedMajorId,
@@ -542,7 +722,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         padding: const EdgeInsets.symmetric(vertical: 15),
         backgroundColor: Colors.grey[300],
-        side: BorderSide.none,
+        side: BorderSide(),
       ),
       child: Text(text, style: const TextStyle(color: Colors.black)),
     );

@@ -1,4 +1,5 @@
 // features/restaurant/register_restaurant.dart
+import 'package:flutter/cupertino.dart'; // 🎯 อิมพอร์ตเพิ่มเข้ามาสำหรับใช้ตัวเลือกช่องเลื่อนสากล
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
@@ -23,7 +24,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
   String? _locationError;
   String? _restaurantImageError;
-  String? _ownerImageError; // 🎯 ตัวแปรเก็บ Error รูปหน้าเจ้าของร้าน
   String? _typeError;
   String? _openDayError;
   bool _obscureText = true;
@@ -75,7 +75,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   String? _selectedType;
   String? _selectedLocation;
   File? _selectedImage;
-  File? _selectedOwnerImage; // 🎯 ตัวแปรเก็บไฟล์รูปหน้าเจ้าของร้าน
+  File?
+  _selectedOwnerImage; // 🎯 ประกาศไว้เพื่อสแตนด์บายรับค่าขากลับป้องกันตัวแดง Undefined
 
   Future<void> fetchTypes() async {
     try {
@@ -88,35 +89,116 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
     }
   }
 
-  Future<void> _selectTime(BuildContext context, bool isOpenTime) async {
-    final TimeOfDay? picked = await showTimePicker(
+  // 🎯 ฟังก์ชันเลือกเวลาแบบดรัมสไลด์เวอร์ชันอัปเกรดขยายขนาดใหญ่เต็มตา (1.3x)
+  void _selectTimeScrollWheel(BuildContext context, bool isOpenTime) {
+    Duration initialDuration = const Duration(hours: 8, minutes: 0);
+
+    if (isOpenTime && openTimeController.text.isNotEmpty) {
+      final parts = openTimeController.text.split(':');
+      initialDuration = Duration(
+        hours: int.parse(parts[0]),
+        minutes: int.parse(parts[1]),
+      );
+    } else if (!isOpenTime && closeTimeController.text.isNotEmpty) {
+      final parts = closeTimeController.text.split(':');
+      initialDuration = Duration(
+        hours: int.parse(parts[0]),
+        minutes: int.parse(parts[1]),
+      );
+    }
+
+    showModalBottomSheet(
       context: context,
-      initialTime: TimeOfDay.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.light(primary: Colors.green),
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (BuildContext context) {
+        Duration tempDuration = initialDuration;
+        return SafeArea(
+          child: SizedBox(
+            height: 380, // 🌟 ขยายความสูงกล่องรวมเพื่อรองรับวงล้อขนาดใหญ่
+            child: Column(
+              children: [
+                // แถบเมนูกดยืนยันด้านบน (เพิ่มขนาดอักษรให้ใหญ่และหนาขึ้น)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text(
+                          "ยกเลิก",
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        isOpenTime ? "เลือกเวลาเปิดร้าน" : "เลือกเวลาปิดร้าน",
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            String formattedTime =
+                                "${tempDuration.inHours.toString().padLeft(2, '0')}:${(tempDuration.inMinutes % 60).toString().padLeft(2, '0')}:00";
+                            if (isOpenTime) {
+                              openTimeController.text = formattedTime;
+                            } else {
+                              closeTimeController.text = formattedTime;
+                            }
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          "ตกลง",
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, thickness: 1),
+
+                // 🌟 ขยายขนาดตัวเลขและช่องเลื่อนดรัมให้ใหญ่สะใจ 1.3 เท่า
+                Expanded(
+                  child: Center(
+                    child: Transform.scale(
+                      scale: 1.3, // 🎯 สั่งขยายสเกลตรงนี้เลยครับ
+                      child: CupertinoTimerPicker(
+                        mode: CupertinoTimerPickerMode.hm,
+                        initialTimerDuration: initialDuration,
+                        onTimerDurationChanged: (Duration newDuration) {
+                          tempDuration = newDuration;
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-          child: child!,
         );
       },
     );
-
-    if (picked != null) {
-      setState(() {
-        String formattedTime =
-            "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00";
-
-        if (isOpenTime) {
-          openTimeController.text = formattedTime;
-        } else {
-          closeTimeController.text = formattedTime;
-        }
-      });
-    }
   }
 
-  Future<void> pickImage(bool isRestaurantImage) async {
+  Future<void> pickImage() async {
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -134,13 +216,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                 );
                 if (image != null) {
                   setState(() {
-                    if (isRestaurantImage) {
-                      _selectedImage = File(image.path);
-                      _restaurantImageError = null;
-                    } else {
-                      _selectedOwnerImage = File(image.path);
-                      _ownerImageError = null;
-                    }
+                    _selectedImage = File(image.path);
+                    _restaurantImageError = null;
                   });
                 }
               },
@@ -156,13 +233,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                 );
                 if (image != null) {
                   setState(() {
-                    if (isRestaurantImage) {
-                      _selectedImage = File(image.path);
-                      _restaurantImageError = null;
-                    } else {
-                      _selectedOwnerImage = File(image.path);
-                      _ownerImageError = null;
-                    }
+                    _selectedImage = File(image.path);
+                    _restaurantImageError = null;
                   });
                 }
               },
@@ -243,7 +315,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'ข้อมูลร้านค้า',
+                    'textอาหารแนะนำ',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 15),
@@ -397,59 +469,19 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                   const SizedBox(height: 15),
 
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildUploadBox(
-                              "รูปภาพร้านค้า (Restaurant Image)",
-                              _selectedImage,
-                              () => pickImage(true),
-                            ),
-                            if (_restaurantImageError != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4, left: 4),
-                                child: Text(
-                                  _restaurantImageError!,
-                                  style: const TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // 🎯 แก้เลเบลการแสดงผลกล่องอัปโหลดรูปภาพใบหน้าที่สองตามเงื่อนไขของอาจารย์
-                            _buildUploadBox(
-                              "รูปภาพหน้าเจ้าของร้านค้า",
-                              _selectedOwnerImage,
-                              () => pickImage(false),
-                            ),
-                            if (_ownerImageError != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4, left: 4),
-                                child: Text(
-                                  _ownerImageError!,
-                                  style: const TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  _buildUploadBox(
+                    "รูปภาพร้านค้า (Restaurant Image)",
+                    _selectedImage,
+                    () => pickImage(),
                   ),
+                  if (_restaurantImageError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 4),
+                      child: Text(
+                        _restaurantImageError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
 
                   const SizedBox(height: 15),
 
@@ -463,7 +495,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                             TextFormField(
                               controller: openTimeController,
                               readOnly: true,
-                              onTap: () => _selectTime(context, true),
+                              onTap: () =>
+                                  _selectTimeScrollWheel(context, true),
                               validator: (value) =>
                                   (value == null || value.isEmpty)
                                   ? "กรุณาระบุเวลาเปิด"
@@ -488,7 +521,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                             TextFormField(
                               controller: closeTimeController,
                               readOnly: true,
-                              onTap: () => _selectTime(context, false),
+                              onTap: () =>
+                                  _selectTimeScrollWheel(context, false),
                               validator: (value) =>
                                   (value == null || value.isEmpty)
                                   ? "กรุณาระบุเวลาปิด"
@@ -576,10 +610,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                               _selectedImage,
                               "รูปร้านค้า",
                             );
-                            _ownerImageError = _validateImage(
-                              _selectedOwnerImage,
-                              "รูปหน้าเจ้าของร้านค้า",
-                            );
                             _openDayError = _selectedDays.every((d) => !d)
                                 ? "กรุณาเลือกวันเปิดร้านอย่างน้อย 1 วัน"
                                 : null;
@@ -589,7 +619,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                               _typeError != null ||
                               _locationError != null ||
                               _restaurantImageError != null ||
-                              _ownerImageError != null ||
                               _openDayError != null) {
                             return;
                           }
@@ -612,7 +641,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                 closeTime: closeTimeController.text,
                                 selectedDays: _selectedDays,
                                 restaurantImage: _selectedImage,
-                                ownerImage: _selectedOwnerImage,
+                                ownerImage:
+                                    _selectedOwnerImage, // ✅ ส่งตัวแปรที่ประกาศรองรับไว้สมบูรณ์แล้ว
                               ),
                             ),
                           );
@@ -623,6 +653,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                               _ownerLastName = result['ownerLastName'];
                               _ownerEmail = result['email'];
                               _ownerPhone = result['phone'];
+                              _selectedOwnerImage = result['ownerImage'];
                             });
                           }
                         },
@@ -710,7 +741,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
         GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 80,
+            height: 140,
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.white,
@@ -722,7 +753,11 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                     borderRadius: BorderRadius.circular(10),
                     child: Image.file(selectedFile, fit: BoxFit.cover),
                   )
-                : const Icon(Icons.add, color: Colors.grey, size: 40),
+                : const Icon(
+                    Icons.add_a_photo_outlined,
+                    color: Colors.grey,
+                    size: 40,
+                  ),
           ),
         ),
       ],

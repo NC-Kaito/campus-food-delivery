@@ -135,7 +135,7 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
           // 🎯 ปรับเปลี่ยนฟิลด์ประเภทการยิงเซฟรูปจาก 'lease' เดิม สลับให้เป็นหมวดภาพ 'owner' ตามคำสั่งอาจารย์
           newOwnerImageUrl = await _uploadImage(
             widget.updatedOwnerImage!,
-            'owner',
+            'ownerImage',
           );
         }
 

@@ -1,6 +1,7 @@
 // features/restaurant/register_owner_info.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:image_picker/image_picker.dart'; // 🎯 ดึง ImagePicker มาใช้งานในหน้านี้
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -22,7 +23,7 @@ class RegisterOwnerInfo extends StatefulWidget {
   final String closeTime;
   final List<bool> selectedDays;
   final File? restaurantImage;
-  final File? ownerImage;
+  final File? ownerImage; // รับค่ามาเผื่อไว้ (หรือเลือกใหม่ในหน้านี้)
 
   const RegisterOwnerInfo({
     super.key,
@@ -50,7 +51,13 @@ class RegisterOwnerInfo extends StatefulWidget {
 class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
   RestaurantService restaurantService = RestaurantService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  final ImagePicker ownerImagePicker =
+      ImagePicker(); // 🎯 สแตนด์บายตัวเลือกรูปภาพ
+
   bool _isLoading = false;
+  String? _ownerImageError; // 🎯 ตัวแปรจับ Error ของรูปเจ้าของร้าน
+  File? _selectedOwnerImage; // 🎯 ถือไฟล์รูปภาพใบหน้าในหน้านี้
+
   late final TextEditingController ownerFirstNameController;
   late final TextEditingController ownerLastnameController;
   late final TextEditingController emailController;
@@ -66,6 +73,11 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     );
     emailController = TextEditingController(text: widget.initialEmail);
     phoneController = TextEditingController(text: widget.initialPhone);
+
+    // ตั้งค่าเริ่มต้นรูปภาพจากหน้าแรก (ถ้ามี)
+    if (widget.ownerImage != null) {
+      _selectedOwnerImage = widget.ownerImage;
+    }
     super.initState();
   }
 
@@ -76,6 +88,65 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     emailController.dispose();
     phoneController.dispose();
     super.dispose();
+  }
+
+  // 🎯 เพิ่มฟังก์ชันเปิดแผงเลือกรูปภาพ (กล้อง/คลังภาพ)
+  Future<void> pickOwnerImage() async {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt, color: Colors.green),
+              title: const Text("ถ่ายรูป"),
+              onTap: () async {
+                Navigator.pop(context);
+                final XFile? image = await ownerImagePicker.pickImage(
+                  source: ImageSource.camera,
+                  imageQuality: 80,
+                );
+                if (image != null) {
+                  setState(() {
+                    _selectedOwnerImage = File(image.path);
+                    _ownerImageError = null;
+                  });
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library, color: Colors.green),
+              title: const Text("เลือกจากแกลเลอรี่"),
+              onTap: () async {
+                Navigator.pop(context);
+                final XFile? image = await ownerImagePicker.pickImage(
+                  source: ImageSource.gallery,
+                  imageQuality: 80,
+                );
+                if (image != null) {
+                  setState(() {
+                    _selectedOwnerImage = File(image.path);
+                    _ownerImageError = null;
+                  });
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String? _validateImage(File? file, String fieldName) {
+    if (file == null) return "กรุณาแนบ$fieldName";
+    final ext = file.path.split('.').last.toLowerCase();
+    if (ext != 'jpg' && ext != 'jpeg' && ext != 'png') {
+      return "$fieldName ต้องเป็น .jpg หรือ .png";
+    }
+    final size = file.lengthSync();
+    if (size > 1024 * 1024) return "ขนาดเกิน 1MB";
+    return null;
   }
 
   Future<String?> uploadImage(File? imageFile, String type) async {
@@ -102,25 +173,34 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
   }
 
   Future<void> doRegister() async {
-    if (formKey.currentState!.validate()) {
+    // 🎯 ทำการตรวจสอบความครบถ้วนของรูปภาพใบหน้าควบคู่กับฟอร์ม
+    setState(() {
+      _ownerImageError = _validateImage(
+        _selectedOwnerImage,
+        "รูปหน้าเจ้าของร้านค้า",
+      );
+    });
+
+    if (formKey.currentState!.validate() && _ownerImageError == null) {
       setState(() => _isLoading = true);
       try {
-        // อัปโหลดรูปร้านค้าเข้าโฟลเดอร์ฝั่งเซิร์ฟเวอร์หลังบ้านตามปกติ
         final restaurantImageUrl = await uploadImage(
           widget.restaurantImage,
           'restaurant',
         );
 
-        // 🎯 แก้ไขจุดวิกฤต: สลับมาส่งประเภทเป็น 'owner' แทนคำว่า 'lease' เพื่อให้ฝั่ง Java จัดระเบียบแยกโฟลเดอร์รูปใบหน้าได้ถูกต้อง
-        final ownerImageUrl = await uploadImage(widget.ownerImage, 'owner');
+        // ยิงภาพประเภท 'owner' ตรงเข้าหลังบ้าน
+        final ownerImageUrl = await uploadImage(
+          _selectedOwnerImage,
+          'ownerImage',
+        );
 
         RestaurantModel restaurant = RestaurantModel(
           username: widget.username,
           password: widget.password,
           restaurantName: widget.restaurantName,
           restaurantImage: restaurantImageUrl,
-          ownerImage:
-              ownerImageUrl, // 🎯 แมปค่าพาธสั้นสากลที่อัปโหลดเสร็จเก็บเข้าสู่ตัวแปรเจ้าของร้านค้า
+          ownerImage: ownerImageUrl,
           openTime: widget.openTime,
           closeTime: widget.closeTime,
           openDay: convertDaysToInt(widget.selectedDays),
@@ -287,12 +367,10 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                         return "กรุณากรอกอีเมล";
                       if (value.contains(' '))
                         return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
-
                       if (!RegExp(
                         r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(value)) {
+                      ).hasMatch(value))
                         return "รูปแบบอีเมลไม่ถูกต้อง";
-                      }
                       final parts = value.split('@');
                       if (parts.isNotEmpty) {
                         final localPart = parts[0];
@@ -339,6 +417,21 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                     ),
                   ),
 
+                  // 🎯 ย้ายกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านมาสแตนด์บายฝั่งขวาหน้าจอนี้เรียบร้อยครับ
+                  _buildUploadBox(
+                    "รูปภาพหน้าเจ้าของร้านค้า (Owner Image)",
+                    _selectedOwnerImage,
+                    pickOwnerImage,
+                  ),
+                  if (_ownerImageError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, left: 4),
+                      child: Text(
+                        _ownerImageError!,
+                        style: const TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+
                   const SizedBox(height: 30),
 
                   Row(
@@ -350,6 +443,8 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                             'ownerLastName': ownerLastnameController.text,
                             'email': emailController.text,
                             'phone': phoneController.text,
+                            'ownerImage':
+                                _selectedOwnerImage, // ส่งย้อนกลับไปเก็บเผื่อด้วย
                           }),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey[300],
@@ -427,6 +522,38 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           ],
         ),
       ),
+    );
+  }
+
+  // วิดเจ็ตกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านค้า
+  Widget _buildUploadBox(String label, File? selectedFile, VoidCallback onTap) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(label),
+        GestureDetector(
+          onTap: onTap,
+          child: Container(
+            height: 140, // ปรับความสูงกล่องให้พอเหมาะ สวยงาม
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: selectedFile != null
+                ? ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(selectedFile, fit: BoxFit.cover),
+                  )
+                : const Icon(
+                    Icons.add_a_photo_outlined,
+                    color: Colors.grey,
+                    size: 40,
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

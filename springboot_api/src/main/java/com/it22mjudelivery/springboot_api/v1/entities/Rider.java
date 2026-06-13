@@ -63,7 +63,7 @@ public class Rider {
     private String notApproveDetail;
 
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private LocalDate expiryDate;
 
     @ManyToOne(fetch = FetchType.LAZY)

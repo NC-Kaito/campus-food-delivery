@@ -1,6 +1,6 @@
+// features/restaurant/agrees_restaurant.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/features/restaurant/register_restaurant.dart';
-import 'package:flutter_app/features/user/register_member.dart';
 
 class AgreesRestaurant extends StatefulWidget {
   const AgreesRestaurant({super.key});
@@ -10,12 +10,10 @@ class AgreesRestaurant extends StatefulWidget {
 }
 
 class _AgreesRestaurantState extends State<AgreesRestaurant> {
-  // สร้าง List สำหรับเก็บสถานะการเลือกแต่ละข้อ (5 ข้อ)
-  // null = ยังไม่เลือก, true = ยินยอม, false = ไม่ยินยอม
-  List<bool?> _agreements = List.generate(5, (index) => null);
-  bool _agreeAll = false;
+  // 🎯 ปรับเหลือตัวแปรจับสถานะการยินยอมเพียงค่าเดียว
+  bool _isAccepted = false;
 
-  // หัวข้อและรายละเอียดตามรูปภาพ
+  // หัวข้อและรายละเอียดข้อตกลง
   final List<Map<String, String>> _content = [
     {
       "title": "1. คุณสมบัติของผู้เข้าร่วมโครงการ",
@@ -44,15 +42,6 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
     },
   ];
 
-  void _handleAgreeAll(bool? value) {
-    setState(() {
-      _agreeAll = value ?? false;
-      for (int i = 0; i < _agreements.length; i++) {
-        _agreements[i] = _agreeAll ? true : null;
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -68,6 +57,7 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
       ),
       body: Column(
         children: [
+          // ส่วนแสดงรายละเอียดเงื่อนไขทั้งหมด
           Expanded(
             child: Container(
               margin: const EdgeInsets.all(16),
@@ -89,22 +79,16 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
                           fontSize: 16,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 6),
                       Text(
                         _content[index]['desc']!,
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
+                          height: 1.4,
                         ),
                       ),
-                      Row(
-                        children: [
-                          _buildChoice(index, true, "ยินยอม"),
-                          const SizedBox(width: 20),
-                          _buildChoice(index, false, "ไม่ยินยอม"),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 20), // เว้นระยะห่างระหว่างข้อ
                     ],
                   );
                 },
@@ -112,31 +96,44 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
             ),
           ),
 
-          // ส่วนล่าง (ยินยอมทั้งหมด และ ปุ่ม)
+          // 🎯 ส่วนล่าง: Checkbox ยินยอมเงื่อนไขทั้งหมดอันเดียว และปุ่มนำทาง
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _agreeAll,
-                      onChanged: _handleAgreeAll,
-                      activeColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isAccepted = !_isAccepted;
+                    });
+                  },
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: _isAccepted,
+                        onChanged: (bool? value) {
+                          setState(() {
+                            _isAccepted = value ?? false;
+                          });
+                        },
+                        activeColor: Colors.green,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
-                    ),
-                    const Text(
-                      "ยินยอมทั้งหมด",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                      const Expanded(
+                        child: Text(
+                          "ยอมรับข้อตกลงและเงื่อนไขทั้งหมด",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 Row(
                   children: [
                     Expanded(
@@ -152,7 +149,7 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
                         onPressed: () => Navigator.pop(context),
                         child: const Text(
                           "ย้อนกลับ",
-                          style: TextStyle(color: Colors.black),
+                          style: TextStyle(color: Colors.black, fontSize: 16),
                         ),
                       ),
                     ),
@@ -162,20 +159,19 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: Colors.greenAccent[400],
-                          elevation: 0,
+                          elevation: _isAccepted ? 3 : 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),
                           ),
                         ),
-                        onPressed:
-                            _agreements.contains(null) ||
-                                _agreements.contains(false)
-                            ? null // ปิดปุ่มถ้ายังเลือกไม่ครบ หรือมีข้อที่ไม่ยินยอม
+                        // 🎯 หากยังไม่ติ๊กยินยอม ปุ่มถัดไปจะถูก Disabled (เป็น null) ทันที
+                        onPressed: !_isAccepted
+                            ? null
                             : () {
                                 Navigator.of(context).pushReplacement(
                                   MaterialPageRoute(
                                     builder: (BuildContext buildContext) {
-                                      return RegisterRestaurant();
+                                      return const RegisterRestaurant();
                                     },
                                   ),
                                 );
@@ -185,6 +181,7 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
                       ),
@@ -196,32 +193,6 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildChoice(int index, bool value, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Checkbox(
-          value: _agreements[index] == value,
-          onChanged: (bool? newValue) {
-            setState(() {
-              if (newValue == true) {
-                _agreements[index] = value;
-              } else {
-                _agreements[index] = null;
-              }
-              // เช็คว่าถ้าติ๊กยินยอมทุกข้อ ให้ติ๊ก "ยินยอมทั้งหมด" อัตโนมัติ
-              _agreeAll =
-                  !_agreements.contains(null) && !_agreements.contains(false);
-            });
-          },
-          activeColor: Colors.black,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-        Text(label),
-      ],
     );
   }
 }
