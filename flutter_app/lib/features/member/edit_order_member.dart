@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 ดึงตัวแปรไอพีกลางสากลเข้ามาจัดการความชัวร์ของรูปภาพ
 
 class EditOrderMember extends StatefulWidget {
   final CartItem cartItem;
@@ -37,6 +38,19 @@ class _EditOrderMemberState extends State<EditOrderMember> {
       }
     }
     _loadMenuAddons();
+  }
+
+  // 🎯 ฟังก์ชันสากลช่วยกะเทาะและเชื่อมพาร์ทรูปสั้นเข้ากับ URL ไอพีกลางให้ถูกต้องสมบูรณ์
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   Future<void> _loadMenuAddons() async {
@@ -80,8 +94,6 @@ class _EditOrderMemberState extends State<EditOrderMember> {
 
   @override
   Widget build(BuildContext context) {
-    const String baseIp = "10.244.27.211";
-
     int basePrice = widget.cartItem.menu.price?.toInt() ?? 0;
 
     // คำนวณราคา Add-on ทั้งหมดตามโครงสร้างพิมพ์เขียวที่คุณ Kaito ตั้งไว้
@@ -93,12 +105,9 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     int totalPrice = (basePrice + addonTotalPrice.toInt()) * _quantity;
 
     String? rawMenuImage = widget.cartItem.menu.menuImage;
-    String safeImageUrl = "";
-    if (rawMenuImage != null && rawMenuImage.isNotEmpty) {
-      safeImageUrl = rawMenuImage
-          .replaceAll("10.226.43.211", baseIp)
-          .replaceAll("10.0.2.2", baseIp);
-    }
+
+    // 🌟 ดึงผ่านฟังก์ชันต่อพาร์ทไอพีกลางสากล ปรับภาพอาหารในหน้าแก้ไขให้ขึ้นจอได้ถูกต้อง
+    String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
     final groupedAddons = _groupAddons();
 
@@ -181,9 +190,9 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                     Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: safeImageUrl.isNotEmpty
+                        child: finalMenuUrl.isNotEmpty
                             ? Image.network(
-                                Uri.encodeFull(safeImageUrl),
+                                Uri.encodeFull(finalMenuUrl),
                                 width: 260,
                                 height: 260,
                                 fit: BoxFit.cover,
@@ -315,7 +324,7 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                 ),
               ),
             ),
-      // 🎯 ปรับดีไซน์จุดที่ 3: ยกเครื่อง Bottom Bar แผงลอยตัวเลขสรุปราคาและกลุ่มปุ่มบวกจำนวน+ปุ่มบันทึกสีนีออนเขียว
+      // 🎯 ปรับดีไซน์จุดที่ 3: ยกเครื่อง Bottom Bar แผงลอยตัวเลขสรุปราคาและกลุ่มปุ่มบันทึกสีนีออนเขียวสากล
       bottomNavigationBar: Container(
         padding: const EdgeInsets.only(
           left: 24,
@@ -420,8 +429,8 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(
-                    0xFF5CFF33,
-                  ), // สีเขียวนีออนตรงใจตาม AddOrder
+                    0xFF76FF03,
+                  ), // ✅ สีเขียวนีออนสว่างสากลเข้าธีมกริบ ๆ
                   foregroundColor: Colors.black,
                   elevation: 2,
                   shape: RoundedRectangleBorder(

@@ -1,3 +1,4 @@
+// features/restaurant/list_menu_restaurant.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
@@ -8,6 +9,7 @@ import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/view_menu.dart';
 import 'package:flutter_app/global_data.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 ดึงตัวแปรไอพีกลางเข้ามาร้อยสายรูปภาพสากล
 
 class ListMenuRestaurant extends StatefulWidget {
   const ListMenuRestaurant({super.key});
@@ -44,6 +46,19 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
     super.dispose();
   }
 
+  // 🎯 ฟังก์ชันสากลช่วยจัดรูปพาร์ทสั้นเข้าหาไอพีศูนย์กลาง
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
+  }
+
   Future<void> loadRestaurantData() async {
     final rest = await restaurantService.getRestaurantByUsername(
       GlobalData.usernameRestaurant,
@@ -52,8 +67,8 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
     if (rest != null) {
       restaurantModel = rest;
 
-      // ✅ แก้ไขจุดที่ 1: ดึง URL รูปหน้าร้านตรงๆ ไม่ต้องใช้ .replaceAll สับขาหลอกไอพีแล้ว
-      restaurantimage = rest.restaurantImage;
+      // 🌟 ดึงพาร์ทรูปหน้าร้านร้อยผ่านฟังก์ชันประกอบไอพีสากล
+      restaurantimage = _getFinalImageUrl(rest.restaurantImage);
 
       restaurantname = rest.restaurantName;
       await loadTypeMenus();
@@ -165,7 +180,9 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                             SizedBox(
                               height: 290,
                               width: double.infinity,
-                              child: restaurantimage != null
+                              child:
+                                  restaurantimage != null &&
+                                      restaurantimage!.isNotEmpty
                                   ? Image.network(
                                       Uri.encodeFull(restaurantimage!),
                                       fit: BoxFit.cover,
@@ -233,23 +250,14 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    OutlinedButton(
-                                      style: OutlinedButton.styleFrom(
-                                        backgroundColor: const Color.fromARGB(
-                                          255,
-                                          43,
-                                          255,
-                                          0,
-                                        ),
-                                        side: const BorderSide(
-                                          color: Color.fromARGB(
-                                            255,
-                                            158,
-                                            158,
-                                            158,
-                                          ),
-                                          width: 1,
-                                        ),
+                                    // 🎯 ปรับปุ่มเพิ่มเมนูอาหาร: ปลุกเสกเปลี่ยนจากโทนสีชมพูเป็นสีเขียวสากลเรียบร้อยครับ
+                                    ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(
+                                          0xFF76FF03,
+                                        ), // สีเขียวสว่างสากลแมตช์ธีมแอป
+                                        foregroundColor: Colors.black,
+                                        elevation: 0,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
                                             15,
@@ -257,11 +265,10 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                         ),
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 20,
-                                          vertical: 3,
+                                          vertical: 10,
                                         ),
                                       ),
                                       onPressed: () async {
-                                        // 🌟 พอกลับมาจากหน้าเพิ่มเมนู ให้โหลดข้อมูลหมวดหมู่และลิสต์ใหม่เพื่อความชัวร์
                                         await Navigator.push(
                                           context,
                                           MaterialPageRoute(
@@ -273,9 +280,8 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                       child: const Text(
                                         "เพิ่มเมนู",
                                         style: TextStyle(
-                                          fontSize: 18,
+                                          fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.black,
                                         ),
                                       ),
                                     ),
@@ -334,7 +340,7 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                 ];
               },
 
-              // --- CONTENT (รายการสไลด์อาหารจานย่อย) ---
+              // --- CONTENT (รายการเมนูอาหารแยกตามแท็บหมวดหมู่) ---
               body: TabBarView(
                 controller: _tabController!,
                 children: typeMenus.isEmpty
@@ -376,6 +382,10 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                               final menu = currentMenus[index];
                               final isAvailable = menu.status ?? true;
 
+                              final finalMenuImgUrl = _getFinalImageUrl(
+                                menu.menuImage,
+                              );
+
                               return GestureDetector(
                                 onTap: () async {
                                   await Navigator.push(
@@ -412,11 +422,10 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                           child: SizedBox(
                                             width: 110,
                                             height: 110,
-                                            child: menu.menuImage != null
+                                            child: finalMenuImgUrl.isNotEmpty
                                                 ? Image.network(
-                                                    // ✅ แก้ไขจุดที่ 2: ดึงผ่านไอพีตรงๆ จาก DB ไม่ต้องสั่งสลับตัวเลขไอพีขัดขาตัวเองแล้ว
                                                     Uri.encodeFull(
-                                                      menu.menuImage!,
+                                                      finalMenuImgUrl,
                                                     ),
                                                     fit: BoxFit.cover,
                                                     errorBuilder:

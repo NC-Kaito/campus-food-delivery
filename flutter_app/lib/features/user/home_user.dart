@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
+import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
+import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/features/user/view_restaurant_user.dart';
-import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 มั่นใจว่าอิมพอร์ตดึงตัวแปรกลาง DioClient เข้ามาสวมไอพีรูปภาพ
+import 'package:flutter_app/core/network/dio_client.dart';
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});
@@ -19,9 +21,11 @@ class _HomeUserState extends State<HomeUser> {
   final TextEditingController searchController = TextEditingController();
   final RestaurantService _restaurantService = RestaurantService();
   final TypeRestaurantService _typeRestaurantService = TypeRestaurantService();
+  final MenuService _menuService = MenuService();
 
   List<RestaurantModel> _results = [];
   List<TypeRestaurantModel> typeList = [];
+  Map<String, List<MenuModel>> _restaurantMenusIndex = {};
 
   bool _isLoading = true;
   String? selectedType;
@@ -65,10 +69,23 @@ class _HomeUserState extends State<HomeUser> {
     if (!mounted) return;
     setState(() => _isLoading = true);
 
+    _restaurantMenusIndex.clear();
+
     var data = await _restaurantService.searchRestaurant(keyword);
 
     if (_selectedTypeId != null) {
       data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
+    }
+
+    for (var rest in data) {
+      if (rest.username != null) {
+        try {
+          final menus = await _menuService.getMenusByRestaurant(rest.username!);
+          _restaurantMenusIndex[rest.username!] = menus;
+        } catch (e) {
+          _restaurantMenusIndex[rest.username!] = [];
+        }
+      }
     }
 
     if (mounted) {
@@ -103,8 +120,7 @@ class _HomeUserState extends State<HomeUser> {
 
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
-    if (rawPath.startsWith('http'))
-      return rawPath; // รองรับลิงก์เต็มรูปแบบกรณีข้อมูลเก่าค้างตู้ DB
+    if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
     if (rawPath.startsWith('/')) {
@@ -117,16 +133,20 @@ class _HomeUserState extends State<HomeUser> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors
+          .grey[50], // ปรับสีพื้นหลังของแอปให้ดรอปลงเล็กน้อยเพื่อให้ตัว Card สีขาวเด่นขึ้น
       appBar: AppBar(
-        title: const Text("CAMPUS EAT"),
+        title: const Text(
+          "CAMPUS EAT",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.green,
         centerTitle: true,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: Column(
         children: [
-          // ── ส่วนกล่องค้นหาข้อมูลด้านบน (Header สีเขียว) ──
           Container(
             padding: const EdgeInsets.fromLTRB(16, 15, 16, 20),
             color: Colors.white,
@@ -154,22 +174,37 @@ class _HomeUserState extends State<HomeUser> {
                             Icons.search,
                             color: Colors.green,
                           ),
-                          labelText: "ค้นหาร้านค้า",
-                          hintText: "กรุณากรอกชื่อร้านค้า",
-                          labelStyle: const TextStyle(
-                            color: Colors.green,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                          suffixIcon: searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(
+                                    Icons.clear,
+                                    color: Colors.grey,
+                                  ),
+                                  onPressed: () {
+                                    searchController.clear();
+                                    _loadResults("");
+                                  },
+                                )
+                              : null,
+                          hintText: "ค้นหาชื่อร้านค้า หรือเมนูอาหาร...",
+                          hintStyle: TextStyle(
+                            color: Colors.grey[400],
+                            fontSize: 14,
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[100],
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 12,
                           ),
                           enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: const BorderSide(color: Colors.green),
+                            borderRadius: BorderRadius.circular(25),
+                            borderSide: BorderSide(color: Colors.grey.shade300),
                           ),
                           focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
+                            borderRadius: BorderRadius.circular(25),
                             borderSide: const BorderSide(
-                              color: Colors.deepOrange,
-                              width: 2,
+                              color: Colors.green,
+                              width: 1.5,
                             ),
                           ),
                         ),
@@ -179,7 +214,7 @@ class _HomeUserState extends State<HomeUser> {
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.green,
-                        borderRadius: BorderRadius.circular(15),
+                        borderRadius: BorderRadius.circular(25),
                       ),
                       child: IconButton(
                         onPressed: () => _loadResults(searchController.text),
@@ -199,15 +234,21 @@ class _HomeUserState extends State<HomeUser> {
                       color: Colors.green,
                       fontWeight: FontWeight.bold,
                     ),
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 6,
+                      horizontal: 10,
+                    ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: const BorderSide(color: Colors.green),
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(25),
                       borderSide: const BorderSide(
                         color: Colors.green,
-                        width: 2,
+                        width: 1.5,
                       ),
                     ),
                   ),
@@ -244,7 +285,7 @@ class _HomeUserState extends State<HomeUser> {
 
           if (!_isLoading)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
                 children: [
                   const Icon(Icons.manage_search, size: 20, color: Colors.grey),
@@ -258,6 +299,7 @@ class _HomeUserState extends State<HomeUser> {
                       style: const TextStyle(
                         fontWeight: FontWeight.w600,
                         color: Colors.black54,
+                        fontSize: 13,
                       ),
                     ),
                   ),
@@ -271,7 +313,16 @@ class _HomeUserState extends State<HomeUser> {
                     child: CircularProgressIndicator(color: Colors.green),
                   )
                 : _results.isEmpty
-                ? const Center(child: Text("ไม่พบข้อมูลร้านค้า"))
+                ? const Center(
+                    child: Text(
+                      "ไม่พบข้อมูลร้านค้าหรือเมนูที่ระบุ",
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.only(bottom: 20),
                     itemCount: _results.length,
@@ -285,7 +336,7 @@ class _HomeUserState extends State<HomeUser> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Card(
-          elevation: 6,
+          elevation: 4,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(15),
           ),
@@ -328,19 +379,32 @@ class _HomeUserState extends State<HomeUser> {
   }
 
   Widget _buildRestaurantCard(BuildContext context, RestaurantModel item) {
-    // 🎯 แปลงพาร์ทรูปสั้นให้กลายเป็น URL ลิงก์รูปภาพตัวเต็มที่ผูกติดไอพีศูนย์กลาง
     final String finalImageUrl = _getFinalImageUrl(item.restaurantImage);
+
+    final String keyword = searchController.text.trim().toLowerCase();
+    final List<MenuModel> storeMenus =
+        _restaurantMenusIndex[item.username] ?? [];
+
+    final List<MenuModel> matchedMenus = storeMenus
+        .where(
+          (m) =>
+              keyword.isNotEmpty &&
+              (m.menuName ?? "").toLowerCase().contains(keyword),
+        )
+        .toList();
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        // 🎯 แก้ไขจุดสำคัญ 1: ลงเส้นขอบสีเทาอ่อนความหนา 1.0 ครอบคลุมมิติการ์ดทั้งหมดเพื่อไม่ให้กลืนไปกับ Background ของแอป
+        border: Border.all(color: Colors.grey.shade300, width: 1.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -359,13 +423,15 @@ class _HomeUserState extends State<HomeUser> {
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16),
+                top: Radius.circular(
+                  15,
+                ), // ปรับลงมาเล็กน้อยให้เข้าล็อกกรอบ Border.all ด้านบนพอดี
               ),
               child: AspectRatio(
                 aspectRatio: 16 / 9,
                 child: finalImageUrl.isNotEmpty
                     ? Image.network(
-                        finalImageUrl, // 🌟 ยิงโหลดตรงผ่านลิงก์รูปภาพประกอบเสร็จสมบูรณ์
+                        finalImageUrl,
                         fit: BoxFit.cover,
                         loadingBuilder: (context, child, loadingProgress) {
                           if (loadingProgress == null) return child;
@@ -461,6 +527,105 @@ class _HomeUserState extends State<HomeUser> {
                 ],
               ),
             ),
+
+            // 🌟 ส่วนแผงเมนูอาหารที่เสิร์ชเจอ: กางกล่องเหลืองพาสเทล พร้อมขอบตัดโค้งรับฐานการ์ดล่างสุด
+            if (matchedMenus.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFFC8).withOpacity(0.5),
+                  borderRadius: const BorderRadius.only(
+                    // 🎯 แก้ไขจุดสำคัญ 2: ปรับแต่งให้ขอบล่างโค้งมนรับกับกรอบสี่เหลี่ยมด้านนอกได้อย่างพอเหมาะพอดี
+                    bottomLeft: Radius.circular(15),
+                    bottomRight: Radius.circular(15),
+                  ),
+                  border: Border(top: BorderSide(color: Colors.grey.shade200)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.fastfood, size: 16, color: Colors.orange),
+                        SizedBox(width: 6),
+                        Text(
+                          "เมนูที่ตรงกับคำค้นหาของคุณ:",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ...matchedMenus.map((menu) {
+                      final String finalMenuImgUrl = _getFinalImageUrl(
+                        menu.menuImage,
+                      );
+
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          vertical: 4,
+                          horizontal: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: SizedBox(
+                                width: 45,
+                                height: 45,
+                                child: finalMenuImgUrl.isNotEmpty
+                                    ? Image.network(
+                                        Uri.encodeFull(finalMenuImgUrl),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          color: Colors.grey[200],
+                                          child: const Icon(
+                                            Icons.fastfood,
+                                            size: 20,
+                                            color: Colors.grey,
+                                          ),
+                                        ),
+                                      )
+                                    : Container(
+                                        color: Colors.grey[200],
+                                        child: const Icon(
+                                          Icons.fastfood,
+                                          size: 20,
+                                          color: Colors.grey,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                menu.menuName ?? "-",
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                            ),
+                            Text(
+                              "฿${menu.price?.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black54,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
+                  ],
+                ),
+              ),
           ],
         ),
       ),

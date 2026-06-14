@@ -1,8 +1,10 @@
+// features/member/add_order_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 ดึงตัวแปรไอพีกลางสากลเข้ามาจัดการความชัวร์ของรูปภาพ
 
 class AddOrderMember extends StatefulWidget {
   final MenuModel menuModel;
@@ -28,6 +30,19 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   void initState() {
     super.initState();
     _loadMenuAddons();
+  }
+
+  // 🎯 ฟังก์ชันสากลช่วยกะเทาะและเชื่อมพาร์ทรูปสั้นเข้ากับ URL ไอพีกลางให้ถูกต้องสมบูรณ์
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   Future<void> _loadMenuAddons() async {
@@ -59,7 +74,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   Map<String, List<MenuAddonDetailModel>> _groupAddons() {
     Map<String, List<MenuAddonDetailModel>> grouped = {};
     for (var addon in _allAddons) {
-      // 🎯 แก้ไข: ดึงชื่อกลุ่มจากโมเดลคู่สัมพันธ์โดยตรง (เผื่อโครงสร้างสะกดตัวเล็กใหญ่แตกต่างกัน)
       String groupName =
           addon.menuAddonGroup?.addonGroupName ?? "ตัวเลือกเสริม";
       if (!grouped.containsKey(groupName)) {
@@ -72,11 +86,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
   @override
   Widget build(BuildContext context) {
-    const String baseIp = "10.244.27.211";
-
     int basePrice = widget.menuModel.price?.toInt() ?? 0;
 
-    // 🎯 แก้ไขจุดที่ 1: เปลี่ยนมาใช้ฟิลด์ .addonprice (ตัว p เล็ก) ในการคำนวณราคารวมทั้งหมด
+    // เปลี่ยนมาใช้ฟิลด์ .addonprice (ตัว p เล็ก) ในการคำนวณราคารวมทั้งหมด
     double addonTotalPrice = 0;
     _selectedAddons.forEach((id, detail) {
       addonTotalPrice += detail.addonPrice ?? 0;
@@ -85,12 +97,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     int totalPrice = (basePrice + addonTotalPrice.toInt()) * _quantity;
 
     String? rawMenuImage = widget.menuModel.menuImage;
-    String safeImageUrl = "";
-    if (rawMenuImage != null && rawMenuImage.isNotEmpty) {
-      safeImageUrl = rawMenuImage
-          .replaceAll("10.226.43.211", baseIp)
-          .replaceAll("10.0.2.2", baseIp);
-    }
+
+    // 🌟 ดึงผ่านฟังก์ชันต่อพาร์ทไอพีกลางสากล ปรับภาพอาหารจานเดี่ยวให้ขึ้นจอคมชัด
+    String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
     final groupedAddons = _groupAddons();
 
@@ -133,9 +142,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     Center(
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(16),
-                        child: safeImageUrl.isNotEmpty
+                        child: finalMenuUrl.isNotEmpty
                             ? Image.network(
-                                Uri.encodeFull(safeImageUrl),
+                                Uri.encodeFull(finalMenuUrl),
                                 width: 260,
                                 height: 260,
                                 fit: BoxFit.cover,
@@ -191,7 +200,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                         String groupName = entry.key;
                         List<MenuAddonDetailModel> items = entry.value;
 
-                        // ดึงเงื่อนไขตรวจสอบจากกลุ่มตัวเลือก
                         bool isRequired =
                             items.first.menuAddonGroup?.isRequired ?? false;
                         int maxSelect =
@@ -381,7 +389,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                   Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5CFF33),
+                  backgroundColor: const Color(
+                    0xFF76FF03,
+                  ), // 🎯 ปรับให้แมตช์ธีมสีเขียวสว่างสากลตัวเดียวกัน
                   foregroundColor: Colors.black,
                   elevation: 2,
                   shape: RoundedRectangleBorder(
@@ -400,12 +410,10 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     );
   }
 
-  // ฟังก์ชันวาดตัวเลือกรายการ Addon พร้อมเพิ่มการดักจับขีดจำกัดโควตาเลือกสูงสุด
   Widget _buildAddonItemOption(MenuAddonDetailModel detail, int maxSelect) {
     int id = detail.addonDetailId ?? 0;
     bool isSelected = _selectedAddons.containsKey(id);
 
-    // 🎯 แก้ไขจุดที่ 2 & 3: ปรับโครงสร้างเจาะเข้าไปหาวัตถุลูก .addonmenu และฟิลด์ราคา .addonprice (ตัวเล็กทั้งหมด)
     String title = detail.addonMenu?.addonName ?? "ไม่มีชื่อ";
     int price = detail.addonPrice?.toInt() ?? 0;
     int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;

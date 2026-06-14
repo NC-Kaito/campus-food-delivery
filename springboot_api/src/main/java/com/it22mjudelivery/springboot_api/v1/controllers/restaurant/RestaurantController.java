@@ -92,7 +92,8 @@
 
         @GetMapping("/searchRestaurant")
         public ResponseEntity<List<Restaurant>> searchRestaurant(@RequestParam String name) {
-            return ResponseEntity.ok(restaurantRepository.findByRestaurantnameContainingIgnoreCaseAndVerificationstatus(name, "true"));
+            List<Restaurant> results = restaurantRepository.searchByStoreOrMenu(name, "true");
+            return ResponseEntity.ok(results);
         }
 
         //------Restaurant---------------------------------------------------------------------

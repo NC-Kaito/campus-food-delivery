@@ -1,3 +1,4 @@
+// features/member/view_order_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/models/order_detail_addon_model.dart';
@@ -10,6 +11,7 @@ import 'package:flutter_app/features/member/edit_order_member.dart';
 import 'package:flutter_app/features/member/location_order_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 ดึงตัวแปรไอพีกลางสากลเข้ามาจัดการความชัวร์ของรูปภาพ
 
 class ViewOrderMember extends StatefulWidget {
   final String storeName;
@@ -43,6 +45,19 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   void initState() {
     super.initState();
     _loadCurrentMemberProfile();
+  }
+
+  // 🎯 ฟังก์ชันสากลช่วยกะเทาะและเชื่อมพาร์ทรูปสั้นเข้ากับ URL ไอพีกลางให้ถูกต้องสมบูรณ์
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   Future<void> _loadCurrentMemberProfile() async {
@@ -86,14 +101,11 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     );
   }
 
-  Widget _buildOrderItemCard(CartItem item, String baseIp, int index) {
+  Widget _buildOrderItemCard(CartItem item, int index) {
     String? rawMenuImage = item.menu.menuImage;
-    String safeImageUrl = "";
-    if (rawMenuImage != null && rawMenuImage.isNotEmpty) {
-      safeImageUrl = rawMenuImage
-          .replaceAll("10.226.43.211", baseIp)
-          .replaceAll("10.0.2.2", baseIp);
-    }
+
+    // 🌟 เปลี่ยนมาดึงพาร์ทรูปตะกร้าผ่านศูนย์รวมไอพีกลางสากล ปลอดภัยไร้ปัญหาลิงก์หลุด
+    String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
     int totalAddonPricePerUnit = 0;
     for (var addon in item.selectedAddons) {
@@ -110,7 +122,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
 
     return InkWell(
       onTap: () async {
-        // 🚀 1. เปิดหน้าแก้ไขรายการอาหารตามปกติ
         final dynamic result = await Navigator.push(
           context,
           MaterialPageRoute(
@@ -118,18 +129,12 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
           ),
         );
 
-        // 🚀 2. ตรวจสอบสถานะขากลับเมื่อหน้า Edit ปิดสนิทลงแล้ว
-        // 🚀 2. ดักเช็กข้อมูลขากลับเมื่อหน้า Edit ปิดสนิทลงแล้ว
         if (result != null) {
           setState(() {
             if (result == "REMOVE") {
-              // 🎯 จุดแก้ไขวิกฤต: สั่งลบไอเทมตัวนี้ออกจากตะกร้ากลาง (CartManager) จริงๆ ด้วยครับ!
               CartManager().removeFromCart(item);
-
-              // จากนั้นค่อยลบออกจาก List จำลองที่วาดบนหน้านี้
               widget.storeItems.removeAt(index);
 
-              // ดักเช็กถ้าของเกลี้ยงตะกร้าแล้ว ให้เคลียร์คิวถอยฉากกลับหน้าแรกทันที
               if (widget.storeItems.isEmpty) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
                   if (mounted) {
@@ -138,11 +143,8 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                 });
               }
             } else if (result is CartItem) {
-              // กรณีแก้ไขเพิ่มลดจำนวนหรือแอนออนปกติ -> เขียนทับตัวแปรแถวเดิม
               widget.storeItems[index] = result;
 
-              // 💡 ทริคเสริม: เพื่อความเนี๊ยบของระบบ ถ้าเขากดบันทึกแก้ไขจำนวนหรือแอดออนมาใหม่
-              // เราก็ต้องอัปเดตไอเทมชิ้นนั้นกลับเข้าตะกร้าหลักในเครื่องด้วยเช่นกันครับ
               final int mainCartIndex = CartManager().items.indexOf(item);
               if (mainCartIndex != -1) {
                 CartManager().items[mainCartIndex] = result;
@@ -165,9 +167,9 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: safeImageUrl.isNotEmpty
+                child: finalMenuUrl.isNotEmpty
                     ? Image.network(
-                        Uri.encodeFull(safeImageUrl),
+                        Uri.encodeFull(finalMenuUrl),
                         width: 65,
                         height: 65,
                         fit: BoxFit.cover,
@@ -243,9 +245,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
 
   @override
   Widget build(BuildContext context) {
-    const String baseIp = "10.244.27.211";
-
-    // 🎯 แก้ไข: คำนวณราคารวมสินค้าโดยคิดรวมราคาเมนู + ราคา Add-on ทั้งหมด คูณด้วยจำนวนชิ้นจริง
     int subtotalPrice = 0;
     for (var item in widget.storeItems) {
       int addonsSum = 0;
@@ -387,7 +386,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(width: 6),
-                Icon(Icons.location_on, color: Colors.red, size: 24),
+                const Icon(Icons.location_on, color: Colors.red, size: 24),
               ],
             ),
             const SizedBox(height: 12),
@@ -500,8 +499,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
               itemCount: widget.storeItems.length,
               itemBuilder: (context, index) {
                 final item = widget.storeItems[index];
-                // 🎯 จุดปรับปรุง: ส่งพารามิเตอร์ index พ่วงท้ายเข้าไปเพื่อให้ลูปจำตำแหน่งการแก้ไขได้
-                return _buildOrderItemCard(item, baseIp, index);
+                return _buildOrderItemCard(item, index);
               },
             ),
             const SizedBox(height: 16),
@@ -566,7 +564,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             ),
             const SizedBox(height: 24),
 
-            // ====== ส่วนปุ่มกดยืนยันคำสั่งซื้อ เชื่อมต่อระบบยิง API ครบวงจร ======
+            // ====== ส่วนปุ่มกดยืนยันคำสั่งซื้อ ======
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -597,7 +595,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     List<OrderDetailModel> orderItems = widget.storeItems.map((
                       cartItem,
                     ) {
-                      // คำนวณหาราคารวมสุทธิรายจาน (ราคาเมนูเดี่ยว + ราคาท็อปปิ้งทั้งหมด) เพื่อส่งเก็บลงฟิลด์ subTotal
                       int currentAddonsSum = 0;
                       for (var addon in cartItem.selectedAddons) {
                         currentAddonsSum += addon.addonPrice?.toInt() ?? 0;
@@ -610,8 +607,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       return OrderDetailModel(
                         menuId: cartItem.menu.menuId ?? 0,
                         qty: cartItem.quantity,
-                        subTotal:
-                            actualSubTotal, // ยัดยอดราคาเน็ตที่คำนวณท็อปปิ้งเรียบร้อยแล้ว
+                        subTotal: actualSubTotal,
                         note: cartItem.note,
                         addons: cartItem.selectedAddons.map((addonDetail) {
                           return OrderDetailAddonModel(
@@ -662,7 +658,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         content: Text("❌ สั่งซื้อไม่สำเร็จ: $error"),
                         backgroundColor: Colors.redAccent,
                         behavior: SnackBarBehavior.floating,
-                        // 🎯 เพิ่มมาร์จิ้นดักไว้ เพื่อยกตัวกล่องให้ลอยหนีการเบียดบังของ BottomNavigationBar
                         margin: const EdgeInsets.only(
                           bottom: 100,
                           left: 20,
@@ -673,7 +668,9 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   }
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5CFF33),
+                  backgroundColor: const Color(
+                    0xFF76FF03,
+                  ), // 🎯 ปรับแต่งพื้นหลังปุ่มเป็นสีเขียวสว่างสากลแมตช์ธีมหลักเรียบร้อยครับ
                   foregroundColor: Colors.black,
                   elevation: 3,
                   shape: RoundedRectangleBorder(
