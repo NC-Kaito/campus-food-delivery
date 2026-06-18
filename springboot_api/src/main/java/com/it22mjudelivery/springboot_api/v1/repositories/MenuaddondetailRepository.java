@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.awt.*;
 import java.util.List;
 
 @Repository
@@ -18,4 +19,6 @@ public interface MenuaddondetailRepository extends JpaRepository<Menuaddondetail
             "JOIN FETCH md.addonmenu am " +
             "WHERE mg.menu.id = :menuId")
     List<Menuaddondetail> findAddonsByMenuId(@Param("menuId") Long menuId);
+
+
 }

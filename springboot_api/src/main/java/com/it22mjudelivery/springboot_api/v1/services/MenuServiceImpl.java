@@ -143,7 +143,81 @@ public class MenuServiceImpl implements MenuService {
         }
     }
 
+    @Transactional
+    public boolean updateMenuWithAddons(Map<String, Object> requestData) {
+        try {
+            // 1. ดึง MenuId มาเพื่อค้นหาของเดิม
+            Integer menuId = (Integer) requestData.get("menuId");
+            Menu menu = menuRepository.findById(menuId)
+                    .orElseThrow(() -> new RuntimeException("ไม่พบเมนูที่ต้องการอัปเดต"));
 
+            // 2. อัปเดตข้อมูลพื้นฐาน
+            menu.setMenuname((String) requestData.get("menuname"));
+            menu.setDescription((String) requestData.get("description"));
+            menu.setPrice(Double.parseDouble(requestData.get("price").toString()));
+            menu.setStatus((boolean) requestData.get("status"));
+
+            // จัดการรูปภาพ
+            if (requestData.containsKey("imageUrl")) {
+                menu.setImageurl((String) requestData.get("imageUrl"));
+            } else if (requestData.containsKey("imageurl")) {
+                menu.setImageurl((String) requestData.get("imageurl"));
+            }
+
+            // 3. จัดการ TypeMenu (ดึงตาม logic เดิมของคุณ Kaito)
+            Integer typeMenuId = (Integer) requestData.get("typeMenuId");
+            TypeMenu typeMenu = typeMenuRepository.findById(typeMenuId)
+                    .orElseThrow(() -> new RuntimeException("ไม่พบประเภทเมนู"));
+            menu.setTypemenu(typeMenu);
+
+            menuRepository.save(menu);
+
+            // 4. ล้าง Addon เดิมออกให้หมดก่อน (เพื่อเขียนใหม่)
+            // หมายเหตุ: ต้องเพิ่มเมธอด deleteByMenu ใน MenuaddongroupRepository
+            menuaddongroupRepository.deleteByMenu(menu);
+
+            // 5. บันทึก Addon ใหม่เข้าไป (ใช้ Logic เดิมที่คุณมี)
+            if (requestData.containsKey("addonGroups")) {
+                List<Map<String, Object>> groupsData = (List<Map<String, Object>>) requestData.get("addonGroups");
+                for (Map<String, Object> groupMap : groupsData) {
+                    Menuaddongroup group = Menuaddongroup.builder()
+                            .addongroupname((String) groupMap.get("addongroupname"))
+                            .maxselect((int) groupMap.get("maxselect"))
+                            .isRequired((boolean) groupMap.get("isRequired"))
+                            .menu(menu)
+                            .build();
+                    menuaddongroupRepository.save(group);
+
+                    List<Map<String, Object>> detailsData = (List<Map<String, Object>>) groupMap.get("details");
+                    for (Map<String, Object> detailMap : detailsData) {
+                        Integer addonId = (Integer) detailMap.get("addonid");
+                        Addonmenu addonmenu;
+
+                        if (addonId == null) {
+                            addonmenu = Addonmenu.builder()
+                                    .addonname((String) detailMap.get("customaddonname"))
+                                    .build();
+                            addonmenuRepository.save(addonmenu);
+                        } else {
+                            addonmenu = addonmenuRepository.findById(addonId)
+                                    .orElseThrow(() -> new RuntimeException("ไม่พบตัวเลือกเสริม"));
+                        }
+
+                        Menuaddondetail detail = Menuaddondetail.builder()
+                                .addonprice(Double.parseDouble(detailMap.get("addonprice").toString()))
+                                .menuaddongroup(group)
+                                .addonmenu(addonmenu)
+                                .build();
+                        menuaddondetailRepository.save(detail);
+                    }
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            System.out.println("เกิดข้อผิดพลาดในการอัปเดตเมนู: " + e);
+            throw new RuntimeException("อัปเดตข้อมูลล้มเหลว: " + e.getMessage());
+        }
+    }
 
 
 }

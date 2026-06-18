@@ -25,6 +25,9 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
 
   final MemberService memberService = MemberService();
 
+  // 🎯 คุมชุดเฉดสีเขียวประจำธีมแอปพลิเคชัน #64F02D ของเรา
+  final Color primaryGreen = const Color(0xFF64F02D);
+
   @override
   void initState() {
     super.initState();
@@ -75,13 +78,12 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
     return Container(
       width: 65,
       height: 65,
-      color: Colors.orange[50],
-      child: const Icon(Icons.fastfood, color: Colors.orange, size: 30),
+      color: Colors.green.shade50,
+      child: Icon(Icons.fastfood_rounded, color: primaryGreen, size: 30),
     );
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // 🚀 🎯 แก้ไขถูกต้อง: เจาะผ่าน item.menu เข้าไปเอา menuName และ menuImage แบบมี Null Safety
     String menuName = item.menu?.menuName ?? "รายการเมนูรหัส #${item.menuId}";
     String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
 
@@ -90,7 +92,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       decoration: BoxDecoration(
         color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(16),
-        border: const Border(left: BorderSide(color: Colors.green, width: 4)),
+        border: Border(left: BorderSide(color: primaryGreen, width: 4)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -169,35 +171,55 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
   }) {
     return Expanded(
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Expanded(
                 child: Container(
-                  height: 3,
+                  height: 4,
                   color: isFirst
                       ? Colors.transparent
-                      : (isLineCompleted ? Colors.green : Colors.grey.shade300),
+                      : (isCompleted
+                            ? const Color(0xFF64F02D)
+                            : Colors.grey.shade300),
                 ),
               ),
               Container(
-                width: 16,
-                height: 16,
+                width: 18,
+                height: 18,
                 decoration: BoxDecoration(
-                  color: isCompleted ? Colors.green : Colors.grey.shade300,
+                  color: isCompleted
+                      ? const Color(0xFF64F02D)
+                      : Colors.grey.shade300,
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isCompleted
+                        ? const Color(0xFF2E7D32)
+                        : Colors.grey.shade400,
+                    width: 1,
+                  ),
                 ),
               ),
-              Expanded(child: Container(height: 3, color: Colors.transparent)),
+              Expanded(
+                child: Container(
+                  height: 4,
+                  color: isLast
+                      ? Colors.transparent
+                      : (isLineCompleted
+                            ? const Color(0xFF64F02D)
+                            : Colors.grey.shade300),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Text(
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 10,
-              color: isCompleted ? Colors.black87 : Colors.grey,
+              fontSize: 11,
+              color: isCompleted ? Colors.black87 : Colors.grey.shade500,
               fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -233,12 +255,12 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.orange),
+        iconTheme: IconThemeData(color: primaryGreen),
         title: const Text(
           "รายละเอียดคำสั่งซื้อ",
           style: TextStyle(
-            color: Colors.orange,
-            fontSize: 24,
+            color: Colors.black87,
+            fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -259,12 +281,12 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                   children: [
                     const TextSpan(
                       text: "เลขที่ออเดอร์ : ",
-                      style: TextStyle(color: Colors.orange),
+                      style: TextStyle(color: Colors.black87),
                     ),
                     TextSpan(
                       text:
                           "K${widget.order.orderId?.toString().padLeft(6, '0') ?? '000000'}",
-                      style: const TextStyle(color: Colors.green),
+                      style: TextStyle(color: primaryGreen),
                     ),
                   ],
                 ),
@@ -315,24 +337,20 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             else
               Row(
                 children: [
-                  const Icon(
-                    Icons.hourglass_empty,
-                    size: 30,
-                    color: Colors.orange,
-                  ),
+                  Icon(Icons.hourglass_empty, size: 30, color: primaryGreen),
                   const SizedBox(width: 12),
                   Text(
                     "สถานะ: กำลังรอผู้จัดส่งรับงาน...",
                     style: TextStyle(
                       fontSize: 15,
-                      color: Colors.orange[800],
+                      color: Colors.grey.shade700,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ],
               ),
             const SizedBox(height: 16),
-            const Divider(height: 1, color: Colors.grey),
+            const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
             const Text(
@@ -345,11 +363,11 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             ),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 20),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: const Color(0xFFFBFBFB),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -358,23 +376,23 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                   _buildTimelineDot(
                     "รอผู้จัดส่ง\nรับงาน",
                     currentStep >= 1,
-                    false,
+                    currentStep >= 2,
                     isFirst: true,
                   ),
                   _buildTimelineDot(
                     "รอร้านค้า\nยืนยัน",
                     currentStep >= 2,
-                    currentStep >= 2,
+                    currentStep >= 3,
                   ),
                   _buildTimelineDot(
                     "กำลังจัดส่ง\n(Delivering)",
                     currentStep >= 3,
-                    currentStep >= 3,
+                    currentStep >= 4,
                   ),
                   _buildTimelineDot(
                     "จัดส่ง\nสำเร็จ",
                     currentStep >= 4,
-                    currentStep >= 4,
+                    currentStep >= 5,
                     isLast: true,
                   ),
                 ],
@@ -385,7 +403,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             const Text(
               "ข้อมูลผู้สั่งซื้อ",
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.black,
               ),
@@ -393,12 +411,13 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             const SizedBox(height: 12),
             Row(
               children: [
+                // 🎯 บล็อกจุดแก้ไขปิดวงเล็บครอบ Row เกินเพี้ยนเรียบร้อยฉลุยครับ
                 Expanded(
                   child: Row(
                     children: [
                       const Icon(
                         Icons.person_outline,
-                        size: 32,
+                        size: 28,
                         color: Colors.grey,
                       ),
                       const SizedBox(width: 8),
@@ -408,7 +427,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                           Text(
                             "ชื่อผู้รับ",
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               color: Colors.grey[600],
                             ),
                           ),
@@ -429,7 +448,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     children: [
                       const Icon(
                         Icons.phone_in_talk_outlined,
-                        size: 32,
+                        size: 28,
                         color: Colors.grey,
                       ),
                       const SizedBox(width: 8),
@@ -439,7 +458,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                           Text(
                             "เบอร์โทรศัพท์",
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 13,
                               color: Colors.grey[600],
                             ),
                           ),
@@ -458,17 +477,17 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               ],
             ),
             const SizedBox(height: 16),
-            const Divider(height: 1, color: Colors.grey),
+            const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
             Row(
-              children: const [
-                Text(
+              children: [
+                const Text(
                   "ที่อยู่จัดส่ง",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                SizedBox(width: 6),
-                Icon(Icons.location_on, color: Colors.red, size: 24),
+                const SizedBox(width: 6),
+                Icon(Icons.location_on, color: primaryGreen, size: 22),
               ],
             ),
             const SizedBox(height: 12),
@@ -524,7 +543,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               ),
               const SizedBox(height: 16),
             ],
-            const Divider(height: 1, color: Colors.grey),
+            const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
             const Text(
@@ -547,12 +566,16 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               children: [
                 const Text(
                   "ราคารวมสินค้า",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black54,
+                  ),
                 ),
                 Text(
                   "${subtotalPrice.toStringAsFixed(0)} บาท",
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -564,19 +587,23 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               children: [
                 const Text(
                   "ค่าจัดส่ง",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black54,
+                  ),
                 ),
                 Text(
                   "${deliveryFee.toStringAsFixed(0)} บาท",
                   style: const TextStyle(
-                    fontSize: 16,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
-            const Divider(height: 1, color: Colors.grey),
+            const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -586,15 +613,15 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                    color: Colors.black87,
                   ),
                 ),
                 Text(
                   "${totalPrice.toStringAsFixed(0)} บาท",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
+                    color: primaryGreen,
                   ),
                 ),
               ],

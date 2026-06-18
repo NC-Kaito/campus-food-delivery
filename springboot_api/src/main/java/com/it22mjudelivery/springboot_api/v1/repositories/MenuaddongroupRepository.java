@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.repositories;
 
+import com.it22mjudelivery.springboot_api.v1.entities.Menu;
 import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,4 +18,6 @@ public interface MenuaddongroupRepository extends JpaRepository<Menuaddongroup, 
     List<Menuaddongroup> findByMenuId(@Param("menuId") Long menuId);
 
     List<Menuaddongroup> findByMenu_Menuid(Long menuid);
+
+    void deleteByMenu(Menu menu);
 }

@@ -11,6 +11,8 @@ public interface MenuService {
     boolean updateMenuStatus(int menuId, boolean status);
     boolean saveMenuWithAddons(Map<String, Object> requestData);
 
+    boolean updateMenuWithAddons(Map<String, Object> requestData);
+
 
 
 

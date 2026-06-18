@@ -59,4 +59,19 @@ public class MenuAddonController {
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
         }
     }
+
+    @PostMapping("/updateMenuWithAddons")
+    public ResponseEntity<?> updateMenuWithAddons(@RequestBody Map<String, Object> requestData) {
+        try {
+            boolean isSuccess = menuService.saveMenuWithAddons(requestData);
+            if (isSuccess) {
+                return ResponseEntity.ok("บันทึกข้อมูลเมนูอาหารและตัวเลือกเสริมสำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("ไม่สามารถบันทึกข้อมูลได้ ข้อมูลไม่ถูกต้อง");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
+        }
+    }
 }

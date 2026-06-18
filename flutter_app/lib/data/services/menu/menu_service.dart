@@ -190,8 +190,8 @@ class MenuService {
 
   Future<void> updateMenuByRestaurant(Map<String, dynamic> requestData) async {
     try {
-      final response = await DioClient.dio.put(
-        "/v1/menuAddon/updateMenuByRestaurant",
+      final response = await DioClient.dio.post(
+        "/v1/menuAddon/updateMenuWithAddons",
         data: requestData,
       );
       if (response.statusCode != 200) {

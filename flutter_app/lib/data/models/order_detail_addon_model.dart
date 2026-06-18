@@ -27,11 +27,14 @@ class OrderDetailAddonModel {
   }
 
   // 📤 ── ขาส่งออก (แปลงเป็น Map ให้ตรงกับโครงสร้าง JPA Entity ของระบบ Spring Boot) ──
+  // data/models/order_detail_addon_model.dart แก้เฉพาะ toJson
+  // data/models/order_detail_addon_model.dart
   Map<String, dynamic> toJson() {
     return {
-      // แมปกลับไปเป็นรูปแบบโครงสร้าง Object เพื่อให้ตัวตรวจสอบฝั่ง Java รับไปผูกเงื่อนไขง่ายๆ
-      'menuaddondetail': {'addondetailid': addonDetailId},
-      'priceAtOrder': priceAtOrder,
+      'addondetailid':
+          addonDetailId, // 🎯 แก้ส่งไอดีแบบดิบๆ ไม่ต้องห่อซ้อนในคลาส menuaddondetail
+      'priceAtOrder':
+          priceAtOrder ?? 0.0, // 🎯 ใส่ 0.0 สแตนด์บายกันเหนียว Jackson 400
     };
   }
 }

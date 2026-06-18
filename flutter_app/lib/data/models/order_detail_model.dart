@@ -1,6 +1,6 @@
 // data/models/order_detail_model.dart
 import 'package:flutter_app/data/models/order_detail_addon_model.dart';
-import 'package:flutter_app/data/models/menu_model.dart'; // 🎯 อิมพอร์ตโมเดลเมนูอาหารเข้ามาด้วยนะครับ
+import 'package:flutter_app/data/models/menu_model.dart';
 
 class OrderDetailModel {
   final int? orderDetailId;
@@ -8,7 +8,7 @@ class OrderDetailModel {
   final int qty;
   final double subTotal;
   final String note;
-  final MenuModel? menu; // 🎯 เพิ่มฟิลด์รับวัตถุข้อมูลเมนู (รวมชื่อและรูปภาพ)
+  final MenuModel? menu;
   final List<OrderDetailAddonModel> addons;
 
   OrderDetailModel({
@@ -17,25 +17,20 @@ class OrderDetailModel {
     required this.qty,
     required this.subTotal,
     required this.note,
-    this.menu, // 🎯
+    this.menu,
     required this.addons,
   });
 
   factory OrderDetailModel.fromJson(Map<String, dynamic> json) {
     return OrderDetailModel(
       orderDetailId: json['orderdetailid'] ?? json['orderDetailId'],
-
       menuId: json['menu'] != null
           ? (json['menu']['menuid'] ?? json['menu']['menuId'] ?? 0)
           : (json['menuId'] ?? json['menu_id'] ?? 0),
-
       qty: json['qty'] ?? 0,
       subTotal: (json['subtotal'] ?? json['subTotal'] ?? 0).toDouble(),
       note: json['note'] ?? "",
-
-      // 🎯 สอยก้อนข้อมูลเมนูอาหารมาแปลงสวมเข้าโมเดลเพื่อนำไปวาดภาพหน้า UI
       menu: json['menu'] != null ? MenuModel.fromJson(json['menu']) : null,
-
       addons: json['orderDetailAddons'] != null
           ? (json['orderDetailAddons'] as List)
                 .map((addon) => OrderDetailAddonModel.fromJson(addon))
@@ -49,13 +44,16 @@ class OrderDetailModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'orderdetailid': orderDetailId,
+    final Map<String, dynamic> data = {
       'qty': qty,
-      'subtotal': subTotal,
+      // 🎯 แก้เป็น subTotal (ตัว T ใหญ่) เพื่อให้ตรงกับฝั่ง Java เด๊ะๆ ครับ
+      'subTotal': subTotal,
       'note': note,
-      'menu': {'menuid': menuId},
-      'orderDetailAddons': addons.map((addon) => addon.toJson()).toList(),
+      'menuId': menuId,
+      'addons': addons.map((addon) => addon.toJson()).toList(),
     };
+
+    if (orderDetailId != null) data['orderdetailid'] = orderDetailId;
+    return data;
   }
 }

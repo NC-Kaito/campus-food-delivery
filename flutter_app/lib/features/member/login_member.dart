@@ -93,7 +93,7 @@ class _LoginMemberState extends State<LoginMember> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ─── 🎯 เอาปุ่มย้อนกลับด้านบนออกตามคำขอ เว้นระยะด้วยช่องไฟสวยงามแทนคราบบบ ───
+                // ─── เอาปุ่มย้อนกลับด้านบนออกตามคำขอ เว้นระยะด้วยช่องไฟสวยงามแทนคราบบบ ───
                 const SizedBox(height: 35),
 
                 // ─── ส่วนหัวข้อแสดงชื่อระบบ ───
@@ -198,14 +198,20 @@ class _LoginMemberState extends State<LoginMember> {
                       ),
                       const SizedBox(height: 40),
 
+                      // ─── 🎯 เรียกใช้ปุ่ม 'เข้าสู่ระบบ' ───
                       _buildActionButton(
                         text: 'เข้าสู่ระบบ',
                         onPressed: doLogin,
                         loading: _isLoading,
-                        isPrimary: true,
+                        isPrimary: true, // สีเขียว มีเงา
                       ),
-                      const SizedBox(height: 14),
 
+                      // ─── 🎯 เพิ่มเส้นคั่นสีเขียวและเว้นระยะห่างตามบรีฟ ───
+                      const SizedBox(height: 20),
+                      const Divider(color: Colors.green, thickness: 1.2),
+                      const SizedBox(height: 20),
+
+                      // ─── 🎯 เรียกใช้ปุ่ม 'สร้างบัญชีผู้ใช้ใหม่' ───
                       _buildActionButton(
                         text: 'สร้างบัญชีผู้ใช้ใหม่',
                         onPressed: () {
@@ -216,7 +222,7 @@ class _LoginMemberState extends State<LoginMember> {
                             ),
                           );
                         },
-                        isPrimary: false,
+                        isPrimary: false, // สีขาว
                       ),
                     ],
                   ),
@@ -227,7 +233,7 @@ class _LoginMemberState extends State<LoginMember> {
         ),
       ),
 
-      // ─── 🎯 ส่วนที่เพิ่มใหม่: แถบเมนูด้านล่าง ถอดแบบโมเดลมาจากหน้า HomeUser ───
+      // ─── แถบเมนูด้านล่าง ───
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -297,6 +303,7 @@ class _LoginMemberState extends State<LoginMember> {
     );
   }
 
+  // ─── 🎯 ซ่อมแซมจุดนี้: ดึงความถูกต้องกลับมาใช้ขอบ OutlineInputBorder เคลียร์พื้นที่ Alert ตัวอักษรสีแดงให้ชัดเจนตามบล็อกดั้งเดิมครับ ───
   Widget _buildTextFormField({
     required TextEditingController controller,
     required String hintText,
@@ -306,7 +313,8 @@ class _LoginMemberState extends State<LoginMember> {
     return TextFormField(
       controller: controller,
       obscureText: isPassword,
-      autovalidateMode: AutovalidateMode.onUserInteraction,
+      autovalidateMode:
+          AutovalidateMode.onUserInteraction, // ตรวจสอบแบบเรียลไทม์ทีละช่อง
       validator: (value) {
         if (value == null || value.trim().isEmpty) {
           return 'กรุณากรอกข้อมูลในช่องนี้ให้เรียบร้อยครับ';
@@ -324,13 +332,10 @@ class _LoginMemberState extends State<LoginMember> {
           vertical: 16,
           horizontal: 16,
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide.none,
-        ),
+        // ใช้ดีไซน์กรอบปกติที่เสถียรที่สุดเพื่อล็อกพื้นที่คำเตือน Alert แดงๆ ด้านล่างให้เด้งหลุดออกมาอย่างสวยงาม
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey.shade200, width: 1.0),
+          borderSide: BorderSide(color: Colors.grey.shade400, width: 1.0),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -376,9 +381,7 @@ class _LoginMemberState extends State<LoginMember> {
           elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            side: isPrimary
-                ? BorderSide.none
-                : BorderSide(color: Colors.grey.shade300, width: 1),
+            side: const BorderSide(color: Colors.black, width: 0.5),
           ),
         ),
         child: loading
@@ -395,7 +398,7 @@ class _LoginMemberState extends State<LoginMember> {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: isPrimary ? Colors.black87 : Colors.grey.shade700,
+                  color: isPrimary ? Colors.black87 : Colors.grey.shade800,
                 ),
               ),
       ),

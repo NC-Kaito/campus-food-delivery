@@ -85,9 +85,10 @@ class OrderModel {
     );
   }
 
+  // data/models/order_model.dart ลำดับเดิมทุกประการ แก้เฉพาะ toJson
+  // data/models/order_model.dart
   Map<String, dynamic> toJson() {
-    return {
-      'orderId': orderId,
+    final Map<String, dynamic> data = {
       'deliveryFee': deliveryFee,
       'totalPrice': totalPrice,
       'latitude': latitude,
@@ -95,9 +96,13 @@ class OrderModel {
       'addressDetail': addressDetail,
       'memberUsername': memberUsername,
       'restaurantUsername': restaurantUsername,
-      'orderstatus': orderStatus,
-      'orderdate': orderdate?.toIso8601String(),
       'items': items.map((item) => item.toJson()).toList(),
     };
+
+    if (orderId != null) data['orderId'] = orderId;
+    if (orderStatus != null) data['orderstatus'] = orderStatus;
+    if (orderdate != null) data['orderdate'] = orderdate!.toIso8601String();
+
+    return data;
   }
 }
