@@ -379,10 +379,11 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
                                 typerestaurantName ?? "-",
                               ),
                               const SizedBox(height: 20),
+                              // ค้นหาจุดนี้ใน method build ของคุณ
                               _buildInfoRow(
                                 Icons.access_time,
                                 "เวลาเปิด - ปิด",
-                                "$opentime - $closetime น.",
+                                "${_formatTime(opentime)} - ${_formatTime(closetime)} น.", // ✅ แก้ไขตรงนี้
                               ),
                             ],
                           ),
@@ -398,6 +399,22 @@ class _HomeRestaurantState extends State<HomeRestaurant> {
         ),
       ),
     );
+  }
+
+  // 1. เพิ่มฟังก์ชันนี้เพื่อตัดวินาทีทิ้ง
+  String _formatTime(String? time) {
+    if (time == null || time == "--:--") return "--:--";
+    // ถ้า time มาเป็นรูปแบบ HH:mm:ss เช่น "08:00:00"
+    // ให้แบ่งด้วย ':' และเอาเฉพาะ 2 ตัวแรกมารวมกัน
+    try {
+      List<String> parts = time.split(':');
+      if (parts.length >= 2) {
+        return "${parts[0]}:${parts[1]}";
+      }
+    } catch (e) {
+      return time;
+    }
+    return time;
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {

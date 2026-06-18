@@ -131,7 +131,7 @@
                         restaurantDto.getLatitude(),restaurantDto.getLongitude(),
                         restaurantDto.getOpentime(),
                         restaurantDto.getClosetime(),restaurantDto.getOpenday(),restaurantDto.getOwnerfirstname(),
-                        restaurantDto.getOwnerlastname(),restaurantDto.getEmail(),restaurantDto.getPhone());
+                        restaurantDto.getOwnerlastname(),restaurantDto.getEmail(),restaurantDto.getPhone(),restaurantDto.getOwnerimage());
                 if (isResult) {
                     return ResponseEntity.ok("updateProfileRestaurant สำเร็จ");
                 }
@@ -141,6 +141,18 @@
             } catch (Exception e) {
                 System.out.println(e);
                 return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+            }
+        }
+
+        @PostMapping("/doCloseAccount/{username}")
+        public ResponseEntity<?> doCloseAccount(@PathVariable String username) {
+            try {
+                restaurantService.doCloseAccount(username);
+                return ResponseEntity.ok("อนุมัติร้านค้าสำเร็จ");
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            } catch (Exception e) {
+                return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดในการอนุมัติ");
             }
         }
 

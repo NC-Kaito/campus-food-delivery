@@ -5,6 +5,7 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
+import 'package:flutter_app/features/member/add_order_member.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/view_menu.dart';
@@ -291,6 +292,7 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                               const SizedBox(height: 20),
 
                               // --- TAB BAR (แถบประเภทเมนูอาหารกลาง) ---
+                              // ค้นหาคำว่า Container ที่ครอบ TabBar ของคุณอยู่ แล้วเปลี่ยนเป็นแบบนี้ครับ
                               Container(
                                 decoration: const BoxDecoration(
                                   color: Color(0xFFFFFFC8),
@@ -303,10 +305,9 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                 ),
                                 child: TabBar(
                                   controller: _tabController!,
-                                  isScrollable: typeMenus.length > 3,
-                                  tabAlignment: typeMenus.length > 3
-                                      ? TabAlignment.start
-                                      : TabAlignment.fill,
+                                  isScrollable: true, // 🎯 ให้เลื่อนซ้าย-ขวาได้
+                                  tabAlignment:
+                                      TabAlignment.start, // 🎯 เริ่มจากซ้าย
                                   labelColor: Colors.black,
                                   unselectedLabelColor: Colors.black54,
                                   indicatorColor: Colors.black,
@@ -320,6 +321,11 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                   unselectedLabelStyle: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
+                                  ),
+                                  // 🎯 เพิ่ม labelPadding เพื่อให้ช่องว่างสวยงามและปรับความกว้าง tab ให้เห็น 3 อัน
+                                  labelPadding: EdgeInsets.symmetric(
+                                    horizontal:
+                                        MediaQuery.of(context).size.width / 12,
                                   ),
                                   tabs: typeMenus.isEmpty
                                       ? [const Tab(text: "ไม่มีประเภท")]
@@ -387,20 +393,25 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                               );
 
                               return GestureDetector(
-                                onTap: () async {
-                                  await Navigator.push(
+                                onTap: () {
+                                  Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (_) => const ViewMenu(),
+                                      builder: (context) =>
+                                          ViewMenu(menuModel: menu),
                                     ),
                                   );
-                                  loadMenusByType(typeId);
                                 },
                                 child: Container(
                                   decoration: BoxDecoration(
                                     color: isAvailable
                                         ? Colors.white
-                                        : const Color(0xFFEEEEEE),
+                                        : const Color.fromARGB(
+                                            255,
+                                            206,
+                                            206,
+                                            206,
+                                          ),
                                     borderRadius: BorderRadius.circular(16),
                                     boxShadow: [
                                       BoxShadow(
@@ -462,49 +473,17 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
                                               const SizedBox(height: 10),
 
                                               // ปุ่มเปิด-ปิดสถานะ มี / หมด
+                                              // ในส่วนของ Row ปุ่มเดิม เปลี่ยนเป็นอันนี้
                                               Row(
                                                 children: [
-                                                  const SizedBox(width: 55),
-                                                  SizedBox(
-                                                    width: 100,
-                                                    child:
-                                                        _buildInlineStatusButton(
-                                                          label: "มี",
-                                                          isSelected:
-                                                              isAvailable,
-                                                          selectedColor:
-                                                              const Color(
-                                                                0xFF8BC34A,
-                                                              ),
-                                                          onTap: isAvailable
-                                                              ? null
-                                                              : () =>
-                                                                    toggleStatus(
-                                                                      typeId,
-                                                                      index,
-                                                                    ),
-                                                        ),
-                                                  ),
-                                                  const SizedBox(width: 30),
-                                                  SizedBox(
-                                                    width: 100,
-                                                    child:
-                                                        _buildInlineStatusButton(
-                                                          label: "หมด",
-                                                          isSelected:
-                                                              !isAvailable,
-                                                          selectedColor:
-                                                              const Color(
-                                                                0xFFE53935,
-                                                              ),
-                                                          onTap: !isAvailable
-                                                              ? null
-                                                              : () =>
-                                                                    toggleStatus(
-                                                                      typeId,
-                                                                      index,
-                                                                    ),
-                                                        ),
+                                                  const SizedBox(width: 200),
+                                                  _buildInlineStatusButton(
+                                                    isAvailable:
+                                                        isAvailable, // ใช้ค่า status ปัจจุบัน
+                                                    onTap: () => toggleStatus(
+                                                      typeId,
+                                                      index,
+                                                    ), // กดแล้วเรียกฟังก์ชันสลับสถานะ
                                                   ),
                                                 ],
                                               ),
@@ -536,34 +515,32 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
   }
 
   Widget _buildInlineStatusButton({
-    required String label,
-    required bool isSelected,
-    required Color selectedColor,
-    required VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        alignment: Alignment.center,
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? selectedColor : Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isSelected ? selectedColor : Colors.grey.shade400,
-            width: 1.5,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-            color: isSelected ? Colors.white : Colors.black54,
-          ),
+    required bool isAvailable,
+    required VoidCallback onTap,
+  }) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: 60, // ปรับความกว้างให้เหมือนสวิตช์
+      height: 30,
+      padding: const EdgeInsets.all(2),
+      alignment: isAvailable
+          ? Alignment.centerRight
+          : Alignment.centerLeft, // เลื่อนตำแหน่งวงกลม
+      decoration: BoxDecoration(
+        color: isAvailable
+            ? const Color(0xFF8BC34A)
+            : const Color.fromARGB(255, 255, 0, 0),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Container(
+        width: 30,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          shape: BoxShape.circle,
         ),
       ),
-    );
-  }
+    ),
+  );
 }

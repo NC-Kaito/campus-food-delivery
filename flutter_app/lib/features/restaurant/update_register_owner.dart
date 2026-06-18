@@ -1,17 +1,16 @@
 // features/restaurant/update_register_owner.dart
-import 'package:dio/dio.dart'
-    as dio_package; // 🎯 ดึง dio_package มาใช้อัปโหลดไฟล์แทน http ตัวเก่า
+import 'package:dio/dio.dart' as dio_package;
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
-import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตตัวแปรไอพีกลาง
+import 'package:flutter_app/core/network/dio_client.dart';
 import 'dart:io';
+import 'package:image_picker/image_picker.dart';
 
 class UpdateRegisterOwner extends StatefulWidget {
   final String verificationStatus;
   final RestaurantModel? restaurantData;
   final bool isFormFieldsEditable;
-
   final String? updatedRestaurantName;
   final int? updatedTypeId;
   final double? updatedLatitude;
@@ -20,8 +19,7 @@ class UpdateRegisterOwner extends StatefulWidget {
   final String? updatedCloseTime;
   final List<bool>? updatedSelectedDays;
   final File? updatedImage;
-  final File?
-  updatedOwnerImage; // รูปหน้าเจ้าของร้านที่มีการเลือกปรับเปลี่ยนใหม่จากหน้าแรก
+  final File? updatedOwnerImage;
 
   const UpdateRegisterOwner({
     super.key,
@@ -46,10 +44,12 @@ class UpdateRegisterOwner extends StatefulWidget {
 class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final RestaurantService restaurantService = RestaurantService();
+  final ImagePicker _picker = ImagePicker();
 
   bool _isLoadingAction = false;
+  File? _selectedOwnerImage;
+  String? ownerImageNetwork;
 
-  // Controllers
   late final TextEditingController ownerFirstNameController;
   late final TextEditingController ownerLastNameController;
   late final TextEditingController emailController;
@@ -58,17 +58,24 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
   @override
   void initState() {
     super.initState();
-    ownerFirstNameController = TextEditingController();
-    ownerLastNameController = TextEditingController();
-    emailController = TextEditingController();
-    phoneController = TextEditingController();
+    ownerFirstNameController = TextEditingController(
+      text: widget.restaurantData?.ownerFirstName ?? "",
+    );
+    ownerLastNameController = TextEditingController(
+      text: widget.restaurantData?.ownerLastName ?? "",
+    );
+    emailController = TextEditingController(
+      text: widget.restaurantData?.email ?? "",
+    );
+    phoneController = TextEditingController(
+      text: widget.restaurantData?.phone ?? "",
+    );
 
-    if (widget.restaurantData != null) {
-      ownerFirstNameController.text =
-          widget.restaurantData!.ownerFirstName ?? "";
-      ownerLastNameController.text = widget.restaurantData!.ownerLastName ?? "";
-      emailController.text = widget.restaurantData!.email ?? "";
-      phoneController.text = widget.restaurantData!.phone ?? "";
+    _selectedOwnerImage = widget.updatedOwnerImage;
+
+    if (widget.restaurantData?.ownerImage != null &&
+        widget.restaurantData!.ownerImage!.isNotEmpty) {
+      ownerImageNetwork = _getFinalImageUrl(widget.restaurantData!.ownerImage!);
     }
   }
 
@@ -81,15 +88,23 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
     super.dispose();
   }
 
-  int _convertDaysToInt(List<bool> days) {
-    int result = 0;
-    for (int i = 0; i < days.length; i++) {
-      if (days[i]) result += (1 << i);
-    }
-    return result;
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // 🎯 ปรับฟังก์ชันอัปโหลดรูปภาพใหม่ผ่าน DioClient: มั่นคง ปลอดภัย รองรับการสลับไอพีเราเตอร์กลาง
+  Future<void> pickOwnerImage() async {
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 80,
+    );
+    if (image != null) {
+      setState(() => _selectedOwnerImage = File(image.path));
+    }
+  }
+
   Future<String?> _uploadImage(File imageFile, String type) async {
     try {
       String fileName = imageFile.path.split('/').last;
@@ -100,28 +115,28 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
         ),
         'type': type,
       });
-
       var response = await DioClient.dio.post(
         '/v1/restaurant/uploadImage',
         data: formData,
       );
-
-      if (response.statusCode == 200 && response.data != null) {
-        return response.data['url'];
-      }
-      return null;
+      return response.statusCode == 200 ? response.data['url'] : null;
     } catch (e) {
-      print("Upload error: $e");
       return null;
     }
   }
 
-  // ── ฟังก์ชันส่งข้อมูลแก้ไขทั้งหมดไปหาฐานข้อมูลผ่าน Service ──
+  int _convertDaysToInt(List<bool> days) {
+    int result = 0;
+    for (int i = 0; i < days.length; i++) {
+      if (days[i]) result += (1 << i);
+    }
+    return result;
+  }
+
   Future<void> doUpdateRegisterData() async {
     if (formKey.currentState!.validate()) {
       setState(() => _isLoadingAction = true);
       try {
-        // 1. ตรวจสอบและอัปโหลดรูปภาพใหม่เข้าสู่ระบบปลายทางหลังบ้าน
         String? newRestaurantImageUrl;
         String? newOwnerImageUrl;
 
@@ -131,15 +146,15 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
             'restaurant',
           );
         }
-        if (widget.updatedOwnerImage != null) {
-          // 🎯 ปรับเปลี่ยนฟิลด์ประเภทการยิงเซฟรูปจาก 'lease' เดิม สลับให้เป็นหมวดภาพ 'owner' ตามคำสั่งอาจารย์
+
+        // บังคับอัปโหลดรูปใหม่ถ้ามีการเลือกไฟล์เข้ามา
+        if (_selectedOwnerImage != null) {
           newOwnerImageUrl = await _uploadImage(
-            widget.updatedOwnerImage!,
+            _selectedOwnerImage!,
             'ownerImage',
           );
         }
 
-        // 2. มัดรวมข้อมูลประกอบร่างเซฟทับตาราง PostgreSQL หลังบ้าน
         RestaurantModel updatedModel = RestaurantModel(
           username: widget.restaurantData?.username,
           password: widget.restaurantData?.password,
@@ -148,10 +163,7 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
               widget.restaurantData?.restaurantName,
           restaurantImage:
               newRestaurantImageUrl ?? widget.restaurantData?.restaurantImage,
-
-          // 🎯 แก้ไขจุดสำคัญ: ถอด leaseAgreementImg เก่าทิ้ง แล้วส่งค่าอัปเดตรูปใหม่เข้าตัวแปร ownerImage แทน
           ownerImage: newOwnerImageUrl ?? widget.restaurantData?.ownerImage,
-
           openTime: widget.updatedOpenTime ?? widget.restaurantData?.openTime,
           closeTime:
               widget.updatedCloseTime ?? widget.restaurantData?.closeTime,
@@ -163,60 +175,170 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
           latitude: widget.updatedLatitude ?? widget.restaurantData?.latitude,
           longitude:
               widget.updatedLongitude ?? widget.restaurantData?.longitude,
-
-          // ข้อมูลฟอร์มในหน้าที่สอง
           ownerFirstName: ownerFirstNameController.text,
           ownerLastName: ownerLastNameController.text,
           email: emailController.text,
           phone: phoneController.text,
-
           statusOpen: widget.restaurantData?.statusOpen ?? false,
-          registerDate: widget.restaurantData?.registerDate,
-          verificationStatus: widget.restaurantData?.verificationStatus,
-          notApproveDetail: widget.restaurantData?.notApproveDetail,
         );
 
-        // 3. ยิงข้อมูลอัปเดตผ่าน Service
-        await restaurantService.updateProfileRestaurant(updatedModel);
+        // 🎯 ตรวจสอบค่าก่อนยิง API (เปิดใช้บรรทัดล่างเพื่อดูใน Log)
+        // print("Sending Model: ${updatedModel.toJson()}");
 
+        await restaurantService.updateProfileRestaurant(updatedModel);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว'),
+              content: Text('บันทึกสำเร็จ'),
               backgroundColor: Colors.green,
             ),
           );
           Navigator.pop(context, 'success');
         }
       } catch (e) {
-        print("Update Register Error: $e");
-        if (mounted) {
+        if (mounted)
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('เกิดข้อผิดพลาดในการบันทึก: $e'),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
-        }
       } finally {
         if (mounted) setState(() => _isLoadingAction = false);
       }
     }
   }
 
-  InputDecoration _inputDecoration({bool enabled = true}) {
-    return InputDecoration(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-      filled: true,
-      fillColor: enabled ? Colors.white : const Color(0xFFE0E0E0),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.grey.shade400),
+  InputDecoration _inputDecoration({bool enabled = true}) => InputDecoration(
+    contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+    filled: true,
+    fillColor: enabled ? Colors.white : const Color(0xFFE0E0E0),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(10),
+      borderSide: BorderSide(color: Colors.grey.shade400),
+    ),
+  );
+
+  Widget _buildLabel(String text) => Padding(
+    padding: const EdgeInsets.only(bottom: 4, top: 10),
+    child: Text(
+      text,
+      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+    ),
+  );
+
+  Widget _buildButton(
+    String text,
+    Color bg,
+    Color textC,
+    VoidCallback press,
+  ) => Container(
+    width: double.infinity,
+    height: 48,
+    child: ElevatedButton(
+      onPressed: press,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: bg,
+        foregroundColor: textC,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
+      child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold)),
+    ),
+  );
+
+  Widget _buildUploadBox(
+    String lbl,
+    File? localFile,
+    String? networkUrl,
+    VoidCallback tap, {
+    bool enabled = true,
+  }) {
+    ImageProvider? imageProvider;
+    if (localFile != null)
+      imageProvider = FileImage(localFile);
+    else if (networkUrl != null && networkUrl.isNotEmpty)
+      imageProvider = NetworkImage(Uri.encodeFull(networkUrl));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildLabel(lbl),
+        GestureDetector(
+          onTap: enabled ? tap : null,
+          child: Container(
+            height: 230,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: enabled ? Colors.white : const Color(0xFFE0E0E0),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.grey.shade400),
+              image: imageProvider != null
+                  ? DecorationImage(image: imageProvider, fit: BoxFit.cover)
+                  : null,
+            ),
+            child: imageProvider == null
+                ? const Icon(Icons.add, color: Colors.grey, size: 30)
+                : null,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionButtons(bool isWaitStatus, bool canEdit) {
+    if (isWaitStatus)
+      return _buildButton(
+        "ย้อนกลับ",
+        const Color(0xFFE0E0E0),
+        Colors.black,
+        () => Navigator.pop(context),
+      );
+    if (!canEdit)
+      return Column(
+        children: [
+          _buildButton(
+            "แก้ไขข้อมูล",
+            const Color(0xFF55FF33),
+            Colors.white,
+            () => Navigator.pop(context, 'edit'),
+          ),
+          const SizedBox(height: 12),
+          _buildButton(
+            "ย้อนกลับ",
+            const Color(0xFFE0E0E0),
+            Colors.black,
+            () => Navigator.pop(context),
+          ),
+        ],
+      );
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildButton(
+                "ยกเลิก",
+                const Color(0xFFFF5252),
+                Colors.white,
+                () => Navigator.pop(context, 'cancel'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildButton(
+                "ย้อนกลับ",
+                const Color(0xFFE0E0E0),
+                Colors.black,
+                () => Navigator.pop(context),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildButton(
+          _isLoadingAction ? "กำลังบันทึก..." : "บันทึกการแก้ไข",
+          const Color(0xFF55FF33),
+          Colors.white,
+          _isLoadingAction ? () {} : doUpdateRegisterData,
+        ),
+      ],
     );
   }
 
@@ -259,46 +381,40 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
               children: [
                 const Text(
                   'ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-
                 _buildLabel("ชื่อ (FirstName)"),
                 TextFormField(
                   controller: ownerFirstNameController,
                   enabled: canEdit,
                   decoration: _inputDecoration(enabled: canEdit),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? "กรุณากรอกชื่อจริง" : null,
                 ),
-
                 _buildLabel("นามสกุล (LastName)"),
                 TextFormField(
                   controller: ownerLastNameController,
                   enabled: canEdit,
                   decoration: _inputDecoration(enabled: canEdit),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? "กรุณากรอกนามสกุล" : null,
                 ),
-
                 _buildLabel("อีเมล (Email)"),
                 TextFormField(
                   controller: emailController,
                   enabled: canEdit,
                   decoration: _inputDecoration(enabled: canEdit),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? "กรุณากรอกอีเมล" : null,
                 ),
-
                 _buildLabel("เบอร์โทรศัพท์ (Phone)"),
                 TextFormField(
                   controller: phoneController,
                   enabled: canEdit,
                   decoration: _inputDecoration(enabled: canEdit),
-                  validator: (v) => (v == null || v.isEmpty)
-                      ? "กรุณากรอกเบอร์โทรศัพท์"
-                      : null,
                 ),
-
+                const SizedBox(height: 15),
+                _buildUploadBox(
+                  "บัตรประชาชน",
+                  _selectedOwnerImage,
+                  ownerImageNetwork,
+                  canEdit ? pickOwnerImage : () {},
+                  enabled: canEdit,
+                ),
                 const SizedBox(height: 40),
                 _buildActionButtons(isWaitStatus, canEdit),
               ],
@@ -308,112 +424,4 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
       ),
     );
   }
-
-  Widget _buildActionButtons(bool isWaitStatus, bool canEdit) {
-    if (isWaitStatus) {
-      return _buildButton(
-        "ย้อนกลับ",
-        const Color(0xFFE0E0E0),
-        Colors.black,
-        () => Navigator.pop(context),
-      );
-    } else {
-      if (!canEdit) {
-        return Column(
-          children: [
-            _buildButton(
-              "แก้ไขข้อมูล",
-              const Color(0xFF55FF33),
-              Colors.white,
-              () {
-                Navigator.pop(context, 'edit');
-              },
-            ),
-            const SizedBox(height: 12),
-            _buildButton(
-              "ย้อนกลับ",
-              const Color(0xFFE0E0E0),
-              Colors.black,
-              () => Navigator.pop(context),
-            ),
-          ],
-        );
-      } else {
-        return Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _buildButton(
-                    "ยกเลิก",
-                    const Color(0xFFFF5252),
-                    Colors.white,
-                    () {
-                      Navigator.pop(context, 'cancel');
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildButton(
-                    "ย้อนกลับ",
-                    const Color(0xFFE0E0E0),
-                    Colors.black,
-                    () => Navigator.pop(context),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            _buildButton(
-              _isLoadingAction ? "กำลังบันทึก..." : "บันทึกการแก้ไข",
-              const Color(0xFF55FF33),
-              Colors.white,
-              _isLoadingAction ? () {} : doUpdateRegisterData,
-            ),
-          ],
-        );
-      }
-    }
-  }
-
-  Widget _buildButton(String text, Color bg, Color textC, VoidCallback press) {
-    return Container(
-      width: double.infinity,
-      height: 48,
-      decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 4,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: press,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: textC,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(24),
-          ),
-        ),
-        child: Text(
-          text,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text) => Padding(
-    padding: const EdgeInsets.only(bottom: 4, top: 10),
-    child: Text(
-      text,
-      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-    ),
-  );
 }

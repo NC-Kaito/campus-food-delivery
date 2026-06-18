@@ -16,6 +16,8 @@ public interface RestaurantService {
             String username, String restaurantname, String restaurantimage, int typeid,
             double latitude, double longitude,
             LocalTime opentime, LocalTime closetime, int openday, String ownerfirstname,
-            String ownerlastname, String email, String phone
+            String ownerlastname, String email, String phone, String ownerimage
     );
+
+    void doCloseAccount(String username);
 }

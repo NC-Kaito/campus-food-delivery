@@ -265,13 +265,12 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        'textอาหารแนะนำ',
+                        'ข้อมูลร้านค้า',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       _buildLabel("ชื่อผู้ใช้ (Username)"),
                       TextFormField(
                         controller: usernameController,
@@ -369,17 +368,6 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                               enabled: _isEditable,
                             ),
                           ),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: _buildUploadBox(
-                              // 🎯 แก้ไขคำกำกับหัวข้อและจัดสรรตัวแปรสกรีนภาพถ่ายหน้าเจ้าของร้านค้าแทนที่ของเดิม
-                              "รูปหน้าเจ้าของร้านค้า",
-                              _selectedOwnerImage,
-                              ownerImageNetwork,
-                              () => pickImage(false),
-                              enabled: _isEditable,
-                            ),
-                          ),
                         ],
                       ),
 
@@ -440,7 +428,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                               height: 40,
                               decoration: BoxDecoration(
                                 color: _selectedDays[index]
-                                    ? Colors.greenAccent[400]
+                                    ? const Color.fromARGB(255, 230, 115, 0)
                                     : Colors.white,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.grey),
@@ -545,8 +533,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
           updatedCloseTime: closeTimeController.text,
           updatedSelectedDays: _selectedDays,
           updatedImage: _selectedImage,
-          updatedOwnerImage:
-              _selectedOwnerImage, // 🎯 แมปส่งรูปหน้าเจ้าของร้านตัวแปรใหม่ไปหน้าที่สอง
+          updatedOwnerImage: _selectedOwnerImage,
         ),
       ),
     );
@@ -646,7 +633,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
         GestureDetector(
           onTap: enabled ? tap : null,
           child: Container(
-            height: 80,
+            height: 230,
             width: double.infinity,
             decoration: BoxDecoration(
               color: enabled ? Colors.white : const Color(0xFFE0E0E0),

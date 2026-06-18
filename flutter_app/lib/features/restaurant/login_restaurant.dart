@@ -36,21 +36,35 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
 
   Future<void> doLogin() async {
     if (formKey.currentState!.validate()) {
-      setState(() {
-        _isLoading = true;
-      });
+      setState(() => _isLoading = true);
       try {
         final restaurant = await RestaurantService().doLoginRestaurant(
           usernameController.text,
           passwordController.text,
         );
+
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          setState(() => _isLoading = false);
           GlobalData.usernameRestaurant = usernameController.text;
+
           final status = restaurant.verificationStatus;
-          // ── ค้นหาท่อน if-else ด้านล่างนี้ในฟังก์ชัน doLogin แล้วเปลี่ยนเป็นชุดนี้ครับ ──
+
+          // --- เพิ่มส่วนตรวจสอบสถานะ 'close' ตรงนี้ ---
+          if (status == 'close') {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'บัญชีนี้ถูกปิดใช้งานแล้ว',
+                  style: TextStyle(color: Colors.black),
+                ),
+                backgroundColor: Color.fromARGB(255, 255, 221, 0),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+            return; // หยุดการทำงาน ไม่ต้องไปหน้าถัดไป
+          }
+          // ----------------------------------------
+
           if (status == 'true') {
             Navigator.pushAndRemoveUntil(
               context,
@@ -58,7 +72,6 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
               (route) => false,
             );
           } else {
-            // มั่นใจว่าส่งค่าทั้ง 2 ตัวข้ามไปหน้า WaitApprove ไม่ว่าจะ wait หรือ false
             Navigator.pushAndRemoveUntil(
               context,
               MaterialPageRoute(
@@ -73,9 +86,7 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
         }
       } catch (e) {
         if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(e.toString()),
@@ -90,7 +101,6 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
 
   @override
   Widget build(BuildContext context) {
-    // สีฟ้าเริ่มต้นที่ offset นี้ (ครึ่งล่างของ header)
     const double blueStartOffset = 290;
 
     return Scaffold(
@@ -100,9 +110,10 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
           key: formKey,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minHeight: MediaQuery.of(context).size.height, // ← เพิ่มตรงนี้
+              minHeight: MediaQuery.of(context).size.height,
             ),
             child: Stack(
+              // ✅ child เดียวของ ConstrainedBox
               children: [
                 Positioned(
                   top: blueStartOffset,
@@ -113,10 +124,8 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                     color: const Color.fromARGB(255, 219, 219, 219),
                   ),
                 ),
-
                 Column(
                   children: [
-                    // ข้อความบนพื้นขาว
                     Container(
                       color: Colors.white,
                       width: double.infinity,
@@ -142,14 +151,12 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                         ],
                       ),
                     ),
-                    // รูป banner ลอยอยู่เหนือสีฟ้า
                     Image.asset(
                       'assets/images/restaurant_banner.png',
                       width: double.infinity,
                       fit: BoxFit.fitWidth,
                     ),
                     const SizedBox(height: 30),
-                    // ── Form card ──────────────────────────────────────────
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 24),
                       child: Container(
@@ -158,12 +165,7 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                           borderRadius: BorderRadius.circular(20),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color.fromARGB(
-                                255,
-                                0,
-                                0,
-                                0,
-                              ).withOpacity(0.05),
+                              color: Colors.black.withOpacity(0.05),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),

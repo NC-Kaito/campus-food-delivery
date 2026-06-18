@@ -294,7 +294,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
         title: const Text(
           'สมัครร้านค้า',
           style: TextStyle(
-            color: Colors.black,
+            color: Color.fromARGB(255, 255, 111, 0),
             fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
@@ -314,12 +314,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'textอาหารแนะนำ',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 15),
-
                   _buildLabel("ชื่อผู้ใช้ (Username)"),
                   TextFormField(
                     controller: usernameController,
@@ -560,7 +554,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                           height: 40,
                           decoration: BoxDecoration(
                             color: _selectedDays[index]
-                                ? Colors.greenAccent[400]
+                                ? const Color.fromARGB(255, 246, 127, 0)
                                 : Colors.white,
                             shape: BoxShape.circle,
                             border: Border.all(color: Colors.grey),
@@ -658,7 +652,12 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.greenAccent[400],
+                          backgroundColor: const Color.fromARGB(
+                            255,
+                            0,
+                            255,
+                            51,
+                          ),
                           padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),

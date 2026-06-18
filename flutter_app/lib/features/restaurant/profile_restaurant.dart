@@ -6,6 +6,9 @@ import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/features/restaurant/location_restaurant.dart';
+import 'package:flutter_app/features/restaurant/login_restaurant.dart';
+import 'package:flutter_app/features/restaurant/view_agrees.dart';
+import 'package:flutter_app/features/restaurant/close_account.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:io';
@@ -286,6 +289,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
           "restaurantname": restaurantnameController.text,
           "statusopen": _isStoreOpen,
           "restaurantimage": imageUrl ?? restaurantModel?.restaurantImage,
+          "ownerimage": restaurantModel?.ownerImage ?? "",
           "latitude": _restaurantLatLng?.latitude ?? restaurantModel?.latitude,
           "longitude":
               _restaurantLatLng?.longitude ?? restaurantModel?.longitude,
@@ -390,7 +394,10 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
-        borderSide: const BorderSide(color: Colors.green, width: 1.5),
+        borderSide: const BorderSide(
+          color: Color.fromARGB(255, 21, 22, 21),
+          width: 1.5,
+        ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
@@ -436,6 +443,31 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
           items: displayItems
               .map((name) => DropdownMenuItem(value: name, child: Text(name)))
               .toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuTile({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 26),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+            ),
+          ],
         ),
       ),
     );
@@ -540,11 +572,21 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
                                         content: Text(
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                           newStatus
                                               ? 'เปิดร้านสำเร็จ'
                                               : 'ปิดร้านสำเร็จ',
                                         ),
-                                        backgroundColor: Colors.green,
+                                        backgroundColor: const Color.fromARGB(
+                                          255,
+                                          0,
+                                          255,
+                                          8,
+                                        ),
                                         duration: const Duration(seconds: 1),
                                       ),
                                     );
@@ -575,7 +617,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 height: 35,
                                 decoration: BoxDecoration(
                                   color: _isStoreOpen
-                                      ? Colors.greenAccent[400]
+                                      ? const Color.fromARGB(255, 77, 255, 0)
                                       : Colors.grey[400],
                                   borderRadius: BorderRadius.circular(20),
                                 ),
@@ -619,7 +661,19 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: const Text(
+                            "ข้อมูลร้านค้า",
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
 
                         // ══ Section 1: ข้อมูลร้านค้า ════════════════════════
                         Container(
@@ -632,15 +686,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                "ข้อมูลร้านค้า",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-
                               _buildLabel("ชื่อผู้ใช้ (Username)"),
                               TextFormField(
                                 controller: usernameController,
@@ -671,18 +716,31 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                               ),
 
                               _buildLabel("ชื่อร้านค้า (Restaurant Name)"),
+
                               TextFormField(
                                 controller: restaurantnameController,
-                                enabled:
-                                    false, // บล็อกฟิลด์ไม่ให้คีย์ตามบรีฟโปรไฟล์
-                                decoration: _inputDecoration(enabled: false),
+                                enabled: _isEditable,
+                                validator: _isEditable
+                                    ? (v) {
+                                        if (v == null || v.trim().isEmpty)
+                                          return "กรุณากรอกชื่อร้านค้า";
+                                        if (v.length < 8)
+                                          return "ความยาว 8 ตัวอักษรขึ้นไป";
+                                        return null;
+                                      }
+                                    : null,
+                                decoration: _inputDecoration(
+                                  enabled: _isEditable,
+                                ),
                               ),
 
                               _buildLabel("ประเภทร้านค้า (Restaurant Type)"),
                               _buildDropdown(),
 
+                              const SizedBox(height: 3),
+
                               _buildLabel("ปักหมุดที่อยู่ร้านค้า"),
-                              InkWell(
+                              GestureDetector(
                                 onTap: _isEditable
                                     ? () async {
                                         final LatLng? pickedLocation =
@@ -696,17 +754,16 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                                     ),
                                               ),
                                             );
-
                                         if (pickedLocation != null) {
-                                          setState(() {
-                                            _restaurantLatLng = pickedLocation;
-                                          });
+                                          setState(
+                                            () => _restaurantLatLng =
+                                                pickedLocation,
+                                          );
                                         }
                                       }
                                     : null,
-                                borderRadius: BorderRadius.circular(16),
                                 child: Container(
-                                  height: 160,
+                                  height: 200,
                                   width: double.infinity,
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(16),
@@ -717,43 +774,32 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(14),
-                                    child: Stack(
-                                      children: [
-                                        GoogleMap(
-                                          initialCameraPosition: CameraPosition(
-                                            target:
-                                                _restaurantLatLng ??
-                                                const LatLng(18.8920, 99.0145),
-                                            zoom: 15.5,
-                                          ),
-                                          zoomControlsEnabled: false,
-                                          zoomGesturesEnabled: false,
-                                          scrollGesturesEnabled: false,
-                                          rotateGesturesEnabled: false,
-                                          tiltGesturesEnabled: false,
-                                          markers: _restaurantLatLng == null
-                                              ? {}
-                                              : {
-                                                  Marker(
-                                                    markerId: const MarkerId(
-                                                      'store_mini_preview_pos',
-                                                    ),
-                                                    position:
-                                                        _restaurantLatLng!,
-                                                  ),
-                                                },
-                                        ),
-                                        Positioned.fill(
-                                          child: Container(
-                                            color: Colors.transparent,
-                                          ),
-                                        ),
-                                      ],
+                                    child: GoogleMap(
+                                      initialCameraPosition: CameraPosition(
+                                        target:
+                                            _restaurantLatLng ??
+                                            const LatLng(18.8920, 99.0145),
+                                        zoom: 15.5,
+                                      ),
+                                      zoomControlsEnabled: false,
+                                      zoomGesturesEnabled: false,
+                                      scrollGesturesEnabled: false,
+                                      rotateGesturesEnabled: false,
+                                      tiltGesturesEnabled: false,
+                                      markers: _restaurantLatLng == null
+                                          ? {}
+                                          : {
+                                              Marker(
+                                                markerId: const MarkerId(
+                                                  'store_pos',
+                                                ),
+                                                position: _restaurantLatLng!,
+                                              ),
+                                            },
                                     ),
                                   ),
                                 ),
                               ),
-
                               const SizedBox(height: 10),
                               Row(
                                 children: [
@@ -838,7 +884,12 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                       height: 40,
                                       decoration: BoxDecoration(
                                         color: _selectedDays[i]
-                                            ? Colors.greenAccent[400]
+                                            ? const Color.fromARGB(
+                                                255,
+                                                230,
+                                                115,
+                                                0,
+                                              )
                                             : Colors.white,
                                         shape: BoxShape.circle,
                                         border: Border.all(
@@ -864,7 +915,19 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 30),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: const Text(
+                            "ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน",
+                            style: TextStyle(
+                              color: Colors.orange,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 15),
 
                         // ══ Section 2: ข้อมูลเจ้าของร้าน ════════════════════
                         Container(
@@ -877,15 +940,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
-                                "ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-
                               _buildLabel("ชื่อ (FirstName)"),
                               TextFormField(
                                 controller: ownerfirstnameController,
@@ -1032,7 +1086,12 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                               : doUpdateRestaurant,
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor:
-                                                Colors.greenAccent[400],
+                                                const Color.fromARGB(
+                                                  255,
+                                                  77,
+                                                  255,
+                                                  0,
+                                                ),
                                             foregroundColor: Colors.white,
                                             elevation: 5,
                                             shape: RoundedRectangleBorder(
@@ -1046,7 +1105,12 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                                   width: 20,
                                                   child:
                                                       CircularProgressIndicator(
-                                                        color: Colors.white,
+                                                        color: Color.fromARGB(
+                                                          255,
+                                                          77,
+                                                          255,
+                                                          0,
+                                                        ),
                                                         strokeWidth: 2,
                                                       ),
                                                 )
@@ -1069,7 +1133,12 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                     onPressed: () =>
                                         setState(() => _isEditable = true),
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.greenAccent[400],
+                                      backgroundColor: const Color.fromARGB(
+                                        255,
+                                        77,
+                                        255,
+                                        0,
+                                      ),
                                       foregroundColor: Colors.white,
                                       elevation: 5,
                                       shape: RoundedRectangleBorder(
@@ -1086,6 +1155,217 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   ),
                                 ),
                         ),
+
+                        // ── เมนูเพิ่มเติม (ซ่อนตอนแก้ไข) ────────────────────
+                        if (!_isEditable)
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey.shade200),
+                            ),
+                            child: Column(
+                              children: [
+                                // ข้อตกลงและเงื่อนไขการยินยอม
+                                _buildMenuTile(
+                                  icon: Icons.article_outlined,
+                                  iconColor: Colors.orange,
+                                  label: 'ข้อตกลงและเงื่อนไขการยินยอม',
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            const ViewAgrees(),
+                                      ),
+                                    );
+                                  },
+                                ),
+                                Divider(
+                                  height: 1,
+                                  color: Colors.grey.shade300,
+                                  indent: 16,
+                                  endIndent: 16,
+                                ),
+
+                                // ปิดบัญชีผู้ใช้
+                                _buildMenuTile(
+                                  icon: Icons.cancel_outlined,
+                                  iconColor: Colors.red,
+                                  label: 'ปิดบัญชีผู้ใช้',
+                                  // แก้จากเดิมที่เรียกแบบไม่มี parameter:
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => CloseAccount(
+                                          restaurant: restaurantModel!,
+                                        ), // ใส่ตัวแปร restaurantModel เข้าไป
+                                      ),
+                                    );
+                                  },
+                                ),
+                                Divider(
+                                  height: 1,
+                                  color: Colors.grey.shade300,
+                                  indent: 16,
+                                  endIndent: 16,
+                                ),
+
+                                // ออกจากระบบ
+                                _buildMenuTile(
+                                  icon: Icons.logout,
+                                  iconColor: Colors.orange,
+                                  label: 'ออกจากระบบ',
+                                  onTap: () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: context,
+                                      barrierColor: Colors.black.withOpacity(
+                                        0.4,
+                                      ),
+                                      builder: (context) => Dialog(
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            16,
+                                          ),
+                                        ),
+                                        backgroundColor: Colors.white,
+                                        child: Padding(
+                                          padding: const EdgeInsets.all(28),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 64,
+                                                height: 64,
+                                                decoration: const BoxDecoration(
+                                                  color: Color(0xFFFFEBEE),
+                                                  shape: BoxShape.circle,
+                                                ),
+                                                child: const Icon(
+                                                  Icons.logout_rounded,
+                                                  color: Color(0xFFE53935),
+                                                  size: 32,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 20),
+                                              const Text(
+                                                'ออกจากระบบ',
+                                                style: TextStyle(
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Color(0xFF1A1A2E),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 10),
+                                              const Text(
+                                                'คุณต้องการออกจากระบบใช่หรือไม่?',
+                                                textAlign: TextAlign.center,
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  color: Colors.black,
+                                                  height: 1.5,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 28),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: OutlinedButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            false,
+                                                          ),
+                                                      style: OutlinedButton.styleFrom(
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 14,
+                                                            ),
+                                                        side: BorderSide(
+                                                          color: Colors
+                                                              .grey
+                                                              .shade300,
+                                                        ),
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                10,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                      child: Text(
+                                                        'ยกเลิก',
+                                                        style: TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color:
+                                                              Colors.grey[700],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 12),
+                                                  Expanded(
+                                                    child: ElevatedButton(
+                                                      onPressed: () =>
+                                                          Navigator.pop(
+                                                            context,
+                                                            true,
+                                                          ),
+                                                      style: ElevatedButton.styleFrom(
+                                                        backgroundColor:
+                                                            const Color(
+                                                              0xFFE53935,
+                                                            ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 14,
+                                                            ),
+                                                        elevation: 0,
+                                                        shape: RoundedRectangleBorder(
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                10,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                      child: const Text(
+                                                        'ออกจากระบบ',
+                                                        style: TextStyle(
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.w600,
+                                                          color: Colors.white,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    );
+
+                                    if (confirm == true && mounted) {
+                                      Navigator.pushAndRemoveUntil(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              const LoginRestaurant(),
+                                        ),
+                                        (route) => false,
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
