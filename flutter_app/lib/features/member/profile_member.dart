@@ -5,6 +5,7 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/features/member/home_member.dart';
+import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart'; // 🎯 นำเข้า NavbarMember ส่วนกลาง
 import 'package:flutter_app/global_data.dart';
 import 'dart:io';
@@ -244,7 +245,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                         child: Column(
                           children: [
                             const SizedBox(height: 10),
-                            // ─── ส่วนรูปภาพโปรไฟล์วงกลมแบบสแต็ก ───
+                            // ─── ส่วนรูปภาพโปรไฟล์วงกลมแบบสैक्ट ───
                             SizedBox(
                               width: 110,
                               height: 110,
@@ -337,24 +338,18 @@ class _ProfileMemberState extends State<ProfileMember> {
 
                       const SizedBox(height: 25),
 
-                      // ─── ฟอร์มกรอกข้อมูลสากล (ล็อกเบรกตายตัวตามสิทธิ์ร้านค้า) ───
+                      // ─── ฟอร์มกรอกข้อมูลสากล ───
                       _buildInputLabel("ชื่อผู้ใช้ (Username)"),
-                      _buildCustomTextField(
-                        usernameController,
-                        enabled: false,
-                      ), // ปิดตายถาวรเพราะเป็นคีย์หลักไอดีฐานข้อมูล
+                      _buildCustomTextField(usernameController, enabled: false),
 
                       _buildInputLabel("ชื่อจริง (Firstname)"),
                       _buildCustomTextField(
                         firstnameController,
                         enabled: false,
-                      ), // ปิดตายถาวรระบบหลังบ้านล็อกไว้
+                      ),
 
                       _buildInputLabel("นามสกุล (Lastname)"),
-                      _buildCustomTextField(
-                        lastnameController,
-                        enabled: false,
-                      ), // ปิดตายถาวรระบบหลังบ้านล็อกไว้
+                      _buildCustomTextField(lastnameController, enabled: false),
 
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16.0),
@@ -373,20 +368,17 @@ class _ProfileMemberState extends State<ProfileMember> {
                       ),
 
                       _buildInputLabel("อีเมลสถาบัน (Email)"),
-                      _buildCustomTextField(
-                        emailController,
-                        enabled: false,
-                      ), // ล็อกอ่านอย่างเดียวห้ามแก้ไขเปลี่ยนไอดีหลัก
+                      _buildCustomTextField(emailController, enabled: false),
 
                       _buildInputLabel("เบอร์โทรศัพท์จัดส่งสินค้า (Phone)"),
                       _buildCustomTextField(
                         phoneController,
                         enabled: _isEditable,
-                      ), // 🎯 ปลดล็อก/ล็อก ตามสถานะ _isEditable ของตัวแปรกลุ่มหลัก
+                      ),
 
                       const SizedBox(height: 40),
 
-                      // ─── 🎯 3. ส่วนควบคุมด้านล่างสลับสวิตช์อัตโนมัติแบบระบบร้านค้าต้นแบบ ───
+                      // ─── 🎯 ส่วนควบคุมสลับสถานะ และปุ่มออกจากระบบ ───
                       _isEditable
                           ? Row(
                               children: [
@@ -408,7 +400,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                           _isEditable = false;
                                           _selectedImage = null;
                                         });
-                                        fetchMemberData(); // รีดึงกวาดค่าเดิมกลับมาทับ Controller ทันทีป้องกันข้อมูลค้างเพี้ยน
+                                        fetchMemberData();
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(
@@ -454,7 +446,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(
                                           0xFF64F02D,
-                                        ), // เขียวสปอร์ตตัวใหม่
+                                        ),
                                         foregroundColor: Colors.white,
                                         elevation: 0,
                                         shape: RoundedRectangleBorder(
@@ -485,56 +477,227 @@ class _ProfileMemberState extends State<ProfileMember> {
                                 ),
                               ],
                             )
-                          : Container(
-                              width: double.infinity,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF64F02D,
-                                    ).withOpacity(0.2),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 5),
+                          : Column(
+                              children: [
+                                Container(
+                                  width: double.infinity,
+                                  height: 50,
+                                  decoration: BoxDecoration(
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(
+                                          0xFF64F02D,
+                                        ).withOpacity(0.2),
+                                        blurRadius: 12,
+                                        offset: const Offset(0, 5),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  setState(() {
-                                    _isEditable = true;
-                                  });
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(
-                                    0xFF64F02D,
-                                  ), // สวมสีเขียวสปอร์ตขวัญใจไรเดอร์แม่โจ้
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.edit_note_rounded,
-                                      color: Colors.white,
-                                      size: 22,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      "แก้ไขข้อมูลส่วนตัว",
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        _isEditable = true;
+                                      });
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF64F02D),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(14),
                                       ),
                                     ),
-                                  ],
+                                    child: const Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.edit_note_rounded,
+                                          color: Colors.white,
+                                          size: 22,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          "แก้ไขข้อมูลส่วนตัว",
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+                                // ── 🎯 ปุ่มออกจากระบบที่จะแสดงผลเมื่อไม่ได้อยู่ในโหมดแก้ไข ──
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color.fromARGB(
+                                        255,
+                                        206,
+                                        206,
+                                        206,
+                                      ),
+                                    ),
+                                  ),
+                                  child: _buildMenuTile(
+                                    icon: Icons.logout,
+                                    iconColor: Colors.orange,
+                                    label: 'ออกจากระบบ',
+                                    onTap: () async {
+                                      final confirm = await showDialog<bool>(
+                                        context: context,
+                                        barrierColor: Colors.black.withOpacity(
+                                          0.4,
+                                        ),
+                                        builder: (context) => Dialog(
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              16,
+                                            ),
+                                          ),
+                                          backgroundColor: Colors.white,
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(28),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  width: 64,
+                                                  height: 64,
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        color: Color(
+                                                          0xFFFFEBEE,
+                                                        ),
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                  child: const Icon(
+                                                    Icons.logout_rounded,
+                                                    color: Color(0xFFE53935),
+                                                    size: 32,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 20),
+                                                const Text(
+                                                  'ออกจากระบบ',
+                                                  style: TextStyle(
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF1A1A2E),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 10),
+                                                const Text(
+                                                  'คุณต้องการออกจากระบบใช่หรือไม่?',
+                                                  textAlign: TextAlign.center,
+                                                  style: TextStyle(
+                                                    fontSize: 16,
+                                                    color: Colors.black,
+                                                    height: 1.5,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 28),
+                                                Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: OutlinedButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                              context,
+                                                              false,
+                                                            ),
+                                                        style: OutlinedButton.styleFrom(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                vertical: 14,
+                                                              ),
+                                                          side: BorderSide(
+                                                            color: Colors
+                                                                .grey
+                                                                .shade300,
+                                                          ),
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  10,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                        child: Text(
+                                                          'ยกเลิก',
+                                                          style: TextStyle(
+                                                            fontSize: 16,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: Colors
+                                                                .grey[700],
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Expanded(
+                                                      child: ElevatedButton(
+                                                        onPressed: () =>
+                                                            Navigator.pop(
+                                                              context,
+                                                              true,
+                                                            ),
+                                                        style: ElevatedButton.styleFrom(
+                                                          backgroundColor:
+                                                              const Color(
+                                                                0xFFE53935,
+                                                              ),
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                vertical: 14,
+                                                              ),
+                                                          elevation: 0,
+                                                          shape: RoundedRectangleBorder(
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  10,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                        child: const Text(
+                                                          'ออกจากระบบ',
+                                                          style: TextStyle(
+                                                            fontSize: 16,
+                                                            fontWeight:
+                                                                FontWeight.w600,
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                      );
+
+                                      if (confirm == true && mounted) {
+                                        Navigator.pushAndRemoveUntil(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const LoginMember(),
+                                          ),
+                                          (route) => false,
+                                        );
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
                             ),
                       const SizedBox(height: 30),
                     ],
@@ -583,11 +746,7 @@ class _ProfileMemberState extends State<ProfileMember> {
         ),
         decoration: InputDecoration(
           filled: true,
-          fillColor: enabled
-              ? Colors.white
-              : const Color(
-                  0xFFEEEEEE,
-                ), // พ่นสีเทากลืนฟิลด์ถ้ายึดสถานะปิดอ่านอย่างเดียว
+          fillColor: enabled ? Colors.white : const Color(0xFFEEEEEE),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 14,
@@ -608,6 +767,32 @@ class _ProfileMemberState extends State<ProfileMember> {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: Color(0xFF64F02D), width: 1.5),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ─── 🎯 ฟังก์ชันสำหรับสร้างแถบเมนูรายการออกจากระบบให้ตรงตามแมตช์หน้า ProfileRestaurant ───
+  Widget _buildMenuTile({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 26),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 15, color: Colors.black87),
+            ),
+          ],
         ),
       ),
     );

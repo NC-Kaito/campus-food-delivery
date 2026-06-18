@@ -293,10 +293,9 @@ class _ListMenuUserState extends State<ListMenuUser>
                                 ),
                                 child: TabBar(
                                   controller: _tabController!,
-                                  isScrollable: _typeMenus.length > 3,
-                                  tabAlignment: _typeMenus.length > 3
-                                      ? TabAlignment.start
-                                      : TabAlignment.fill,
+                                  isScrollable: true, // 🎯 ให้เลื่อนซ้าย-ขวาได้
+                                  tabAlignment:
+                                      TabAlignment.start, // 🎯 เริ่มจากซ้าย
                                   labelColor: Colors.black,
                                   unselectedLabelColor: Colors.black54,
                                   indicatorColor: Colors.black,
@@ -310,6 +309,11 @@ class _ListMenuUserState extends State<ListMenuUser>
                                   unselectedLabelStyle: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
+                                  ),
+                                  // 🎯 เพิ่ม labelPadding เพื่อให้ช่องว่างสวยงามและปรับความกว้าง tab ให้เห็น 3 อัน
+                                  labelPadding: EdgeInsets.symmetric(
+                                    horizontal:
+                                        MediaQuery.of(context).size.width / 12,
                                   ),
                                   tabs: _typeMenus.isEmpty
                                       ? [const Tab(text: "ไม่มีประเภท")]
@@ -351,88 +355,89 @@ class _ListMenuUserState extends State<ListMenuUser>
 
                         return ListView.builder(
                           itemCount: currentMenus.length,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                           itemBuilder: (context, index) {
                             final menu = currentMenus[index];
-                            String? rawMenuImage =
+                            final rawMenuImage =
                                 menu.menuImage ?? (menu as dynamic).imageUrl;
-                            String finalMenuUrl = _getFinalImageUrl(
+                            final finalMenuUrl = _getFinalImageUrl(
                               rawMenuImage,
                             );
 
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 15,
-                                vertical: 8,
+                            // 🎯 ปรับแต่งตามรูปที่ส่งมา: การ์ดสีอ่อนและปุ่มบวก
+                            // 🎯 ปรับแต่งตามรูปที่ส่งมา: การ์ดสีอ่อนและปุ่มบวก
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(
+                                  0xFFF0F4E8,
+                                ), // สีพื้นหลังตามรูป
+                                borderRadius: BorderRadius.circular(16),
                               ),
-                              elevation: 2,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: InkWell(
-                                onTap: _showLoginWarningDialog,
-                                borderRadius: BorderRadius.circular(15),
-                                child: ListTile(
-                                  contentPadding: const EdgeInsets.all(12),
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: finalMenuUrl.isNotEmpty
-                                        ? Image.network(
-                                            Uri.encodeFull(finalMenuUrl),
-                                            width: 70,
-                                            height: 70,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return _buildPlaceholderIcon();
-                                                },
-                                          )
-                                        : _buildPlaceholderIcon(),
-                                  ),
-                                  title: Text(
-                                    menu.menuName ?? "ไม่มีชื่อเมนู",
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 17,
+                              // 🎯 เปลี่ยนจาก ListTile มาใช้ Padding + Row เพื่อปลดล็อคขนาดรูป
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Row(
+                                  children: [
+                                    // 1. รูปภาพ
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: SizedBox(
+                                        width:
+                                            110, // ได้ขนาด 110x110 แบบไม่โดนบีบแล้ว
+                                        height: 110,
+                                        child: finalMenuUrl.isNotEmpty
+                                            ? Image.network(
+                                                Uri.encodeFull(finalMenuUrl),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (_, __, ___) =>
+                                                    _buildPlaceholderIcon(),
+                                              )
+                                            : _buildPlaceholderIcon(),
+                                      ),
                                     ),
-                                  ),
-                                  subtitle: Padding(
-                                    padding: const EdgeInsets.only(top: 4.0),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (menu.description != null &&
-                                            menu.description!.isNotEmpty)
+                                    const SizedBox(
+                                      width: 15,
+                                    ), // ระยะห่างระหว่างรูปกับข้อความ
+                                    // 2. ข้อความชื่อและราคา
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
                                           Text(
-                                            menu.description!,
-                                            style: TextStyle(
-                                              color: Colors.grey[600],
-                                              fontSize: 13,
+                                            menu.menuName ?? "ไม่มีชื่อเมนู",
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
                                             ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          "ราคา ${menu.price?.toStringAsFixed(0) ?? '0'} บาท",
-                                          style: const TextStyle(
-                                            color: Colors.green,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            "ราคา ${menu.price?.toStringAsFixed(0) ?? '0'} บาท",
+                                            style: const TextStyle(
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 14,
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                  trailing: IconButton(
-                                    onPressed: _showLoginWarningDialog,
-                                    icon: const Icon(
-                                      Icons.add_circle,
-                                      color: Colors.green,
-                                      size: 36,
+
+                                    // 3. ปุ่มบวก
+                                    IconButton(
+                                      onPressed: _showLoginWarningDialog,
+                                      icon: const Icon(
+                                        Icons.add_circle,
+                                        color: Color(0xFF4CAF50),
+                                        size: 36,
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
                               ),
                             );
@@ -447,12 +452,11 @@ class _ListMenuUserState extends State<ListMenuUser>
     );
   }
 
+  // 🎯 ส่วนที่แก้ไข Widget Placeholder ให้เหมือนหน้า list_menu_restaurant
   Widget _buildPlaceholderIcon() {
     return Container(
-      width: 70,
-      height: 70,
-      color: Colors.orange.shade50,
-      child: const Icon(Icons.fastfood, size: 32, color: Colors.orange),
+      color: Colors.grey[200],
+      child: const Icon(Icons.fastfood, color: Colors.grey, size: 36),
     );
   }
 }

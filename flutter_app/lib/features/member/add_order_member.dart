@@ -103,177 +103,275 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
     final groupedAddons = _groupAddons();
 
+    final String? description =
+        (widget.menuModel.description?.trim().isNotEmpty == true)
+        ? widget.menuModel.description
+        : null;
+
     return Scaffold(
       backgroundColor: Colors.white,
+      extendBodyBehindAppBar: true, // 🎯 ให้ Body ทะลุขึ้นไปหลัง AppBar
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent, // 🎯 ปรับให้โปร่งใสเพื่อโชว์ภาพ
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.orange),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.shopping_cart_outlined,
-              color: Colors.orange,
-              size: 28,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.black38,
+            child: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
-            onPressed: () {},
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.account_circle_outlined,
-              color: Colors.orange,
-              size: 28,
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+            child: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.shopping_cart_outlined,
+                  color: Colors.orange,
+                  size: 22,
+                ),
+                onPressed: () {},
+              ),
             ),
-            onPressed: () {},
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+            child: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.account_circle_outlined,
+                  color: Colors.orange,
+                  size: 22,
+                ),
+                onPressed: () {},
+              ),
+            ),
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
+          : Stack(
+              children: [
+                // 🎯 1. ภาพพื้นหลังเต็มความกว้าง (ถอดแบบ ViewMenu)
+                SizedBox(
+                  width: double.infinity,
+                  height: 400,
+                  child: finalMenuUrl.isNotEmpty
+                      ? Image.network(
+                          Uri.encodeFull(finalMenuUrl),
+                          width: double.infinity,
+                          height: 400,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _buildPlaceholderBanner(),
+                        )
+                      : _buildPlaceholderBanner(),
+                ),
 
-                    Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: finalMenuUrl.isNotEmpty
-                            ? Image.network(
-                                Uri.encodeFull(finalMenuUrl),
-                                width: 260,
-                                height: 260,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildPlaceholderIcon(),
-                              )
-                            : _buildPlaceholderIcon(),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.menuModel.menuName ?? "ไม่มีชื่อเมนู",
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
+                // 🎯 2. ส่วนเนื้อหาเลื่อนได้ (ถอดแบบ ViewMenu)
+                SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 350), // ดันให้เห็นรูปภาพด้านบน
+                      Container(
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(28),
+                            topRight: Radius.circular(28),
                           ),
                         ),
-                        Text(
-                          "฿$basePrice",
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    Text(
-                      widget.menuModel.description ??
-                          "ไม่มีคำอธิบายสำหรับรายการเมนูนี้",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // =========================================================
-                    // ส่วนยิงวาดกลุ่มข้อมูล Add-on แบบ Dynamic
-                    // =========================================================
-                    if (groupedAddons.isNotEmpty) ...[
-                      ...groupedAddons.entries.map((entry) {
-                        String groupName = entry.key;
-                        List<MenuAddonDetailModel> items = entry.value;
-
-                        bool isRequired =
-                            items.first.menuAddonGroup?.isRequired ?? false;
-                        int maxSelect =
-                            items.first.menuAddonGroup?.maxSelect ?? 1;
-
-                        return Column(
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  groupName,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                Expanded(
+                                  child: Text(
+                                    widget.menuModel.menuName ??
+                                        "ไม่มีชื่อเมนู",
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 Text(
-                                  isRequired
-                                      ? "จำเป็น (สูงสุด $maxSelect)"
-                                      : "ไม่จำเป็น (สูงสุด $maxSelect)",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isRequired
-                                        ? Colors.orange[400]
-                                        : Colors.grey[500],
+                                  "฿$basePrice",
+                                  style: const TextStyle(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            ...items.map(
-                              (addonDetail) =>
-                                  _buildAddonItemOption(addonDetail, maxSelect),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-                        );
-                      }),
-                    ],
 
-                    const Text(
-                      "ระบุเพิ่มเติม",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                            if (description != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+
+                            const SizedBox(height: 24),
+
+                            // =========================================================
+                            // ส่วนยิงวาดกลุ่มข้อมูล Add-on แบบ Dynamic
+                            // 🎯 ปรับแต่งเส้นสีเขียวด้านข้างให้เหมือน ViewMenu
+                            // =========================================================
+                            if (groupedAddons.isNotEmpty) ...[
+                              ...groupedAddons.entries.toList().asMap().entries.map((
+                                mapEntry,
+                              ) {
+                                final isFirstGroup = mapEntry.key == 0;
+                                final entry = mapEntry.value;
+
+                                String groupName = entry.key;
+                                List<MenuAddonDetailModel> items = entry.value;
+
+                                bool isRequired =
+                                    items.first.menuAddonGroup?.isRequired ??
+                                    false;
+                                int maxSelect =
+                                    items.first.menuAddonGroup?.maxSelect ?? 1;
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!isFirstGroup)
+                                      Divider(
+                                        height: 24,
+                                        thickness: 1,
+                                        color: Colors.grey[300],
+                                      )
+                                    else
+                                      const SizedBox(height: 8),
+
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          groupName,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          isRequired
+                                              ? "จำเป็น (สูงสุด $maxSelect)"
+                                              : "ไม่จำเป็น (สูงสุด $maxSelect)",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isRequired
+                                                ? Colors.orange[400]
+                                                : Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    // 🎯 IntrinsicHeight + Row ให้เส้นเขียวยาวคลุมทุก item ในกลุ่ม
+                                    IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Container(
+                                            width: 2,
+                                            color: const Color(0xFF76FF03),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              children: items
+                                                  .map(
+                                                    (addonDetail) =>
+                                                        _buildAddonItemOption(
+                                                          addonDetail,
+                                                          maxSelect,
+                                                        ),
+                                                  )
+                                                  .toList(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                );
+                              }),
+                            ],
+
+                            const SizedBox(height: 10),
+                            const Text(
+                              "ระบุเพิ่มเติม",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _noteController,
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                hintText:
+                                    "ตัวอย่างเช่น ไม่เอาผัก, เผ็ดน้อย อื่นๆ",
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                                contentPadding: const EdgeInsets.all(16),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(
+                              height: 40,
+                            ), // พื้นที่เผื่อแผงล่างสุด
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _noteController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        hintText: "ตัวอย่างเช่น ไม่เอาผัก, เผ็ดน้อย อื่นๆ",
-                        hintStyle: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                        contentPadding: const EdgeInsets.all(16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
       bottomNavigationBar: Container(
         padding: const EdgeInsets.only(
@@ -506,12 +604,13 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     );
   }
 
-  Widget _buildPlaceholderIcon() {
+  // 🎯 ใช้ Banner กว้างเต็มจอสำหรับตอนไม่มีรูป
+  Widget _buildPlaceholderBanner() {
     return Container(
-      width: 260,
-      height: 260,
+      width: double.infinity,
+      height: 400,
       color: Colors.orange.shade50,
-      child: const Icon(Icons.fastfood, size: 64, color: Colors.orange),
+      child: const Icon(Icons.fastfood, size: 80, color: Colors.orange),
     );
   }
 }

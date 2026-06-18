@@ -134,37 +134,21 @@ class _HomeUserState extends State<HomeUser> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(
-        0xFFF9FBF7,
-      ), // สีเบสเขียวอ่อนๆ สบายตาแมตช์ธีมมแม่โจ้
-      appBar: AppBar(
-        automaticallyImplyLeading:
-            false, // 🎯 ปลดลบล้างปุ่มลูกศรย้อนกลับบนซ้ายออกเรียบร้อยครับ!
-        title: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.restaurant_rounded, color: Colors.white, size: 22),
-            SizedBox(width: 8),
-            Text(
-              "Campus Food Delivery",
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
-                fontSize: 20,
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: const Color(
-          0xFF64F02D,
-        ), // 🎯 1. เปลี่ยนสีพื้นหลังแอปบาร์เป็นเขียวใหม่ #64F02D
-        centerTitle: true,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
+      backgroundColor: const Color(0xFFF9FBF7),
+
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            width: double.infinity,
+            height: 150, // ปรับความสูงตามความเหมาะสม
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/member_home.png'),
+                fit: BoxFit.cover, // ปรับให้ภาพเต็มพื้นที่
+              ),
+            ),
+          ),
           // 🛑 ส่วนบน: แผงเสิร์ชข้อมูลดีไซน์สวยหรู
           Container(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),

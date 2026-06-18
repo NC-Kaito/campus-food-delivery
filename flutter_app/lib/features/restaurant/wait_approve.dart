@@ -1,3 +1,4 @@
+// features/restaurant/wait_approve.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/global_data.dart';
@@ -21,7 +22,7 @@ class WaitApprove extends StatefulWidget {
 class _WaitApproveState extends State<WaitApprove> {
   RestaurantModel? get restaurantModel => null;
 
-  // ฟังก์ชันออกจากระบบ: ทำงานเหมือนกันทุกสถานะ
+  // ฟังก์ชันออกจากระบบ
   void _handleLogout() {
     GlobalData.usernameRestaurant = ""; // ล้างค่าเซสชัน
 
@@ -36,169 +37,180 @@ class _WaitApproveState extends State<WaitApprove> {
 
   @override
   Widget build(BuildContext context) {
-    // เช็กสถานะเพื่อเปลี่ยนหน้าตา UI
     final bool isRejected = widget.verificationStatus == 'false';
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF4F7F6), // พื้นหลังสีสว่างสบายตา
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
             child: Padding(
               padding: const EdgeInsets.symmetric(
-                horizontal: 32.0,
-                vertical: 24.0,
+                horizontal: 24.0,
+                vertical: 32.0,
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // ── หัวข้อ สมัครร้านค้า ──
-                  const Text(
-                    'สมัครร้านค้า',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFFF8C00),
+                  // ─── โลโก้หรือไอคอนด้านบน ───
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: isRejected
+                          ? Colors.red.withOpacity(0.1)
+                          : Colors.orange.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isRejected
+                          ? Icons.error_outline_rounded
+                          : Icons.hourglass_top_rounded,
+                      size: 48,
+                      color: isRejected ? Colors.redAccent : Colors.orange,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
 
-                  // ── ผลการตรวจสอบข้อมูล ──
-                  const Text(
-                    'ผลการตรวจสอบข้อมูล',
+                  // ─── ข้อความสถานะหลัก ───
+                  Text(
+                    isRejected ? 'ไม่ผ่านการอนุมัติ' : 'อยู่ระหว่างการตรวจสอบ',
                     style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w900,
+                      color: isRejected ? Colors.redAccent : Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 8),
-
-                  // ── ข้อความสถานะ ──
                   Text(
-                    isRejected ? 'ไม่ผ่าน' : 'กรุณารอเจ้าหน้าที่ตรวจสอบข้อมูล',
+                    isRejected
+                        ? 'ข้อมูลของคุณยังไม่ผ่านเกณฑ์ โปรดแก้ไขแล้วส่งใหม่'
+                        : 'ทีมงานกำลังเร่งตรวจสอบข้อมูลร้านค้าของคุณ\nอดใจรออีกนิดนะครับ 😊',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: isRejected ? Colors.red : const Color(0xFFD4AF37),
+                      fontSize: 15,
+                      color: Colors.grey.shade600,
+                      height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // ── กล่องแสดงเนื้อหาตรงกลาง ──
+                  // ─── การ์ดแสดงผลเนื้อหา (Dynamic ตามสถานะ) ───
                   Container(
                     width: double.infinity,
-                    height: 200,
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: isRejected
-                          ? Colors.white
-                          : const Color(0xFFF5F5F5),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.black, width: 1),
-                    ),
-                    child: isRejected
-                        ? Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Align(
-                              alignment: Alignment.topLeft,
-                              child: Text(
-                                widget.notApproveDetail ?? 'ไม่ระบุหมายเหตุ',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
-                          )
-                        : ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: Image.asset(
-                              'assets/images/waitApprove.png',
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // ── เวลาทำการ ──
-                  const Text(
-                    'เวลาทำการ จันทร์-ศุกร์ 08:00-16:00',
-                    style: TextStyle(fontSize: 12, color: Colors.black54),
-                  ),
-                  const SizedBox(height: 48),
-
-                  // ── ปุ่ม ดูข้อมูล (เปิดให้กดไปหน้า UpdateRegister ได้เสมอ) ──
-                  Container(
-                    width: double.infinity,
-                    height: 50,
-                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 4,
-                          offset: const Offset(0, 4),
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
+                    child: isRejected
+                        ? _buildRejectedContent()
+                        : _buildWaitingContent(),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // ─── เวลาทำการ (ทำเป็น Badge เล็กๆ น่ารัก) ───
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 16,
+                          color: Colors.grey.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'เวลาทำการ จ.-ศ. 08:00 - 16:00 น.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 40),
+
+                  // ─── ปุ่ม ดำเนินการ (ดูข้อมูล / แก้ไข) ───
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
                     child: ElevatedButton(
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (context) => UpdateRegisterFields(
-                              // ✅ ส่งแค่นี้พอครับ เส้นสีแดงจะหายทันที
                               verificationStatus: widget.verificationStatus,
                             ),
                           ),
                         );
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF76FF03),
-                        foregroundColor: const Color(0xFF1B5E20),
+                        backgroundColor: const Color(0xFF76FF03), // เขียวแบรนด์
+                        foregroundColor: Colors.black,
+                        elevation: 4,
+                        shadowColor: const Color(0xFF76FF03).withOpacity(0.4),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        elevation: 0,
                       ),
-                      child: const Text(
-                        'ดูข้อมูล',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isRejected
+                                ? Icons.edit_document
+                                : Icons.remove_red_eye_rounded,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            isRejected ? 'แก้ไขข้อมูล' : 'ดูข้อมูลที่ส่งไป',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                   const SizedBox(height: 16),
 
-                  // ── ปุ่ม ออกจากระบบ (เปิดให้กดทำงานได้เสมอ) ──
-                  Container(
+                  // ─── ปุ่ม ออกจากระบบ (Text Button เนียนๆ) ───
+                  SizedBox(
                     width: double.infinity,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ElevatedButton(
+                    height: 54,
+                    child: TextButton(
                       onPressed: _handleLogout,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE0E0E0),
-                        foregroundColor: Colors.black,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey.shade700,
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
+                          borderRadius: BorderRadius.circular(20),
                         ),
-                        elevation: 0,
                       ),
                       child: const Text(
                         'ออกจากระบบ',
                         style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -210,6 +222,87 @@ class _WaitApproveState extends State<WaitApprove> {
           ),
         ),
       ),
+    );
+  }
+
+  // 🔴 เนื้อหาเมื่อสถานะเป็น "ไม่ผ่าน (Rejected)"
+  Widget _buildRejectedContent() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.info_outline_rounded,
+              color: Colors.redAccent,
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'หมายเหตุจากเจ้าหน้าที่',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.red.shade700,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.red.shade50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.red.shade100),
+          ),
+          child: Text(
+            widget.notApproveDetail ?? 'ไม่ระบุสาเหตุ โปรดติดต่อแอดมิน',
+            style: const TextStyle(
+              fontSize: 15,
+              color: Colors.black87,
+              height: 1.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 🟡 เนื้อหาเมื่อสถานะเป็น "รอตรวจสอบ (Waiting)"
+  Widget _buildWaitingContent() {
+    return Column(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            'assets/images/waitApprove.png',
+            height: 160,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) => Container(
+              height: 160,
+              color: Colors.orange.shade50,
+              child: const Center(
+                child: Icon(
+                  Icons.storefront_rounded,
+                  size: 60,
+                  color: Colors.orange,
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'สถานะ: รอดำเนินการ',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.orange.shade700,
+          ),
+        ),
+      ],
     );
   }
 }
