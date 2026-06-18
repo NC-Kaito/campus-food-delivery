@@ -70,24 +70,20 @@ class RiderModel {
       birthday: json['birthday'],
       email: json['email'],
       phone: json['phone'],
-
-      // ✅ เก็บ path ดิบๆ จาก DB เลย ไม่ต้องเติม baseUrl ที่นี่
       studentCardImage: json['studentCard_Image'],
       drivingLicenseImg: json['drivingLicenseImg'],
       vehicleImage: json['vehicle_Image'],
-
       vehiclePlate: json['vehiclePlate'],
       isActive: json['isActive'] as bool?,
       verificationStatus: json['verificationStatus'],
       registerDate: json['registerDate'],
       notApproveDetail: json['notApproveDetail'],
-      majorId: json['major'] != null ? json['major']['majorid'] as int? : null,
-      majorName: json['major'] != null
-          ? json['major']['majorname'] as String?
-          : null,
-      facultyName: json['major'] != null && json['major']['faculty'] != null
-          ? json['major']['faculty']['facultyname'] as String?
-          : null,
+
+      // ✅ รองรับทั้ง DTO (flat) และ Entity (nested)
+      majorId: json['majorId'] ?? json['major']?['majorid'],
+      majorName: json['majorName'] ?? json['major']?['majorname'],
+      facultyName:
+          json['facultyName'] ?? json['major']?['faculty']?['facultyname'],
     );
   }
 }

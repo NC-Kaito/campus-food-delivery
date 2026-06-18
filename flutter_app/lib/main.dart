@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/features/admin/login_admin.dart';
 import 'package:flutter_app/features/member/login_member.dart';
@@ -18,7 +20,14 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Campus food Delivery',
-      theme: ThemeData(colorScheme: .fromSeed(seedColor: Colors.green)),
+      //ปิดแถบDebug เวลารัน
+      debugShowCheckedModeBanner: false,
+
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: .fromSeed(seedColor: Colors.green),
+        textTheme: GoogleFonts.kanitTextTheme(Theme.of(context).textTheme),
+      ),
       home: SelectRolePage(),
     );
   }

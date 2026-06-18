@@ -1,10 +1,8 @@
 package com.it22mjudelivery.springboot_api.v1.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -15,6 +13,7 @@ import java.util.Set;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class OrderDetail {
 
     @Id
@@ -32,6 +31,7 @@ public class OrderDetail {
 
     @ManyToOne
     @JoinColumn(name = "order_id", nullable = false)
+    @JsonIgnore
     private Order order;
 
     @ManyToOne

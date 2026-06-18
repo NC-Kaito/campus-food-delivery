@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,9 +22,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int orderid;
 
-    @Column(nullable = false)
+    @Column(nullable = true)
     private LocalDateTime orderdate;
-
 
     @Column
     private LocalTime pickuptime;
@@ -54,19 +54,27 @@ public class Order {
 
     @Column(length = 100)
     private String canceldetail;
-
     @ManyToOne
     @JoinColumn(name = "memberId", nullable = false)
+    // 🎯 ดักไม่ให้ดึงลิสต์ orders ของ Member ซ้ำซ้อน
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"orders", "hibernateLazyInitializer", "handler"})
     private Member member;
 
     @ManyToOne
     @JoinColumn(name = "riderId", nullable = true)
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"orders", "hibernateLazyInitializer", "handler"})
     private Rider rider;
 
     @ManyToOne
     @JoinColumn(name = "restaurantId", nullable = false)
+    // 🎯 ดักไม่ให้ดึงลิสต์ orders และ menus ของ Restaurant มาพันกัน
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"orders", "menus", "hibernateLazyInitializer", "handler"})
     private Restaurant restaurant;
 
     @OneToMany(mappedBy = "order" , cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore // 🎯 บิลแจ้งเตือนไม่ต้องส่งไปหน้าประวัติ ให้ตัดทิ้งลดขนาด JSON
     private List<Notification> notifications;
+
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<OrderDetail> orderDetails;
 }

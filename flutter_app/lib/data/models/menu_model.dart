@@ -1,3 +1,4 @@
+// data/models/menu_model.dart
 import 'package:flutter_app/data/models/restaurant_model.dart';
 
 class MenuModel {
@@ -26,16 +27,13 @@ class MenuModel {
     this.restaurant,
   });
 
+  // 📥 แปลงจาก JSON หลังบ้าน (Spring Boot) เข้าสู่ Object บน Flutter
   factory MenuModel.fromJson(Map<String, dynamic> json) {
     return MenuModel(
       menuId: json['menuid'],
-
       menuName: json['menuname'],
-
       description: json['description'],
-
       menuImage: json['imageurl'],
-
       price: json['price']?.toDouble(),
       status: json['status'],
 
@@ -56,17 +54,18 @@ class MenuModel {
     );
   }
 
-  // แปลงจาก Object กลับเป็น JSON (สำหรับส่งไป Save/Update)
+  // 📤 แปลงจาก Object บน Flutter กลับเป็น JSON (ส่งค่าไป Save/Update ฝั่ง Spring Boot)
   Map<String, dynamic> toJson() {
     return {
-      'menuId': menuId,
-      'menuName': menuName,
+      'menuid': menuId,
+      'menuname': menuName,
       'description': description,
-      'imageUrl': menuImage,
+      'imageurl': menuImage,
       'price': price,
       'status': status,
-      'restaurant': {'restaurantId': restaurantId},
-      'typeMenu': {'typeMenuId': typeMenuId},
+      // ส่งโครงสร้างความสัมพันธ์ความเชื่อมโยงเป็น Object ซ้อนตามสไตล์ JPA/Hibernate
+      if (restaurantId != null) 'restaurant': {'username': restaurantId},
+      if (typeMenuId != null) 'typemenu': {'typemenuId': typeMenuId},
     };
   }
 }

@@ -51,7 +51,7 @@ public class Rider {
     private String vehicle_Image;
 
     @Column(nullable = false)
-    private boolean isActive;
+    private Boolean isActive;
 
     @Column(nullable = false, length = 10)
     private String verificationStatus;

@@ -1,23 +1,27 @@
-// features/member/list_order_member.dart
+// features/member/list_confirm_order_member.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_app/features/member/cart_manager_member.dart';
-import 'package:flutter_app/features/member/list_confirm_order_member.dart';
+import 'package:flutter_app/data/models/order_model.dart';
+import 'package:flutter_app/data/services/order_service.dart';
+import 'package:flutter_app/features/member/list_order_member.dart';
+import 'package:flutter_app/features/member/view_confirm_order_member.dart';
 import 'package:flutter_app/features/member/view_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
-import 'package:flutter_app/features/member/profile_member.dart'; // 🌟 อิมพอร์ตเพิ่มเพื่อใช้ในลิงก์ Navbar ล่าง
+import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/global_data.dart';
 
-class ListOrderMember extends StatefulWidget {
-  const ListOrderMember({super.key});
+class ListConfirmOrderMember extends StatefulWidget {
+  const ListConfirmOrderMember({super.key});
 
   @override
-  State<ListOrderMember> createState() => _ListOrderMemberState();
+  State<ListConfirmOrderMember> createState() => _ListConfirmOrderMemberState();
 }
 
-class _ListOrderMemberState extends State<ListOrderMember> {
-  late Map<String, List<CartItem>> _groupedCart;
+class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
+  final OrderService _orderService = OrderService();
+  List<OrderModel> _orderHistoryList = [];
+  bool _isLoading = true;
 
-  // สไตล์ข้อความของเมนูด้านล่าง (เหมือนกับหน้า Home)
   final menuTextStyle = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.bold,
@@ -27,34 +31,55 @@ class _ListOrderMemberState extends State<ListOrderMember> {
   @override
   void initState() {
     super.initState();
-    // ดึงข้อมูลรายการอาหารในตะกร้าที่จัดกลุ่มตามร้านค้า
-    _groupedCart = CartManager().getGroupedByStore();
+    _fetchOrderHistory();
   }
 
-  // 🎯 ฟังก์ชันช่วยต่อหัวเชื่อมต่อรูปภาพร้านค้า ป้องกันลิงก์ชิดติดกันจนพังหน้าจอ
+  Future<void> _fetchOrderHistory() async {
+    if (!mounted) return;
+    setState(() => _isLoading = true);
+
+    try {
+      String username = GlobalData.usernameMember;
+      final history = await _orderService.getConfirmOrdersByMember(username);
+
+      if (mounted) {
+        setState(() {
+          _orderHistoryList = history;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการโหลดประวัติคำสั่งซื้อหน้า UI: $e");
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-    if (rawPath.startsWith('/')) {
-      return "$baseUrl$rawPath";
-    } else {
-      return "$baseUrl/$rawPath";
-    }
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      // 🌟 แถบ Navbar บน (เหมือนหน้า Home)
-      appBar: const NavbarMember(title: "ตะกร้ารายการอาหาร"),
-      body: _groupedCart.isEmpty
+      backgroundColor: Colors.grey[50],
+      appBar: const NavbarMember(title: "ประวัติคำสั่งซื้อ"),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: Colors.green))
+          : _orderHistoryList.isEmpty
           ? const Center(
               child: Text(
-                "ไม่มีรายการอาหารในตะกร้า",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
+                "ไม่มีรายการคำสั่งซื้อในฐานข้อมูล",
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             )
           : ListView.builder(
@@ -62,24 +87,12 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                 horizontal: 20.0,
                 vertical: 15.0,
               ),
-              itemCount: _groupedCart.keys.length,
+              itemCount: _orderHistoryList.length,
               itemBuilder: (context, index) {
-                String storeUsername = _groupedCart.keys.elementAt(index);
-                List<CartItem> storeItems = _groupedCart[storeUsername]!;
-
-                String storeName =
-                    storeItems.first.menu.restaurant?.restaurantName ??
-                    storeUsername;
-
-                return _buildStoreCartCard(
-                  storeUsername,
-                  storeName,
-                  storeItems,
-                );
+                return _buildOrderHistoryCard(_orderHistoryList[index]);
               },
             ),
 
-      // 🌟 1. เพิ่ม Bottom Navigation Bar ของหน้า Home เข้ามาประกบที่นี่
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Card(
@@ -93,30 +106,20 @@ class _ListOrderMemberState extends State<ListOrderMember> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 _buildNavItem(Icons.home, "หน้าหลัก", () {
-                  // กดย้อนกลับไปหน้าหลัก (เพื่อป้องกันการเปิดหน้าซ้อนกันเรื่อยๆ)
                   Navigator.popUntil(context, (route) => route.isFirst);
                 }),
-                _buildNavItem(
-                  Icons.shopping_basket,
-                  "ตะกร้าอาหาร",
-                  () {
-                    // อยู่หน้านี้อยู่แล้ว รีเฟรชข้อมูลตะกร้าล่าสุด
-                    setState(() {
-                      _groupedCart = CartManager().getGroupedByStore();
-                    });
-                  },
-                  isActive: true,
-                ), // 🎯 ตั้งค่าให้ปุ่มตะกร้าทำงานและเป็นสีเขียว
-                _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
+                _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ListConfirmOrderMember(),
+                      builder: (context) => const ListOrderMember(),
                     ),
                   );
                 }),
+                _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
+                  _fetchOrderHistory();
+                }, isActive: true),
                 _buildNavItem(Icons.person, "โปรไฟล์", () {
-                  // กดเปิดหน้า Profile สมาชิก
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
@@ -132,7 +135,6 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     );
   }
 
-  // 🌟 2. เพิ่มฟังก์ชันสำหรับสร้างปุ่มไอเทมเมนู (Copy มาจากหน้า Home เป๊ะๆ)
   Widget _buildNavItem(
     IconData icon,
     String label,
@@ -160,20 +162,16 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     );
   }
 
-  Widget _buildStoreCartCard(
-    String storeUsername,
-    String storeName,
-    List<CartItem> storeItems,
-  ) {
-    int totalItemsInStore = 0;
-    for (var item in storeItems) {
-      totalItemsInStore += item.quantity;
+  Widget _buildOrderHistoryCard(OrderModel order) {
+    int totalItems = 0;
+    for (var item in order.items) {
+      totalItems += item.qty;
     }
 
-    String? rawRestaurantImage =
-        storeItems.first.menu.restaurant?.restaurantImage;
-
-    final String finalImageUrl = _getFinalImageUrl(rawRestaurantImage);
+    // 🎯 ดึงชื่อร้านค้าและรูปภาพทะลุผ่าน RestaurantModel ตัวใหม่
+    String storeName =
+        order.restaurant?.restaurantName ?? order.restaurantUsername;
+    String finalImageUrl = _getFinalImageUrl(order.restaurant?.restaurantImage);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20.0),
@@ -191,21 +189,13 @@ class _ListOrderMemberState extends State<ListOrderMember> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16.0),
-        onTap: () async {
-          await Navigator.push(
+        onTap: () {
+          Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ViewOrderMember(
-                storeUsername: storeUsername,
-                storeName: storeName,
-                storeItems: storeItems,
-              ),
+              builder: (context) => ViewConfirmOrderMember(order: order),
             ),
           );
-
-          setState(() {
-            _groupedCart = CartManager().getGroupedByStore();
-          });
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -237,18 +227,48 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      "จำนวน $totalItemsInStore รายการ",
+                      "รหัสบิล: #${order.orderId ?? '-'}",
                       style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey[800],
+                        fontSize: 12,
+                        color: Colors.grey[600],
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "จำนวน $totalItems รายการ",
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.grey[800],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          "฿${order.totalPrice.toStringAsFixed(0)}",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: Colors.green,
               ),
             ],
           ),

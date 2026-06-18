@@ -6,23 +6,40 @@ import com.it22mjudelivery.springboot_api.v1.dtos.AddOrderDto;
 import com.it22mjudelivery.springboot_api.v1.entities.*;
 import com.it22mjudelivery.springboot_api.v1.repositories.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
-
-    // 🎯 เติม final ล็อกไว้หน้า Repository ทั้งหมดเพื่อให้ @RequiredArgsConstructor ทำงานสร้าง Constructor ได้ถูกต้อง
+    @Autowired
     private final OrderRepository orderRepo;
+
+    @Autowired
     private final OrderDetailRepository orderDetailRepo;
+
+    @Autowired
     private final OrderDetailAddonRepository orderDetailAddonRepo;
+
+    @Autowired
     private final MemberRepository memberRepo;
+
+    @Autowired
     private final RestaurantRepository restaurantRepo;
+
+    @Autowired
     private final MenuRepository menuRepo;
+
+    @Autowired
     private final MenuaddondetailRepository menuaddondetailRepo;
+
+    @Autowired
+    private final RiderRepository riderRepo;
 
     @Override
     @Transactional // ดักจับ Transaction เผื่อบันทึกตารางลูกตัวไหนพลาด ระบบจะได้ Rollback อัตโนมัติ
@@ -101,5 +118,46 @@ public class OrderServiceImpl implements OrderService {
         }
 
         return false;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Order> getOrdersByMember(String username) {
+        System.out.println("📦 [SERVICE] กำลังดึงประวัติคำสั่งซื้อของกลุ่มสมาชิก: " + username);
+        try {
+            return orderRepo.findOrdersByMemberUsername(username.trim());
+        } catch (Exception e) {
+            System.out.println("🚨 เกิดข้อผิดพลาดในการดึงประวัติออเดอร์ที่ Service: " + e.getMessage());
+            e.printStackTrace();
+            return List.of();
+        }
+    }
+
+    @Override
+    public List<Order> getWaitingOrders() {
+        try {
+            // 🔍 ค้นหาออเดอร์ที่มีสถานะ "WaitingRider" จาก Repository
+            return orderRepo.findByOrderstatusOrderByOrderidDesc("WaitingRider");
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รอไรเดอร์ได้: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean doConfirmOrderByRider(String studentId, int orderId) {
+        try{
+        Rider rider = riderRepo.findByStudentid(studentId).orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบชื่อผู้ใช้งาน"));
+
+        Order order = orderRepo.findById(orderId).orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อในระบบ"));
+
+        order.setRider(rider);
+        order.setOrderstatus("WaitingRestaurant");
+        order.setPickuptime(LocalTime.now());
+        orderRepo.save(order);
+        return true;
+        }catch (Exception e){
+            new RuntimeException("เกิดข้อผิดพลาดที่ระบบ");
+            return false;
+        }
     }
 }

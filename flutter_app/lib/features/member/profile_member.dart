@@ -5,10 +5,10 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/features/member/home_member.dart';
+import 'package:flutter_app/features/member/navbar_member.dart'; // 🎯 นำเข้า NavbarMember ส่วนกลาง
 import 'package:flutter_app/global_data.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
-import 'dart:convert';
 
 class ProfileMember extends StatefulWidget {
   const ProfileMember({super.key});
@@ -25,6 +25,7 @@ class _ProfileMemberState extends State<ProfileMember> {
   GlobalData globalData = GlobalData();
   bool isLooding = true;
   bool isLoadingAction = false;
+  bool _isEditable = false; // 🎯 ตัวแปรสถานะเปิด/ปิดสิทธิ์การแก้ไขโปรไฟล์
   File? _selectedImage;
   final ImagePicker _picker = ImagePicker();
 
@@ -73,11 +74,13 @@ class _ProfileMemberState extends State<ProfileMember> {
       setState(() {
         isLooding = false;
       });
-      print("เกิดข้อผิดพลาด: $e");
+      debugPrint("เกิดข้อผิดพลาดในการดึงโปรไฟล์: $e");
     }
   }
 
   Future<void> _pickImage() async {
+    if (!_isEditable)
+      return; // 🔒 ดักจับความปลอดภัย: ถ้าไม่ได้เปิดโหมดแก้ไข ห้ามกดเลือกภาพ
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -85,8 +88,8 @@ class _ProfileMemberState extends State<ProfileMember> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.green),
-              title: const Text("ถ่ายรูป"),
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF64F02D)),
+              title: const Text("ถ่ายรูปโปรไฟล์ใหม่"),
               onTap: () async {
                 Navigator.pop(context);
                 final XFile? image = await _picker.pickImage(
@@ -99,8 +102,11 @@ class _ProfileMemberState extends State<ProfileMember> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.green),
-              title: const Text("เลือกจากคลัง"),
+              leading: const Icon(
+                Icons.photo_library,
+                color: Color(0xFF64F02D),
+              ),
+              title: const Text("เลือกรูปจากคลังภาพ"),
               onTap: () async {
                 Navigator.pop(context);
                 final XFile? image = await _picker.pickImage(
@@ -138,7 +144,7 @@ class _ProfileMemberState extends State<ProfileMember> {
       }
       return null;
     } catch (e) {
-      print("Upload error: $e");
+      debugPrint("Upload profile image error: $e");
       return null;
     }
   }
@@ -164,24 +170,22 @@ class _ProfileMemberState extends State<ProfileMember> {
         if (mounted) {
           setState(() {
             isLoadingAction = false;
+            _isEditable =
+                false; // บันทึกเสร็จแล้วให้ปิดสิทธิ์แก้ไขกลับสู่โหมดอ่านปกติ
+            _selectedImage = null;
           });
           GlobalData.usernameMember = usernameController.text;
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('บันทึกการแก้ไขเรียบร้อยแล้ว'),
+              content: Text('🎉 บันทึกการแก้ไขข้อมูลโปรไฟล์เรียบร้อยแล้วครับ'),
               backgroundColor: Colors.green,
             ),
           );
 
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeMember()),
-            (route) => false,
-          );
+          await fetchMemberData(); // สอยข้อมูลใหม่เบื้องหลังมาอัปเดตแผงจอ
         }
       } catch (e) {
-        print("ERROR: $e");
         if (mounted) {
           setState(() {
             isLoadingAction = false;
@@ -198,15 +202,11 @@ class _ProfileMemberState extends State<ProfileMember> {
     }
   }
 
-  // 🎯 ฟังก์ชันดักประกอบร่างสวมหัวขยับไอพีรูปโปรไฟล์ให้ถูกต้องสมบูรณ์ร้อยเปอร์เซ็นต์
   String _getFinalProfileImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
-    if (rawPath.startsWith('http'))
-      return rawPath; // กรณีข้อมูลเก่ามีแช่หัวเว็บไว้
+    if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-
-    // ถ้ารูปเก็บแบบไม่มีสแลชนำหน้า (เช่น "uploads/member/...") ให้สวมเครื่องหมาย / แทรกกลาง
     if (rawPath.startsWith('/')) {
       return "$baseUrl$rawPath";
     } else {
@@ -221,264 +221,228 @@ class _ProfileMemberState extends State<ProfileMember> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(
+        0xFFF9FBF7,
+      ), // คุมโทนสีเบสเขียวอ่อนสบายตาแมตช์กันทั้งระบบ
+      // 🌟 1. สวมใส่ AppBar ตัวเก่งเหมือนหน้า HomeMember ครบถ้วนตามระเบียบ
+      appBar: const NavbarMember(title: ""),
       body: isLooding
-          ? const Center(child: CircularProgressIndicator(color: Colors.green))
+          ? const Center(
+              child: CircularProgressIndicator(color: Color(0xFF64F02D)),
+            )
           : SafeArea(
+              top: false, // ปล่อยให้ Navbar คุมหัวสเปซด้านบนไปเลยครับ
               child: Form(
                 key: formKey,
                 child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(24.0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // ─── แถบเมนูด้านบนสุด ───
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 12,
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      // ─── ส่วนแสดงหัวข้อหน้าจอ ───
+                      Center(
+                        child: Column(
                           children: [
-                            GestureDetector(
-                              onTap: () => Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const HomeMember(),
+                            const SizedBox(height: 10),
+                            // ─── ส่วนรูปภาพโปรไฟล์วงกลมแบบสแต็ก ───
+                            SizedBox(
+                              width: 110,
+                              height: 110,
+                              child: GestureDetector(
+                                onTap: _isEditable
+                                    ? _pickImage
+                                    : null, // ปิดการกดเลือกรูปถ้ายึดสถานะปิดโหมดแก้ไข
+                                child: Stack(
+                                  children: [
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: _isEditable
+                                              ? const Color(0xFF64F02D)
+                                              : Colors.grey.shade400,
+                                          width: 2.5,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(
+                                              0.05,
+                                            ),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: 52,
+                                        backgroundColor: const Color(
+                                          0xFFE0E0E0,
+                                        ),
+                                        backgroundImage: _selectedImage != null
+                                            ? FileImage(_selectedImage!)
+                                                  as ImageProvider
+                                            : finalProfileUrl.isNotEmpty
+                                            ? NetworkImage(
+                                                Uri.encodeFull(finalProfileUrl),
+                                              )
+                                            : null,
+                                        child:
+                                            (_selectedImage == null &&
+                                                finalProfileUrl.isEmpty)
+                                            ? const Icon(
+                                                Icons.person,
+                                                size: 55,
+                                                color: Colors.grey,
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                    // โชว์แผ่นป้ายไอคอนดินสอแก้ไขเมื่อไรที่กดยืนยันโหมด _isEditable เท่านั้น
+                                    if (_isEditable)
+                                      Positioned(
+                                        bottom: 2,
+                                        right: 2,
+                                        child: CircleAvatar(
+                                          radius: 16,
+                                          backgroundColor: const Color(
+                                            0xFF64F02D,
+                                          ),
+                                          child: const Icon(
+                                            Icons.camera_alt_rounded,
+                                            size: 16,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                                (route) => false,
-                              ),
-                              child: const Icon(
-                                Icons.home_outlined,
-                                color: Colors.orange,
-                                size: 30,
                               ),
                             ),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.shopping_cart_outlined,
-                                  color: Colors.orange,
-                                  size: 28,
-                                ),
-                                const SizedBox(width: 15),
-                                Icon(
-                                  Icons.account_circle,
-                                  color: Colors.orange[700],
-                                  size: 30,
-                                ),
-                              ],
+                            const SizedBox(height: 14),
+                            Text(
+                              _isEditable
+                                  ? "โหมดแก้ไขข้อมูล"
+                                  : "ข้อมูลโปรไฟล์ของฉัน",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: _isEditable
+                                    ? const Color(0xFF2E7D32)
+                                    : Colors.black87,
+                              ),
                             ),
                           ],
                         ),
                       ),
 
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24.0,
-                          vertical: 10,
+                      const SizedBox(height: 25),
+
+                      // ─── ฟอร์มกรอกข้อมูลสากล (ล็อกเบรกตายตัวตามสิทธิ์ร้านค้า) ───
+                      _buildInputLabel("ชื่อผู้ใช้ (Username)"),
+                      _buildCustomTextField(
+                        usernameController,
+                        enabled: false,
+                      ), // ปิดตายถาวรเพราะเป็นคีย์หลักไอดีฐานข้อมูล
+
+                      _buildInputLabel("ชื่อจริง (Firstname)"),
+                      _buildCustomTextField(
+                        firstnameController,
+                        enabled: false,
+                      ), // ปิดตายถาวรระบบหลังบ้านล็อกไว้
+
+                      _buildInputLabel("นามสกุล (Lastname)"),
+                      _buildCustomTextField(
+                        lastnameController,
+                        enabled: false,
+                      ), // ปิดตายถาวรระบบหลังบ้านล็อกไว้
+
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16.0),
+                        child: Divider(color: Colors.black12, thickness: 1),
+                      ),
+
+                      const Center(
+                        child: Text(
+                          "ช่องทางข้อมูลติดต่อ",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                          ),
                         ),
-                        child: Column(
-                          children: [
-                            // ─── ส่วนรูปภาพโปรไฟล์ ───
-                            Center(
-                              child: Column(
-                                children: [
-                                  SizedBox(
-                                    width: 110,
-                                    height: 110,
-                                    child: GestureDetector(
-                                      onTap: _pickImage,
-                                      child: Stack(
-                                        children: [
-                                          Container(
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              border: Border.all(
-                                                color: Colors.grey.shade400,
-                                                width: 2,
-                                              ),
-                                            ),
-                                            child: CircleAvatar(
-                                              radius: 52,
-                                              backgroundColor: const Color(
-                                                0xFFE0E0E0,
-                                              ),
-                                              backgroundImage:
-                                                  _selectedImage != null
-                                                  ? FileImage(_selectedImage!)
-                                                        as ImageProvider
-                                                  : finalProfileUrl.isNotEmpty
-                                                  ? NetworkImage(
-                                                      Uri.encodeFull(
-                                                        finalProfileUrl,
-                                                      ),
-                                                    )
-                                                  : null,
-                                              child:
-                                                  (_selectedImage == null &&
-                                                      finalProfileUrl.isEmpty)
-                                                  ? const Icon(
-                                                      Icons.person,
-                                                      size: 55,
-                                                      color: Colors.grey,
-                                                    )
-                                                  : null,
-                                            ),
-                                          ),
-                                          Positioned(
-                                            bottom: 2,
-                                            right: 2,
-                                            child: CircleAvatar(
-                                              radius: 16,
-                                              backgroundColor: Colors.grey[800],
-                                              child: const Icon(
-                                                Icons.edit,
-                                                size: 16,
-                                                color: Colors.white,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
+                      ),
 
-                                  const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        "แก้โปรไฟล์ ",
-                                        style: TextStyle(
-                                          fontSize: 22,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.black,
-                                        ),
-                                      ),
-                                      Icon(
-                                        Icons.edit_outlined,
-                                        size: 22,
-                                        color: Colors.black,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
+                      _buildInputLabel("อีเมลสถาบัน (Email)"),
+                      _buildCustomTextField(
+                        emailController,
+                        enabled: false,
+                      ), // ล็อกอ่านอย่างเดียวห้ามแก้ไขเปลี่ยนไอดีหลัก
 
-                            const SizedBox(height: 25),
+                      _buildInputLabel("เบอร์โทรศัพท์จัดส่งสินค้า (Phone)"),
+                      _buildCustomTextField(
+                        phoneController,
+                        enabled: _isEditable,
+                      ), // 🎯 ปลดล็อก/ล็อก ตามสถานะ _isEditable ของตัวแปรกลุ่มหลัก
 
-                            // ─── ฟอร์มข้อมูลดีไซน์กรอบสี่เหลี่ยมสีเทาตามแบบ ───
-                            _buildInputLabel("ชื่อผู้ใช้ (Username)"),
-                            _buildCustomTextField(
-                              usernameController,
-                              enabled: false,
-                            ),
+                      const SizedBox(height: 40),
 
-                            _buildInputLabel("ชื่อ (Firstname)"),
-                            _buildCustomTextField(
-                              firstnameController,
-                              enabled: false,
-                            ),
-
-                            _buildInputLabel("นามสกุล (Lastname)"),
-                            _buildCustomTextField(
-                              lastnameController,
-                              enabled: false,
-                            ),
-
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 16.0),
-                              child: Divider(
-                                color: Colors.grey,
-                                thickness: 0.8,
-                              ),
-                            ),
-
-                            const Center(
-                              child: Text(
-                                "ข้อมูลติดต่อ",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
-
-                            _buildInputLabel("อีเมล (Email)"),
-                            _buildCustomTextField(
-                              emailController,
-                              enabled: false,
-                            ),
-
-                            _buildInputLabel("เบอร์โทรศัพท์ (Phone)"),
-                            _buildCustomTextField(
-                              phoneController,
-                              enabled: true,
-                            ),
-
-                            const SizedBox(height: 40),
-
-                            // ─── ปุ่มควบคุมด้านล่าง (ยกเลิก และ บันทึกการแก้ไข) ───
-                            Row(
+                      // ─── 🎯 3. ส่วนควบคุมด้านล่างสลับสวิตช์อัตโนมัติแบบระบบร้านค้าต้นแบบ ───
+                      _isEditable
+                          ? Row(
                               children: [
                                 Expanded(
                                   child: Container(
-                                    height: 46,
+                                    height: 48,
                                     decoration: BoxDecoration(
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.12),
-                                          blurRadius: 4,
+                                          color: Colors.black.withOpacity(0.06),
+                                          blurRadius: 6,
                                           offset: const Offset(0, 4),
                                         ),
                                       ],
                                     ),
                                     child: ElevatedButton(
                                       onPressed: () {
-                                        Navigator.pushAndRemoveUntil(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const HomeMember(),
-                                          ),
-                                          (route) => false,
-                                        );
+                                        setState(() {
+                                          _isEditable = false;
+                                          _selectedImage = null;
+                                        });
+                                        fetchMemberData(); // รีดึงกวาดค่าเดิมกลับมาทับ Controller ทันทีป้องกันข้อมูลค้างเพี้ยน
                                       },
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(
                                           0xFFE0E0E0,
                                         ),
-                                        foregroundColor: Colors.black,
+                                        foregroundColor: Colors.black87,
                                         elevation: 0,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
-                                            24,
+                                            14,
                                           ),
                                         ),
                                       ),
                                       child: const Text(
                                         "ยกเลิก",
                                         style: TextStyle(
-                                          fontSize: 16,
                                           fontWeight: FontWeight.bold,
+                                          fontSize: 15,
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
                                 const SizedBox(width: 16),
-
                                 Expanded(
                                   child: Container(
-                                    height: 46,
+                                    height: 48,
                                     decoration: BoxDecoration(
                                       boxShadow: [
                                         BoxShadow(
-                                          color: Colors.black.withOpacity(0.15),
-                                          blurRadius: 4,
+                                          color: const Color(
+                                            0xFF64F02D,
+                                          ).withOpacity(0.25),
+                                          blurRadius: 10,
                                           offset: const Offset(0, 4),
                                         ),
                                       ],
@@ -489,13 +453,13 @@ class _ProfileMemberState extends State<ProfileMember> {
                                           : doUpdateProfile,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(
-                                          0xFF55FF33,
-                                        ),
-                                        foregroundColor: Colors.black,
+                                          0xFF64F02D,
+                                        ), // เขียวสปอร์ตตัวใหม่
+                                        foregroundColor: Colors.white,
                                         elevation: 0,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(
-                                            24,
+                                            14,
                                           ),
                                         ),
                                       ),
@@ -504,26 +468,75 @@ class _ProfileMemberState extends State<ProfileMember> {
                                               height: 20,
                                               width: 20,
                                               child: CircularProgressIndicator(
-                                                color: Colors.black,
+                                                color: Colors.white,
                                                 strokeWidth: 2,
                                               ),
                                             )
                                           : const Text(
-                                              "บันทึกการแก้ไข",
+                                              "บันทึกข้อมูล",
                                               style: TextStyle(
-                                                fontSize: 16,
                                                 fontWeight: FontWeight.bold,
+                                                fontSize: 15,
+                                                color: Colors.white,
                                               ),
                                             ),
                                     ),
                                   ),
                                 ),
                               ],
+                            )
+                          : Container(
+                              width: double.infinity,
+                              height: 50,
+                              decoration: BoxDecoration(
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF64F02D,
+                                    ).withOpacity(0.2),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditable = true;
+                                  });
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(
+                                    0xFF64F02D,
+                                  ), // สวมสีเขียวสปอร์ตขวัญใจไรเดอร์แม่โจ้
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.edit_note_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "แก้ไขข้อมูลส่วนตัว",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 30),
-                          ],
-                        ),
-                      ),
+                      const SizedBox(height: 30),
                     ],
                   ),
                 ),
@@ -533,17 +546,14 @@ class _ProfileMemberState extends State<ProfileMember> {
   }
 
   Widget _buildInputLabel(String label) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 6, top: 12),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: Colors.black,
-          ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6, top: 14),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          color: Colors.black87,
         ),
       ),
     );
@@ -553,32 +563,51 @@ class _ProfileMemberState extends State<ProfileMember> {
     TextEditingController controller, {
     bool enabled = true,
   }) {
-    return TextFormField(
-      controller: controller,
-      enabled: enabled,
-      style: const TextStyle(
-        color: Colors.black87,
-        fontSize: 15,
-        fontWeight: FontWeight.w500,
+    return Container(
+      decoration: BoxDecoration(
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: const Color(0xFFEAEAEA),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 12,
+      child: TextFormField(
+        controller: controller,
+        enabled: enabled,
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade400, width: 1.0),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: Colors.grey.shade400, width: 1.0),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: const BorderSide(color: Colors.green, width: 1.5),
+        decoration: InputDecoration(
+          filled: true,
+          fillColor: enabled
+              ? Colors.white
+              : const Color(
+                  0xFFEEEEEE,
+                ), // พ่นสีเทากลืนฟิลด์ถ้ายึดสถานะปิดอ่านอย่างเดียว
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200, width: 1.0),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF64F02D), width: 1.5),
+          ),
         ),
       ),
     );

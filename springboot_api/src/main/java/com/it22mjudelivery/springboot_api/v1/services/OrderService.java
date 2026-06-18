@@ -7,6 +7,14 @@ import com.it22mjudelivery.springboot_api.v1.entities.Order;
 import com.it22mjudelivery.springboot_api.v1.entities.OrderDetail;
 import com.it22mjudelivery.springboot_api.v1.entities.Orderdetailaddon;
 
+import java.util.List;
+
 public interface OrderService {
     boolean memberConfirmOrder(AddOrderDto addOrderDto);
+
+    List<Order> getOrdersByMember(String username);
+
+    List<Order> getWaitingOrders();
+
+    boolean doConfirmOrderByRider(String studentId, int orderId);
 }

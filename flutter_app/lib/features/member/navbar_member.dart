@@ -6,6 +6,7 @@ import 'package:flutter_app/features/member/home_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/global_data.dart';
+import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 เรียกใช้ไอพีตัวกลางเซิร์ฟเวอร์หลัก
 
 class NavbarMember extends StatefulWidget implements PreferredSizeWidget {
   final String title;
@@ -32,6 +33,15 @@ class _NavbarMemberState extends State<NavbarMember> {
     loadMemberData();
   }
 
+  // ฟังก์ชันเชื่อมพาร์ทสั้นเข้าไอพีเซิร์ฟเวอร์ส่วนกลางหลัก
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+  }
+
   Future<void> loadMemberData() async {
     try {
       final member = await memberService.getMemberByUsername(
@@ -42,15 +52,8 @@ class _NavbarMemberState extends State<NavbarMember> {
         setState(() {
           if (member != null) {
             memberModel = member;
-
-            String? rawImage = member.profileimg;
-
-            if (rawImage != null && rawImage.isNotEmpty) {
-              memberImage = rawImage.replaceAll(
-                '10.244.27.84',
-                '10.244.27.211',
-              );
-            }
+            // 🎯 ปรับให้แมตช์เข้าสายแปลงพาร์ทผ่าน Base URL ไอพีกลาง ปลอดภัยรูปไม่หลุด
+            memberImage = _getFinalImageUrl(member.profileimg);
           }
         });
       }
@@ -63,13 +66,8 @@ class _NavbarMemberState extends State<NavbarMember> {
   Widget build(BuildContext context) {
     return AppBar(
       backgroundColor: Colors.white,
-
-      // ── 🎯 ทริคการปรับแต่งเงาดำบางๆ ให้ตัดกับแผงหลังสวยงาม ──
-      elevation: 4, // ปรับระดับความลอยให้มิติเงาทอดตัวยาวขึ้นเล็กน้อย
-      shadowColor: Colors.black.withOpacity(
-        1,
-      ), // 🚀 เปลี่ยนสีกรอบเงาให้เป็นสีดำจางๆ (25%) เพิ่มความพรีเมียม นุ่มนวลไม่แข็งกระด้าง
-
+      elevation: 4,
+      shadowColor: Colors.black.withOpacity(0.25),
       automaticallyImplyLeading: false,
       title: Text(
         widget.title,

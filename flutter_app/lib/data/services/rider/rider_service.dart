@@ -66,4 +66,47 @@ class RiderService {
       rethrow;
     }
   }
+
+  Future<RiderModel> getRiderByStudentId(String studentId) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/rider/getRider",
+        queryParameters: {'studentId': studentId},
+      );
+      return RiderModel.fromJson(response.data);
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateProfileMember(RiderModel rider) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/rider/updateProfileRider",
+        data: rider.toJson(),
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> updateIsActive(String studentId, bool isActive) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/rider/updateIsActive",
+        data: {"studentId": studentId, "isActive": isActive},
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

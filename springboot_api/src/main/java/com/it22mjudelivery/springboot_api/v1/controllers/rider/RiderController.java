@@ -1,6 +1,8 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.rider;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.RiderDto;
+import com.it22mjudelivery.springboot_api.v1.entities.Member;
+import com.it22mjudelivery.springboot_api.v1.entities.Order;
 import com.it22mjudelivery.springboot_api.v1.entities.Rider;
 import com.it22mjudelivery.springboot_api.v1.services.RiderService;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -87,19 +90,61 @@ public class RiderController {
         String safeFilename = originalFilename.replaceAll("\\s+", "");
         String fileName = UUID.randomUUID() + "_" + safeFilename;
 
-        // 2. กำหนด Path (เช่น uploads/rider/studentCard)
         Path uploadDir = Paths.get("uploads", "rider", subFolder);
 
-        // 3. สร้างโฟลเดอร์ถ้ายังไม่มี
         if (!Files.exists(uploadDir)) {
             Files.createDirectories(uploadDir);
         }
 
-        // 4. บันทึกไฟล์
         Path savePath = uploadDir.resolve(fileName);
         Files.copy(file.getInputStream(), savePath);
 
-        // 5. คืนค่า Path เพื่อเอาไปเก็บลง Database
         return "uploads/rider/" + subFolder + "/" + fileName;
     }
+
+    @GetMapping("/getRider")
+    public ResponseEntity<?> getRiderByStudentId(@RequestParam("studentId") String studentId) {
+        try {
+            RiderDto rider = riderService.getRiderByStudentId(studentId);
+            return ResponseEntity.ok(rider);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/updateIsActive")
+// 🎯 แก้หัวเมธอดตรงนี้: เปลี่ยนจาก @RequestParam ทั้งหมด ให้เป็น @RequestBody Map แบบนี้ครับ
+    public ResponseEntity<?> updateRiderStatus(@RequestBody Map<String, Object> payload) {
+        try {
+            // 📦 แกะข้อมูลจาก JSON Body ที่ Flutter ส่งมาให้อย่างถูกต้อง
+            String studentId = payload.get("studentId").toString();
+            boolean isActive = (boolean) payload.get("isActive");
+
+            // ยิงเข้าสู่ชั้น Service ของคุณ Kaito
+            boolean isResult = riderService.updateRiderStatus(studentId, isActive);
+
+            if (isResult) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "message", "เปลี่ยนสถานะการรับงานสำเร็จแล้ว!"
+                ));
+            }
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error",
+                    "message", "เกิดข้อผิดพลาดภายในระบบ ไม่สามารถเปลี่ยนสถานะได้"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                    "status", "error",
+                    "message", " เกิดข้อผิดพลาดที่ Rider Controller: " + e.getMessage()
+            ));
+        }
+    }
+
+
 }
