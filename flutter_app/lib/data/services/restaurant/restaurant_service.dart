@@ -96,4 +96,16 @@ class RestaurantService {
       rethrow;
     }
   }
+
+  //doCloseAccount
+  Future<void> doCloseAccount(String username) async {
+    try {
+      await DioClient.dio.post("/v1/restaurant/doCloseAccount/$username");
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
 }

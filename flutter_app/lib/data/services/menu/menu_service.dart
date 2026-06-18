@@ -187,4 +187,19 @@ class MenuService {
       throw (msg is String ? msg : "เกิดข้อผิดพลาดในการบันทึกเมนู");
     }
   }
+
+  Future<void> updateMenuByRestaurant(Map<String, dynamic> requestData) async {
+    try {
+      final response = await DioClient.dio.put(
+        "/v1/menuAddon/updateMenuByRestaurant",
+        data: requestData,
+      );
+      if (response.statusCode != 200) {
+        throw "อัปเดตเมนูไม่สำเร็จ";
+      }
+    } on DioException catch (e) {
+      final msg = e.response?.data;
+      throw (msg is String ? msg : "เกิดข้อผิดพลาดในการอัปเดตเมนู");
+    }
+  }
 }

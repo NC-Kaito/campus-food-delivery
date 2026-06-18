@@ -79,7 +79,7 @@ public class RestaurantServiceImpl implements RestaurantService{
                                            double latitude, double longitude,
                                            LocalTime opentime,
                                            LocalTime closetime, int openday, String ownerfirstname,
-                                           String ownerlastname, String email, String phone) {
+                                           String ownerlastname, String email, String phone, String ownerimage) {
 
         Restaurant restaurant = restaurantRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
@@ -99,9 +99,19 @@ public class RestaurantServiceImpl implements RestaurantService{
         restaurant.setOwnerlastname(ownerlastname);
         restaurant.setEmail(email);
         restaurant.setPhone(phone);
+        restaurant.setOwnerimage(ownerimage);
 
         restaurantRepository.save(restaurant);
         return true;
+    }
+
+
+    public void doCloseAccount(String username) {
+        Restaurant restaurant = restaurantRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งานร้านค้า: " + username));
+        restaurant.setVerificationstatus("close");
+        restaurant.setNotapprovedetail(null);
+        restaurantRepository.save(restaurant);
     }
 
 }

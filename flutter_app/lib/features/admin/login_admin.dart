@@ -246,7 +246,8 @@ class _LoginAdminState extends State<LoginAdmin>
 
                   // Login Card
                   Container(
-                    width: 500,
+                    width: 600,
+                    height: 450,
                     padding: const EdgeInsets.all(32),
                     decoration: BoxDecoration(
                       color: const Color.fromARGB(255, 237, 237, 237),

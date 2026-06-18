@@ -41,12 +41,33 @@ public class MenuServiceImpl implements MenuService {
     public boolean saveMenuWithAddons(Map<String, Object> requestData) {
         try {
             String restaurantId = (String) requestData.get("restaurantId");
-            Integer typeMenuId = (Integer) requestData.get("typeMenuId");
+//            Integer typeMenuId = (Integer) requestData.get("typeMenuId");
 
             Restaurant restaurant = restaurantRepository.findByUsername(restaurantId)
                     .orElseThrow(() -> new RuntimeException("ไม่พบข้อมูลร้านค้า"));
-            TypeMenu typeMenu = typeMenuRepository.findById(typeMenuId)
-                    .orElseThrow(() -> new RuntimeException("ไม่พบประเภทเมนู"));
+//            TypeMenu typeMenu = typeMenuRepository.findById(typeMenuId)
+//                    .orElseThrow(() -> new RuntimeException("ไม่พบประเภทเมนู"));
+
+//=============================================================
+            // ใหม่ — รองรับทั้ง typeMenuId เดิม และ typeMenuName ใหม่
+            TypeMenu typeMenu;
+            Integer typeMenuId = requestData.get("typeMenuId") != null
+                    ? (Integer) requestData.get("typeMenuId") : null;
+            String typeMenuName = (String) requestData.get("typeMenuName");
+
+            if (typeMenuId != null) {
+                typeMenu = typeMenuRepository.findById(typeMenuId)
+                        .orElseThrow(() -> new RuntimeException("ไม่พบประเภทเมนู"));
+            } else if (typeMenuName != null && !typeMenuName.isBlank()) {
+                // สร้างประเภทใหม่แล้วบันทึกเลย
+                TypeMenu newType = new TypeMenu();
+                newType.setTypemenuName(typeMenuName);
+                typeMenu = typeMenuRepository.save(newType);
+            } else {
+                throw new RuntimeException("กรุณาระบุประเภทเมนู");
+            }
+
+//==========================================================================
 
             // 🌟 แกะค่าพาร์ท URL รูปภาพที่ได้จาก Flutter (รองรับทั้งกรณีพิมพ์เล็กพิมพ์ใหญ่)
             String finalImageUrl = "";

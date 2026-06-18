@@ -14,23 +14,21 @@ class MenuAddonService {
         List<MenuAddonDetailModel> flatDetailsList = [];
         List<dynamic> groupJsonList = response.data;
 
-        // 🎯 1. วนลูปแกะกลุ่มแม่ (MenuAddonGroupModel) ออกมาก่อน
         for (var groupJson in groupJsonList) {
           MenuAddonGroupModel groupModel = MenuAddonGroupModel.fromJson(
             groupJson,
           );
 
-          // 🎯 2. เจาะลึกลงไปสอยลิสต์รายการลูกย่อย (menuaddondetails) ที่ติดมาใน JSON
+          groupModel.isRequired = groupJson['required'] == true;
+
           if (groupJson['menuaddondetails'] != null) {
             List<dynamic> detailsJsonList = groupJson['menuaddondetails'];
 
             for (var detailJson in detailsJsonList) {
-              // 🎯 3. แกะข้อมูลรายละเอียดลูกเข้าโมเดล
               MenuAddonDetailModel detailModel = MenuAddonDetailModel.fromJson(
                 detailJson,
               );
 
-              // 🚀 ผูกความสัมพันธ์ย้อนกลับไปให้กลุ่มแม่ด้วย เพื่อให้ UI ใช้คำสั่ง .menuAddonGroup แยกกลุ่มได้
               detailModel.menuAddonGroup = groupModel;
 
               flatDetailsList.add(detailModel);
@@ -38,7 +36,7 @@ class MenuAddonService {
           }
         }
 
-        return flatDetailsList; // ส่งลิสต์ที่จัดของเสร็จแล้วกลับไปให้หน้าจอ UI วาด
+        return flatDetailsList;
       } else {
         throw Exception("Failed to load addons");
       }

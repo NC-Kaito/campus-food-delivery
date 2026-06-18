@@ -466,7 +466,12 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : doRegister,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.greenAccent[400],
+                            backgroundColor: const Color.fromARGB(
+                              255,
+                              0,
+                              255,
+                              51,
+                            ),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 15),
                             shape: RoundedRectangleBorder(

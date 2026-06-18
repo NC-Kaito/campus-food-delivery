@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
+import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:flutter_app/data/models/type_menu_model.dart';
@@ -38,18 +39,18 @@ class AddMenu extends StatefulWidget {
 
 class _AddMenuState extends State<AddMenu> {
   final MenuService menuService = MenuService();
-
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final TypeMenuService typeMenuService = TypeMenuService();
-
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   final TextEditingController menuNameController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
+  final TextEditingController _newTypeNameController = TextEditingController();
 
   bool isAddonOn = false;
   bool _isLoading = false;
+  bool _isAddingNewType = false;
 
   List<AddonGroupFormState> addonGroups = [];
   List<AddonMenuModel> dbAddonList = [];
@@ -57,6 +58,7 @@ class _AddMenuState extends State<AddMenu> {
 
   int? _selectedTypeMenuId;
   String? _selectedTypeMenuName;
+  String? _newTypeName;
   File? _selectedImage;
   String? _imageError;
   String? _typeMenuError;
@@ -75,6 +77,7 @@ class _AddMenuState extends State<AddMenu> {
     menuNameController.dispose();
     descriptionController.dispose();
     priceController.dispose();
+    _newTypeNameController.dispose();
     _clearAllAddonGroups();
     super.dispose();
   }
@@ -256,14 +259,14 @@ class _AddMenuState extends State<AddMenu> {
       _imageError = _selectedImage == null
           ? "กรุณาเลือกรูปภาพอาหารประกอบด้วย"
           : null;
-      _typeMenuError = _selectedTypeMenuId == null
-          ? "กรุณาเลือกประเภทหมวดหมู่เมนู"
+      _typeMenuError =
+          (_selectedTypeMenuId == null &&
+              (_newTypeName == null || _newTypeName!.isEmpty))
+          ? "กรุณาเลือกหรือกรอกประเภทหมวดหมู่เมนู"
           : null;
     });
 
-    if (!isFormValid || _imageError != null || _typeMenuError != null) {
-      return;
-    }
+    if (!isFormValid || _imageError != null || _typeMenuError != null) return;
 
     setState(() => _isLoading = true);
 
@@ -272,7 +275,6 @@ class _AddMenuState extends State<AddMenu> {
         _selectedImage,
       );
 
-      // ✅ แก้ไขตรงนี้: ปรับตัวแปรคีย์ "imageurl" -> "imageUrl" ให้ตรงสเปกดีทีโอฝั่งจาวาแล้ว
       final Map<String, dynamic> requestData = {
         "menuname": menuNameController.text.trim(),
         "description": descriptionController.text.trim(),
@@ -280,7 +282,9 @@ class _AddMenuState extends State<AddMenu> {
         "status": true,
         "imageUrl": imageUrl ?? "",
         "restaurantId": GlobalData.usernameRestaurant,
-        "typeMenuId": _selectedTypeMenuId,
+        if (_selectedTypeMenuId != null) "typeMenuId": _selectedTypeMenuId,
+        if (_newTypeName != null && _newTypeName!.isNotEmpty)
+          "typeMenuName": _newTypeName,
       };
 
       if (isAddonOn) {
@@ -358,24 +362,9 @@ class _AddMenuState extends State<AddMenu> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'เพิ่มเมนู',
-          style: TextStyle(
-            color: Color(0xFFFF9800),
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
-        ),
-      ),
+      backgroundColor: const Color.fromARGB(255, 255, 255, 255),
+      extendBodyBehindAppBar: true,
+      appBar: const RestaurantNavbar(title: ""),
       body: Form(
         key: formKey,
         child: SingleChildScrollView(
@@ -384,7 +373,7 @@ class _AddMenuState extends State<AddMenu> {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.grey[100],
+                color: const Color.fromARGB(255, 255, 255, 255),
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
@@ -396,15 +385,29 @@ class _AddMenuState extends State<AddMenu> {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+
                 children: [
+                  const SizedBox(height: 50),
+
+                  Center(
+                    child: Text(
+                      'เพิ่มเมนู',
+                      style: TextStyle(
+                        color: Color(0xFFFF9800),
+                        fontWeight: FontWeight.bold,
+                        fontSize: 24,
+                      ),
+                    ),
+                  ),
+                  // ── รูปอาหาร ──────────────────────────────────────────
                   _buildLabel("รูปอาหาร"),
                   const SizedBox(height: 5),
                   Center(
                     child: GestureDetector(
                       onTap: pickImage,
                       child: Container(
-                        height: 160,
-                        width: 160,
+                        height: 200,
+                        width: 300,
                         decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
@@ -441,6 +444,7 @@ class _AddMenuState extends State<AddMenu> {
                     ),
                   const SizedBox(height: 10),
 
+                  // ── ชื่อเมนู ──────────────────────────────────────────
                   _buildLabel("ชื่อเมนู (Menu Name)"),
                   TextFormField(
                     controller: menuNameController,
@@ -451,51 +455,193 @@ class _AddMenuState extends State<AddMenu> {
                     decoration: _inputDecoration(hint: "เช่น กระเพราหมูกรอบ"),
                   ),
 
-                  _buildLabel("ประเภทเมนู (MenuType)"),
-                  typeMenuList.isEmpty
-                      ? Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 15,
-                            vertical: 15,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.grey.shade400),
-                          ),
-                          child: const Row(
+                  // ── ประเภทเมนู ────────────────────────────────────────
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6, top: 12),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        RichText(
+                          text: const TextSpan(
+                            text: "ประเภทเมนู (MenuType)",
+                            style: TextStyle(
+                              color: Colors.black,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                             children: [
-                              SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.orange,
-                                ),
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                "กำลังโหลดประเภทหมวดหมู่...",
-                                style: TextStyle(color: Colors.grey),
+                              TextSpan(
+                                text: ' *',
+                                style: TextStyle(color: Colors.red),
                               ),
                             ],
                           ),
-                        )
-                      : _buildDropdown(
-                          typeMenuList
-                              .map((e) => e.typemenuName ?? "")
-                              .toList(),
-                          _selectedTypeMenuName,
-                          (val) {
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
                             setState(() {
-                              _selectedTypeMenuName = val;
-                              _selectedTypeMenuId = typeMenuList
-                                  .firstWhere((e) => e.typemenuName == val)
-                                  .typemenuId;
-                              _typeMenuError = null;
+                              _isAddingNewType = !_isAddingNewType;
+                              if (!_isAddingNewType) {
+                                _newTypeNameController.clear();
+                                _newTypeName = null;
+                              } else {
+                                // ✅ ล้าง dropdown ที่เลือกไว้ก่อนหน้า
+                                _selectedTypeMenuId = null;
+                                _selectedTypeMenuName = null;
+                              }
                             });
                           },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _isAddingNewType
+                                ? Colors.orange
+                                : Colors.grey.shade300,
+                            foregroundColor: _isAddingNewType
+                                ? Colors.white
+                                : Colors.black87,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 14,
+                              vertical: 6,
+                            ),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text(
+                            "เพิ่ม",
+                            style: TextStyle(fontSize: 13),
+                          ),
                         ),
+                      ],
+                    ),
+                  ),
+
+                  if (!_isAddingNewType) ...[
+                    // โหมดปกติ: Dropdown
+                    typeMenuList.isEmpty
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 15,
+                              vertical: 15,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade400),
+                            ),
+                            child: const Row(
+                              children: [
+                                SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.orange,
+                                  ),
+                                ),
+                                SizedBox(width: 10),
+                                Text(
+                                  "กำลังโหลดประเภทหมวดหมู่...",
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                              ],
+                            ),
+                          )
+                        : _buildDropdown(
+                            typeMenuList
+                                .map((e) => e.typemenuName ?? "")
+                                .toList(),
+                            _selectedTypeMenuName,
+                            (val) {
+                              setState(() {
+                                _selectedTypeMenuName = val;
+                                _selectedTypeMenuId = typeMenuList
+                                    .firstWhere((e) => e.typemenuName == val)
+                                    .typemenuId;
+                                _typeMenuError = null;
+                                _newTypeName = null;
+                              });
+                            },
+                          ),
+                  ] else ...[
+                    // โหมดเพิ่มใหม่: TextField + ปุ่มยกเลิกใน suffix
+                    TextFormField(
+                      controller: _newTypeNameController,
+                      autofocus: true,
+                      onChanged: (val) {
+                        setState(() {
+                          _newTypeName = val.trim().isEmpty ? null : val.trim();
+                          _selectedTypeMenuId = null; // ✅ ล้างทุกครั้งที่พิมพ์
+                          _selectedTypeMenuName = null;
+                          _typeMenuError = null;
+                        });
+                      },
+                      decoration: InputDecoration(
+                        hintText: "ชื่อประเภทอาหาร....",
+                        hintStyle: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 14,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 15,
+                          vertical: 12,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                        suffixIcon: SizedBox(
+                          width: 80,
+                          child: TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _isAddingNewType = false;
+                                _newTypeNameController.clear();
+                                _newTypeName = null;
+                              });
+                            },
+                            style: TextButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.only(
+                                  topRight: Radius.circular(10),
+                                  bottomRight: Radius.circular(10),
+                                ),
+                              ),
+                              padding: EdgeInsets.zero,
+                            ),
+                            child: const Text(
+                              "ยกเลิก",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: Colors.grey.shade400),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF5DF232),
+                            width: 1.5,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(color: Colors.red),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+
                   if (_typeMenuError != null)
                     Padding(
                       padding: const EdgeInsets.only(top: 6, left: 4),
@@ -505,6 +651,7 @@ class _AddMenuState extends State<AddMenu> {
                       ),
                     ),
 
+                  // ── รายละเอียด ────────────────────────────────────────
                   _buildLabel("รายละเอียด (description)"),
                   TextFormField(
                     controller: descriptionController,
@@ -514,7 +661,8 @@ class _AddMenuState extends State<AddMenu> {
                     ),
                   ),
 
-                  _buildLabel("ราคาปกติ (price)"),
+                  // ── ราคา ──────────────────────────────────────────────
+                  _buildLabel("ราคา (price)"),
                   TextFormField(
                     controller: priceController,
                     keyboardType: TextInputType.number,
@@ -545,6 +693,7 @@ class _AddMenuState extends State<AddMenu> {
                     child: Divider(thickness: 1),
                   ),
 
+                  // ── Add-on Toggle ─────────────────────────────────────
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -579,6 +728,7 @@ class _AddMenuState extends State<AddMenu> {
                     ],
                   ),
 
+                  // ── Addon Groups ──────────────────────────────────────
                   if (isAddonOn) ...[
                     ListView.builder(
                       shrinkWrap: true,
@@ -927,6 +1077,7 @@ class _AddMenuState extends State<AddMenu> {
 
                   const SizedBox(height: 20),
 
+                  // ── ปุ่มบันทึก ────────────────────────────────────────
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(

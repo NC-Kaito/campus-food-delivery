@@ -7,9 +7,7 @@ import com.it22mjudelivery.springboot_api.v1.repositories.TypeRestaurantReposito
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -23,4 +21,6 @@ public class TypeMenuController {
     public ResponseEntity<List<TypeMenu>> getAllTypes() {
         return ResponseEntity.ok(typeMenuRepository.findAll());
     }
+
+
 }

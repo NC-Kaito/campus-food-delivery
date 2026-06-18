@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/home_restaurant.dart';
@@ -33,11 +34,21 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
       setState(() {
         if (rest != null) {
           restaurantModel = rest;
-
-          // ✅ แก้ไขจุดตาย: ดึง URL รูปโปรไฟล์ตรงๆ จากไอพีเครื่องจริง (.211) ไม่ต้องใช้ .replaceAll ขัดขาตัวเองแล้ว
           restaurantimage = rest.restaurantImage;
         }
       });
+    }
+  }
+
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
     }
   }
 
@@ -114,7 +125,9 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
               backgroundColor: const Color(0xFFFFEBCC),
               backgroundImage:
                   (restaurantimage != null && restaurantimage!.isNotEmpty)
-                  ? NetworkImage(Uri.encodeFull(restaurantimage!))
+                  ? NetworkImage(
+                      _getFinalImageUrl(restaurantimage!),
+                    ) // 3. เรียกใช้ฟังก์ชันที่สร้างขึ้นใหม่
                   : null,
               onBackgroundImageError:
                   (restaurantimage != null && restaurantimage!.isNotEmpty)

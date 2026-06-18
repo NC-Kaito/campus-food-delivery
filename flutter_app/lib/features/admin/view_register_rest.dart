@@ -408,9 +408,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 20),
-                                  _sectionTitle('ข้อมูลการติดต่อ'),
-                                  const SizedBox(height: 14),
+                                  const SizedBox(height: 24),
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
@@ -420,20 +418,15 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
                                           children: [
-                                            _labelValue(
-                                              'ชื่อ-นามสกุล เจ้าของ',
-                                              '${r.ownerFirstName ?? ''} ${r.ownerLastName ?? ''}',
+                                            const Text(
+                                              'รูปร้านค้า (Restaurant Image)',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87,
+                                              ),
                                             ),
-                                            const SizedBox(height: 24),
-                                            _labelValue(
-                                              'อีเมล (Email)',
-                                              r.email ?? '-',
-                                            ),
-                                            const SizedBox(height: 24),
-                                            _labelValue(
-                                              'เบอร์โทรศัพท์ (Phone)',
-                                              r.phone ?? '-',
-                                            ),
+                                            const SizedBox(height: 10),
+                                            _imageBox(r.restaurantImage),
                                           ],
                                         ),
                                       ),
@@ -451,8 +444,8 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                             ),
                                             const SizedBox(height: 8),
                                             Container(
-                                              width: 190,
-                                              height: 145,
+                                              width: 300,
+                                              height: 200,
                                               decoration: BoxDecoration(
                                                 border: Border.all(
                                                   color: const Color(
@@ -578,7 +571,9 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _sectionTitle('ข้อมูลเอกสาร'),
+                                  _sectionTitle(
+                                    'ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน',
+                                  ),
                                   const SizedBox(height: 14),
 
                                   // ใช้ Row จัดระเบียบให้รูปร้านค้า และ รูปหน้าเจ้าของร้านค้า แสดงผลเคียงคู่กัน
@@ -591,21 +586,27 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                         child: Column(
                                           crossAxisAlignment:
                                               CrossAxisAlignment.start,
+
                                           children: [
-                                            const Text(
-                                              'รูปร้านค้า (Restaurant Image)',
-                                              style: TextStyle(
-                                                fontSize: 14,
-                                                color: Colors.black87,
-                                              ),
+                                            _labelValue(
+                                              'ชื่อ-นามสกุล',
+                                              '${r.ownerFirstName ?? ''} ${r.ownerLastName ?? ''}',
                                             ),
-                                            const SizedBox(height: 10),
-                                            _imageBox(r.restaurantImage),
+                                            const SizedBox(height: 24),
+                                            _labelValue(
+                                              'อีเมล (Email)',
+                                              r.email ?? '-',
+                                            ),
+                                            const SizedBox(height: 24),
+                                            _labelValue(
+                                              'เบอร์โทรศัพท์ (Phone)',
+                                              r.phone ?? '-',
+                                            ),
                                           ],
                                         ),
                                       ),
                                       const SizedBox(
-                                        width: 16,
+                                        width: 10,
                                       ), // ระยะเว้นวรรคช่องว่างระหว่างรูป
                                       // ฝั่งรูปหน้าเจ้าของร้านค้า
                                       Expanded(
@@ -615,9 +616,9 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                           children: [
                                             // 🎯 ปรับปรุงข้อความหัวข้อตามความต้องการของอาจารย์
                                             const Text(
-                                              'รูปหน้าเจ้าของร้าน (Owner Image)',
+                                              'บัตรประชาชน (National ID)',
                                               style: TextStyle(
-                                                fontSize: 14,
+                                                fontSize: 13,
                                                 color: Colors.black87,
                                               ),
                                             ),
@@ -717,8 +718,9 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
         : "";
 
     return Container(
-      width: 240,
-      height: 260,
+      // 1. ตั้งค่า Container ให้มีขนาดที่คุณต้องการ
+      width: 300,
+      height: 200,
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border.all(color: Colors.black26),
@@ -735,10 +737,13 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                     borderRadius: BorderRadius.circular(8),
                     child: Stack(
                       children: [
+                        // 2. ตั้งค่า Image.network ให้มีขนาดเท่ากับ Container
                         Image.network(
                           encodedUrl,
-                          width: 240,
-                          height: 260,
+                          width: 300,
+                          height: 200,
+                          // 3. ใช้ BoxFit.cover เพื่อให้รูปขยายเต็มพื้นที่
+                          // หรือถ้าอยากให้เห็นรูปทั้งหมดโดยไม่โดนตัดให้ใช้ BoxFit.contain
                           fit: BoxFit.cover,
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
@@ -757,22 +762,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                             );
                           },
                         ),
-                        Positioned(
-                          bottom: 6,
-                          right: 6,
-                          child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.black45,
-                              shape: BoxShape.circle,
-                            ),
-                            padding: const EdgeInsets.all(4),
-                            child: const Icon(
-                              Icons.zoom_in,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                          ),
-                        ),
+                        // ... (ส่วนของปุ่มซูม)
                       ],
                     ),
                   ),
