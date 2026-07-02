@@ -521,25 +521,46 @@ class _ListMenuRestaurantState extends State<ListMenuRestaurant>
     onTap: onTap,
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      width: 60, // ปรับความกว้างให้เหมือนสวิตช์
+      width: 70, // ขยายความกว้างจาก 60 เป็น 70 เพื่อให้มีที่ว่างใส่ข้อความ
       height: 30,
       padding: const EdgeInsets.all(2),
-      alignment: isAvailable
-          ? Alignment.centerRight
-          : Alignment.centerLeft, // เลื่อนตำแหน่งวงกลม
       decoration: BoxDecoration(
         color: isAvailable
-            ? const Color(0xFF8BC34A)
-            : const Color.fromARGB(255, 255, 0, 0),
+            ? const Color(0xFF8BC34A) // เขียว
+            : const Color.fromARGB(255, 255, 0, 0), // แดง
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Container(
-        width: 30,
-        height: 40,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-        ),
+      child: Stack(
+        alignment: isAvailable ? Alignment.centerRight : Alignment.centerLeft,
+        children: [
+          // ข้อความแสดงสถานะ
+          Center(
+            child: Padding(
+              padding: EdgeInsets.only(
+                // เว้นที่ให้วงกลมไม่บังข้อความ
+                left: isAvailable ? 0 : 15,
+                right: isAvailable ? 15 : 0,
+              ),
+              child: Text(
+                isAvailable ? "มี" : "หมด",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          // วงกลมปุ่มเลื่อน
+          Container(
+            width: 26,
+            height: 26,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
       ),
     ),
   );

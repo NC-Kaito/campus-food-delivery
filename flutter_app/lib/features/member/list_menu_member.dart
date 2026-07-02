@@ -2,15 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/type_menu_model.dart'; // 🎯 ดึงโมเดลประเภทเมนูมาร่วมประกอบโครงสร้าง
+import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/features/member/add_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
-import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 เรียกไอพีส่วนกลางมาดักพาร์ทรูปภาพ
+import 'package:flutter_app/core/network/dio_client.dart';
 
 class ListMenuMember extends StatefulWidget {
-  final RestaurantModel
-  restaurantModel; // 🎯 รับข้อมูลร้านค้าต่อสายมาจากหน้า ViewRestaurantMember
+  final RestaurantModel restaurantModel;
   const ListMenuMember({super.key, required this.restaurantModel});
 
   @override
@@ -23,10 +22,8 @@ class _ListMenuMemberState extends State<ListMenuMember>
   TabController? _tabController;
 
   bool _isLoading = true;
-  List<TypeMenuModel> _typeMenus =
-      []; // 🎯 เก็บรายการหมวดหมู่ประเภทอาหารของร้าน
-  Map<int, List<MenuModel>> _categoryMenus =
-      {}; // 🎯 คัดกลุ่มเมนูอาหารลงกล่อง Map
+  List<TypeMenuModel> _typeMenus = [];
+  final Map<int, List<MenuModel>> _categoryMenus = {};
 
   String? restaurantimage;
   String? restaurantname = "กำลังโหลด...";
@@ -43,7 +40,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
     super.dispose();
   }
 
-  // 🎯 ฟังก์ชันช่วยต่อสายพาร์ทรูปภาพสั้นเข้าหาเซิร์ฟเวอร์ไอพีหลัก
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -56,17 +52,14 @@ class _ListMenuMemberState extends State<ListMenuMember>
     }
   }
 
-  // 🎯 ดึงพาร์ทประเภทและจับคัดเมนูแยกหมวดหมู่ที่พร้อมขายจริง (status != false)
   Future<void> _loadAllMenuData() async {
     if (widget.restaurantModel.username == null) return;
 
     try {
-      // 1. เรียกประเภทเมนูทั้งหมดของร้านค้า
       final categories = await _menuService.getTypeMenuByRestaurant(
         widget.restaurantModel.username!,
       );
 
-      // 2. ดึงรายการอาหารในแต่ละหมวดหมู่และคัดเฉพาะสถานะพร้อมขาย
       for (var cat in categories) {
         if (cat.typemenuId != null) {
           final menuData = await _menuService.getMenusByTypeMenu(
@@ -74,10 +67,8 @@ class _ListMenuMemberState extends State<ListMenuMember>
             cat.typemenuId!,
           );
 
-          // โชว์เฉพาะเมนูที่มีของขายอยู่ ณ เวลาปัจจุบัน
-          _categoryMenus[cat.typemenuId!] = menuData
-              .where((m) => m.status ?? true)
-              .toList();
+          // 🎯 ปลดล็อก: โชว์เมนูทั้งหมด รวมถึงเมนูที่หมด (status == false) ด้วย
+          _categoryMenus[cat.typemenuId!] = menuData.toList();
         }
       }
 
@@ -100,7 +91,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
         });
       }
     } catch (e) {
-      print("Error fetching member menus data: $e");
+      debugPrint("Error fetching member menus data: $e");
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -117,9 +108,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
-      appBar: const NavbarMember(
-        title: "",
-      ), // เรียกใช้ Navbar โครงสร้างระบบสมาชิกตามเดิม
+      appBar: const NavbarMember(title: ""),
       body: Column(
         children: [
           Expanded(
@@ -129,7 +118,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                   SliverToBoxAdapter(
                     child: Column(
                       children: [
-                        // --- ส่วนหัวรูปภาพร้านค้าเสมือนลอยพื้นหลัง ---
                         Stack(
                           clipBehavior: Clip.none,
                           children: [
@@ -180,8 +168,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                             ),
                           ],
                         ),
-
-                        // กล่องรายละเอียดชื่อร้านค้า
                         Container(
                           width: double.infinity,
                           color: Colors.white,
@@ -202,8 +188,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                 ),
                               ),
                               const SizedBox(height: 20),
-
-                              // 🌟 แถบหมวดหมู่สีเหลืองพาสเทล เลื่อนได้
                               Container(
                                 decoration: const BoxDecoration(
                                   color: Color(0xFFFFFFC8),
@@ -254,8 +238,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                   ),
                 ];
               },
-
-              // --- CONTENT (รายการสินค้ากดสั่งลงตะกร้าแยกตามแต่ละแท็บ) ---
               body: TabBarView(
                 controller: _tabController!,
                 children: _typeMenus.isEmpty
@@ -290,13 +272,16 @@ class _ListMenuMemberState extends State<ListMenuMember>
                               rawMenuImage,
                             );
 
-                            // 🎯 ใช้ Container คู่ Padding+Row แทน ListTile เพื่อจัดรูปภาพได้อิสระ
+                            // 🎯 เช็กสถานะว่ามีของหรือไม่
+                            final isAvailable = menu.status ?? true;
+
                             return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
+                              margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                color: const Color(
-                                  0xFFF0F4E8,
-                                ), // สีเขียวอ่อนแบบเดียวกับตัวอย่าง
+                                // 🎯 การ์ดสีเทาเมื่อเมนูหมด
+                                color: isAvailable
+                                    ? const Color(0xFFF0F4E8)
+                                    : Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(16),
                               ),
                               child: Padding(
@@ -309,14 +294,55 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                       child: SizedBox(
                                         width: 110,
                                         height: 110,
-                                        child: finalMenuUrl.isNotEmpty
-                                            ? Image.network(
-                                                Uri.encodeFull(finalMenuUrl),
-                                                fit: BoxFit.cover,
-                                                errorBuilder: (_, __, ___) =>
-                                                    _buildPlaceholderIcon(),
-                                              )
-                                            : _buildPlaceholderIcon(),
+                                        child: Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            finalMenuUrl.isNotEmpty
+                                                ? Image.network(
+                                                    Uri.encodeFull(
+                                                      finalMenuUrl,
+                                                    ),
+                                                    fit: BoxFit.cover,
+                                                    errorBuilder: (_, __, ___) =>
+                                                        _buildPlaceholderIcon(),
+                                                  )
+                                                : _buildPlaceholderIcon(),
+
+                                            // 🎯 Overlay สีดำ + ป้ายหมด
+                                            if (!isAvailable)
+                                              Container(
+                                                color: Colors.black.withOpacity(
+                                                  0.5,
+                                                ),
+                                                child: Center(
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.symmetric(
+                                                          horizontal: 12,
+                                                          vertical: 4,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.red
+                                                          .withOpacity(0.9),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                    child: const Text(
+                                                      "หมด",
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: 16,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                     const SizedBox(width: 15),
@@ -329,16 +355,22 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                         children: [
                                           Text(
                                             menu.menuName ?? "ไม่มีชื่อเมนู",
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
+                                              // 🎯 ดรอปสีตัวอักษรลง ไม่มีเส้นขีดทับ
+                                              color: isAvailable
+                                                  ? Colors.black
+                                                  : Colors.grey.shade700,
                                             ),
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
                                             "ราคา ${menu.price?.toStringAsFixed(0) ?? '0'} บาท",
-                                            style: const TextStyle(
-                                              color: Colors.green,
+                                            style: TextStyle(
+                                              color: isAvailable
+                                                  ? Colors.green
+                                                  : Colors.grey.shade600,
                                               fontWeight: FontWeight.bold,
                                               fontSize: 14,
                                             ),
@@ -347,20 +379,27 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                       ),
                                     ),
 
-                                    // 3. ปุ่มบวกสำหรับ Member (พาไปหน้าสั่งซื้อสินค้า)
+                                    // 3. ปุ่มบวกสำหรับ Member
                                     IconButton(
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                AddOrderMember(menuModel: menu),
-                                          ),
-                                        );
-                                      },
-                                      icon: const Icon(
+                                      // 🎯 ถ้าหมด กดไม่ได้ (null) สีกระดุมเทา
+                                      onPressed: isAvailable
+                                          ? () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (context) =>
+                                                      AddOrderMember(
+                                                        menuModel: menu,
+                                                      ),
+                                                ),
+                                              );
+                                            }
+                                          : null,
+                                      icon: Icon(
                                         Icons.add_circle,
-                                        color: Color(0xFF4CAF50),
+                                        color: isAvailable
+                                            ? const Color(0xFF4CAF50)
+                                            : Colors.grey.shade400,
                                         size: 36,
                                       ),
                                     ),
@@ -379,7 +418,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
     );
   }
 
-  // 🎯 ส่วนที่แก้ไข Widget Placeholder ให้เหมือนหน้า list_menu_restaurant
   Widget _buildPlaceholderIcon() {
     return Container(
       color: Colors.grey[200],

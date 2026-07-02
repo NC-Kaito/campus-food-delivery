@@ -419,7 +419,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
 
                   // 🎯 ย้ายกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านมาสแตนด์บายฝั่งขวาหน้าจอนี้เรียบร้อยครับ
                   _buildUploadBox(
-                    "รูปภาพหน้าเจ้าของร้านค้า (Owner Image)",
+                    "รูปภาพบัตรประชาชน (CardID Image)",
                     _selectedOwnerImage,
                     pickOwnerImage,
                   ),

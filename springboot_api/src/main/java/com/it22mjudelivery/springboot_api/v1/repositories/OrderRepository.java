@@ -12,7 +12,7 @@ import java.util.List;
 public interface OrderRepository extends JpaRepository<Order, Integer> {
     @Query("SELECT DISTINCT o FROM Order o " +
             "LEFT JOIN FETCH o.orderDetails d " +
-            "LEFT JOIN FETCH d.orderDetailAddons " +
+//            "LEFT JOIN FETCH d.orderDetailAddons " +
             "WHERE o.member.username = :username " +
             "ORDER BY o.orderid DESC")
     List<Order> findOrdersByMemberUsername(@Param("username") String username);

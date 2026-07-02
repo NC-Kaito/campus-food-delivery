@@ -6,93 +6,130 @@ import 'package:flutter_app/features/user/home_user.dart';
 class SelectRolePage extends StatelessWidget {
   const SelectRolePage({super.key});
 
+  // 🎯 สีเขียวประจำโปรเจกต์
+  final Color primaryGreen = const Color(0xFF64F02D);
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white, // พื้นหลังแอปสีขาวสะอาดตา
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 40.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // --- ข้อความหัวข้อ ---
-                const Text(
-                  "เลือกดู",
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Column(
+            children: [
+              const Spacer(flex: 1),
+              // --- หัวข้อ ---
+              const Text(
+                "ยินดีต้อนรับสู่\nCampus Delivery",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.black,
+                  height: 1.2,
                 ),
-                const SizedBox(height: 35),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                "เลือกสถานะการใช้งานของคุณ",
+                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              ),
+              const Spacer(flex: 1),
 
-                // --- กลุ่มปุ่มตัวเลือกผู้ใช้งาน ---
-                _buildRoleButton(context, "User", () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const HomeUser()),
-                  );
-                }),
-                const SizedBox(height: 25), // ระยะห่างระหว่างปุ่มตามแบบ Figma
+              // --- กลุ่มปุ่มตัวเลือก (ใช้ Card แทนปุ่มธรรมดา) ---
+              _buildRoleCard(
+                context,
+                "ผู้ใช้งานทั่วไป",
+                Icons.person_outline,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const HomeUser()),
+                ),
+              ),
+              const SizedBox(height: 16),
 
-                _buildRoleButton(context, "Restaurant", () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginRestaurant()),
-                  );
-                }),
-                const SizedBox(height: 25),
+              _buildRoleCard(
+                context,
+                "ร้านค้า",
+                Icons.store_mall_directory_outlined,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginRestaurant()),
+                ),
+              ),
+              const SizedBox(height: 16),
 
-                _buildRoleButton(context, "Rider", () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginRider()),
-                  );
-                }),
-                // const SizedBox(height: 25),
-
-                // _buildRoleButton(context, "Admin", () {
-                //   // TODO: Navigator.push ไปหน้าของ Admin
-                // }),
-              ],
-            ),
+              _buildRoleCard(
+                context,
+                "ไรเดอร์",
+                Icons.delivery_dining_outlined,
+                () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginRider()),
+                ),
+              ),
+              const Spacer(flex: 2),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // 🛠️ ฟังก์ชันสำหรับสร้างปุ่มตัวเลือกแบบกำหนดสไตล์ครั้งเดียวใช้ร่วมกันได้ทุกปุ่ม
-  Widget _buildRoleButton(
+  // 🛠️ ปรับสไตล์ Card ให้ดูนูนและมีไอคอน เพิ่มลูกเล่นด้วย InkWell
+  Widget _buildRoleCard(
     BuildContext context,
     String title,
+    IconData icon,
     VoidCallback onTap,
   ) {
-    return SizedBox(
-      width: double.infinity, // ขยายให้กว้างเต็มพื้นที่ตาม Padding ที่กำหนดไว้
-      height: 85, // ความสูงปุ่มสี่เหลี่ยมผืนผ้าตามสัดส่วนภาพต้นแบบ
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFDC0000).withOpacity(
-            0.12,
-          ), // สีเทาอมอ่อนพาสเทลตาม Layout (ดีฟอลต์ใช้สเปกสีใกล้เคียง #E0E0E0 หรือเทาอ่อนพื้นฐาน)
-          // หมายเหตุ: หากต้องการสีเทาแบบในภาพเป๊ะๆ สามารถเปลี่ยนใช้: const Color(0xFFD9D9D9) ได้ครับ
-          shadowColor: Colors.transparent,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(4), // ปรับขอบมนเล็กน้อยตามภาพ
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
           ),
-        ),
-        onPressed: onTap,
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 26,
-            fontWeight: FontWeight.w500, // ความหนาตัวอักษรกำลังดีอ่านง่าย
-            color: Colors.black,
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: primaryGreen.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: Colors.black87, size: 30),
+                ),
+                const SizedBox(width: 20),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const Spacer(),
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+              ],
+            ),
           ),
         ),
       ),

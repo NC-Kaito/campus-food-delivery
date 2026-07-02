@@ -1,5 +1,6 @@
 // features/user/home_user.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/features/admin/list_restaurant.dart';
 import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
+import 'package:flutter_app/features/user/list_menu_user.dart';
 import 'package:flutter_app/features/user/view_restaurant_user.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 
@@ -258,13 +260,12 @@ class _HomeUserState extends State<HomeUser> {
               ),
             ),
           ),
-          SizedBox(
-            height: 42,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              itemCount: typeList.length + 1,
-              itemBuilder: (context, index) {
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: List.generate(typeList.length + 1, (index) {
                 final bool isAllTab = index == 0;
                 final String? typeName = isAllTab
                     ? null
@@ -273,61 +274,54 @@ class _HomeUserState extends State<HomeUser> {
                     (isAllTab && selectedType == null) ||
                     (selectedType == typeName);
 
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                  child: ChoiceChip(
-                    showCheckmark:
-                        false, // บล็อกเครื่องหมายถูกออกตามเดิมไม่เปลี่ยนครับ
-                    avatar: Icon(
-                      isAllTab
-                          ? Icons.all_inclusive_rounded
-                          : Icons.local_dining_rounded,
-                      size: 16,
-                      color: isSelected
-                          ? Colors.white
-                          : const Color(
-                              0xFF64F02D,
-                            ), // 🎯 4. เปลี่ยนสีไอคอนในชิปที่ไม่ได้เลือกเป็นเขียวใหม่
-                    ),
-                    label: Text(isAllTab ? "ทั้งหมด" : typeName ?? ""),
-                    selected: isSelected,
-                    selectedColor: const Color(
-                      0xFF64F02D,
-                    ), // 🎯 5. เปลี่ยนสีชิปเมื่อถูกเลือกใช้งานเป็นเขียวใหม่
-                    backgroundColor: Colors.white,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : Colors.black87,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    side: BorderSide(
-                      color: isSelected
-                          ? Colors.transparent
-                          : const Color(
-                              0xFF64F02D,
-                            ).withOpacity(0.3), // เส้นขอบชิปเขียวอ่อน
-                    ),
-                    onSelected: (bool selected) {
-                      setState(() {
-                        if (isAllTab) {
-                          selectedType = null;
-                          _selectedTypeId = null;
-                        } else {
-                          selectedType = typeName;
-                          _selectedTypeId = typeList[index - 1].id;
-                        }
-                      });
-                      _loadResults(searchController.text);
-                    },
+                return ChoiceChip(
+                  showCheckmark: false,
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 0,
                   ),
+                  avatar: Icon(
+                    isAllTab
+                        ? Icons.all_inclusive_rounded
+                        : Icons.local_dining_rounded,
+                    size: 15,
+                    color: isSelected ? Colors.white : const Color(0xFF64F02D),
+                  ),
+                  label: Text(isAllTab ? "ทั้งหมด" : typeName ?? ""),
+                  selected: isSelected,
+                  selectedColor: const Color(0xFF64F02D),
+                  backgroundColor: Colors.white,
+                  labelStyle: TextStyle(
+                    color: isSelected ? Colors.white : Colors.black87,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  side: BorderSide(
+                    color: isSelected
+                        ? Colors.transparent
+                        : const Color(0xFF64F02D).withOpacity(0.3),
+                  ),
+                  onSelected: (bool selected) {
+                    setState(() {
+                      if (isAllTab) {
+                        selectedType = null;
+                        _selectedTypeId = null;
+                      } else {
+                        selectedType = typeName;
+                        _selectedTypeId = typeList[index - 1].id;
+                      }
+                    });
+                    _loadResults(searchController.text);
+                  },
                 );
-              },
+              }),
             ),
           ),
-
           const SizedBox(height: 10),
 
           // แสดงสแตมป์สรุปยอดผลการค้นหา
@@ -464,79 +458,124 @@ class _HomeUserState extends State<HomeUser> {
         )
         .toList();
 
+    // 🎯 คุมโทนเฉดสีเขียวหลักประจำโปรเจกต์ 0xFF64F02D
+    final Color primaryGreen = const Color(0xFF64F02D);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 14,
-            spreadRadius: 1,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 16,
+            spreadRadius: 0,
+            offset: const Offset(0, 6),
           ),
         ],
-        border: Border.all(color: Colors.grey.shade100, width: 1),
+        border: Border.all(color: Colors.grey.shade100, width: 1.5),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         onTap: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ViewRestaurantUser(restaurant: item),
+              builder: (context) => ListMenuUser(restaurantModel: item),
             ),
           );
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ส่วนภาพของร้านอาหาร
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(20),
-              ),
-              child: AspectRatio(
-                aspectRatio: 16 / 8.5,
-                child: finalImageUrl.isNotEmpty
-                    ? Image.network(
-                        finalImageUrl,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.grey[100],
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                color: Color(
-                                  0xFF64F02D,
-                                ), // 🎯 8. เปลี่ยนสีวงเวียนโหลดบนรูปภาพการ์ดเป็นเขียวใหม่
-                                strokeWidth: 2,
-                              ),
+            // ─── ส่วนภาพของร้านอาหาร ───────────────────────────
+            Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 8.5,
+                    child: finalImageUrl.isNotEmpty
+                        ? Image.network(
+                            finalImageUrl,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                color: Colors.grey[50],
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    color: primaryGreen,
+                                    strokeWidth: 2.5,
+                                  ),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  color: Colors.grey[50],
+                                  child: Icon(
+                                    Icons.storefront_rounded,
+                                    color: Colors.grey.shade400,
+                                    size: 45,
+                                  ),
+                                ),
+                          )
+                        : Container(
+                            color: Colors.grey[50],
+                            child: Icon(
+                              Icons.storefront_rounded,
+                              color: Colors.grey.shade400,
+                              size: 45,
                             ),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: Colors.grey[100],
-                          child: const Icon(
-                            Icons.restaurant_rounded,
-                            color: Colors.grey,
-                            size: 40,
                           ),
-                        ),
-                      )
-                    : Container(
-                        color: Colors.grey[100],
-                        child: const Icon(
-                          Icons.restaurant_rounded,
-                          color: Colors.grey,
-                          size: 40,
-                        ),
+                  ),
+                ),
+
+                // ป้ายแท็กประเภทหมวดหมู่ร้านค้า
+                if (item.typerestaurantName != null &&
+                    item.typerestaurantName!.isNotEmpty)
+                  Positioned(
+                    top: 12,
+                    left: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
                       ),
-              ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.65),
+                        borderRadius: BorderRadius.circular(10),
+                        // 🎯 ✅ แก้ไขแล้ว: ลบ blurRadius ออกจาก BoxDecoration
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.restaurant_menu_rounded,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            "${item.typerestaurantName}",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            // รายละเอียดของร้านอาหาร
+
+            // ─── รายละเอียดของร้านอาหาร ───────────────────────────
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -549,51 +588,64 @@ class _HomeUserState extends State<HomeUser> {
                         child: Text(
                           item.restaurantName ?? "ร้านอาหาร",
                           style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2A2A2A),
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF1A1A1A),
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 10,
+                          vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF64F02D).withOpacity(
-                            0.12,
-                          ), // สีเขียวพาสเทลจางๆ สไตล์เปิดร้าน
-                          borderRadius: BorderRadius.circular(8),
+                          color: primaryGreen.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Text(
-                          "• เปิดอยู่",
-                          style: TextStyle(
-                            color: Color(
-                              0xFF2E7D32,
-                            ), // เฉดเข้มเพื่อให้อ่านข้อความชัดเจน
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                        // 🎯 ✅ แก้ไขแล้ว: ลบ const หน้า Row ออก และย้ายมาใส่ตัวที่รองรับแทน
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 6,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF2E7D32),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              "เปิดอยู่",
+                              style: TextStyle(
+                                color: Color(0xFF2E7D32),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 14),
+
                   Row(
                     children: [
                       Icon(
                         Icons.calendar_today_rounded,
-                        size: 14,
-                        color: Colors.orange.shade700,
+                        size: 15,
+                        color: Colors.grey.shade500,
                       ),
-                      const SizedBox(width: 6),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _getOpenDayText(item.openDay),
                           style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
+                            color: Colors.grey.shade700,
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
                           ),
                           overflow: TextOverflow.ellipsis,
@@ -601,44 +653,74 @@ class _HomeUserState extends State<HomeUser> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
+
                   Row(
                     children: [
-                      const Icon(
-                        Icons.alarm_on_rounded,
-                        size: 14,
-                        color: Color(
-                          0xFF64F02D,
-                        ), // 🎯 9. เปลี่ยนสีไอคอนนาฬิกาของการ์ดร้านค้าเป็นเขียวใหม่
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        "${item.openTime?.substring(0, 5)} - ${item.closeTime?.substring(0, 5)} น.",
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        flex: 5,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 16,
+                              color: primaryGreen,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              "${item.openTime?.substring(0, 5)} - ${item.closeTime?.substring(0, 5)} น.",
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+
+                      if (item.phone != null && item.phone!.isNotEmpty)
+                        Expanded(
+                          flex: 5,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Icon(
+                                Icons.phone_in_talk_rounded,
+                                size: 15,
+                                color: Colors.orange.shade700,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                "${item.phone}",
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                     ],
                   ),
                 ],
               ),
             ),
 
-            // แผงเมนูอาหารที่ค้นหาเจอ
+            // ─── แผงเมนูอาหารที่ค้นหาเจอ ─────────────────
             if (matchedMenus.isNotEmpty)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.04),
+                  color: primaryGreen.withOpacity(0.03),
                   borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(20),
-                    bottomRight: Radius.circular(20),
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
                   ),
                   border: Border(
-                    top: BorderSide(color: Colors.orange.shade50, width: 1),
+                    top: BorderSide(color: Colors.grey.shade100, width: 1.5),
                   ),
                 ),
                 child: Column(
@@ -647,9 +729,9 @@ class _HomeUserState extends State<HomeUser> {
                     Row(
                       children: [
                         Icon(
-                          Icons.saved_search_rounded,
+                          Icons.search_rounded,
                           size: 18,
-                          color: Colors.orange.shade800,
+                          color: Colors.grey.shade800,
                         ),
                         const SizedBox(width: 6),
                         Text(
@@ -657,12 +739,12 @@ class _HomeUserState extends State<HomeUser> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade800,
+                            color: Colors.grey.shade800,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
                     ...matchedMenus.map((menu) {
                       final String finalMenuImgUrl = _getFinalImageUrl(
                         menu.menuImage,
@@ -670,18 +752,25 @@ class _HomeUserState extends State<HomeUser> {
 
                       return Container(
                         margin: const EdgeInsets.symmetric(vertical: 4),
-                        padding: const EdgeInsets.all(6),
+                        padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
                           color: Colors.white,
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.02),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
                         child: Row(
                           children: [
                             ClipRRect(
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(8),
                               child: SizedBox(
-                                width: 38,
-                                height: 38,
+                                width: 42,
+                                height: 42,
                                 child: finalMenuImgUrl.isNotEmpty
                                     ? Image.network(
                                         Uri.encodeFull(finalMenuImgUrl),
@@ -689,8 +778,8 @@ class _HomeUserState extends State<HomeUser> {
                                         errorBuilder: (_, __, ___) => Container(
                                           color: Colors.grey[100],
                                           child: const Icon(
-                                            Icons.fastfood,
-                                            size: 16,
+                                            Icons.fastfood_rounded,
+                                            size: 18,
                                             color: Colors.grey,
                                           ),
                                         ),
@@ -698,32 +787,30 @@ class _HomeUserState extends State<HomeUser> {
                                     : Container(
                                         color: Colors.grey[100],
                                         child: const Icon(
-                                          Icons.fastfood,
-                                          size: 16,
+                                          Icons.fastfood_rounded,
+                                          size: 18,
                                           color: Colors.grey,
                                         ),
                                       ),
                               ),
                             ),
-                            const SizedBox(width: 10),
+                            const SizedBox(width: 12),
                             Expanded(
                               child: Text(
                                 menu.menuName ?? "-",
                                 style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
                                   color: Colors.black87,
                                 ),
                               ),
                             ),
                             Text(
                               "฿${menu.price?.toStringAsFixed(0)}",
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(
-                                  0xFF64F02D,
-                                ), // 🎯 10. เปลี่ยนสีตัวเลขราคาสินค้าที่เสิร์ชเจอเป็นเขียวใหม่
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                                color: primaryGreen,
                               ),
                             ),
                           ],
