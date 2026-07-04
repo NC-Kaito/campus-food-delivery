@@ -624,7 +624,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                             ),
                                             const SizedBox(height: 10),
                                             // 🎯 ดึงประวัติรูปภาพใบหน้าจากฟิลด์ใหม่ r.ownerImage มาเรนเดอร์ขึ้นจอแอดมินโดยอัตโนมัติ
-                                            _imageBox(r.ownerImage),
+                                            _imageBox(r.imagecardid),
                                           ],
                                         ),
                                       ),

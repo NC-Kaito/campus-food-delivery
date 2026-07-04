@@ -49,11 +49,11 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     return Scaffold(
       backgroundColor: Colors.white,
       // 🌟 แถบ Navbar บน (เหมือนหน้า Home)
-      appBar: const NavbarMember(title: "ตะกร้ารายการอาหาร"),
+      appBar: const NavbarMember(title: "รายการอาหาร"),
       body: _groupedCart.isEmpty
           ? const Center(
               child: Text(
-                "ไม่มีรายการอาหารในตะกร้า",
+                "ไม่มีรายการอาหารใน",
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             )

@@ -24,7 +24,7 @@ public class RestaurantDto {
     private int openday;
     private Double latitude;
     private Double longitude;
-    private String ownerimage;
+    private String imagecardid;
     private String ownerfirstname;
     private String ownerlastname;
     private String email;

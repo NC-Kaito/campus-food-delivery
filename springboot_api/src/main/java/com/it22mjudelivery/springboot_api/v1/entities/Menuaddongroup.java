@@ -29,6 +29,9 @@ public class Menuaddongroup {
     @Column(nullable = false)
     private int maxselect;
 
+    @Column(nullable = false)
+    private boolean status;
+
     @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "menuid", nullable = false)

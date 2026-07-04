@@ -289,7 +289,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
           "restaurantname": restaurantnameController.text,
           "statusopen": _isStoreOpen,
           "restaurantimage": imageUrl ?? restaurantModel?.restaurantImage,
-          "ownerimage": restaurantModel?.ownerImage ?? "",
+          "ownerimage": restaurantModel?.imagecardid ?? "",
           "latitude": _restaurantLatLng?.latitude ?? restaurantModel?.latitude,
           "longitude":
               _restaurantLatLng?.longitude ?? restaurantModel?.longitude,

@@ -10,6 +10,7 @@ class OrderDetailModel {
   final String note;
   final MenuModel? menu;
   final List<OrderDetailAddonModel> addons;
+  final List<dynamic>? orderDetailCurries;
 
   OrderDetailModel({
     this.orderDetailId,
@@ -19,6 +20,7 @@ class OrderDetailModel {
     required this.note,
     this.menu,
     required this.addons,
+    this.orderDetailCurries,
   });
 
   factory OrderDetailModel.fromJson(Map<String, dynamic> json) {
@@ -51,6 +53,7 @@ class OrderDetailModel {
       'note': note,
       'menuId': menuId,
       'addons': addons.map((addon) => addon.toJson()).toList(),
+      "orderDetailCurries": orderDetailCurries,
     };
 
     if (orderDetailId != null) data['orderdetailid'] = orderDetailId;

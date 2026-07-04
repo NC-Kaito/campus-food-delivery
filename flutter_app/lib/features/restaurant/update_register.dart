@@ -148,8 +148,8 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
 
         // 🎯 สลัดคราบสัญญาเช่าผี เปลี่ยนมาดึงฟังก์ชันเซ็ตหัวไอพีรูปใบหน้าเจ้าของร้านค้าแทน
         ownerImageNetwork =
-            result.ownerImage != null && result.ownerImage!.isNotEmpty
-            ? _getFinalImageUrl(result.ownerImage)
+            result.imagecardid != null && result.imagecardid!.isNotEmpty
+            ? _getFinalImageUrl(result.imagecardid)
             : null;
 
         // จับคู่ประเภทร้านค้า

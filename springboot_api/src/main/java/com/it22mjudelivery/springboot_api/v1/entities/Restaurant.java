@@ -54,7 +54,7 @@ public class Restaurant {
     private String ownerlastname;
 
     @Column(length = 200, nullable = false)
-    private String ownerimage;
+    private String imagecardid;
 
     @Column(length = 100, nullable = false, unique = true)
     private String email;

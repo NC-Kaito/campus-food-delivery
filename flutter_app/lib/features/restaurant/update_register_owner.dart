@@ -73,9 +73,11 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
 
     _selectedOwnerImage = widget.updatedOwnerImage;
 
-    if (widget.restaurantData?.ownerImage != null &&
-        widget.restaurantData!.ownerImage!.isNotEmpty) {
-      ownerImageNetwork = _getFinalImageUrl(widget.restaurantData!.ownerImage!);
+    if (widget.restaurantData?.imagecardid != null &&
+        widget.restaurantData!.imagecardid!.isNotEmpty) {
+      ownerImageNetwork = _getFinalImageUrl(
+        widget.restaurantData!.imagecardid!,
+      );
     }
   }
 
@@ -163,7 +165,7 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
               widget.restaurantData?.restaurantName,
           restaurantImage:
               newRestaurantImageUrl ?? widget.restaurantData?.restaurantImage,
-          ownerImage: newOwnerImageUrl ?? widget.restaurantData?.ownerImage,
+          imagecardid: newOwnerImageUrl ?? widget.restaurantData?.imagecardid,
           openTime: widget.updatedOpenTime ?? widget.restaurantData?.openTime,
           closeTime:
               widget.updatedCloseTime ?? widget.restaurantData?.closeTime,

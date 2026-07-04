@@ -23,7 +23,7 @@ class RegisterOwnerInfo extends StatefulWidget {
   final String closeTime;
   final List<bool> selectedDays;
   final File? restaurantImage;
-  final File? ownerImage; // รับค่ามาเผื่อไว้ (หรือเลือกใหม่ในหน้านี้)
+  final File? imagecardid;
 
   const RegisterOwnerInfo({
     super.key,
@@ -41,7 +41,7 @@ class RegisterOwnerInfo extends StatefulWidget {
     required this.closeTime,
     required this.selectedDays,
     this.restaurantImage,
-    this.ownerImage,
+    this.imagecardid,
   });
 
   @override
@@ -75,8 +75,8 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     phoneController = TextEditingController(text: widget.initialPhone);
 
     // ตั้งค่าเริ่มต้นรูปภาพจากหน้าแรก (ถ้ามี)
-    if (widget.ownerImage != null) {
-      _selectedOwnerImage = widget.ownerImage;
+    if (widget.imagecardid != null) {
+      _selectedOwnerImage = widget.imagecardid;
     }
     super.initState();
   }
@@ -190,7 +190,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
         );
 
         // ยิงภาพประเภท 'owner' ตรงเข้าหลังบ้าน
-        final ownerImageUrl = await uploadImage(
+        final imagecardIdUrl = await uploadImage(
           _selectedOwnerImage,
           'ownerImage',
         );
@@ -200,7 +200,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           password: widget.password,
           restaurantName: widget.restaurantName,
           restaurantImage: restaurantImageUrl,
-          ownerImage: ownerImageUrl,
+          imagecardid: imagecardIdUrl,
           openTime: widget.openTime,
           closeTime: widget.closeTime,
           openDay: convertDaysToInt(widget.selectedDays),

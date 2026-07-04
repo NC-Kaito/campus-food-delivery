@@ -24,6 +24,9 @@ public class Menuaddondetail {
     @Column(nullable = false)
     private double addonprice;
 
+    @Column(nullable = false)
+    private boolean status;
+
     @JsonIgnore
     @OneToMany(mappedBy = "menuaddondetail", fetch = FetchType.LAZY)
     @Builder.Default

@@ -45,7 +45,7 @@ public class RestaurantServiceImpl implements RestaurantService{
                 .latitude(restaurantDto.getLatitude())
                 .longitude(restaurantDto.getLongitude())
                 .restaurantimage(restaurantDto.getRestaurantimage())
-                .ownerimage(restaurantDto.getOwnerimage())
+                .imagecardid(restaurantDto.getImagecardid())
                 .opentime(restaurantDto.getOpentime())
                 .closetime(restaurantDto.getClosetime())
                 .openDay(restaurantDto.getOpenday())
@@ -99,7 +99,7 @@ public class RestaurantServiceImpl implements RestaurantService{
         restaurant.setOwnerlastname(ownerlastname);
         restaurant.setEmail(email);
         restaurant.setPhone(phone);
-        restaurant.setOwnerimage(ownerimage);
+        restaurant.setImagecardid(ownerimage);
 
         restaurantRepository.save(restaurant);
         return true;

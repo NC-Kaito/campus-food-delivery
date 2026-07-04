@@ -101,19 +101,37 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   }
 
   Widget _buildOrderItemCard(CartItem item, int index) {
+    // 🌟 1. เช็กว่าเป็นเมนูประเภทข้าวราดแกงหรือไม่
+    final bool isCurryDish = item.selectedCurries.isNotEmpty;
+
+    // 🌟 2. กำหนดชื่อเมนูที่จะแสดงผลบนหัว Card ให้เหมาะสม
+    final String displayMenuName = isCurryDish
+        ? "ข้าวราดแกง (${item.selectedCurries.length} อย่าง)"
+        : (item.menu.menuName ?? "ไม่มีชื่อเมนู");
+
     String? rawMenuImage = item.menu.menuImage;
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
-    int totalAddonPricePerUnit = 0;
-    for (var addon in item.selectedAddons) {
-      totalAddonPricePerUnit += addon.addonPrice?.toInt() ?? 0;
+    // คำนวณราคาต่อหน่วย
+    int finalPricePerUnit = 0;
+    if (isCurryDish) {
+      finalPricePerUnit = item.totalPrice;
+    } else {
+      int totalAddonPricePerUnit = 0;
+      for (var addon in item.selectedAddons) {
+        totalAddonPricePerUnit += addon.addonPrice?.toInt() ?? 0;
+      }
+      int baseMenuPrice = item.menu.price?.toInt() ?? 0;
+      finalPricePerUnit = baseMenuPrice + totalAddonPricePerUnit;
     }
-
-    int baseMenuPrice = item.menu.price?.toInt() ?? 0;
-    int finalPricePerUnit = baseMenuPrice + totalAddonPricePerUnit;
 
     String addonText = item.selectedAddons
         .map((e) => e.addonMenu?.addonName ?? '')
+        .where((name) => name.isNotEmpty)
+        .join(", ");
+
+    String curriesText = item.selectedCurries
+        .map((e) => e.menuName ?? '')
         .where((name) => name.isNotEmpty)
         .join(", ");
 
@@ -163,16 +181,17 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
-                child: finalMenuUrl.isNotEmpty
-                    ? Image.network(
+                // 🌟 3. ถ้าเป็นข้าวราดแกง ให้สลับมาใช้ไอคอนกลางแทนรูปแกงถ้วยเดี่ยวทันที
+                child: isCurryDish || finalMenuUrl.isEmpty
+                    ? _buildPlaceholderIcon()
+                    : Image.network(
                         Uri.encodeFull(finalMenuUrl),
                         width: 65,
                         height: 65,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             _buildPlaceholderIcon(),
-                      )
-                    : _buildPlaceholderIcon(),
+                      ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -182,8 +201,9 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        // 🌟 4. เปลี่ยนมาเรนเดอร์ตัวแปร displayMenuName ที่เราดักค่าไว้
                         Text(
-                          item.menu.menuName ?? "ไม่มีชื่อเมนู",
+                          displayMenuName,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -207,6 +227,17 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
+                    if (curriesText.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        "กับข้าวที่ราด: $curriesText",
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.green.shade800,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                     if (addonText.isNotEmpty) ...[
                       const SizedBox(height: 2),
                       Text(
@@ -241,14 +272,21 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
 
   @override
   Widget build(BuildContext context) {
+    // 🌟 4. ปรับปรุงสูตรคิดราคารวมสินค้าทั้งหมดในร้านค้านั้นๆ ให้รองรับราดแกง
     int subtotalPrice = 0;
     for (var item in widget.storeItems) {
-      int addonsSum = 0;
-      for (var addon in item.selectedAddons) {
-        addonsSum += addon.addonPrice?.toInt() ?? 0;
+      if (item.selectedCurries.isNotEmpty) {
+        // ถ้าราดแกง เอาค่าหัวราคาจานคูณจำนวนไปได้ทันที
+        subtotalPrice += (item.totalPrice * item.quantity);
+      } else {
+        // เมนูตามสั่งปกติ คิดแบบราคาเบส + ท็อปปิ้งออริจินัล
+        int addonsSum = 0;
+        for (var addon in item.selectedAddons) {
+          addonsSum += addon.addonPrice?.toInt() ?? 0;
+        }
+        int actualMenuPrice = (item.menu.price?.toInt() ?? 0) + addonsSum;
+        subtotalPrice += (actualMenuPrice * item.quantity);
       }
-      int actualMenuPrice = (item.menu.price?.toInt() ?? 0) + addonsSum;
-      subtotalPrice += (actualMenuPrice * item.quantity);
     }
 
     int deliveryFee = 15;
@@ -591,8 +629,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                           "⚠️ กรุณาแตะแผ่นแผนที่เพื่อระบุตำแหน่งจัดส่งสินค้าก่อนครับ",
                         ),
                         backgroundColor: Colors.amber,
-                        behavior:
-                            SnackBarBehavior.fixed, // 🎯 แก้ให้ไม่ลอยชนจอพัง
+                        behavior: SnackBarBehavior.fixed,
                       ),
                     );
                     return;
@@ -607,18 +644,30 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   );
 
                   try {
+                    // 🌟 5. แปลงข้อมูลตะกร้าสินค้า ให้พร้อมยิงไปหาตารางใหม่หลังบ้าน
                     List<OrderDetailModel> orderItems = widget.storeItems.map((
                       cartItem,
                     ) {
-                      int currentAddonsSum = 0;
-                      for (var addon in cartItem.selectedAddons) {
-                        currentAddonsSum += addon.addonPrice?.toInt() ?? 0;
-                      }
-                      double actualSubTotal =
-                          ((cartItem.menu.price?.toInt() ?? 0) +
-                              currentAddonsSum) *
-                          cartItem.quantity.toDouble();
+                      double actualSubTotal = 0;
 
+                      if (cartItem.selectedCurries.isNotEmpty) {
+                        // เคสราดแกง: ราคารวมคูณจำนวนไปได้โดยตรง
+                        actualSubTotal =
+                            (cartItem.totalPrice * cartItem.quantity)
+                                .toDouble();
+                      } else {
+                        // เคสอาหารปกติ
+                        int currentAddonsSum = 0;
+                        for (var addon in cartItem.selectedAddons) {
+                          currentAddonsSum += addon.addonPrice?.toInt() ?? 0;
+                        }
+                        actualSubTotal =
+                            ((cartItem.menu.price?.toInt() ?? 0) +
+                                currentAddonsSum) *
+                            cartItem.quantity.toDouble();
+                      }
+
+                      // สลายข้อมูลวัตถุให้พร้อมส่งออกไปยัง JSON
                       return OrderDetailModel(
                         menuId: cartItem.menu.menuId ?? 0,
                         qty: cartItem.quantity,
@@ -630,6 +679,17 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                             priceAtOrder: (addonDetail.addonPrice ?? 0)
                                 .toDouble(),
                           );
+                        }).toList(),
+                        // 🎯 ยัดข้อมูลส่วนประกอบราดแกงเพิ่มเข้าไปที่โมเดลส่งออก (แมปเข้ากับฟิลด์หลังบ้านตรงๆ)
+                        // หมายเหตุ: อย่าลืมแวะเพิ่มฟิลด์ orderDetailCurries ในคลาส OrderDetailModel ด้วยนะคราบบบ
+                        orderDetailCurries: cartItem.selectedCurries.map((
+                          curry,
+                        ) {
+                          return {
+                            "menu": {"menuid": curry.menuId ?? 0},
+                            "priceAtOrder":
+                                5.0, // ล็อกยอดตักเพิ่มชิ้นละ 5 บาท Fixed ตามราคาหน้าร้าน
+                          };
                         }).toList(),
                       );
                     }).toList();
@@ -661,8 +721,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                           "🎉 สั่งซื้ออาหารสำเร็จ! ระบบกำลังตามหาไรเดอร์ให้คุณครับ",
                         ),
                         backgroundColor: Colors.green,
-                        behavior:
-                            SnackBarBehavior.fixed, // 🎯 แก้ให้ไม่ลอยชนจอพัง
+                        behavior: SnackBarBehavior.fixed,
                       ),
                     );
 
@@ -675,8 +734,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       SnackBar(
                         content: Text("❌ สั่งซื้อไม่สำเร็จ: $error"),
                         backgroundColor: Colors.redAccent,
-                        behavior:
-                            SnackBarBehavior.fixed, // 🎯 แก้ให้ไม่ลอยชนจอพัง
+                        behavior: SnackBarBehavior.fixed,
                       ),
                     );
                   }

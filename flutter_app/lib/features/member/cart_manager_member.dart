@@ -5,15 +5,21 @@ import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 // โมเดลสำหรับเก็บไอเทมที่อยู่ในตะกร้า
 class CartItem {
   final MenuModel menu;
-  final List<MenuAddonDetailModel> selectedAddons;
+  final List<MenuAddonDetailModel>
+  selectedAddons; // สำหรับท็อปปิ้งปกติ (เช่น ไข่ดาว, ไข่เจียว)
+  final List<MenuModel>
+  selectedCurries; // 🌟 เพิ่มฟิลด์นี้สำหรับเก็บกับข้าวราดแกง (ที่ชี้ไปตาราง Menu)
   int quantity;
   final String note;
   final int addonPrice;
-  final int totalPrice;
+  final int
+  totalPrice; // แนะนำให้ค่านี้เป็น "ราคาต่อหน่วย/ต่อจาน" จะได้คูณ quantity ได้ง่ายครับ
 
   CartItem({
     required this.menu,
     required this.selectedAddons,
+    this.selectedCurries =
+        const [], // 🎯 กำหนดให้เป็น Default Value เพื่อไม่ให้โค้ดเก่าพัง
     required this.quantity,
     required this.note,
     required this.addonPrice,
@@ -49,12 +55,11 @@ class CartManager {
     if (item.quantity > 1) {
       item.quantity--;
     } else {
-      // ถ้าจำนวนเหลือ 1 แล้วกดลด ให้ลบออกจากตะกร้าเลย
       removeFromCart(item);
     }
   }
 
-  // 🎯 3. ฟังก์ชันเพิ่มจำนวน (สำหรับกดปุ่ม + ในหน้าดูรายละเอียดออเดอร์)
+  // 🎯 3. ฟังก์ชันเพิ่มจำนวน
   void increaseQuantity(CartItem item) {
     item.quantity++;
   }

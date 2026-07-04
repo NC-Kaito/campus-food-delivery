@@ -27,6 +27,13 @@ class _ListMenuUserState extends State<ListMenuUser>
   String? restaurantimage;
   String? restaurantname = "กำลังโหลด...";
 
+  // ─── 🎯 ส่วนเสริม State สำหรับ Logic ร้านข้าวแกง ──────────────────
+  final int _maxCurrySelect = 3;
+  final List<MenuModel> _selectedCurries = [];
+  bool _isExtraRice = false;
+  bool _isAddEgg = false;
+  int _curryQty = 1;
+
   @override
   void initState() {
     super.initState();
@@ -65,8 +72,6 @@ class _ListMenuUserState extends State<ListMenuUser>
             widget.restaurantModel.username!,
             cat.typemenuId!,
           );
-
-          // 🎯 ปลดล็อก! ดึงเมนูทั้งหมดมาโชว์ (รวมเมนูที่ status == false ด้วย)
           _categoryMenus[cat.typemenuId!] = menuData.toList();
         }
       }
@@ -162,8 +167,44 @@ class _ListMenuUserState extends State<ListMenuUser>
     );
   }
 
+  // ─── 🎯 ส่วนเสริมสุ่มแจ้งเตือนข้อมูลตะกร้าข้าวแกง ──────────────────
+  void _showMockCurryCartDialog(double total, String note) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.shopping_basket, color: Colors.green),
+            SizedBox(width: 8),
+            Text("ระบบรับข้อมูลข้าวแกง"),
+          ],
+        ),
+        content: Text(
+          "💰 ราคารวม: ฿${total.toStringAsFixed(0)} บาท\n🔢 จำนวน: $_curryQty จาน\n📝 ข้อมูลที่บันทึกใน Note:\n\"$note\"",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() {
+                _selectedCurries.clear();
+                _isExtraRice = false;
+                _isAddEgg = false;
+                _curryQty = 1;
+              });
+            },
+            child: const Text("ตกลง"),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bool shouldScroll = _typeMenus.length > 3;
+
     if (_isLoading || _tabController == null) {
       return const Scaffold(
         backgroundColor: Colors.white,
@@ -236,7 +277,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                               left: 0,
                               right: 0,
                               child: Container(
-                                height: 35,
+                                height: 30,
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.only(
@@ -256,18 +297,18 @@ class _ListMenuUserState extends State<ListMenuUser>
                             children: [
                               Padding(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
+                                  horizontal: 16,
                                 ),
                                 child: Text(
                                   restaurantname ?? "-",
                                   style: const TextStyle(
-                                    fontSize: 30,
+                                    fontSize: 28,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.black,
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 10),
                               Container(
                                 decoration: const BoxDecoration(
                                   color: Color(0xFFFFFFC8),
@@ -280,8 +321,10 @@ class _ListMenuUserState extends State<ListMenuUser>
                                 ),
                                 child: TabBar(
                                   controller: _tabController!,
-                                  isScrollable: true,
-                                  tabAlignment: TabAlignment.start,
+                                  isScrollable: shouldScroll,
+                                  tabAlignment: shouldScroll
+                                      ? TabAlignment.start
+                                      : TabAlignment.fill,
                                   labelColor: Colors.black,
                                   unselectedLabelColor: Colors.black54,
                                   indicatorColor: Colors.black,
@@ -289,17 +332,18 @@ class _ListMenuUserState extends State<ListMenuUser>
                                   indicatorSize: TabBarIndicatorSize.tab,
                                   dividerColor: Colors.transparent,
                                   labelStyle: const TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                   ),
                                   unselectedLabelStyle: const TextStyle(
-                                    fontSize: 16,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                  labelPadding: EdgeInsets.symmetric(
-                                    horizontal:
-                                        MediaQuery.of(context).size.width / 12,
-                                  ),
+                                  labelPadding: shouldScroll
+                                      ? const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                        )
+                                      : EdgeInsets.zero,
                                   tabs: _typeMenus.isEmpty
                                       ? [const Tab(text: "ไม่มีประเภท")]
                                       : _typeMenus
@@ -326,6 +370,12 @@ class _ListMenuUserState extends State<ListMenuUser>
                         final typeId = type.typemenuId!;
                         final currentMenus = _categoryMenus[typeId] ?? [];
 
+                        // 🎯 เช็กเงื่อนไข: หากชื่อแท็บหมวดหมู่มีคำว่า "ข้าวราดแกง" ให้เปิดใช้โครงสร้างแบบร้านข้าวแกงทันที
+                        if (type.typemenuName != null &&
+                            type.typemenuName!.contains("ข้าวราดแกง")) {
+                          return _buildCurrySpecialLayout(currentMenus);
+                        }
+
                         if (currentMenus.isEmpty) {
                           return const Center(
                             child: Text(
@@ -338,6 +388,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                           );
                         }
 
+                        // 🍜 โหมดวาดข้อมูลแท็บแบบรายการอาหารปกติทั่วไป
                         return ListView.builder(
                           itemCount: currentMenus.length,
                           padding: const EdgeInsets.symmetric(
@@ -352,14 +403,11 @@ class _ListMenuUserState extends State<ListMenuUser>
                               rawMenuImage,
                             );
 
-                            // 🎯 เช็กสถานะว่าเมนูนี้พร้อมขายหรือไม่
                             final isAvailable = menu.status ?? true;
 
-                            // 🎯 ปรับแต่งตามคำขอ: ปรับพื้นหลังเป็นสีเทา และเอาเส้นขีดทับชื่อออก
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                // 🎯 ถ้ามีของเป็นสีเขียวอ่อน ถ้าหมดให้การ์ดเป็นสีเทา
                                 color: isAvailable
                                     ? const Color(0xFFF0F4E8)
                                     : Colors.grey.shade200,
@@ -369,7 +417,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                                 padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
-                                    // 1. รูปภาพ
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
                                       child: SizedBox(
@@ -388,8 +435,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                                                         _buildPlaceholderIcon(),
                                                   )
                                                 : _buildPlaceholderIcon(),
-
-                                            // Overlay สีดำโปร่งแสงพร้อมป้าย "หมด"
                                             if (!isAvailable)
                                               Container(
                                                 color: Colors.black.withOpacity(
@@ -422,13 +467,23 @@ class _ListMenuUserState extends State<ListMenuUser>
                                                   ),
                                                 ),
                                               ),
+                                            IgnorePointer(
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: Colors.grey,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 15),
-
-                                    // 2. ข้อความชื่อและราคา
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -439,7 +494,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              // 🎯 เอาเส้นขีดทับ (LineThrough) ออกแล้ว เหลือแค่ดรอปสี
                                               color: isAvailable
                                                   ? Colors.black
                                                   : Colors.grey.shade700,
@@ -459,10 +513,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                                         ],
                                       ),
                                     ),
-
-                                    // 3. ปุ่มบวก
                                     IconButton(
-                                      // ถ้าเมนูหมด กดไม่ได้ (ปุ่มตาย)
                                       onPressed: isAvailable
                                           ? _showLoginWarningDialog
                                           : null,
@@ -486,6 +537,425 @@ class _ListMenuUserState extends State<ListMenuUser>
           ),
         ],
       ),
+    );
+  }
+
+  // ─── 🍲 LAYOUT พิเศษ: แท็บข้าวราดแกง คำนวณราคา 1 อย่าง 20 | 2 อย่าง 25 | 3 อย่าง 30 ───
+  // ─── 🍲 LAYOUT พิเศษ: แท็บข้าวราดแกง เวอร์ชันดีไซน์สวยงามระดับพรีเมียม ───
+  Widget _buildCurrySpecialLayout(List<MenuModel> curryItems) {
+    if (curryItems.isEmpty) {
+      return const Center(
+        child: Text(
+          "ไม่มีเมนูกับข้าวพร้อมจำหน่ายในขณะนี้",
+          style: TextStyle(color: Colors.grey, fontSize: 15),
+        ),
+      );
+    }
+
+    int selectCount = _selectedCurries.length;
+
+    double basePrice = 0;
+    if (selectCount >= 1) {
+      basePrice = 25;
+    }
+
+    double extraCurryPrice = 0;
+    if (selectCount > 1) {
+      extraCurryPrice = (selectCount - 1) * 5.0;
+    }
+
+    double optionPrice = 0;
+    if (_isExtraRice) optionPrice += 5;
+
+    double totalPrice = (basePrice + extraCurryPrice + optionPrice) * _curryQty;
+
+    return Column(
+      children: [
+        // ─── ส่วน scroll ───────────────────────────────────────
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 💳 1. แผงสรุปราคา
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.04),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                    border: Border.all(color: Colors.grey.shade100),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                "ข้าวราดแกงตามใจชอบ",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: selectCount == 0
+                                      ? Colors.orange.shade50
+                                      : Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  "เลือกแล้ว $selectCount / $_maxCurrySelect อย่าง",
+                                  style: TextStyle(
+                                    color: selectCount == 0
+                                        ? Colors.orange.shade800
+                                        : Colors.green.shade800,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            "฿${totalPrice.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF4CAF50),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: Divider(height: 1, color: Color(0xFFF5F5F5)),
+                      ),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline,
+                            size: 14,
+                            color: Colors.grey,
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // 🍛 2. หัวข้อรายการกับข้าว
+                const Row(
+                  children: [
+                    Icon(
+                      Icons.restaurant_menu,
+                      size: 20,
+                      color: Colors.black87,
+                    ),
+                    SizedBox(width: 8),
+                    Text(
+                      "เลือกกับข้าวที่ต้องการราดหน้า",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // 🍱 3. รายการกับข้าว
+                ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.only(top: 8),
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: curryItems.length,
+                  itemBuilder: (context, index) {
+                    final curry = curryItems[index];
+                    final isAvailable = curry.status ?? true;
+                    final isSelected = _selectedCurries.any(
+                      (element) => element.menuId == curry.menuId,
+                    );
+                    final imgUrl = _getFinalImageUrl(
+                      curry.menuImage ?? (curry as dynamic).imageUrl,
+                    );
+
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color: !isAvailable
+                            ? Colors.grey.shade50
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFF4CAF50)
+                              : Colors.grey.shade200,
+                          width: isSelected ? 2.0 : 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: isSelected
+                                ? const Color(0xFF4CAF50).withOpacity(0.06)
+                                : Colors.black.withOpacity(0.02),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: CheckboxListTile(
+                        activeColor: const Color(0xFF4CAF50),
+                        checkboxShape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        secondary: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 85,
+                            height: 85,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                imgUrl.isNotEmpty
+                                    ? Image.network(
+                                        Uri.encodeFull(imgUrl),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) =>
+                                            _buildPlaceholderIcon(),
+                                      )
+                                    : _buildPlaceholderIcon(),
+                                if (!isAvailable)
+                                  Container(
+                                    color: Colors.black.withOpacity(0.4),
+                                    child: const Center(
+                                      child: Text(
+                                        "หมด",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                IgnorePointer(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: Colors.black.withOpacity(0.06),
+                                        width: 1,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          curry.menuName ?? "ไม่มีชื่อกับข้าว",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                            color: isAvailable ? Colors.black87 : Colors.grey,
+                          ),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            (curry.price != null && curry.price! > 0)
+                                ? "เมนูพิเศษ +${curry.price!.toStringAsFixed(0)} บาท"
+                                : "รวมในราคาฐานแล้ว",
+                            style: TextStyle(
+                              color: (curry.price != null && curry.price! > 0)
+                                  ? Colors.orange.shade800
+                                  : Colors.grey.shade500,
+                              fontSize: 12,
+                              fontWeight:
+                                  (curry.price != null && curry.price! > 0)
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ),
+                        value: isSelected,
+                        onChanged:
+                            (!isAvailable ||
+                                (isSelected == false &&
+                                    _selectedCurries.length >= _maxCurrySelect))
+                            ? null
+                            : (bool? value) {
+                                setState(() {
+                                  if (isSelected) {
+                                    _selectedCurries.removeWhere(
+                                      (element) =>
+                                          element.menuId == curry.menuId,
+                                    );
+                                  } else {
+                                    _selectedCurries.add(curry);
+                                  }
+                                });
+                              },
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+
+        // ─── Bottom Bar fixed ──────────────────────────────────
+        Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Colors.grey.shade200, width: 1),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 12,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ⚙️ ตัวเลือกเสริม
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: CheckboxListTile(
+                  activeColor: const Color(0xFF4CAF50),
+                  dense: true,
+                  checkboxShape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  title: const Text(
+                    "เพิ่มปริมาณข้าวสวย",
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: const Text(
+                    "+5 บาท",
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  value: _isExtraRice,
+                  onChanged: (val) =>
+                      setState(() => _isExtraRice = val ?? false),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // 🛒 จำนวน + ปุ่มลงตะกร้า
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.remove,
+                            size: 20,
+                            color: Colors.black87,
+                          ),
+                          onPressed: _curryQty > 1
+                              ? () => setState(() => _curryQty--)
+                              : null,
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            '$_curryQty',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.add,
+                            size: 20,
+                            color: Colors.black87,
+                          ),
+                          onPressed: () => setState(() => _curryQty++),
+                        ),
+                      ],
+                    ),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF4CAF50),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.grey.shade300,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 16,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      elevation: 0,
+                    ),
+                    onPressed: _selectedCurries.isEmpty
+                        ? null
+                        : () {
+                            _showLoginWarningDialog();
+                          },
+                    child: const Text(
+                      "เพิ่มลงตะกร้า",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

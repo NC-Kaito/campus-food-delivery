@@ -635,7 +635,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                 closeTime: closeTimeController.text,
                                 selectedDays: _selectedDays,
                                 restaurantImage: _selectedImage,
-                                ownerImage:
+                                imagecardid:
                                     _selectedOwnerImage, // ✅ ส่งตัวแปรที่ประกาศรองรับไว้สมบูรณ์แล้ว
                               ),
                             ),

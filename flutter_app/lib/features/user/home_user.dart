@@ -30,8 +30,7 @@ class _HomeUserState extends State<HomeUser> {
   Map<String, List<MenuModel>> _restaurantMenusIndex = {};
 
   bool _isLoading = true;
-  String? selectedType;
-  int? _selectedTypeId;
+  Set<int> _selectedTypeIds = {};
 
   // 🎯 ปรับแต่งสีข้อความเมนูแถบล่างให้เป็นสีเขียวใหม่ #64F02D
   final menuTextStyle = const TextStyle(
@@ -76,8 +75,14 @@ class _HomeUserState extends State<HomeUser> {
 
     var data = await _restaurantService.searchRestaurant(keyword);
 
-    if (_selectedTypeId != null) {
-      data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
+    // if (_selectedTypeId != null) {
+    //   data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
+    // }
+
+    if (_selectedTypeIds.isNotEmpty) {
+      data = data
+          .where((r) => _selectedTypeIds.contains(r.typerestaurantId))
+          .toList();
     }
 
     for (var rest in data) {
@@ -267,12 +272,15 @@ class _HomeUserState extends State<HomeUser> {
               runSpacing: 8,
               children: List.generate(typeList.length + 1, (index) {
                 final bool isAllTab = index == 0;
+                final int? typeId = isAllTab ? null : typeList[index - 1].id;
                 final String? typeName = isAllTab
                     ? null
                     : typeList[index - 1].name;
-                final bool isSelected =
-                    (isAllTab && selectedType == null) ||
-                    (selectedType == typeName);
+
+                // ทั้งหมด = ไม่มีตัวไหนถูกเลือก, อื่นๆ = เช็คใน Set
+                final bool isSelected = isAllTab
+                    ? _selectedTypeIds.isEmpty
+                    : _selectedTypeIds.contains(typeId);
 
                 return ChoiceChip(
                   showCheckmark: false,
@@ -309,11 +317,14 @@ class _HomeUserState extends State<HomeUser> {
                   onSelected: (bool selected) {
                     setState(() {
                       if (isAllTab) {
-                        selectedType = null;
-                        _selectedTypeId = null;
+                        // กด "ทั้งหมด" → ล้างการเลือกทั้งหมด
+                        _selectedTypeIds.clear();
+                      } else if (selected) {
+                        // เลือกเพิ่ม
+                        _selectedTypeIds.add(typeId!);
                       } else {
-                        selectedType = typeName;
-                        _selectedTypeId = typeList[index - 1].id;
+                        // ยกเลิกตัวนี้
+                        _selectedTypeIds.remove(typeId);
                       }
                     });
                     _loadResults(searchController.text);
@@ -329,7 +340,7 @@ class _HomeUserState extends State<HomeUser> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Text(
-                searchController.text.trim().isEmpty && selectedType == null
+                searchController.text.trim().isEmpty && _selectedTypeIds.isEmpty
                     ? "🏪 ร้านค้าพร้อมเสิร์ฟทั้งหมด (${_results.length} ร้าน)"
                     : "🔍 พบร้านค้าเด็ดตรงตามเงื่อนไข ${_results.length} ร้าน",
                 style: const TextStyle(

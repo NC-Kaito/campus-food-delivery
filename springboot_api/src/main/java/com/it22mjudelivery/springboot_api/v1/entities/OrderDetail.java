@@ -42,5 +42,8 @@ public class OrderDetail {
     @Builder.Default
     private Set<Orderdetailaddon> orderDetailAddons = new HashSet<>();
 
+    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private Set<Orderdetailcurry> orderDetailCurries = new HashSet<>();
 }
 

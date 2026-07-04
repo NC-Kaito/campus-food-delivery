@@ -131,7 +131,7 @@
                         restaurantDto.getLatitude(),restaurantDto.getLongitude(),
                         restaurantDto.getOpentime(),
                         restaurantDto.getClosetime(),restaurantDto.getOpenday(),restaurantDto.getOwnerfirstname(),
-                        restaurantDto.getOwnerlastname(),restaurantDto.getEmail(),restaurantDto.getPhone(),restaurantDto.getOwnerimage());
+                        restaurantDto.getOwnerlastname(),restaurantDto.getEmail(),restaurantDto.getPhone(),restaurantDto.getImagecardid());
                 if (isResult) {
                     return ResponseEntity.ok("updateProfileRestaurant สำเร็จ");
                 }
