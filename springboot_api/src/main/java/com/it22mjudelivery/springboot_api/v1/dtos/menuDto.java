@@ -20,7 +20,8 @@ public class menuDto {
     private String menuname;
     private String description;
     private String imageurl;
-    private Double price;   // เปลี่ยนจาก double -> Double (แก้ตรงนี้จะหายพัง)
+    private Double price;
+    private Double extraprice;
     private boolean status;
     private String restaurantid;
     private Integer typeMenuId; // เปลี่ยนจาก int -> Integer

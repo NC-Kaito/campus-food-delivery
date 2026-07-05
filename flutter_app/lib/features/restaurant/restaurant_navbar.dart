@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
-import 'package:flutter_app/features/restaurant/home_restaurant.dart';
 import 'package:flutter_app/features/restaurant/profile_restaurant.dart';
 import 'package:flutter_app/global_data.dart';
 
@@ -11,7 +10,9 @@ class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
 
   const RestaurantNavbar({super.key, required this.title});
 
-  static const Color _orange = Color(0xFFFF8C00);
+  static const Color orange = Color(
+    0xFFFF8C00,
+  ); // 🎯 ลบ underscore ให้เป็น public เพราะจะถูกเรียกใช้ข้ามไฟล์
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -65,28 +66,24 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
       elevation: 3,
       automaticallyImplyLeading: false,
 
-      // ── ไอคอนบ้าน ด้านซ้าย ───────────────────────────
+      // ── ไอคอนสามขีด ด้านซ้าย (เปิด Drawer) ─────────────
       leading: IconButton(
         icon: const Icon(
-          Icons.home_rounded,
-          color: RestaurantNavbar._orange,
+          Icons.menu_rounded,
+          color: RestaurantNavbar.orange,
           size: 35,
         ),
         onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeRestaurant()),
-          );
+          Scaffold.of(context).openDrawer();
         },
       ),
 
       // ── ไอคอนด้านขวา ──────────────────────────────────
       actions: [
-        // ตะกร้า / ร้านค้า
         IconButton(
           icon: const Icon(
             Icons.shopping_bag_outlined,
-            color: RestaurantNavbar._orange,
+            color: RestaurantNavbar.orange,
             size: 35,
           ),
           onPressed: () {
@@ -95,11 +92,10 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
         ),
         const SizedBox(width: 20),
 
-        // กระดิ่ง
         IconButton(
           icon: const Icon(
             Icons.notifications_outlined,
-            color: RestaurantNavbar._orange,
+            color: RestaurantNavbar.orange,
             size: 35,
           ),
           onPressed: () {
@@ -108,7 +104,6 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
         ),
         const SizedBox(width: 20),
 
-        // รูปโปรไฟล์หน้าร้าน (CircleAvatar)
         Padding(
           padding: const EdgeInsets.only(right: 20),
           child: GestureDetector(
@@ -125,9 +120,7 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
               backgroundColor: const Color(0xFFFFEBCC),
               backgroundImage:
                   (restaurantimage != null && restaurantimage!.isNotEmpty)
-                  ? NetworkImage(
-                      _getFinalImageUrl(restaurantimage!),
-                    ) // 3. เรียกใช้ฟังก์ชันที่สร้างขึ้นใหม่
+                  ? NetworkImage(_getFinalImageUrl(restaurantimage!))
                   : null,
               onBackgroundImageError:
                   (restaurantimage != null && restaurantimage!.isNotEmpty)
@@ -138,7 +131,7 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
               child: (restaurantimage == null || restaurantimage!.isEmpty)
                   ? const Icon(
                       Icons.person_outline_rounded,
-                      color: RestaurantNavbar._orange,
+                      color: RestaurantNavbar.orange,
                       size: 20,
                     )
                   : null,

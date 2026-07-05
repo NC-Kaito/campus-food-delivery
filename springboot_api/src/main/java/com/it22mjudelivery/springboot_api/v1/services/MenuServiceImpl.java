@@ -37,6 +37,15 @@ public class MenuServiceImpl implements MenuService {
         }).orElse(false);
     }
 
+    // 🎯 helper: อ่านค่า extraprice จาก requestData แบบปลอดภัย ถ้าไม่ส่งมาให้เป็น 0.0
+    private double extractExtraPrice(Map<String, Object> requestData) {
+        Object raw = requestData.containsKey("extraprice")
+                ? requestData.get("extraprice")
+                : requestData.get("extraPrice"); // เผื่อฝั่ง Flutter ส่งมาคนละ casing
+        if (raw == null) return 0.0;
+        return Double.parseDouble(raw.toString());
+    }
+
     @Transactional // บังคับทำธุรกรรมฐานข้อมูล หากขั้นตอนไหนพังจะ Rollback ข้อมูลให้ปลอดภัยทันที
     public boolean saveMenuWithAddons(Map<String, Object> requestData) {
         try {
@@ -82,6 +91,8 @@ public class MenuServiceImpl implements MenuService {
                     .menuname((String) requestData.get("menuname"))
                     .description((String) requestData.get("description"))
                     .price(Double.parseDouble(requestData.get("price").toString()))
+                    // 🎯 ราคาพิเศษ (extraprice) — ถ้าไม่ส่งมาหรือปิดไว้ฝั่ง Flutter จะเป็น 0.0
+                    .extraprice(extractExtraPrice(requestData))
 
                     // ✅ ดึงรูปภาพจากตัวแปรที่เราสกัดไว้มาเซฟลง DB จริงแทนค่าว่างของเดิม
                     .imageurl(finalImageUrl)
@@ -155,6 +166,8 @@ public class MenuServiceImpl implements MenuService {
             menu.setMenuname((String) requestData.get("menuname"));
             menu.setDescription((String) requestData.get("description"));
             menu.setPrice(Double.parseDouble(requestData.get("price").toString()));
+            // 🎯 ราคาพิเศษ (extraprice) — ถ้าไม่ส่งมาหรือปิดไว้ฝั่ง Flutter จะเป็น 0.0
+            menu.setExtraprice(extractExtraPrice(requestData));
             menu.setStatus((boolean) requestData.get("status"));
 
             // จัดการรูปภาพ
