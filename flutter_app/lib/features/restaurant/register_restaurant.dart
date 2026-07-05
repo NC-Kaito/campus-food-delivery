@@ -152,7 +152,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                         onPressed: () {
                           setState(() {
                             String formattedTime =
-                                "${tempDuration.inHours.toString().padLeft(2, '0')}:${(tempDuration.inMinutes % 60).toString().padLeft(2, '0')}:00";
+                                "${tempDuration.inHours.toString().padLeft(2, '0')}:${(tempDuration.inMinutes % 60).toString().padLeft(2, '0')}";
                             if (isOpenTime) {
                               openTimeController.text = formattedTime;
                             } else {
@@ -314,6 +314,11 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    "ข้อมูลร้านค้า",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  SizedBox(height: 10),
                   _buildLabel("ชื่อผู้ใช้ (Username)"),
                   TextFormField(
                     controller: usernameController,
@@ -329,7 +334,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                         return "ความยาว 8-20 ตัวอักษร";
                       return null;
                     },
-                    decoration: _inputDecoration(hint: ""),
+                    decoration: _inputDecoration(hint: "ตัวอย่าง rest1234"),
                   ),
 
                   _buildLabel("รหัสผ่าน (Password)"),
@@ -496,7 +501,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                   ? "กรุณาระบุเวลาเปิด"
                                   : null,
                               decoration: InputDecoration(
-                                hintText: "00:00:00",
+                                hintText: "00:00",
                                 prefixIcon: const Icon(Icons.access_time),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(10),
@@ -522,7 +527,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                   ? "กรุณาระบุเวลาปิด"
                                   : null,
                               decoration: InputDecoration(
-                                hintText: "00:00:00",
+                                hintText: "00:00",
                                 prefixIcon: const Icon(
                                   Icons.history_toggle_off,
                                 ),
@@ -740,7 +745,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
         GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 140,
+            height: 200,
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.white,

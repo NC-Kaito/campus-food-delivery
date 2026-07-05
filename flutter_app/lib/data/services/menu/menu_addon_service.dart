@@ -45,4 +45,22 @@ class MenuAddonService {
       return [];
     }
   }
+
+  // 🎯 สร้างกลุ่มตัวเลือกเสริมแบบเดี่ยว ๆ (ไม่ผูกกับเมนูใดเมนูหนึ่งโดยตรง)
+  // ใช้โดยหน้า AddAddon — endpoint ด้านล่างเป็นค่าตั้งต้นชั่วคราว
+  // 🎯 TODO: เปลี่ยน path ให้ตรงกับ endpoint จริงฝั่ง Spring Boot ถ้าไม่ตรงกัน
+  Future<void> createAddonGroup(Map<String, dynamic> requestData) async {
+    try {
+      final response = await DioClient.dio.post(
+        "/v1/menuAddon/addGroup",
+        data: requestData,
+      );
+      if (response.statusCode != 200) {
+        throw "บันทึกตัวเลือกไม่สำเร็จ";
+      }
+    } on DioException catch (e) {
+      final msg = e.response?.data;
+      throw (msg is String ? msg : "เกิดข้อผิดพลาดในการบันทึกตัวเลือก");
+    }
+  }
 }

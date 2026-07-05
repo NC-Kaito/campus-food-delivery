@@ -212,17 +212,7 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Center(
-                              child: const Text(
-                                "เข้าสู่ระบบ",
-                                style: TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color.fromARGB(221, 255, 128, 0),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 10),
 
                             // Username Field
                             _buildLabel('ชื่อผู้ใช้ (Username)'),
@@ -375,12 +365,6 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
             fontWeight: FontWeight.bold,
             color: Colors.black87,
           ),
-          children: const [
-            TextSpan(
-              text: ' *',
-              style: TextStyle(color: Colors.red),
-            ),
-          ],
         ),
       ),
     );

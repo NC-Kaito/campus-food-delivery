@@ -40,4 +40,9 @@ public class Menuaddongroup {
     @OneToMany(mappedBy = "menuaddongroup", fetch = FetchType.EAGER)
     private List<Menuaddondetail> menuaddondetails;
 
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "username", nullable = false)
+    private Restaurant username;
+
 }

@@ -202,4 +202,19 @@ class MenuService {
       throw (msg is String ? msg : "เกิดข้อผิดพลาดในการอัปเดตเมนู");
     }
   }
+
+  Future<void> deleteMenu(Map<String, dynamic> requestData) async {
+    try {
+      final response = await DioClient.dio.post(
+        "/v1/menu/deleteMenu",
+        data: requestData,
+      );
+      if (response.statusCode != 200) {
+        throw "ลบเมนูไม่สำเร็จ";
+      }
+    } on DioException catch (e) {
+      final msg = e.response?.data;
+      throw (msg is String ? msg : "เกิดข้อผิดพลาดในการลบเมนู");
+    }
+  }
 }

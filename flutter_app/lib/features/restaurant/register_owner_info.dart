@@ -1,6 +1,7 @@
 // features/restaurant/register_owner_info.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:flutter_app/features/restaurant/login_restaurant.dart';
 import 'package:image_picker/image_picker.dart'; // 🎯 ดึง ImagePicker มาใช้งานในหน้านี้
 import 'dart:io';
 import 'package:dio/dio.dart';
@@ -223,7 +224,10 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const LoginRestaurant()),
+            (route) => false,
+          );
         }
       } catch (e) {
         if (mounted) {
@@ -288,7 +292,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
         title: const Text(
           'สมัครร้านค้า',
           style: TextStyle(
-            color: Colors.black,
+            color: Color.fromARGB(255, 255, 111, 0),
             fontWeight: FontWeight.bold,
             fontSize: 22,
           ),
@@ -313,7 +317,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                     'ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
 
                   _buildLabel("ชื่อจริง (FirstName)"),
                   TextFormField(
@@ -539,7 +543,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
         GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 140, // ปรับความสูงกล่องให้พอเหมาะ สวยงาม
+            height: 200,
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.white,
