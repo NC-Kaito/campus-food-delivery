@@ -24,7 +24,7 @@ public class Menuaddondetail {
     @Column(nullable = false)
     private double addonprice;
 
-    @Column(nullable = false)
+    @Column
     private boolean status;
 
     @JsonIgnore

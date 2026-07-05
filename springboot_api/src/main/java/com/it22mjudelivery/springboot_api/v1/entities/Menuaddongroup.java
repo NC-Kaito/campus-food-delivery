@@ -29,7 +29,7 @@ public class Menuaddongroup {
     @Column(nullable = false)
     private int maxselect;
 
-    @Column(nullable = false)
+    @Column
     private boolean status;
 
     @JsonIgnore

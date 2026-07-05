@@ -383,55 +383,123 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
+                // ─── ฝั่งซ้าย: จำนวนที่สั่ง ───────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      "รวมราคา  ",
+                      "จำนวนที่สั่ง",
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
-                    Text(
-                      "$totalPrice บาท",
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 6),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.remove_circle_outline,
+                              size: 24,
+                              color: _quantity > 1
+                                  ? Colors.black87
+                                  : Colors.grey.shade400,
+                            ),
+                            onPressed: () {
+                              if (_quantity > 1) setState(() => _quantity--);
+                            },
+                          ),
+                          SizedBox(
+                            width: 28,
+                            child: Text(
+                              "$_quantity",
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              size: 24,
+                              color: Colors.black87,
+                            ),
+                            onPressed: () => setState(() => _quantity++),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                Row(
+
+                const Spacer(),
+
+                // ─── ฝั่งขวา: ราคารวม ──────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, size: 28),
-                      onPressed: () {
-                        if (_quantity > 1) setState(() => _quantity--);
-                      },
-                    ),
                     Text(
-                      "$_quantity",
+                      "จำนวน $_quantity รายการ",
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline, size: 28),
-                      onPressed: () => setState(() => _quantity++),
+                    const SizedBox(height: 6),
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          const TextSpan(
+                            text: "ราคารวม  ",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          TextSpan(
+                            text: "฿$totalPrice",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
+
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -463,7 +531,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     }
                   }
 
-                  // บันทึกลงตะกร้ากลางชั่วคราว
                   final cartItem = CartItem(
                     menu: widget.menuModel,
                     selectedAddons: _selectedAddons.values.toList(),
@@ -487,9 +554,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                   Navigator.pop(context);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(
-                    0xFF76FF03,
-                  ), // 🎯 ปรับให้แมตช์ธีมสีเขียวสว่างสากลตัวเดียวกัน
+                  backgroundColor: const Color(0xFF76FF03),
                   foregroundColor: Colors.black,
                   elevation: 2,
                   shape: RoundedRectangleBorder(
