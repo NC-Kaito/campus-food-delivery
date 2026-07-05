@@ -1,10 +1,13 @@
 package com.it22mjudelivery.springboot_api.v1.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.Set;
 
 @Entity
 @Table(name="menu")
@@ -42,4 +45,13 @@ public class Menu {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "typeMenuId", nullable = false)
     private TypeMenu typemenu;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "menu_addongroups", // ชื่อตารางกลาง
+            joinColumns = @JoinColumn(name = "menu_id"),
+            inverseJoinColumns = @JoinColumn(name = "addongroup_id")
+    )
+    @JsonIgnore // 🛑 ป้องกันไม่ให้ JSON ดึงค่าวนลูปกลับไปมา
+    private Set<Menuaddongroup> menuAddonGroups;
 }

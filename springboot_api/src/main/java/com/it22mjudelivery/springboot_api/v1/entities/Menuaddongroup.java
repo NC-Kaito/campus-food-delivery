@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Set;
 
 @Entity
 @Table(name="Menuaddongroup")
@@ -32,10 +33,9 @@ public class Menuaddongroup {
     @Column
     private boolean status;
 
+    @ManyToMany(mappedBy = "menuAddonGroups")
     @JsonIgnore
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "menuid", nullable = false)
-    private Menu menu;
+    private Set<Menu> menus;
 
     @OneToMany(mappedBy = "menuaddongroup", fetch = FetchType.EAGER)
     private List<Menuaddondetail> menuaddondetails;

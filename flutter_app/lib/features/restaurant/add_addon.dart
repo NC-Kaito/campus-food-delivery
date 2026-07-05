@@ -402,102 +402,116 @@ class _AddAddonState extends State<AddAddon> {
             ),
           ),
           const SizedBox(width: 10),
+          // ─── ช่องชื่อตัวเลือก ───
           Expanded(
             flex: 3,
-            child: SizedBox(
-              height: 42,
-              child: TextFormField(
-                controller: addon.nameController,
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: "ชื่อตัวเลือก",
-                  hintStyle: const TextStyle(
-                    fontSize: 13,
-                    color: _AddonTheme.textSecondary,
+            child: TextFormField(
+              // ← ลบ SizedBox(height:42) ออก
+              controller: addon.nameController,
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "ชื่อตัวเลือก",
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  color: _AddonTheme.textSecondary,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                filled: true,
+                fillColor: _AddonTheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: _AddonTheme.primary,
+                    width: 1.4,
                   ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                  filled: true,
-                  fillColor: _AddonTheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: _AddonTheme.primary,
-                      width: 1.4,
-                    ),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _AddonTheme.danger),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _AddonTheme.danger),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: _AddonTheme.danger,
+                    width: 1.4,
                   ),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 8),
+
+          // ─── ช่องราคา ───
           Expanded(
             flex: 2,
-            child: SizedBox(
-              height: 42,
-              child: TextFormField(
-                controller: addon.priceController,
-                keyboardType: TextInputType.number,
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) return "ราคา";
-                  if (double.tryParse(value.trim()) == null) return "ผิด";
-                  return null;
-                },
-                style: const TextStyle(fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: "0",
-                  hintStyle: const TextStyle(
-                    fontSize: 13,
-                    color: _AddonTheme.textSecondary,
+            child: TextFormField(
+              // ← ลบ SizedBox(height:42) ออก
+              controller: addon.priceController,
+              keyboardType: TextInputType.number,
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) return "กรอกราคา";
+                if (double.tryParse(value.trim()) == null)
+                  return "ตัวเลขเท่านั้น";
+                return null;
+              },
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: "0",
+                hintStyle: const TextStyle(
+                  fontSize: 13,
+                  color: _AddonTheme.textSecondary,
+                ),
+                prefixText: "฿ ",
+                prefixStyle: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _AddonTheme.textSecondary,
+                ),
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                filled: true,
+                fillColor: _AddonTheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: _AddonTheme.primary,
+                    width: 1.4,
                   ),
-                  prefixText: "฿ ",
-                  prefixStyle: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: _AddonTheme.textSecondary,
-                  ),
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 12,
-                  ),
-                  filled: true,
-                  fillColor: _AddonTheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: _AddonTheme.primary,
-                      width: 1.4,
-                    ),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _AddonTheme.danger),
+                ),
+                errorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _AddonTheme.danger),
+                ),
+                focusedErrorBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: _AddonTheme.danger,
+                    width: 1.4,
                   ),
                 ),
               ),

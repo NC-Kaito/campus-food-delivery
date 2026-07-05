@@ -30,9 +30,9 @@ public class MenuAddonController {
     private MenuService menuService;
 
     @GetMapping("/{menuId}/addons")
-    public ResponseEntity<?> getMenuAddons(@PathVariable Long menuId) {
+    public ResponseEntity<?> getMenuAddons(@PathVariable Integer menuId) {
         // ดึงข้อมูลลูกผสมทุกตารางออกมารวดเดียว
-        List<Menuaddongroup> groups = menuaddongroupRepository.findByMenu_Menuid(menuId);
+        List<Menuaddongroup> groups = menuaddongroupRepository.findGroupsByMenuId(menuId);
 
         // 🎯 3. พ่นก้อนโครงสร้างต้นไม้ส่งคืนไปให้ Flutter แตกยอดแยกหมวดหมู่ UI ได้เลย
         return ResponseEntity.ok(groups);

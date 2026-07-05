@@ -110,7 +110,7 @@ public class MemberController {
     }
 
     @GetMapping("/v1/menu-addons/{menuId}")
-    public ResponseEntity<?> getMenuAddons(@PathVariable Long menuId) {
+    public ResponseEntity<?> getMenuAddons(@PathVariable Integer menuId) {
 
         List<Menuaddongroup> addonGroups = menuaddongroupRepo.findByMenuId(menuId);
 

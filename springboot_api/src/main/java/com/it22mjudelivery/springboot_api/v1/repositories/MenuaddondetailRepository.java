@@ -12,13 +12,10 @@ import java.util.List;
 @Repository
 public interface MenuaddondetailRepository extends JpaRepository<Menuaddondetail, Integer> {
 
-    // ดึงรายละเอียดเมนูเสริมทั้งหมด โดยเจาะจงที่รหัสเมนูหลัก (Menu ID)
-    // สั่ง JOIN FETCH เพื่อดึงข้อมูลกลุ่ม (Group) และชื่อเมนูเสริม (Addonmenu) ติดสอยมาด้วยทันที
     @Query("SELECT md FROM Menuaddondetail md " +
             "JOIN FETCH md.menuaddongroup mg " +
             "JOIN FETCH md.addonmenu am " +
-            "WHERE mg.menu.id = :menuId")
+            "JOIN mg.menus m " +          // ← เปลี่ยนจาก mg.menu เป็น JOIN mg.menus
+            "WHERE m.menuid = :menuId")   // ← เปลี่ยนจาก mg.menu.id เป็น m.menuid
     List<Menuaddondetail> findAddonsByMenuId(@Param("menuId") Long menuId);
-
-
 }

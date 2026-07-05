@@ -11,9 +11,9 @@ import java.util.List;
 @Repository
 public interface AddonmenuRepository extends JpaRepository<Addonmenu, Integer> {
 
-    // 🌟 คิวรีดึงรายชื่อแอดออนทั้งหมดที่เป็นของเมนูอาหารในร้านค้านี้ (ป้องกันข้อมูลร้านอื่นปนเข้ามา)
-    @Query("SELECT DISTINCT d.addonmenu " +
-            "FROM Menuaddondetail d " +
-            "WHERE d.menuaddongroup.menu.restaurant.username = :username")
+    @Query("SELECT DISTINCT d.addonmenu FROM Menuaddondetail d " +
+            "JOIN d.menuaddongroup mg " +
+            "JOIN mg.menus m " +
+            "WHERE m.restaurant.username = :username")
     List<Addonmenu> findAllByRestaurantUsername(@Param("username") String username);
 }
