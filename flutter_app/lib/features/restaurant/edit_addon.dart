@@ -1,23 +1,20 @@
-// features/restaurant/add_addon.dart
+// features/restaurant/edit_addon.dart
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/addon_menu_model.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/addon_group_request_model.dart';
 
+import 'package:flutter_app/data/models/addon_menu_model.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart'
     show CustomAddonItem;
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/global_data.dart';
 
-// ============================================================
-// 🎨 Design tokens — สีและระยะห่างที่ใช้ทั้งหน้า ปรับที่นี่ที่เดียว
-// ============================================================
 class _AddonTheme {
-  static const Color primary = Color(0xFFFF8A00); // ส้ม — โทนหลักของแบรนด์
-  static const Color accent = Color(0xFF2FB86A); // เขียว — ปุ่มยืนยัน/สถานะ on
+  static const Color primary = Color(0xFFFF8A00);
+  static const Color accent = Color(0xFF2FB86A);
   static const Color danger = Color(0xFFE5484D);
   static const Color surface = Colors.white;
   static const Color pageBg = Color(0xFFF6F7F9);
@@ -27,21 +24,33 @@ class _AddonTheme {
   static const Color border = Color(0xFFE7E8EC);
 }
 
-class AddAddon extends StatefulWidget {
-  const AddAddon({super.key});
+class EditAddon extends StatefulWidget {
+  final int? groupId;
+  final String? groupName;
+  final bool isRequired;
+  final int maxSelect;
+  final List<MenuAddonDetailModel> details;
+
+  const EditAddon({
+    super.key,
+    required this.groupId,
+    required this.groupName,
+    required this.isRequired,
+    required this.maxSelect,
+    required this.details,
+  });
 
   @override
-  State<AddAddon> createState() => _AddAddonState();
+  State<EditAddon> createState() => _EditAddonState();
 }
 
-class _AddAddonState extends State<AddAddon> {
+class _EditAddonState extends State<EditAddon> {
   final MenuAddonService _addonService = MenuAddonService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
-  final TextEditingController groupNameController = TextEditingController();
-
-  int maxSelect = 1; // 🎯 ควบคุมด้วย stepper แทนช่องกรอกตัวเลข
-  bool isRequired = true;
+  late final TextEditingController groupNameController;
+  late int maxSelect;
+  late bool isRequired;
   bool _isLoading = false;
 
   List<CustomAddonItem> selectedAddons = [];
@@ -52,10 +61,34 @@ class _AddAddonState extends State<AddAddon> {
   final Map<CustomAddonItem, List<AddonMenuModel>> _suggestions = {};
   Timer? _debounce;
 
+  final List<int> _deletedAddonIds = [];
+
   @override
   void initState() {
     super.initState();
-    _addNewCustomAddonRow();
+    _prefillFromExistingData();
+  }
+
+  void _prefillFromExistingData() {
+    groupNameController = TextEditingController(text: widget.groupName ?? "");
+    isRequired = widget.isRequired;
+    maxSelect = widget.maxSelect;
+
+    if (widget.details.isEmpty) {
+      _addNewCustomAddonRow();
+    } else {
+      selectedAddons = widget.details.map<CustomAddonItem>((d) {
+        return CustomAddonItem(
+          nameController: TextEditingController(
+            text: d.addonMenu?.addonName ?? "",
+          ),
+          priceController: TextEditingController(
+            text: (d.addonPrice ?? 0).toString(),
+          ),
+          addonId: d.addonDetailId,
+        );
+      }).toList();
+    }
   }
 
   @override
@@ -80,12 +113,9 @@ class _AddAddonState extends State<AddAddon> {
       );
       selectedAddons.add(newAddon);
 
-      // สร้าง focus node + layer link ผูกกับแถวนี้
       final focusNode = FocusNode();
       _nameFocusNodes[newAddon] = focusNode;
       _layerLinks[newAddon] = LayerLink();
-
-      // ปิด dropdown อัตโนมัติเมื่อออกจากช่อง (เผื่อผู้ใช้แตะที่อื่นโดยไม่เลือก suggestion)
       focusNode.addListener(() {
         if (!focusNode.hasFocus) {
           _removeOverlay(newAddon);
@@ -98,6 +128,9 @@ class _AddAddonState extends State<AddAddon> {
     if (selectedAddons.length <= 1) return;
     setState(() {
       final removed = selectedAddons[index];
+      if (removed.addonId != null) {
+        _deletedAddonIds.add(removed.addonId!);
+      }
 
       _removeOverlay(removed);
       _nameFocusNodes[removed]?.dispose();
@@ -129,7 +162,7 @@ class _AddAddonState extends State<AddAddon> {
       _suggestions[addon] = results;
 
       if (results.isEmpty) {
-        _removeOverlay(addon); // ไม่เจอ → ปิด dropdown ให้พิมพ์ต่อแบบปกติ
+        _removeOverlay(addon);
       } else {
         _showOverlay(addon);
       }
@@ -137,18 +170,18 @@ class _AddAddonState extends State<AddAddon> {
   }
 
   void _showOverlay(CustomAddonItem addon) {
-    _removeOverlay(addon); // ปิดของเก่าก่อนสร้างใหม่ กันซ้อนกัน
+    _removeOverlay(addon);
 
     final layerLink = _layerLinks[addon];
     if (layerLink == null) return;
 
     final overlay = OverlayEntry(
       builder: (context) => Positioned(
-        width: 240, // ← ปรับตามความกว้างช่องชื่อจริงถ้าต้องการ
+        width: 240,
         child: CompositedTransformFollower(
           link: layerLink,
           showWhenUnlinked: false,
-          offset: const Offset(0, 48), // เลื่อนลงมาใต้ช่อง input
+          offset: const Offset(0, 48),
           child: Material(
             elevation: 4,
             borderRadius: BorderRadius.circular(10),
@@ -193,10 +226,10 @@ class _AddAddonState extends State<AddAddon> {
   void _selectSuggestion(CustomAddonItem addon, AddonMenuModel item) {
     addon.nameController.text = item.addonName ?? "";
     _removeOverlay(addon);
-    _nameFocusNodes[addon]?.unfocus(); // ปิดคีย์บอร์ดหลังเลือก
+    _nameFocusNodes[addon]?.unfocus();
   }
 
-  Future<void> _doSaveAddonGroup() async {
+  Future<void> _doUpdateAddonGroup() async {
     final isFormValid = formKey.currentState!.validate();
     if (!isFormValid) return;
 
@@ -223,6 +256,7 @@ class _AddAddonState extends State<AddAddon> {
     try {
       // ─── สร้าง request model จาก form ───────────────────
       final request = AddonGroupRequestModel(
+        addonGroupId: widget.groupId,
         restaurantUsername: GlobalData.usernameRestaurant ?? "",
         addongroupname: groupNameController.text.trim(),
         isRequired: isRequired,
@@ -230,6 +264,7 @@ class _AddAddonState extends State<AddAddon> {
         status: true,
         details: selectedAddons.map((addon) {
           return AddonDetailRequestModel(
+            addonDetailId: addon.addonId,
             addonname: addon.nameController.text.trim(),
             addonprice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
@@ -238,12 +273,12 @@ class _AddAddonState extends State<AddAddon> {
         }).toList(),
       );
 
-      await _addonService.createAddonGroupTemplate(request);
+      await _addonService.updateAddonGroupTemplate(request);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("บันทึกตัวเลือกสำเร็จ"),
+            content: const Text("แก้ไขตัวเลือกสำเร็จ"),
             backgroundColor: _AddonTheme.accent,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -269,9 +304,10 @@ class _AddAddonState extends State<AddAddon> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  } // ============================================================
+  }
 
-  // Shared styles
+  // ============================================================
+  // Shared styles (เหมือนกับ AddAddon ทุกประการ)
   // ============================================================
   InputDecoration _fieldDecoration({String hint = "", Widget? prefixIcon}) {
     return InputDecoration(
@@ -375,7 +411,7 @@ class _AddAddonState extends State<AddAddon> {
   }
 
   // ============================================================
-  // Max-select stepper — แทนช่องกรอกตัวเลขด้วยปุ่ม -/+ ให้กดง่ายบนมือถือ
+  // Max-select stepper
   // ============================================================
   Widget _buildMaxSelectStepper() {
     return Container(
@@ -509,6 +545,17 @@ class _AddAddonState extends State<AddAddon> {
     final addon = selectedAddons[index];
     final bool canDelete = selectedAddons.length > 1;
 
+    final layerLink = _layerLinks.putIfAbsent(addon, () => LayerLink());
+    final focusNode = _nameFocusNodes.putIfAbsent(addon, () {
+      final node = FocusNode();
+      node.addListener(() {
+        if (!node.hasFocus) {
+          _removeOverlay(addon);
+        }
+      });
+      return node;
+    });
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
@@ -537,16 +584,14 @@ class _AddAddonState extends State<AddAddon> {
             ),
           ),
           const SizedBox(width: 10),
-          // ─── ช่องชื่อตัวเลือก ───
           Expanded(
             flex: 3,
             child: CompositedTransformTarget(
-              link: _layerLinks[addon]!, // ← ผูกกับ overlay ที่จะลอยใต้ช่องนี้
+              link: _layerLinks[addon]!,
               child: TextFormField(
                 controller: addon.nameController,
-                focusNode: _nameFocusNodes[addon], // ← เพิ่ม
-                onChanged: (value) =>
-                    _onAddonNameChanged(addon, value), // ← เพิ่ม
+                focusNode: focusNode,
+                onChanged: (value) => _onAddonNameChanged(addon, value),
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
                 style: const TextStyle(fontSize: 14),
@@ -594,12 +639,9 @@ class _AddAddonState extends State<AddAddon> {
             ),
           ),
           const SizedBox(width: 8),
-
-          // ─── ช่องราคา ───
           Expanded(
             flex: 2,
             child: TextFormField(
-              // ← ลบ SizedBox(height:42) ออก
               controller: addon.priceController,
               keyboardType: TextInputType.number,
               validator: (value) {
@@ -725,7 +767,8 @@ class _AddAddonState extends State<AddAddon> {
                       ],
                     ),
                     child: const Icon(
-                      Icons.tune_rounded,
+                      Icons
+                          .edit_rounded, // ← เปลี่ยนไอคอนให้สื่อว่าเป็นการแก้ไข
                       color: Colors.white,
                       size: 22,
                     ),
@@ -736,7 +779,7 @@ class _AddAddonState extends State<AddAddon> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "เพิ่มตัวเลือกเสริม",
+                          "แก้ไขตัวเลือกเสริม",
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
@@ -744,7 +787,7 @@ class _AddAddonState extends State<AddAddon> {
                           ),
                         ),
                         Text(
-                          "สร้างกลุ่มตัวเลือกใหม่ให้ลูกค้าปรับแต่งเมนู",
+                          "ปรับปรุงกลุ่มตัวเลือกที่มีอยู่ให้ตรงกับเมนูของคุณ",
                           style: TextStyle(
                             fontSize: 12.5,
                             color: _AddonTheme.textSecondary,
@@ -855,9 +898,7 @@ class _AddAddonState extends State<AddAddon> {
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
                         children: [
-                          const SizedBox(
-                            width: 36,
-                          ), // เว้นที่ให้ตรงกับเลขลำดับ (circle) ด้านล่าง
+                          const SizedBox(width: 36),
                           const Expanded(
                             flex: 3,
                             child: Text(
@@ -881,9 +922,7 @@ class _AddAddonState extends State<AddAddon> {
                               ),
                             ),
                           ),
-                          const SizedBox(
-                            width: 40,
-                          ), // เว้นที่ให้ตรงกับปุ่มลบ (×) ด้านล่าง
+                          const SizedBox(width: 40),
                         ],
                       ),
                     ),
@@ -952,7 +991,7 @@ class _AddAddonState extends State<AddAddon> {
             width: double.infinity,
             height: 54,
             child: ElevatedButton(
-              onPressed: _isLoading ? null : _doSaveAddonGroup,
+              onPressed: _isLoading ? null : _doUpdateAddonGroup,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _AddonTheme.accent,
                 foregroundColor: Colors.white,
@@ -977,7 +1016,7 @@ class _AddAddonState extends State<AddAddon> {
                         Icon(Icons.check_circle_rounded, size: 19),
                         SizedBox(width: 8),
                         Text(
-                          "บันทึกตัวเลือก",
+                          "บันทึกการแก้ไข",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,

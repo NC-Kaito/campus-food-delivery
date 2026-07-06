@@ -1,5 +1,6 @@
 // features/restaurant/home_restaurant.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/menu_addon_group_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
@@ -9,9 +10,9 @@ import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/add_addon.dart';
+import 'package:flutter_app/features/restaurant/edit_addon.dart';
 // 🎯 หน้าแก้ไขเมนู — ปรับ path/ชื่อคลาสให้ตรงกับโปรเจกต์จริงถ้าไม่ตรงกัน
 import 'package:flutter_app/features/restaurant/edit_menu.dart';
-import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/restaurant_scaffold.dart';
 import 'package:flutter_app/features/restaurant/view_menu.dart';
 import 'package:flutter_app/global_data.dart';
@@ -112,11 +113,12 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       _tabController = newController;
     });
 
-    for (var type in data) {
-      if (type.typemenuId != null) {
-        loadMenusByType(type.typemenuId!);
-      }
-    }
+    // ✅ รอทุก type โหลดเสร็จพร้อมกัน
+    await Future.wait(
+      data
+          .where((type) => type.typemenuId != null)
+          .map((type) => loadMenusByType(type.typemenuId!)),
+    );
   }
 
   Future<void> loadMenusByType(int typeMenuId) async {
@@ -219,71 +221,61 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   // ================================================================
   Future<void> _loadAddonOptions() async {
     if (_isLoadingAddons) return;
-
     setState(() => _isLoadingAddons = true);
 
-    // รวมเมนูทั้งหมดของร้าน (ทุกหมวดหมู่) ที่โหลดไว้แล้ว
-    final allMenus = categoryMenus.values.expand((list) => list).toList();
-
-    final futures = allMenus
-        .where((m) => m.menuId != null)
-        .map(
-          (m) => _addonService
-              .getAddonsByMenuId(m.menuId!)
-              .then((details) => MapEntry(m.menuId!, details)),
-        );
-
-    List<MapEntry<int, List<MenuAddonDetailModel>>> results = [];
     try {
-      results = await Future.wait(futures);
+      // ✅ ใช้ endpoint ใหม่ดึงตรงจาก username ไม่ต้องวนผ่านเมนู
+      final groups = await _addonService.getAddonGroupsByRestaurant(
+        GlobalData.usernameRestaurant ?? "",
+      );
+
+      debugPrint("📦 addon groups: ${groups.length} กลุ่ม");
+
+      if (!mounted) return;
+
+      setState(() {
+        // แปลง MenuAddonGroupModel → _AddonGroupAggregate
+        _addonGroups = groups.map((group) {
+          final agg = _AddonGroupAggregate(group);
+
+          // ใส่ details จาก group.details ที่ดึงมาพร้อมกันแล้ว
+          for (final detail in group.details ?? []) {
+            final itemKey =
+                detail.addonMenu?.addonId ??
+                detail.addonDetailId ??
+                detail.hashCode;
+            agg.items.putIfAbsent(itemKey, () => detail);
+          }
+
+          return agg;
+        }).toList();
+
+        // init state toggle/expand
+        for (final agg in _addonGroups) {
+          final gid = agg.group.addonGroupId;
+          if (gid != null) {
+            _groupEnabled.putIfAbsent(gid, () => agg.group.status ?? true);
+            _groupExpanded.putIfAbsent(gid, () => false);
+          }
+          for (final item in agg.items.values) {
+            final key =
+                item.addonMenu?.addonId ?? item.addonDetailId ?? item.hashCode;
+            _itemChecked.putIfAbsent(key, () => item.status ?? true);
+          }
+        }
+
+        _isLoadingAddons = false;
+        _addonsLoaded = true;
+      });
     } catch (e) {
-      debugPrint("โหลดตัวเลือกเสริมผิดพลาด: $e");
-    }
-
-    final Map<int, _AddonGroupAggregate> groupMap = {};
-
-    for (final entry in results) {
-      final menuId = entry.key;
-      for (final detail in entry.value) {
-        final group = detail.menuAddonGroup;
-        final groupId = group?.addonGroupId;
-        if (group == null || groupId == null) continue;
-
-        final agg = groupMap.putIfAbsent(
-          groupId,
-          () => _AddonGroupAggregate(group),
+      debugPrint("❌ โหลด addon groups ผิดพลาด: $e");
+      if (mounted) {
+        setState(() => _isLoadingAddons = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("โหลดตัวเลือกเสริมไม่สำเร็จ: $e")),
         );
-        agg.menuIds.add(menuId);
-
-        // dedup รายการ addon ในกลุ่มด้วย id ของ addon จริง (ไม่ใช่ addonDetailId
-        // เพราะ addonDetailId อาจต่างกันไปตามเมนูที่ผูกไว้)
-        final itemKey =
-            detail.addonMenu?.addonId ??
-            detail.addonDetailId ??
-            detail.hashCode;
-        agg.items.putIfAbsent(itemKey, () => detail);
       }
     }
-
-    if (!mounted) return;
-
-    setState(() {
-      _addonGroups = groupMap.values.toList();
-      for (final agg in _addonGroups) {
-        final gid = agg.group.addonGroupId;
-        if (gid != null) {
-          _groupEnabled.putIfAbsent(gid, () => true);
-          _groupExpanded.putIfAbsent(gid, () => false);
-        }
-        for (final item in agg.items.values) {
-          final key =
-              item.addonMenu?.addonId ?? item.addonDetailId ?? item.hashCode;
-          _itemChecked.putIfAbsent(key, () => true);
-        }
-      }
-      _isLoadingAddons = false;
-      _addonsLoaded = true;
-    });
   }
 
   @override
@@ -720,10 +712,14 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final bool selected = _mainTabIndex == index;
 
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         setState(() => _mainTabIndex = index);
         if (index == 1 && !_addonsLoaded) {
-          _loadAddonOptions();
+          // ✅ รอให้ทุก categoryLoading เป็น false ก่อน
+          while (categoryLoading.values.any((v) => v == true)) {
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+          await _loadAddonOptions();
         }
       },
       child: AnimatedContainer(
@@ -798,51 +794,69 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
     return Container(
       decoration: BoxDecoration(
-        color: enabled ? Colors.white : const Color(0xFFECECEC),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE0E0E0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        // ถ้าปิดอยู่ให้พื้นหลังเทา เหมือนในรูป "น้ำจิ้ม"
+        color: enabled ? Colors.white : const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: enabled ? const Color(0xFFE0E0E0) : const Color(0xFFD0D0D0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── แถวหัว group ────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
+                // ชื่อกลุ่ม — bold ถ้าเปิด, dim ถ้าปิด
                 Expanded(
+                  flex: 3,
                   child: Text(
                     agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: enabled ? Colors.black : Colors.black38,
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+
+                // "ใช้กับ X เมนู"
                 Text(
-                  "ใช้กับ ${agg.menuIds.length} เมนู",
+                  "ใช้กับ ${agg.group.menuCount ?? 0} เมนู",
                   style: const TextStyle(
                     fontSize: 13,
                     color: Colors.blueAccent,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(width: 10),
+
+                // ปุ่มแก้ไข
                 GestureDetector(
-                  onTap: () {
-                    // 🎯 เชื่อมหน้าแก้ไขกลุ่มตัวเลือกเสริมจริงตรงนี้
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("ฟังก์ชันแก้ไขตัวเลือกยังไม่พร้อมใช้งาน"),
+                  onTap: () async {
+                    final updated = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => EditAddon(
+                          groupId: agg.group.addonGroupId,
+                          groupName: agg.group.addonGroupName,
+                          isRequired: agg.group.isRequired ?? true,
+                          maxSelect: agg.group.maxSelect ?? 1,
+                          details:
+                              items, // ← ส่ง List<MenuAddonDetailModel> ตรงๆ เลย
+                        ),
                       ),
                     );
+
+                    // ถ้าแก้ไขสำเร็จ (EditAddon ทำ Navigator.pop(context, true))
+                    // ให้รีเฟรชข้อมูลกลุ่มตัวเลือกใหม่
+                    if (updated == true) {
+                      // TODO: เรียก method โหลดข้อมูลกลุ่มตัวเลือกใหม่ของหน้านี้
+                      // เช่น await _loadAddonGroups();
+                    }
                   },
                   child: const Text(
                     "แก้ไข",
@@ -853,31 +867,46 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                     ),
                   ),
                 ),
+                const SizedBox(width: 4),
+
+                // ลูกศรขยาย/ย่อ
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: Icon(
-                    expanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    color: Colors.black54,
+                  icon: AnimatedRotation(
+                    turns: expanded ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.black54,
+                      size: 22,
+                    ),
                   ),
                   onPressed: () =>
                       setState(() => _groupExpanded[groupId] = !expanded),
                 ),
                 const SizedBox(width: 4),
-                Switch(
-                  value: enabled,
-                  activeColor: Colors.white,
-                  activeTrackColor: const Color(0xFF8BC34A),
-                  onChanged: (val) =>
-                      setState(() => _groupEnabled[groupId] = val),
+
+                // Toggle switch
+                Transform.scale(
+                  scale: 0.85,
+                  child: Switch(
+                    value: enabled,
+                    activeColor: Colors.white,
+                    activeTrackColor: const Color(0xFF8BC34A),
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: Colors.grey.shade400,
+                    onChanged: (val) =>
+                        setState(() => _groupEnabled[groupId] = val),
+                  ),
                 ),
               ],
             ),
           ),
-          if (expanded) ...[
-            Divider(height: 1, thickness: 1, color: Colors.grey[300]),
+
+          // ── รายการ addon detail (ขยายได้) ───────────────
+          if (expanded && items.isNotEmpty) ...[
+            Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Column(
@@ -898,11 +927,21 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final bool checked = _itemChecked[key] ?? true;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Container(width: 3, height: 18, color: const Color(0xFF76FF03)),
+          // เส้นสีเขียวซ้าย
+          Container(
+            width: 3,
+            height: 20,
+            decoration: BoxDecoration(
+              color: const Color(0xFF76FF03),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
           const SizedBox(width: 10),
+
+          // ชื่อ addon
           Expanded(
             child: Text(
               detail.addonMenu?.addonName ?? "ไม่มีชื่อ",
@@ -910,14 +949,26 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               overflow: TextOverflow.ellipsis,
             ),
           ),
+
+          // ราคา
           Text(
-            "ราคา ${detail.addonPrice?.toInt() ?? 0} บาท",
-            style: const TextStyle(fontSize: 13, color: Colors.black54),
+            "ราคา  ${detail.addonPrice?.toInt() ?? 0} บาท",
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
           ),
-          Checkbox(
-            value: checked,
-            activeColor: Colors.blueAccent,
-            onChanged: (val) => setState(() => _itemChecked[key] = val ?? true),
+          const SizedBox(width: 8),
+
+          // Checkbox
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: Checkbox(
+              value: checked,
+              activeColor: Colors.blueAccent,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity: VisualDensity.compact,
+              onChanged: (val) =>
+                  setState(() => _itemChecked[key] = val ?? true),
+            ),
           ),
         ],
       ),
@@ -991,8 +1042,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 // ให้กลายเป็น "1 กลุ่ม = 1 การ์ด" สำหรับหน้าตัวเลือกเพิ่มเติม
 class _AddonGroupAggregate {
   final MenuAddonGroupModel group;
-  final Set<int> menuIds = {};
-  final Map<int, MenuAddonDetailModel> items = {}; // key = addonId (dedup)
+  final Map<int, MenuAddonDetailModel> items = {};
 
   _AddonGroupAggregate(this.group);
 }

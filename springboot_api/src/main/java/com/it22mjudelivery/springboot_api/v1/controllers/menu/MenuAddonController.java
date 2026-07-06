@@ -1,17 +1,21 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.menu;
 
+import com.it22mjudelivery.springboot_api.v1.dtos.AddonGroupRequestDTO;
 import com.it22mjudelivery.springboot_api.v1.entities.Addonmenu;
 import com.it22mjudelivery.springboot_api.v1.entities.Menuaddondetail;
 import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
 import com.it22mjudelivery.springboot_api.v1.repositories.AddonmenuRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddondetailRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddongroupRepository;
+import com.it22mjudelivery.springboot_api.v1.services.AddonService;
 import com.it22mjudelivery.springboot_api.v1.services.MemberService;
 import com.it22mjudelivery.springboot_api.v1.services.MenuService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +32,9 @@ public class MenuAddonController {
 
     @Autowired
     private MenuService menuService;
+
+    @Autowired
+    private AddonService addonService;
 
     @GetMapping("/{menuId}/addons")
     public ResponseEntity<?> getMenuAddons(@PathVariable Integer menuId) {
@@ -72,6 +79,85 @@ public class MenuAddonController {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
+        }
+    }
+
+    @PostMapping("/createGroup")
+    public ResponseEntity<?> createAddonGroup(@RequestBody AddonGroupRequestDTO request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            boolean isSuccess = addonService.createAddonGroupTemplate(request);
+            if (isSuccess) {
+                response.put("status", "success");
+                response.put("message", "สร้างกลุ่มตัวเลือกเสริมเรียบร้อยแล้ว");
+                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            } else {
+                response.put("status", "error");
+                response.put("message", "ไม่สามารถสร้างกลุ่มตัวเลือกเสริมได้");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @PostMapping("/updateGroup")
+    public ResponseEntity<?> updateAddonGroup(@RequestBody AddonGroupRequestDTO request) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            boolean isSuccess = addonService.updateAddonGroupTemplate(request);
+            if (isSuccess) {
+                response.put("status", "success");
+                response.put("message", "แก้ไขกลุ่มตัวเลือกเสริมเรียบร้อยแล้ว");
+                return ResponseEntity.status(HttpStatus.CREATED).body(response);
+            } else {
+                response.put("status", "error");
+                response.put("message", "ไม่สามารถแก้ไขกลุ่มตัวเลือกเสริมได้");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+        } catch (Exception e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    // ดึง addon groups ของร้าน
+    @GetMapping("/groups")
+    public ResponseEntity<?> getAddonGroupsByRestaurant(
+            @RequestParam("username") String username) {
+        List<Menuaddongroup> groups =
+                menuaddongroupRepository.findAllByRestaurantUsername(username);
+        return ResponseEntity.ok(groups);
+    }
+
+    // toggle status
+    @PatchMapping("/groups/{groupId}/status")
+    public ResponseEntity<?> toggleGroupStatus(
+            @PathVariable Integer groupId,
+            @RequestBody Map<String, Boolean> body) {
+        return menuaddongroupRepository.findById(groupId)
+                .map(group -> {
+                    group.setStatus(body.get("status"));
+                    menuaddongroupRepository.save(group);
+                    return ResponseEntity.ok("อัปเดตสถานะสำเร็จ");
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+
+    @GetMapping("/searchAddonName")
+    public ResponseEntity<?> searchAddonName(@RequestParam String keyword) {
+        try {
+            List<Addonmenu> results = addonService.searchAddonByName(keyword);
+            return ResponseEntity.ok(results);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 }

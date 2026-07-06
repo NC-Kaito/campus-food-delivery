@@ -135,7 +135,4 @@ public class AdminController {
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดในการปฏิเสธ");
         }
     }
-
-
-
 }

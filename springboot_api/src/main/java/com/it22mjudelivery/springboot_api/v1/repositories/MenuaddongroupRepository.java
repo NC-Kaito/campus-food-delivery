@@ -26,9 +26,16 @@ public interface MenuaddongroupRepository extends JpaRepository<Menuaddongroup, 
             "WHERE m.menuid = :menuid")
     List<Menuaddongroup> findGroupsByMenuId(@Param("menuid") Integer menuid);
 
+    // แก้ — ดึงตรงจาก restaurant ที่ผูกใน Menuaddongroup โดยตรง
+    @Query("SELECT mg FROM Menuaddongroup mg " +
+            "WHERE mg.username.username = :username")
+    List<Menuaddongroup> findAllByRestaurantUsername(
+            @Param("username") String username);
+
     // 🎯 จุดที่ 3: คำสั่งลบความสัมพันธ์ในรูปแบบ @ManyToMany
     @Modifying
     @Transactional
     @Query("DELETE FROM Menuaddongroup mg WHERE :menu MEMBER OF mg.menus")
     void deleteByMenu(@Param("menu") Menu menu);
+
 }
