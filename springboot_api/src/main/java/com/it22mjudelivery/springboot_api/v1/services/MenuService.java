@@ -10,8 +10,10 @@ public interface MenuService {
     List<Menu> getMenusByRestaurantAndTypeMenu(String username, Integer typeMenuId);
     boolean updateMenuStatus(int menuId, boolean status);
     boolean saveMenuWithAddons(Map<String, Object> requestData);
-
-    boolean updateMenuWithAddons(Map<String, Object> requestData);
+    boolean saveMenu(Map<String, Object> requestData);
+    //boolean updateMenu(Map<String, Object> requestData);
+    boolean updateMenuByRestaurant(Map<String, Object> requestData);
+    boolean deleteMenu(int menuId);
 
 
 

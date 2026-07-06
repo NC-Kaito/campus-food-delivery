@@ -51,6 +51,38 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
         }
     }
 
+    @PostMapping("/addMenu")
+    public ResponseEntity<?> addMenu(@RequestBody Map<String, Object> requestData) {
+        try {
+            boolean isSuccess = menuService.saveMenu(requestData);
+            if (isSuccess) {
+                return ResponseEntity.ok("บันทึกข้อมูลเมนูอาหารสำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("ไม่สามารถบันทึกข้อมูลได้ ข้อมูลไม่ถูกต้อง");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
+        }
+    }
+
+    @PostMapping("/updateMenuByRestaurant")
+    public ResponseEntity<?> updateMenuByRestaurant(@RequestBody Map<String, Object> requestData) {
+        try {
+            boolean isSuccess = menuService.updateMenuByRestaurant(requestData);
+            if (isSuccess) {
+                return ResponseEntity.ok("บันทึกข้อมูลเมนูอาหารและตัวเลือกเสริมสำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("ไม่สามารถบันทึกข้อมูลได้ ข้อมูลไม่ถูกต้อง");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
+        }
+    }
+
+
+
     @PostMapping("/uploadMenuImage")
     public ResponseEntity<?> uploadMenuImage(@RequestParam("image") MultipartFile file) {
         try {
@@ -75,6 +107,28 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("อัปโหลดไม่สำเร็จ: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/deleteMenu")
+    public ResponseEntity<?> deleteMenu(@RequestBody Map<String, Object> body) {
+        try {
+            Object rawId = body.get("menuid");
+            if (rawId == null) {
+                return ResponseEntity.badRequest().body("กรุณาระบุ menuid");
+            }
+            int menuId = Integer.parseInt(rawId.toString());
+
+                boolean isResult = menuService.deleteMenu(menuId);
+            if (isResult) {
+                return ResponseEntity.ok("ลบเมนูสำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("ไม่พบเมนูที่ต้องการลบ");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
         }
     }
 }

@@ -50,6 +50,15 @@ class RegisterOwnerInfo extends StatefulWidget {
 }
 
 class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
+  // ── ธีมสีหลักของหน้า (ชุดเดียวกับ register_restaurant.dart / profile_restaurant.dart) ──
+  static const Color _primary = Color(0xFF16A34A); // เขียวหลัก
+  static const Color _primaryDark = Color(0xFF0F7A38);
+  static const Color _accent = Color(0xFFEA7C1E); // ส้มสำหรับหัวข้อ/แบรนด์
+  static const Color _bg = Color(0xFFF5F6F8);
+  static const Color _textDark = Color(0xFF1E1E24);
+  static const Color _textMuted = Color(0xFF8A8D93);
+  static const Color _danger = Color(0xFFE53935);
+
   RestaurantService restaurantService = RestaurantService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
   final ImagePicker ownerImagePicker =
@@ -59,10 +68,22 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
   String? _ownerImageError; // 🎯 ตัวแปรจับ Error ของรูปเจ้าของร้าน
   File? _selectedOwnerImage; // 🎯 ถือไฟล์รูปภาพใบหน้าในหน้านี้
 
+  // 🎯 ข้อความ error ที่ได้กลับมาจากหลังบ้าน (เช่น อีเมล/เบอร์ซ้ำในระบบ)
+  // แยกจาก validator ปกติ เพราะรูปแบบข้อมูลถูกต้องแต่ซ้ำกับข้อมูลที่มีอยู่แล้ว
+  String? _emailServerError;
+  String? _phoneServerError;
+
   late final TextEditingController ownerFirstNameController;
   late final TextEditingController ownerLastnameController;
   late final TextEditingController emailController;
   late final TextEditingController phoneController;
+
+  // ── GlobalKey ของแต่ละช่อง ใช้สำหรับเลื่อนจอไปหาช่องแรกที่ยังไม่ได้กรอก ──
+  final GlobalKey _firstNameKey = GlobalKey();
+  final GlobalKey _lastNameKey = GlobalKey();
+  final GlobalKey _emailKey = GlobalKey();
+  final GlobalKey _phoneKey = GlobalKey();
+  final GlobalKey _ownerImageKey = GlobalKey();
 
   @override
   void initState() {
@@ -95,45 +116,84 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
   Future<void> pickOwnerImage() async {
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.transparent,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt, color: Colors.green),
-              title: const Text("ถ่ายรูป"),
-              onTap: () async {
-                Navigator.pop(context);
-                final XFile? image = await ownerImagePicker.pickImage(
-                  source: ImageSource.camera,
-                  imageQuality: 80,
-                );
-                if (image != null) {
-                  setState(() {
-                    _selectedOwnerImage = File(image.path);
-                    _ownerImageError = null;
-                  });
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library, color: Colors.green),
-              title: const Text("เลือกจากแกลเลอรี่"),
-              onTap: () async {
-                Navigator.pop(context);
-                final XFile? image = await ownerImagePicker.pickImage(
-                  source: ImageSource.gallery,
-                  imageQuality: 80,
-                );
-                if (image != null) {
-                  setState(() {
-                    _selectedOwnerImage = File(image.path);
-                    _ownerImageError = null;
-                  });
-                }
-              },
-            ),
-          ],
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.camera_alt, color: _primary),
+                ),
+                title: const Text(
+                  "ถ่ายรูป",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final XFile? image = await ownerImagePicker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 80,
+                  );
+                  if (image != null) {
+                    setState(() {
+                      _selectedOwnerImage = File(image.path);
+                      _ownerImageError = null;
+                    });
+                  }
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: _primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.photo_library, color: _primary),
+                ),
+                title: const Text(
+                  "เลือกจากแกลเลอรี่",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final XFile? image = await ownerImagePicker.pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 80,
+                  );
+                  if (image != null) {
+                    setState(() {
+                      _selectedOwnerImage = File(image.path);
+                      _ownerImageError = null;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -148,6 +208,100 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     final size = file.lengthSync();
     if (size > 1024 * 1024) return "ขนาดเกิน 1MB";
     return null;
+  }
+
+  // ── ดึงตรรกะ validate ของแต่ละช่องออกมาเป็นฟังก์ชันแยก เพื่อใช้ทั้งใน
+  // TextFormField.validator และใช้ตรวจซ้ำตอนหาช่องแรกที่ error ─────────────
+  String? _validateFirstName(String? value) {
+    if (value == null || value.trim().isEmpty) return "กรุณากรอกชื่อจริง";
+    if (value.contains(' ')) return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
+    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value)) {
+      return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
+    }
+    if (value.length < 3 || value.length > 30)
+      return "ความยาวต้องระว่าง 3 - 30 ตัวอักษร";
+    return null;
+  }
+
+  String? _validateLastName(String? value) {
+    if (value == null || value.trim().isEmpty) return "กรุณากรอกนามสกุล";
+    if (value.contains(' ')) return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
+    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value)) {
+      return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
+    }
+    if (value.length < 3 || value.length > 30)
+      return "ความยาวต้องระว่าง 3 - 30 ตัวอักษร";
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return "กรุณากรอกอีเมล";
+    if (value.contains(' ')) return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value))
+      return "รูปแบบอีเมลไม่ถูกต้อง";
+    final parts = value.split('@');
+    if (parts.isNotEmpty) {
+      final localPart = parts[0];
+      if (!RegExp(r'^[a-zA-Z0-9.]+$').hasMatch(localPart)) {
+        return "ชื่ออีเมลต้องเป็นภาษาอังกฤษ หรือตัวเลขเท่านั้น";
+      }
+      if (localPart.length < 3 || localPart.length > 20) {
+        return "ส่วนชื่ออีเมลหน้า @ ต้องยาว 3-20 ตัวอักษร";
+      }
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) return "กรุณากรอกเบอร์โทรศัพท์";
+    if (value.contains(' ')) return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
+    if (!RegExp(r'^[0-9]+$').hasMatch(value))
+      return "ต้องเป็นตัวเลข (0-9) เท่านั้น";
+    if (value.length < 10 || value.length > 15)
+      return "ความยาวต้องอยู่ระหว่าง 10 ถึง 15 หลัก";
+    if (!RegExp(r'^(06|08|09)').hasMatch(value))
+      return "เบอร์โทรศัพท์ต้องขึ้นต้นด้วย 06, 08 หรือ 09";
+    return null;
+  }
+
+  // ── เลื่อนจอไปหาช่องแรกสุดที่ยังไม่ผ่าน/ยังไม่ได้กรอก ตามลำดับบนจอ ──────
+  void _scrollToFirstInvalidField() {
+    final List<MapEntry<GlobalKey, bool>> checksInOrder = [
+      MapEntry(
+        _firstNameKey,
+        _validateFirstName(ownerFirstNameController.text) != null,
+      ),
+      MapEntry(
+        _lastNameKey,
+        _validateLastName(ownerLastnameController.text) != null,
+      ),
+      MapEntry(
+        _emailKey,
+        _validateEmail(emailController.text) != null ||
+            _emailServerError != null,
+      ),
+      MapEntry(
+        _phoneKey,
+        _validatePhone(phoneController.text) != null ||
+            _phoneServerError != null,
+      ),
+      MapEntry(_ownerImageKey, _ownerImageError != null),
+    ];
+
+    for (final check in checksInOrder) {
+      if (check.value) {
+        final ctx = check.key.currentContext;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+            alignment: 0.15,
+          );
+        }
+        break;
+      }
+    }
   }
 
   Future<String?> uploadImage(File? imageFile, String type) async {
@@ -219,9 +373,13 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("สมัครร้านค้าสำเร็จ รอการอนุมัติ"),
-              backgroundColor: Colors.green,
+            SnackBar(
+              content: const Text("สมัครร้านค้าสำเร็จ รอการอนุมัติ"),
+              backgroundColor: _primary,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
           Navigator.of(context).pushAndRemoveUntil(
@@ -230,17 +388,98 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           );
         }
       } catch (e) {
-        if (mounted) {
+        // 🎯 พยายามแปลข้อความ error จากหลังบ้านให้เข้าใจง่าย โดยเฉพาะกรณี
+        // ข้อมูลซ้ำในระบบ (unique constraint) เช่น อีเมล/เบอร์โทร/ชื่อผู้ใช้ซ้ำ
+        // รวมข้อความจากทุกแหล่งที่เป็นไปได้ (DioException, ข้อความ toString ทั่วไป)
+        // เผื่อ service layer ห่อ error มาในรูปแบบอื่นที่ไม่ใช่ DioException ตรงๆ
+        final buffer = StringBuffer();
+        if (e is DioException) {
+          final data = e.response?.data;
+          if (data is String) {
+            buffer.write(data);
+          } else if (data != null) {
+            buffer.write(data.toString());
+          }
+          if (e.message != null) buffer.write(' ${e.message}');
+        }
+        buffer.write(' ${e.toString()}');
+
+        final combinedText = buffer.toString();
+        final match = RegExp(
+          r'Key\s*\(\s*(\w+)\s*\)\s*=',
+          caseSensitive: false,
+        ).firstMatch(combinedText);
+        final duplicateField = match?.group(1)?.toLowerCase();
+
+        if (duplicateField == 'email') {
+          // แสดง error ตรงใต้ช่องอีเมลจุดเดียว (ช่องแดงเดียวกับตอน validate รูปแบบ)
+          setState(() {
+            _emailServerError = "อีเมลนี้ถูกใช้งานแล้ว";
+          });
+          formKey.currentState?.validate();
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _scrollToFirstInvalidField(),
+          );
+        } else if (duplicateField == 'phone') {
+          setState(() {
+            _phoneServerError = "เบอร์โทรศัพท์นี้ถูกใช้งานแล้ว";
+          });
+          formKey.currentState?.validate();
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _scrollToFirstInvalidField(),
+          );
+        } else if (duplicateField == 'username') {
+          // username ถูกกรอกไว้ตั้งแต่หน้าแรก (register_restaurant.dart)
+          // หน้านี้แก้ไขไม่ได้ จึงแจ้งให้กดย้อนกลับไปเปลี่ยนแทน
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (dialogContext) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                title: const Text("ชื่อผู้ใช้นี้ถูกใช้งานแล้ว"),
+                content: const Text(
+                  "กรุณากดปุ่ม \"ย้อนกลับ\" เพื่อเปลี่ยนชื่อผู้ใช้ (Username) แล้วลองสมัครใหม่อีกครั้ง",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    child: const Text(
+                      "ตกลง",
+                      style: TextStyle(
+                        color: _primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text("เกิดข้อผิดพลาด: $e"),
-              backgroundColor: Colors.red,
+              content: const Text(
+                "เกิดข้อผิดพลาดในการสมัครร้านค้า กรุณาลองใหม่อีกครั้ง",
+              ),
+              backgroundColor: _danger,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           );
         }
       } finally {
         if (mounted) setState(() => _isLoading = false);
       }
+    } else {
+      // รอให้ error ใต้ช่องขึ้นแสดงก่อน 1 เฟรม แล้วค่อยเลื่อนจอไปหา
+      // ช่องแรกสุดที่ยังไม่ได้กรอก/ยังไม่ถูกต้อง
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _scrollToFirstInvalidField(),
+      );
     }
   }
 
@@ -258,256 +497,25 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       filled: true,
       fillColor: Colors.white,
       suffixIcon: suffixIcon,
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: Colors.grey.shade300),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.green, width: 1.5),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _primary, width: 1.6),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _danger),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red, width: 1.5),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: const Text(
-          'สมัครร้านค้า',
-          style: TextStyle(
-            color: Color.fromARGB(255, 255, 111, 0),
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-          ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Form(
-            key: formKey,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 10),
-
-                  _buildLabel("ชื่อจริง (FirstName)"),
-                  TextFormField(
-                    controller: ownerFirstNameController,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty)
-                        return "กรุณากรอกชื่อจริง";
-                      if (value.contains(' '))
-                        return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
-                      if (!RegExp(
-                        r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                      ).hasMatch(value)) {
-                        return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
-                      }
-                      if (value.length < 3 || value.length > 30)
-                        return "ความยาวต้องระว่าง 3 - 30 ตัวอักษร";
-                      return null;
-                    },
-                    decoration: _inputDecoration(hint: "กรอกชื่อจริง"),
-                  ),
-
-                  _buildLabel("นามสกุล (Lastname)"),
-                  TextFormField(
-                    controller: ownerLastnameController,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty)
-                        return "กรุณากรอกนามสกุล";
-                      if (value.contains(' '))
-                        return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
-                      if (!RegExp(
-                        r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                      ).hasMatch(value)) {
-                        return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
-                      }
-                      if (value.length < 3 || value.length > 30)
-                        return "ความยาวต้องระว่าง 3 - 30 ตัวอักษร";
-                      return null;
-                    },
-                    decoration: _inputDecoration(hint: "กรอกนามสกุล"),
-                  ),
-
-                  _buildLabel("อีเมล (Email)"),
-                  TextFormField(
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty)
-                        return "กรุณากรอกอีเมล";
-                      if (value.contains(' '))
-                        return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
-                      if (!RegExp(
-                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                      ).hasMatch(value))
-                        return "รูปแบบอีเมลไม่ถูกต้อง";
-                      final parts = value.split('@');
-                      if (parts.isNotEmpty) {
-                        final localPart = parts[0];
-                        if (!RegExp(r'^[a-zA-Z0-9.]+$').hasMatch(localPart)) {
-                          return "ชื่ออีเมลต้องเป็นภาษาอังกฤษ หรือตัวเลขเท่านั้น";
-                        }
-                        if (localPart.length < 3 || localPart.length > 20) {
-                          return "ส่วนชื่ออีเมลหน้า @ ต้องยาว 3-20 ตัวอักษร";
-                        }
-                      }
-                      return null;
-                    },
-                    decoration: _inputDecoration(
-                      hint: "ตัวอย่าง xxx@gmail.com",
-                      suffixIcon: Icon(
-                        Icons.email_outlined,
-                        color: Colors.grey[300],
-                      ),
-                    ),
-                  ),
-
-                  _buildLabel("เบอร์โทรศัพท์ (Phone)"),
-                  TextFormField(
-                    controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty)
-                        return "กรุณากรอกเบอร์โทรศัพท์";
-                      if (value.contains(' '))
-                        return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
-                      if (!RegExp(r'^[0-9]+$').hasMatch(value))
-                        return "ต้องเป็นตัวเลข (0-9) เท่านั้น";
-                      if (value.length < 10 || value.length > 15)
-                        return "ความยาวต้องอยู่ระหว่าง 10 ถึง 15 หลัก";
-                      return null;
-                    },
-                    decoration: _inputDecoration(
-                      hint: "ตัวเลข 10-15 หลัก",
-                      suffixIcon: Icon(
-                        Icons.phone_android_outlined,
-                        color: Colors.grey[300],
-                      ),
-                    ),
-                  ),
-
-                  // 🎯 ย้ายกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านมาสแตนด์บายฝั่งขวาหน้าจอนี้เรียบร้อยครับ
-                  _buildUploadBox(
-                    "รูปภาพบัตรประชาชน (CardID Image)",
-                    _selectedOwnerImage,
-                    pickOwnerImage,
-                  ),
-                  if (_ownerImageError != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 4, left: 4),
-                      child: Text(
-                        _ownerImageError!,
-                        style: const TextStyle(color: Colors.red, fontSize: 12),
-                      ),
-                    ),
-
-                  const SizedBox(height: 30),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context, {
-                            'ownerFirstName': ownerFirstNameController.text,
-                            'ownerLastName': ownerLastnameController.text,
-                            'email': emailController.text,
-                            'phone': phoneController.text,
-                            'ownerImage':
-                                _selectedOwnerImage, // ส่งย้อนกลับไปเก็บเผื่อด้วย
-                          }),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[300],
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            "ย้อนกลับ",
-                            style: TextStyle(fontSize: 16),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _isLoading ? null : doRegister,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromARGB(
-                              255,
-                              0,
-                              255,
-                              51,
-                            ),
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            elevation: 5,
-                          ),
-                          child: _isLoading
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  "สมัครสมาชิก",
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _danger, width: 1.6),
       ),
     );
   }
@@ -519,14 +527,15 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
         text: TextSpan(
           text: text,
           style: const TextStyle(
-            color: Colors.black,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
+            color: _textDark,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.1,
           ),
           children: const [
             TextSpan(
               text: ' *',
-              style: TextStyle(color: Colors.red),
+              style: TextStyle(color: _danger),
             ),
           ],
         ),
@@ -534,31 +543,497 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     );
   }
 
+  Widget _fieldError(String? message) {
+    if (message == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, left: 4),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 14, color: _danger),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(color: _danger, fontSize: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeader({required IconData icon, required String title}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14, left: 2),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: _accent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: _accent, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: const TextStyle(
+                color: _textDark,
+                fontSize: 16.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── ตัวบอกขั้นตอน 1/2 ด้านบนสุดของฟอร์ม (ขั้นนี้อยู่ที่ขั้นตอนที่ 2) ──
+  Widget _buildStepIndicator() {
+    Widget dot({
+      required bool active,
+      required bool done,
+      required IconData icon,
+      required String label,
+    }) {
+      return Column(
+        children: [
+          Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: (active || done) ? _primary : Colors.grey[300],
+              shape: BoxShape.circle,
+              boxShadow: active
+                  ? [
+                      BoxShadow(
+                        color: _primary.withOpacity(0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : [],
+            ),
+            child: Icon(
+              done ? Icons.check_rounded : icon,
+              size: 14,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: (active || done) ? FontWeight.w700 : FontWeight.w500,
+              color: (active || done) ? _textDark : _textMuted,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
+      child: Row(
+        children: [
+          dot(
+            active: false,
+            done: true,
+            icon: Icons.storefront_rounded,
+            label: "ข้อมูลร้านค้า",
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 18),
+              child: Container(height: 2, color: _primary.withOpacity(0.5)),
+            ),
+          ),
+          dot(
+            active: true,
+            done: false,
+            icon: Icons.person_outline_rounded,
+            label: "ข้อมูลเจ้าของร้าน",
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: const BoxDecoration(color: _bg, shape: BoxShape.circle),
+            child: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 16,
+              color: _textDark,
+            ),
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'สมัครร้านค้า',
+          style: TextStyle(
+            color: _textDark,
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+          ),
+        ),
+      ),
+      body: Form(
+        key: formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(color: Colors.white, child: _buildStepIndicator()),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _sectionHeader(
+                      icon: Icons.person_outline_rounded,
+                      title: "ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน",
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildLabel("ชื่อจริง (FirstName)"),
+                          TextFormField(
+                            key: _firstNameKey,
+                            controller: ownerFirstNameController,
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                            validator: _validateFirstName,
+                            decoration: _inputDecoration(
+                              hint: "กรอกชื่อจริง",
+                              suffixIcon: Icon(
+                                Icons.badge_outlined,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ),
+
+                          _buildLabel("นามสกุล (Lastname)"),
+                          TextFormField(
+                            key: _lastNameKey,
+                            controller: ownerLastnameController,
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                            validator: _validateLastName,
+                            decoration: _inputDecoration(
+                              hint: "กรอกนามสกุล",
+                              suffixIcon: Icon(
+                                Icons.badge_outlined,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ),
+
+                          _buildLabel("อีเมล (Email)"),
+                          TextFormField(
+                            key: _emailKey,
+                            controller: emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                            validator: (value) =>
+                                _validateEmail(value) ?? _emailServerError,
+                            onChanged: (_) {
+                              if (_emailServerError != null) {
+                                setState(() => _emailServerError = null);
+                              }
+                            },
+                            decoration: _inputDecoration(
+                              hint: "ตัวอย่าง xxx@gmail.com",
+                              suffixIcon: Icon(
+                                Icons.email_outlined,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ),
+
+                          _buildLabel("เบอร์โทรศัพท์ (Phone)"),
+                          TextFormField(
+                            key: _phoneKey,
+                            controller: phoneController,
+                            keyboardType: TextInputType.phone,
+                            autovalidateMode:
+                                AutovalidateMode.onUserInteraction,
+                            validator: (value) =>
+                                _validatePhone(value) ?? _phoneServerError,
+                            onChanged: (_) {
+                              if (_phoneServerError != null) {
+                                setState(() => _phoneServerError = null);
+                              }
+                            },
+                            decoration: _inputDecoration(
+                              hint: "เช่น 08xxxxxxxx",
+                              suffixIcon: Icon(
+                                Icons.phone_android_outlined,
+                                color: Colors.grey[400],
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          // 🎯 ย้ายกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านมาสแตนด์บายฝั่งขวาหน้าจอนี้เรียบร้อยครับ
+                          _buildUploadBox(
+                            "รูปภาพบัตรประชาชน (CardID Image)",
+                            _selectedOwnerImage,
+                            pickOwnerImage,
+                            key: _ownerImageKey,
+                          ),
+                          _fieldError(_ownerImageError),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 26),
+
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 54,
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.pop(context, {
+                                'ownerFirstName': ownerFirstNameController.text,
+                                'ownerLastName': ownerLastnameController.text,
+                                'email': emailController.text,
+                                'phone': phoneController.text,
+                                'ownerImage':
+                                    _selectedOwnerImage, // ส่งย้อนกลับไปเก็บเผื่อด้วย
+                              }),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _textMuted,
+                                side: BorderSide(color: Colors.grey.shade300),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(30),
+                                ),
+                              ),
+                              child: const Text(
+                                "ย้อนกลับ",
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: SizedBox(
+                            height: 54,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(30),
+                                gradient: const LinearGradient(
+                                  colors: [_primary, _primaryDark],
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: _primary.withOpacity(0.35),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                              ),
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : doRegister,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.transparent,
+                                  shadowColor: Colors.transparent,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text(
+                                        "สมัครสมาชิก",
+                                        style: TextStyle(
+                                          fontSize: 15.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: Text(
+                        "ทีมงานจะตรวจสอบและอนุมัติร้านค้าของคุณหลังสมัครสำเร็จ",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12.5, color: _textMuted),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // วิดเจ็ตกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านค้า
-  Widget _buildUploadBox(String label, File? selectedFile, VoidCallback onTap) {
+  Widget _buildUploadBox(
+    String label,
+    File? selectedFile,
+    VoidCallback onTap, {
+    Key? key,
+  }) {
     return Column(
+      key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildLabel(label),
         GestureDetector(
           onTap: onTap,
           child: Container(
-            height: 200,
+            height: 180,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
+              color: selectedFile != null
+                  ? Colors.white
+                  : const Color(0xFFF0F1F3),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selectedFile != null
+                    ? _primary.withOpacity(0.4)
+                    : Colors.grey.shade300,
+                width: 1.2,
+              ),
             ),
             child: selectedFile != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(selectedFile, fit: BoxFit.cover),
+                ? Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(15),
+                        child: Image.file(selectedFile, fit: BoxFit.cover),
+                      ),
+                      Positioned(
+                        right: 10,
+                        bottom: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.12),
+                                blurRadius: 6,
+                              ),
+                            ],
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.edit_outlined,
+                                size: 14,
+                                color: _primary,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                "เปลี่ยนรูป",
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: _textDark,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   )
-                : const Icon(
-                    Icons.add_a_photo_outlined,
-                    color: Colors.grey,
-                    size: 40,
+                : Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          color: _primary.withOpacity(0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.badge_outlined,
+                          color: _primary,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        "แตะเพื่ออัปโหลดรูปบัตรประชาชน",
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: _textDark,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "รองรับ .jpg, .png ขนาดไม่เกิน 1MB",
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.grey[500],
+                        ),
+                      ),
+                    ],
                   ),
           ),
         ),

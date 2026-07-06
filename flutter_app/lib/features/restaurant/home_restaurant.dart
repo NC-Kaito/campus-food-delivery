@@ -101,23 +101,65 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       restaurantModel!.username!,
     );
 
+    // 🎯 โหลดเมนูของทุกประเภทพร้อมกันก่อน แล้วเก็บไว้เฉพาะประเภทที่มี
+    // เมนูอยู่จริงอย่างน้อย 1 รายการ ประเภทที่ไม่มีเมนูจะไม่ถูกสร้างเป็นแท็บเลย
+    final entries = await Future.wait(
+      data.where((t) => t.typemenuId != null).map((type) async {
+        final typeId = type.typemenuId!;
+        try {
+          final menuData = await menuService.getMenusByTypeMenu(
+            restaurantModel!.username!,
+            typeId,
+          );
+          return MapEntry(type, menuData);
+        } catch (e) {
+          return MapEntry(type, <MenuModel>[]);
+        }
+      }),
+    );
+
+    final validEntries = entries.where((e) => e.value.isNotEmpty).toList();
+
     final newController = TabController(
-      length: data.isEmpty ? 1 : data.length,
+      length: validEntries.isEmpty ? 1 : validEntries.length,
       vsync: this,
     );
 
     _tabController?.dispose();
 
     setState(() {
-      typeMenus = data;
+      typeMenus = validEntries.map((e) => e.key).toList();
+      categoryMenus
+        ..clear()
+        ..addEntries(
+          validEntries.map((e) => MapEntry(e.key.typemenuId!, e.value)),
+        );
+      categoryLoading
+        ..clear()
+        ..addEntries(
+          validEntries.map((e) => MapEntry(e.key.typemenuId!, false)),
+        );
       _tabController = newController;
     });
+  }
 
-    // ✅ รอทุก type โหลดเสร็จพร้อมกัน
-    await Future.wait(
-      data
-          .where((type) => type.typemenuId != null)
-          .map((type) => loadMenusByType(type.typemenuId!)),
+  // 🎯 สร้าง TabController ใหม่หลังหมวดหมู่ถูกเอาออก โดยพยายามคง index/แท็บ
+  // ที่ผู้ใช้กำลังดูอยู่ไว้ให้ใกล้เคียงเดิมที่สุด
+  void _rebuildTabController({int? removedIndex}) {
+    final int oldIndex = _tabController?.index ?? 0;
+    _tabController?.dispose();
+
+    final int length = typeMenus.isEmpty ? 1 : typeMenus.length;
+    int newIndex = oldIndex;
+    if (removedIndex != null && removedIndex < oldIndex) {
+      newIndex = oldIndex - 1;
+    }
+    newIndex = newIndex.clamp(0, length - 1);
+
+    _tabController = TabController(
+      length: length,
+      vsync: this,
+      initialIndex: newIndex,
     );
   }
 
@@ -133,10 +175,25 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         restaurantModel!.username!,
         typeMenuId,
       );
-      setState(() {
-        categoryMenus[typeMenuId] = menuData;
-        categoryLoading[typeMenuId] = false;
-      });
+
+      if (menuData.isEmpty) {
+        // 🎯 หมวดหมู่นี้ไม่มีเมนูเหลือแล้ว (เช่น เพิ่งลบเมนูสุดท้ายทิ้ง)
+        // เอาแท็บนี้ออกไปเลย แทนที่จะโชว์ "ไม่มีเมนูในหมวดหมู่นี้"
+        final removedIndex = typeMenus.indexWhere(
+          (t) => t.typemenuId == typeMenuId,
+        );
+        setState(() {
+          categoryMenus.remove(typeMenuId);
+          categoryLoading.remove(typeMenuId);
+          if (removedIndex != -1) typeMenus.removeAt(removedIndex);
+          _rebuildTabController(removedIndex: removedIndex);
+        });
+      } else {
+        setState(() {
+          categoryMenus[typeMenuId] = menuData;
+          categoryLoading[typeMenuId] = false;
+        });
+      }
     } catch (e) {
       setState(() {
         categoryLoading[typeMenuId] = false;
@@ -673,7 +730,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 60),
                               GestureDetector(
                                 onTap: () => confirmDeleteMenu(typeId, menu),
                                 child: const Text(

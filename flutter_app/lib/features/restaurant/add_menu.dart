@@ -64,11 +64,13 @@ class _AddMenuState extends State<AddMenu> {
   // 🎯 ราคาพิเศษ (extraprice) — เปิด/ปิดได้ด้วย toggle "พิเศษ"
   final TextEditingController extraPriceController = TextEditingController();
   final TextEditingController _newTypeNameController = TextEditingController();
+  final FocusNode _newTypeFocusNode = FocusNode();
 
   bool isAddonOn = false;
   bool _isLoading = false;
   bool _isAddingNewType = false;
   bool _hasExtraPrice = false;
+  bool _isLoadingTypeMenu = true;
 
   List<AddonGroupFormState> addonGroups = [];
   List<AddonMenuModel> dbAddonList = [];
@@ -87,7 +89,6 @@ class _AddMenuState extends State<AddMenu> {
   void initState() {
     super.initState();
     fetchTypeMenus();
-    fetchAddonMenus();
   }
 
   @override
@@ -97,6 +98,7 @@ class _AddMenuState extends State<AddMenu> {
     priceController.dispose();
     extraPriceController.dispose();
     _newTypeNameController.dispose();
+    _newTypeFocusNode.dispose();
     _clearAllAddonGroups();
     super.dispose();
   }
@@ -120,108 +122,9 @@ class _AddMenuState extends State<AddMenu> {
       });
     } catch (e) {
       print("ไม่สามารถโหลดประเภทอาหารจาก /v1/typemenu ได้: $e");
+    } finally {
+      if (mounted) setState(() => _isLoadingTypeMenu = false);
     }
-  }
-
-  Future<void> fetchAddonMenus() async {
-    try {
-      final addons = await menuService.getAllAddonMenus(
-        GlobalData.usernameRestaurant,
-      );
-      setState(() {
-        dbAddonList = List<AddonMenuModel>.from(addons);
-        if (addonGroups.isEmpty) {
-          _addNewAddonGroup();
-        } else {
-          for (var group in addonGroups) {
-            group.currentSearchResults = List<AddonMenuModel>.from(dbAddonList);
-          }
-        }
-      });
-    } catch (e) {
-      print("ไม่สามารถโหลดรายการวัตถุดิบเฉพาะร้านได้: $e");
-      if (addonGroups.isEmpty) {
-        _addNewAddonGroup();
-      }
-    }
-  }
-
-  void _addNewAddonGroup() {
-    setState(() {
-      final newGroup = AddonGroupFormState();
-      newGroup.currentSearchResults = List<AddonMenuModel>.from(dbAddonList);
-      addonGroups.add(newGroup);
-    });
-  }
-
-  void _removeAddonGroup(int groupIndex) {
-    setState(() {
-      addonGroups[groupIndex].groupNameController.dispose();
-      addonGroups[groupIndex].searchController.dispose();
-      for (var addon in addonGroups[groupIndex].selectedAddons) {
-        addon.nameController.dispose();
-        addon.priceController.dispose();
-      }
-      addonGroups.removeAt(groupIndex);
-    });
-  }
-
-  void _onSearchChanged(int groupIndex, String query) {
-    setState(() {
-      if (query.trim().isEmpty) {
-        addonGroups[groupIndex].currentSearchResults =
-            List<AddonMenuModel>.from(dbAddonList);
-      } else {
-        addonGroups[groupIndex].currentSearchResults = dbAddonList
-            .where(
-              (item) => (item.addonName ?? "").toLowerCase().contains(
-                query.toLowerCase(),
-              ),
-            )
-            .toList();
-      }
-    });
-  }
-
-  void _addAddonFromDb(int groupIndex, AddonMenuModel addonItem) {
-    int? id = addonItem.addonId;
-    String name = addonItem.addonName ?? "";
-    if (id == null) return;
-    bool isExist = addonGroups[groupIndex].selectedAddons.any(
-      (e) => e.addonId == id,
-    );
-    if (isExist) return;
-    setState(() {
-      addonGroups[groupIndex].selectedAddons.add(
-        CustomAddonItem(
-          nameController: TextEditingController(text: name),
-          priceController: TextEditingController(text: "7"),
-          addonId: id,
-        ),
-      );
-    });
-  }
-
-  void _addNewCustomAddonRow(int groupIndex) {
-    setState(() {
-      addonGroups[groupIndex].selectedAddons.add(
-        CustomAddonItem(
-          nameController: TextEditingController(),
-          priceController: TextEditingController(),
-          addonId: null,
-        ),
-      );
-    });
-  }
-
-  void _removeAddonItemRow(int groupIndex, int addonIndex) {
-    setState(() {
-      addonGroups[groupIndex].selectedAddons[addonIndex].nameController
-          .dispose();
-      addonGroups[groupIndex].selectedAddons[addonIndex].priceController
-          .dispose();
-      addonGroups[groupIndex].selectedAddons.removeAt(addonIndex);
-    });
   }
 
   Future<void> pickImage() async {
@@ -350,7 +253,7 @@ class _AddMenuState extends State<AddMenu> {
         }).toList();
       }
 
-      await menuService.saveMenuWithAddons(requestData);
+      await menuService.saveMenu(requestData);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -706,6 +609,20 @@ class _AddMenuState extends State<AddMenu> {
                                   _selectedTypeMenuName = null;
                                 }
                               });
+                              if (_isAddingNewType) {
+                                // ปล่อยโฟกัสช่องเดิม (เช่น ชื่อเมนู) แล้วค่อยย้าย
+                                // โฟกัสไปช่อง "ชื่อประเภทอาหาร" หลัง build เสร็จ
+                                FocusScope.of(context).unfocus();
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  if (mounted) {
+                                    FocusScope.of(
+                                      context,
+                                    ).requestFocus(_newTypeFocusNode);
+                                  }
+                                });
+                              }
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -751,7 +668,7 @@ class _AddMenuState extends State<AddMenu> {
                     SizedBox(height: 5),
 
                     if (!_isAddingNewType) ...[
-                      typeMenuList.isEmpty
+                      _isLoadingTypeMenu
                           ? Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
@@ -801,6 +718,7 @@ class _AddMenuState extends State<AddMenu> {
                     ] else ...[
                       TextFormField(
                         controller: _newTypeNameController,
+                        focusNode: _newTypeFocusNode,
                         autofocus: true,
                         onChanged: (val) {
                           setState(() {
@@ -1038,6 +956,7 @@ class _AddMenuState extends State<AddMenu> {
     final String? safeValue = (value != null && items.contains(value))
         ? value
         : null;
+    final bool isEmpty = items.isEmpty;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
@@ -1049,9 +968,12 @@ class _AddMenuState extends State<AddMenu> {
         child: DropdownButton<String>(
           value: safeValue,
           isExpanded: true,
-          hint: const Text(
-            "เลือกประเภท",
-            style: TextStyle(fontSize: 14, color: _MenuTheme.textSecondary),
+          hint: Text(
+            isEmpty ? "ยังไม่มีประเภท" : "เลือกประเภท",
+            style: const TextStyle(
+              fontSize: 14,
+              color: _MenuTheme.textSecondary,
+            ),
           ),
           items: items.toSet().map((String e) {
             return DropdownMenuItem<String>(
@@ -1059,7 +981,8 @@ class _AddMenuState extends State<AddMenu> {
               child: Text(e, style: const TextStyle(fontSize: 14)),
             );
           }).toList(),
-          onChanged: onChanged,
+          // ไม่มีประเภทให้เลือก → ปิดการกดดรอปดาว กันเปิดเมนูเปล่า
+          onChanged: isEmpty ? null : onChanged,
         ),
       ),
     );
