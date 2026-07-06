@@ -15,6 +15,11 @@ class CartItem {
   final int
   totalPrice; // แนะนำให้ค่านี้เป็น "ราคาต่อหน่วย/ต่อจาน" จะได้คูณ quantity ได้ง่ายครับ
 
+  // 🎯 สิ่งที่เพิ่มเข้ามาเพื่อแก้ Error:
+  final int
+  unitPrice; // สมมติว่าเป็น int นะครับ (ถ้าคุณใช้ double ให้เปลี่ยนเป็น double)
+  final bool isExtraPrice;
+
   CartItem({
     required this.menu,
     required this.selectedAddons,
@@ -24,6 +29,9 @@ class CartItem {
     required this.note,
     required this.addonPrice,
     required this.totalPrice,
+    // 🎯 อย่าลืมกำหนด require ใน Constructor ด้วย
+    required this.unitPrice,
+    required this.isExtraPrice,
   });
 }
 

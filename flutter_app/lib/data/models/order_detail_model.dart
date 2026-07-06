@@ -42,6 +42,11 @@ class OrderDetailModel {
                       .map((addon) => OrderDetailAddonModel.fromJson(addon))
                       .toList()
                 : []),
+      // ← เพิ่มบรรทัดนี้: เช็คหลายชื่อ key เผื่อ backend สะกดไม่ตรงกัน
+      orderDetailCurries:
+          json['orderdetailcurries'] ??
+          json['orderDetailCurries'] ??
+          json['curries'],
     );
   }
 

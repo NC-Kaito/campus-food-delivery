@@ -7,6 +7,8 @@ import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/global_data.dart';
 
+import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart';
+
 class ListWaitingPickupOrder extends StatefulWidget {
   const ListWaitingPickupOrder({super.key});
 
@@ -236,6 +238,20 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     }
   }
 
+  Future<void> _openOrderDetail(OrderModel orderModel) async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ViewWaitingPickupOrder(orderModel: orderModel),
+      ),
+    );
+
+    // ถ้ารับออเดอร์สำเร็จจากหน้ารายละเอียด (คืนค่า true) ให้รีเฟรชลิสต์ทันที
+    if (result == true) {
+      _fetchWaitingOrders();
+    }
+  }
+
   String _getFinalProfileImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -330,202 +346,208 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
       orderTimeText = "$hour:$minute น.";
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Colors.orange.withOpacity(0.2),
-                        backgroundImage: finalImgUrl.isNotEmpty
-                            ? NetworkImage(finalImgUrl)
-                            : null,
-                        child: finalImgUrl.isEmpty
-                            ? const Icon(
-                                Icons.person,
-                                size: 20,
-                                color: Colors.orange,
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          memberFullName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: () => _openOrderDetail(orderModel),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F9FA),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 18,
+                          backgroundColor: Colors.orange.withOpacity(0.2),
+                          backgroundImage: finalImgUrl.isNotEmpty
+                              ? NetworkImage(finalImgUrl)
+                              : null,
+                          child: finalImgUrl.isEmpty
+                              ? const Icon(
+                                  Icons.person,
+                                  size: 20,
+                                  color: Colors.orange,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            memberFullName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const Text(
-                      "เลขที่ออเดอร์",
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    Text(
-                      "K$orderId",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  children: [
-                    const SizedBox(height: 4),
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: const BoxDecoration(
-                        color: Colors.orange,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       const Text(
-                        "รับที่ (ร้านค้า)",
+                        "เลขที่ออเดอร์",
                         style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
                           color: Colors.grey,
                         ),
                       ),
-                      const SizedBox(height: 2),
                       Text(
-                        restaurantName,
+                        "K$orderId",
                         style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
+                          color: Colors.orange,
                         ),
                       ),
                     ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-
-          // 📦 ส่วนแสดงจำนวนรายการ และ เวลาที่สั่งซื้อด้านล่างรายการ
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment
-                  .spaceBetween, // ดันยอดรายการไปซ้าย เวลาไปขวา
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.restaurant_menu,
-                      size: 16,
-                      color: Colors.grey.shade600,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      "ทั้งหมด $totalItems รายการ",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade700,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    children: [
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: const BoxDecoration(
+                          color: Colors.orange,
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                // 🕒 บล็อกเวลาที่เพิ่มเข้ามาใหม่ อยู่ข้างล่างรายการ
-                Row(
-                  children: [
-                    Icon(
-                      Icons.access_time_rounded,
-                      size: 16,
-                      color: Colors.grey.shade600,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "เวลาสั่งซื้อ: $orderTimeText",
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.grey.shade700,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1, thickness: 1, color: Colors.black12),
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _acceptOrderAction(rawOrderId),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF64FF20),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(30),
+                    ],
                   ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  "รับคำสั่งซื้อ",
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "รับที่ (ร้านค้า)",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          restaurantName,
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // 📦 ส่วนแสดงจำนวนรายการ และ เวลาที่สั่งซื้อด้านล่างรายการ
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment
+                    .spaceBetween, // ดันยอดรายการไปซ้าย เวลาไปขวา
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.restaurant_menu,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        "ทั้งหมด $totalItems รายการ",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  // 🕒 บล็อกเวลาที่เพิ่มเข้ามาใหม่ อยู่ข้างล่างรายการ
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.access_time_rounded,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        "เวลาสั่งซื้อ: $orderTimeText",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1, thickness: 1, color: Colors.black12),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _openOrderDetail(
+                    orderModel,
+                  ), // ← เปลี่ยนจากรับตรงๆ เป็นเปิดดูรายละเอียดก่อน
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF64FF20),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    "ดูรายละเอียด", // ← เปลี่ยนข้อความ เพราะกดแล้วไม่ได้รับเลยทันที
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -13,4 +13,5 @@ public class AddOrderDetailDto {
     private double subTotal;
     private String note;
     private List<AddOrderDetailAddOnDto> addons;
+    private List<AddOrderDetailCurryDto> orderDetailCurries;
 }

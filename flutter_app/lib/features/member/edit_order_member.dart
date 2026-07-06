@@ -25,12 +25,17 @@ class _EditOrderMemberState extends State<EditOrderMember> {
   // สำหรับเก็บรายการ Add-on ที่ผู้ใช้เลือกจิ้ม (Key: ID ของตัวเลือกย่อย, Value: วัตถุข้อมูล)
   final Map<int, MenuAddonDetailModel> _selectedAddons = {};
 
+  // ── สถานะเลือกราคาปกติ/พิเศษ ──
+  bool _useExtraPrice = false;
+
   @override
   void initState() {
     super.initState();
     // 🎯 ดึงข้อมูลเก่าจากตะกร้าเดิมมาตั้งต้นกางบนหน้าจออีดิต
     _quantity = widget.cartItem.quantity;
     _noteController.text = widget.cartItem.note;
+    _useExtraPrice =
+        widget.cartItem.isExtraPrice; // ดึงสถานะราคาพิเศษเดิมมาแสดง
 
     for (var addon in widget.cartItem.selectedAddons) {
       if (addon.addonDetailId != null) {
@@ -94,9 +99,14 @@ class _EditOrderMemberState extends State<EditOrderMember> {
 
   @override
   Widget build(BuildContext context) {
-    int basePrice = widget.cartItem.menu.price?.toInt() ?? 0;
+    final int normalPrice = widget.cartItem.menu.price?.toInt() ?? 0;
+    final int extraPriceValue = widget.cartItem.menu.extraprice?.toInt() ?? 0;
+    final bool hasExtraPriceOption = extraPriceValue > 0;
 
-    // คำนวณราคา Add-on ทั้งหมดตามโครงสร้างพิมพ์เขียวที่คุณ Kaito ตั้งไว้
+    int basePrice = (hasExtraPriceOption && _useExtraPrice)
+        ? extraPriceValue
+        : normalPrice;
+
     double addonTotalPrice = 0;
     _selectedAddons.forEach((id, detail) {
       addonTotalPrice += detail.addonPrice ?? 0;
@@ -105,226 +115,332 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     int totalPrice = (basePrice + addonTotalPrice.toInt()) * _quantity;
 
     String? rawMenuImage = widget.cartItem.menu.menuImage;
-
-    // 🌟 ดึงผ่านฟังก์ชันต่อพาร์ทไอพีกลางสากล ปรับภาพอาหารในหน้าแก้ไขให้ขึ้นจอได้ถูกต้อง
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
-
     final groupedAddons = _groupAddons();
+
+    final String? description =
+        (widget.cartItem.menu.description?.trim().isNotEmpty == true)
+        ? widget.cartItem.menu.description
+        : null;
 
     return Scaffold(
       backgroundColor: Colors.white,
+      extendBodyBehindAppBar:
+          true, // 🎯 ให้ Body ทะลุขึ้นไปหลัง AppBar เหมือนหน้า AddOrder
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent, // โปร่งใสเพื่อโชว์ภาพ
         elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.orange),
-        title: const Text(
-          "แก้ไขรายการอาหาร",
-          style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        actions: [
-          // 🎯 ปุ่มลบเมนูออกจากตะกร้า (ไอคอนถังขยะสีแดงเด่นชัด เจน UX ที่เหมาะสมที่สุด)
-          IconButton(
-            icon: const Icon(
-              Icons.delete_forever_outlined,
-              color: Colors.redAccent,
-              size: 28,
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: CircleAvatar(
+            backgroundColor: Colors.black38,
+            child: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    title: const Text("💥 ลบรายการอาหาร?"),
-                    content: Text(
-                      "คุณต้องการยกเลิกและลบเมนู '${widget.cartItem.menu.menuName}' นี้ออกจากตะกร้าใช่หรือไม่?",
-                    ),
-                    actions: [
-                      TextButton(
-                        child: const Text(
-                          "ยกเลิก",
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
+          ),
+        ),
+        actions: [
+          // 🎯 ปุ่มลบเมนูออกแบบดีไซน์ใหม่ให้เข้ากับตีม
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
+            child: CircleAvatar(
+              backgroundColor: Colors.white,
+              child: IconButton(
+                icon: const Icon(
+                  Icons.delete_forever_outlined,
+                  color: Colors.redAccent,
+                  size: 22,
+                ),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (BuildContext context) {
+                      return AlertDialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
                         ),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      TextButton(
-                        child: const Text(
-                          "ลบรายการ",
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                        title: const Text("💥 ลบรายการอาหาร?"),
+                        content: Text(
+                          "คุณต้องการยกเลิกและลบเมนู '${widget.cartItem.menu.menuName}' นี้ออกจากตะกร้าใช่หรือไม่?",
+                        ),
+                        actions: [
+                          TextButton(
+                            child: const Text(
+                              "ยกเลิก",
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16,
+                              ),
+                            ),
+                            onPressed: () => Navigator.pop(context),
                           ),
-                        ),
-                        onPressed: () {
-                          Navigator.pop(context); // ปิด Dialog เตือน
-                          Navigator.pop(
-                            context,
-                            "REMOVE",
-                          ); // ดีดขากลับส่งสัญญาณไฟแดง "REMOVE" ไปหาหน้าบิวย่อย
-                        },
-                      ),
-                    ],
+                          TextButton(
+                            child: const Text(
+                              "ลบรายการ",
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            onPressed: () {
+                              Navigator.pop(context);
+                              Navigator.pop(context, "REMOVE");
+                            },
+                          ),
+                        ],
+                      );
+                    },
                   );
                 },
-              );
-            },
+              ),
+            ),
           ),
           const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 10),
+          : Stack(
+              children: [
+                // 🎯 1. ภาพพื้นหลังเต็มความกว้าง (ถอดแบบ AddOrder)
+                SizedBox(
+                  width: double.infinity,
+                  height: 400,
+                  child: finalMenuUrl.isNotEmpty
+                      ? Image.network(
+                          Uri.encodeFull(finalMenuUrl),
+                          width: double.infinity,
+                          height: 400,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _buildPlaceholderBanner(),
+                        )
+                      : _buildPlaceholderBanner(),
+                ),
 
-                    // 🎯 ปรับดีไซน์จุดที่ 1: เพิ่มกล่องแสดงรูปภาพอาหารขนาดใหญ่พร้อมขอบมนแบบหน้า AddOrder
-                    Center(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
-                        child: finalMenuUrl.isNotEmpty
-                            ? Image.network(
-                                Uri.encodeFull(finalMenuUrl),
-                                width: 260,
-                                height: 260,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildPlaceholderIcon(),
-                              )
-                            : _buildPlaceholderIcon(),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 🎯 ปรับดีไซน์จุดที่ 2: ปรับ Layout ชื่ออาหารและป้ายราคาหนาสีส้มสะดุดตา
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            widget.cartItem.menu.menuName ?? "ไม่มีชื่อเมนู",
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
+                // 🎯 2. ส่วนเนื้อหาเลื่อนได้
+                SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 350), // ดันให้เห็นรูปภาพด้านบน
+                      Container(
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(28),
+                            topRight: Radius.circular(28),
                           ),
                         ),
-                        Text(
-                          "฿$basePrice",
-                          style: const TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    Text(
-                      widget.cartItem.menu.description ??
-                          "ไม่มีคำอธิบายสำหรับรายการเมนูนี้",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                        height: 1.5,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // =========================================================
-                    // ส่วนยิงวาดกลุ่มข้อมูล Add-on แบบ Dynamic ตามแบบฉบับดีไซน์ AddOrder
-                    // =========================================================
-                    if (groupedAddons.isNotEmpty) ...[
-                      ...groupedAddons.entries.map((entry) {
-                        String groupName = entry.key;
-                        List<MenuAddonDetailModel> items = entry.value;
-
-                        bool isRequired =
-                            items.first.menuAddonGroup?.isRequired ?? false;
-                        int maxSelect =
-                            items.first.menuAddonGroup?.maxSelect ?? 1;
-
-                        return Column(
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  groupName,
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
+                                Expanded(
+                                  child: Text(
+                                    widget.cartItem.menu.menuName ??
+                                        "ไม่มีชื่อเมนู",
+                                    style: const TextStyle(
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                                 Text(
-                                  isRequired
-                                      ? "จำเป็น (สูงสุด $maxSelect)"
-                                      : "ไม่จำเป็น (สูงสุด $maxSelect)",
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isRequired
-                                        ? Colors.orange[400]
-                                        : Colors.grey[500],
+                                  "฿$basePrice",
+                                  style: const TextStyle(
+                                    fontSize: 30,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.orange,
                                   ),
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            ...items.map(
-                              (addonDetail) =>
-                                  _buildAddonItemOption(addonDetail, maxSelect),
-                            ),
-                            const SizedBox(height: 20),
-                          ],
-                        );
-                      }),
-                    ],
 
-                    const Text(
-                      "ระบุเพิ่มเติม",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                            // 🎯 ตัวเลือกราคา: ปกติ / พิเศษ
+                            if (hasExtraPriceOption) ...[
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildPriceOptionCard(
+                                      label: "ราคาปกติ",
+                                      price: normalPrice,
+                                      isSelected: !_useExtraPrice,
+                                      onTap: () => setState(
+                                        () => _useExtraPrice = false,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _buildPriceOptionCard(
+                                      label: "ราคาพิเศษ",
+                                      price: extraPriceValue,
+                                      isSelected: _useExtraPrice,
+                                      onTap: () =>
+                                          setState(() => _useExtraPrice = true),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+
+                            if (description != null) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                description,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+
+                            const SizedBox(height: 24),
+
+                            // 🎯 ส่วนยิงวาดกลุ่มข้อมูล Add-on แบบ Dynamic (พร้อมเส้นสีเขียว)
+                            if (groupedAddons.isNotEmpty) ...[
+                              ...groupedAddons.entries.toList().asMap().entries.map((
+                                mapEntry,
+                              ) {
+                                final isFirstGroup = mapEntry.key == 0;
+                                final entry = mapEntry.value;
+
+                                String groupName = entry.key;
+                                List<MenuAddonDetailModel> items = entry.value;
+
+                                bool isRequired =
+                                    items.first.menuAddonGroup?.isRequired ??
+                                    false;
+                                int maxSelect =
+                                    items.first.menuAddonGroup?.maxSelect ?? 1;
+
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!isFirstGroup)
+                                      Divider(
+                                        height: 24,
+                                        thickness: 1,
+                                        color: Colors.grey[300],
+                                      )
+                                    else
+                                      const SizedBox(height: 8),
+
+                                    Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          groupName,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        Text(
+                                          isRequired
+                                              ? "จำเป็น (สูงสุด $maxSelect)"
+                                              : "ไม่จำเป็น (สูงสุด $maxSelect)",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isRequired
+                                                ? Colors.orange[400]
+                                                : Colors.grey[500],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Container(
+                                            width: 2,
+                                            color: const Color(0xFF76FF03),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              children: items
+                                                  .map(
+                                                    (addonDetail) =>
+                                                        _buildAddonItemOption(
+                                                          addonDetail,
+                                                          maxSelect,
+                                                        ),
+                                                  )
+                                                  .toList(),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                );
+                              }),
+                            ],
+
+                            const SizedBox(height: 10),
+                            const Text(
+                              "ระบุเพิ่มเติม",
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            TextFormField(
+                              controller: _noteController,
+                              maxLines: 3,
+                              decoration: InputDecoration(
+                                hintText:
+                                    "ตัวอย่างเช่น ไม่เอาผัก, เผ็ดน้อย อื่นๆ",
+                                hintStyle: TextStyle(
+                                  color: Colors.grey[400],
+                                  fontSize: 14,
+                                ),
+                                contentPadding: const EdgeInsets.all(16),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.grey[300]!,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 40),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _noteController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        hintText: "ตัวอย่างเช่น ไม่เอาผัก, เผ็ดน้อย อื่นๆ",
-                        hintStyle: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 14,
-                        ),
-                        contentPadding: const EdgeInsets.all(16),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey[300]!),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 40),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+              ],
             ),
-      // 🎯 ปรับดีไซน์จุดที่ 3: ยกเครื่อง Bottom Bar แผงลอยตัวเลขสรุปราคาและกลุ่มปุ่มบันทึกสีนีออนเขียวสากล
+      // 🎯 ยกเครื่อง Bottom Bar ให้ดีไซน์เหมือน AddOrder 100%
       bottomNavigationBar: Container(
         padding: const EdgeInsets.only(
           left: 24,
@@ -335,55 +451,123 @@ class _EditOrderMemberState extends State<EditOrderMember> {
         decoration: BoxDecoration(
           color: Colors.white,
           border: Border(top: BorderSide(color: Colors.grey[200]!, width: 1)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
+                // ─── ฝั่งซ้าย: จำนวนที่สั่ง ───────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      "รวมราคา  ",
+                      "จำนวนที่สั่ง",
                       style: TextStyle(
-                        fontSize: 18,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
-                    Text(
-                      "$totalPrice บาท",
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+                    const SizedBox(height: 6),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(
+                              Icons.remove_circle_outline,
+                              size: 24,
+                              color: _quantity > 1
+                                  ? Colors.black87
+                                  : Colors.grey.shade400,
+                            ),
+                            onPressed: () {
+                              if (_quantity > 1) setState(() => _quantity--);
+                            },
+                          ),
+                          SizedBox(
+                            width: 28,
+                            child: Text(
+                              "$_quantity",
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.add_circle_outline,
+                              size: 24,
+                              color: Colors.black87,
+                            ),
+                            onPressed: () => setState(() => _quantity++),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-                Row(
+
+                const Spacer(),
+
+                // ─── ฝั่งขวา: ราคารวม ──────────────────────
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, size: 28),
-                      onPressed: () {
-                        if (_quantity > 1) setState(() => _quantity--);
-                      },
-                    ),
                     Text(
-                      "$_quantity",
+                      "จำนวน $_quantity รายการ",
                       style: const TextStyle(
-                        fontSize: 18,
+                        fontSize: 12,
                         fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.add_circle_outline, size: 28),
-                      onPressed: () => setState(() => _quantity++),
+                    const SizedBox(height: 6),
+                    RichText(
+                      text: TextSpan(
+                        children: [
+                          const TextSpan(
+                            text: "ราคารวม  ",
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          TextSpan(
+                            text: "฿$totalPrice",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
+
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -415,7 +599,7 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                     }
                   }
 
-                  // 🎯 จัดเตรียมประกอบโมเดลใหม่ส่งดีดกลับไปเขียนทับลิสต์สรุปบิล
+                  // 🎯 จัดเตรียมโมเดลอัปเดต โดยใช้ basePrice และ _useExtraPrice ล่าสุด
                   final updatedItem = CartItem(
                     menu: widget.cartItem.menu,
                     selectedAddons: _selectedAddons.values.toList(),
@@ -423,14 +607,14 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                     note: _noteController.text,
                     addonPrice: addonTotalPrice.toInt(),
                     totalPrice: totalPrice,
+                    unitPrice: basePrice,
+                    isExtraPrice: hasExtraPriceOption && _useExtraPrice,
                   );
 
                   Navigator.pop(context, updatedItem);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(
-                    0xFF76FF03,
-                  ), // ✅ สีเขียวนีออนสว่างสากลเข้าธีมกริบ ๆ
+                  backgroundColor: const Color(0xFF76FF03),
                   foregroundColor: Colors.black,
                   elevation: 2,
                   shape: RoundedRectangleBorder(
@@ -449,7 +633,6 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     );
   }
 
-  // ฟังก์ชันวาดตัวเลือกรายการ Addon พร้อมกรอบสี่เหลี่ยม/วงกลมตรวจจับเงื่อนไข maxSelect
   Widget _buildAddonItemOption(MenuAddonDetailModel detail, int maxSelect) {
     int id = detail.addonDetailId ?? 0;
     bool isSelected = _selectedAddons.containsKey(id);
@@ -546,12 +729,70 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     );
   }
 
-  Widget _buildPlaceholderIcon() {
+  Widget _buildPriceOptionCard({
+    required String label,
+    required int price,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.orange.withOpacity(0.1) : Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.orange : Colors.grey.shade300,
+            width: isSelected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
+              size: 18,
+              color: isSelected ? Colors.orange : Colors.grey[400],
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.orange[800] : Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    "฿$price",
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.orange : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPlaceholderBanner() {
     return Container(
-      width: 260,
-      height: 260,
+      width: double.infinity,
+      height: 400,
       color: Colors.orange.shade50,
-      child: const Icon(Icons.fastfood, size: 64, color: Colors.orange),
+      child: const Icon(Icons.fastfood, size: 80, color: Colors.orange),
     );
   }
 }

@@ -1,6 +1,7 @@
 package com.it22mjudelivery.springboot_api.v1.services;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.AddOrderDetailAddOnDto;
+import com.it22mjudelivery.springboot_api.v1.dtos.AddOrderDetailCurryDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.AddOrderDetailDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.AddOrderDto;
 import com.it22mjudelivery.springboot_api.v1.entities.*;
@@ -41,6 +42,9 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private final RiderRepository riderRepo;
 
+    @Autowired
+    private final OrderdetailcurryRepository orderdetailcurryRepo;
+
     @Override
     @Transactional // ดักจับ Transaction เผื่อบันทึกตารางลูกตัวไหนพลาด ระบบจะได้ Rollback อัตโนมัติ
     public boolean memberConfirmOrder(AddOrderDto addOrderDto) {
@@ -79,7 +83,6 @@ public class OrderServiceImpl implements OrderService {
                     Menu menu = menuRepo.findById(detailDto.getMenuId())
                             .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัสMenu"));
 
-                    // 🎯 แก้ไข: เปลี่ยนจาก addOrderDetailDto เป็น detailDto (ตามรอบการวนลูปจริง) เส้นแดงจะหายไปครับ
                     OrderDetail orderDetail = OrderDetail.builder()
                             .qty(detailDto.getQty())
                             .subtotal(detailDto.getSubTotal())
@@ -91,11 +94,9 @@ public class OrderServiceImpl implements OrderService {
                     OrderDetail savdOrderDetail = orderDetailRepo.save(orderDetail);
 
                     // 3. วนลูปแกะรายการท็อปปิ้งเสริม (Orderdetailaddon) ที่ผูกอยู่กับจานอาหารรอบนั้นๆ
-                    // 🎯 แก้ไข: เปลี่ยนจาก addOrderDetailDto.getAddons() เป็น detailDto.getAddons()
                     if (detailDto.getAddons() != null) {
                         for (AddOrderDetailAddOnDto addOnDto : detailDto.getAddons()) {
 
-                            // 🎯 แก้ไข: เปลี่ยนจาก addOrderDetailAddOnDto เป็น addOnDto ที่ดึงมาจากลูปท็อปปิ้งรอบนั้นๆ
                             Menuaddondetail menuaddondetail = menuaddondetailRepo.findById(addOnDto.getAddondetailid())
                                     .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัสAddOn"));
 
@@ -106,6 +107,24 @@ public class OrderServiceImpl implements OrderService {
                                     .build();
 
                             orderDetailAddonRepo.save(orderdetailaddon);
+                        }
+                    }
+
+                    // 🎯 4. (เพิ่มใหม่) วนลูปแกะรายการกับข้าวราดแกง (Orderdetailcurry)
+                    //    เมนูทั่วไปที่ไม่มีกับข้าว list นี้จะเป็น null/ว่าง โค้ดจะข้ามไปเฉยๆ ไม่กระทบ
+                    if (detailDto.getOrderDetailCurries() != null) {
+                        for (AddOrderDetailCurryDto curryDto : detailDto.getOrderDetailCurries()) {
+
+                            Menu curryMenu = menuRepo.findById(curryDto.getMenuId())
+                                    .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัสเมนูกับข้าว"));
+
+                            Orderdetailcurry orderdetailcurry = Orderdetailcurry.builder()
+                                    .orderDetail(savdOrderDetail)
+                                    .menu(curryMenu)
+                                    .priceAtOrder(curryDto.getPriceAtOrder())
+                                    .build();
+
+                            orderdetailcurryRepo.save(orderdetailcurry);
                         }
                     }
                 }
@@ -119,7 +138,6 @@ public class OrderServiceImpl implements OrderService {
 
         return false;
     }
-
     @Override
     @Transactional(readOnly = true)
     public List<Order> getOrdersByMember(String username) {

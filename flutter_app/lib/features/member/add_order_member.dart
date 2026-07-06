@@ -4,7 +4,8 @@ import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
-import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 ดึงตัวแปรไอพีกลางสากลเข้ามาจัดการความชัวร์ของรูปภาพ
+import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/features/member/view_order_member.dart'; // 🎯 ดึงตัวแปรไอพีกลางสากลเข้ามาจัดการความชัวร์ของรูปภาพ
 
 class AddOrderMember extends StatefulWidget {
   final MenuModel menuModel;
@@ -25,6 +26,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
   // สำหรับเก็บรายการ Add-on ที่ผู้ใช้เลือกจิ้ม (Key: ID ของตัวเลือกย่อย, Value: วัตถุข้อมูล)
   final Map<int, MenuAddonDetailModel> _selectedAddons = {};
+
+  // ── สถานะเลือกราคาปกติ/พิเศษ ──
+  bool _useExtraPrice = false;
 
   @override
   void initState() {
@@ -86,7 +90,14 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
   @override
   Widget build(BuildContext context) {
-    int basePrice = widget.menuModel.price?.toInt() ?? 0;
+    final int normalPrice = widget.menuModel.price?.toInt() ?? 0;
+    final int extraPriceValue = widget.menuModel.extraprice?.toInt() ?? 0;
+    // มีราคาพิเศษให้เลือกก็ต่อเมื่อ extraprice ถูกตั้งไว้และมากกว่า 0
+    final bool hasExtraPriceOption = extraPriceValue > 0;
+
+    int basePrice = (hasExtraPriceOption && _useExtraPrice)
+        ? extraPriceValue
+        : normalPrice;
 
     // เปลี่ยนมาใช้ฟิลด์ .addonprice (ตัว p เล็ก) ในการคำนวณราคารวมทั้งหมด
     double addonTotalPrice = 0;
@@ -222,6 +233,37 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 ),
                               ],
                             ),
+
+                            // ═══════════════════════════════════════════════
+                            // 🎯 ตัวเลือกราคา: ปกติ / พิเศษ (โชว์เฉพาะเมนูที่มี extraprice)
+                            // ═══════════════════════════════════════════════
+                            if (hasExtraPriceOption) ...[
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _buildPriceOptionCard(
+                                      label: "ราคาปกติ",
+                                      price: normalPrice,
+                                      isSelected: !_useExtraPrice,
+                                      onTap: () => setState(
+                                        () => _useExtraPrice = false,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _buildPriceOptionCard(
+                                      label: "ราคาพิเศษ",
+                                      price: extraPriceValue,
+                                      isSelected: _useExtraPrice,
+                                      onTap: () =>
+                                          setState(() => _useExtraPrice = true),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
 
                             if (description != null) ...[
                               const SizedBox(height: 8),
@@ -538,20 +580,37 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     note: _noteController.text,
                     addonPrice: addonTotalPrice.toInt(),
                     totalPrice: totalPrice,
+                    unitPrice: basePrice,
+                    isExtraPrice: hasExtraPriceOption && _useExtraPrice,
                   );
 
                   CartManager().addToCart(cartItem);
 
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text("🛒 เพิ่มลงในตะกร้าเรียบร้อยแล้ว"),
+                      content: Text("เพิ่มลงในตะกร้าเรียบร้อยแล้ว"),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 1),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
 
-                  Navigator.pop(context);
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ViewOrderMember(
+                        // 🎯 ใส่ข้อมูลร้านค้า (คุณอาจจะต้องดึงจาก widget.menuModel หรือตัวแปรที่เก็บไว้)
+                        storeUsername:
+                            widget.menuModel.restaurant?.username ?? '',
+                        storeName:
+                            widget.menuModel.restaurant?.restaurantName ??
+                            'ออเดอร์ของคุณ',
+                        storeItems: CartManager().items,
+                        isFromAddOrder:
+                            true, // 🌟 ส่งค่า true ไปเพื่อปลดล็อกปุ่ม "สั่งอาหารต่อ"[cite: 4]
+                      ),
+                    ),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF76FF03),
@@ -662,6 +721,64 @@ class _AddOrderMemberState extends State<AddOrderMember> {
             Text(
               "+$price",
               style: const TextStyle(fontSize: 15, color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPriceOptionCard({
+    required String label,
+    required int price,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.orange.withOpacity(0.1) : Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? Colors.orange : Colors.grey.shade300,
+            width: isSelected ? 1.6 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.radio_button_checked_rounded
+                  : Icons.radio_button_off_rounded,
+              size: 18,
+              color: isSelected ? Colors.orange : Colors.grey[400],
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.orange[800] : Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    "฿$price",
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? Colors.orange : Colors.black87,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

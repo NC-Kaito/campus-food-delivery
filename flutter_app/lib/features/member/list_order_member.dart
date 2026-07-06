@@ -4,7 +4,7 @@ import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/list_confirm_order_member.dart';
 import 'package:flutter_app/features/member/view_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
-import 'package:flutter_app/features/member/profile_member.dart'; // 🌟 อิมพอร์ตเพิ่มเพื่อใช้ในลิงก์ Navbar ล่าง
+import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 
 class ListOrderMember extends StatefulWidget {
@@ -53,7 +53,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
       body: _groupedCart.isEmpty
           ? const Center(
               child: Text(
-                "ไม่มีรายการอาหารใน",
+                "ไม่มีรายการอาหารในตะกร้า",
                 style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
             )
@@ -178,7 +178,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     return Container(
       margin: const EdgeInsets.only(bottom: 20.0),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8FCD0),
+        color: const Color(0xFFE8FCD0), // สีพื้นหลังการ์ด
         borderRadius: BorderRadius.circular(16.0),
         boxShadow: [
           BoxShadow(
@@ -211,20 +211,23 @@ class _ListOrderMemberState extends State<ListOrderMember> {
           padding: const EdgeInsets.all(16.0),
           child: Row(
             children: [
+              // 1. รูปภาพร้านค้า
               ClipRRect(
                 borderRadius: BorderRadius.circular(12.0),
                 child: finalImageUrl.isNotEmpty
                     ? Image.network(
                         Uri.encodeFull(finalImageUrl),
-                        width: 80,
-                        height: 80,
+                        width: 75,
+                        height: 75,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             _buildPlaceholderIcon(),
                       )
                     : _buildPlaceholderIcon(),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
+
+              // 2. ข้อมูลชื่อร้านและจำนวนรายการ
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,19 +236,60 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                     Text(
                       storeName,
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 6),
                     Text(
                       "จำนวน $totalItemsInStore รายการ",
                       style: TextStyle(
-                        fontSize: 15,
-                        color: Colors.grey[800],
-                        fontWeight: FontWeight.w500,
+                        fontSize: 14,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w600,
                       ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // 🌟 3. ปุ่ม/ไอคอน นำทางบอกให้รู้ว่ากดสั่งอาหารได้ (เพิ่มใหม่ตรงนี้)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade600,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      "สั่งอาหาร",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white,
+                      size: 14,
                     ),
                   ],
                 ),
@@ -259,10 +303,10 @@ class _ListOrderMemberState extends State<ListOrderMember> {
 
   Widget _buildPlaceholderIcon() {
     return Container(
-      width: 80,
-      height: 80,
+      width: 75,
+      height: 75,
       color: Colors.orange[50],
-      child: const Icon(Icons.store, color: Colors.orange, size: 40),
+      child: const Icon(Icons.store, color: Colors.orange, size: 36),
     );
   }
 }

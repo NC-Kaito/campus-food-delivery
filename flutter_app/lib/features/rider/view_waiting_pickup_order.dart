@@ -1,102 +1,64 @@
-// features/member/view_confirm_order_member.dart
+// features/rider/view_waiting_pickup_order.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/member_model.dart';
-import 'package:flutter_app/data/models/order_detail_model.dart';
+import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/order_model.dart';
-import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/data/models/order_detail_model.dart';
+import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_app/core/network/dio_client.dart';
 
-class ViewConfirmOrderMember extends StatefulWidget {
-  final OrderModel order;
+class ViewWaitingPickupOrder extends StatefulWidget {
+  final OrderModel orderModel;
 
-  const ViewConfirmOrderMember({super.key, required this.order});
+  const ViewWaitingPickupOrder({super.key, required this.orderModel});
 
   @override
-  State<ViewConfirmOrderMember> createState() => _ViewConfirmOrderMemberState();
+  State<ViewWaitingPickupOrder> createState() => _ViewWaitingPickupOrderState();
 }
 
-class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
+class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
+  final OrderService _orderService = OrderService();
+  bool _isAccepting = false;
+
   GoogleMapController? _miniMapController;
+  GoogleMapController? _restaurantMapController;
 
-  String _loggedInMemberName = "กำลังโหลด...";
-  String _loggedInMemberPhone = "กำลังโหลด...";
-
-  final MemberService memberService = MemberService();
-
-  // 🎯 คุมชุดเฉดสีเขียวประจำธีมแอปพลิเคชัน #64F02D ของเรา
-  final Color primaryGreen = const Color(0xFF64F02D);
+  final Color primaryOrange = Colors.orange;
 
   @override
-  void initState() {
-    super.initState();
-    _loadCurrentMemberProfile();
+  void dispose() {
+    _miniMapController?.dispose();
+    _restaurantMapController?.dispose();
+    super.dispose();
   }
 
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
-
     final String baseUrl = DioClient.dio.options.baseUrl;
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
-  }
-
-  Future<void> _loadCurrentMemberProfile() async {
-    try {
-      String username = GlobalData.usernameMember;
-      MemberModel mModel = await memberService.getMemberByUsername(username);
-
-      if (mounted) {
-        setState(() {
-          _loggedInMemberName =
-              "${mModel.firstname ?? ''} ${mModel.lastname ?? ''}".trim();
-          if (_loggedInMemberName.isEmpty) {
-            _loggedInMemberName = mModel.username ?? "ไม่ระบุชื่อ";
-          }
-          _loggedInMemberPhone = mModel.phone ?? "ไม่ระบุเบอร์โทร";
-        });
-      }
-    } catch (e) {
-      debugPrint("Error loading member profile: $e");
-      if (mounted) {
-        setState(() {
-          _loggedInMemberName = "ไม่สามารถดึงข้อมูลได้";
-          _loggedInMemberPhone = "ไม่ระบุเบอร์โทร";
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _miniMapController?.dispose();
-    super.dispose();
   }
 
   Widget _buildPlaceholderIcon() {
     return Container(
       width: 65,
       height: 65,
-      color: Colors.green.shade50,
-      child: Icon(Icons.fastfood_rounded, color: primaryGreen, size: 30),
+      color: Colors.orange.shade50,
+      child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
     );
   }
 
+  // ── การ์ดแต่ละรายการเมนู (รองรับทั้งข้าวราดแกงและเมนูทั่วไป) ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // 🎯 1. ตรวจสอบว่าเป็นเมนูข้าวแกงหรือไม่
     final bool isCurryDish =
         (item.orderDetailCurries != null &&
         item.orderDetailCurries!.isNotEmpty);
 
-    // 🎯 2. จัดรูปแบบชื่อเมนูให้ตรงกับ ViewOrder (เช่น "ข้าวราดแกง (1 อย่าง)")
     String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
       displayMenuName = "ข้าวราดแกง (${item.orderDetailCurries!.length} อย่าง)";
     }
 
-    // 🎯 3. ดึงรายการกับข้าวที่ราด — แต่ละ item เป็น Map ดิบจาก JSON
-    //    ต้องใช้ bracket notation ['menu']['menuname'] ไม่ใช่ .menu?.menuName
     String curriesText = "";
     if (isCurryDish) {
       curriesText = item.orderDetailCurries!
@@ -110,17 +72,11 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
           .join(", ");
     }
 
-    // 🎯 4. ดึงรายการตัวเลือกเสริม — item.addons เป็น List<OrderDetailAddonModel> typed แล้ว
     String addonText = item.addons
         .map((addon) => (addon as dynamic).addonMenu?.addonName ?? '')
         .where((name) => name.toString().isNotEmpty)
         .join(", ");
 
-    // ═══════════════════════════════════════════════
-    // 🎯 5. คำนวณราคาต่อหน่วย ตามสูตรที่ยืนยัน + สไตล์เดียวกับหน้า ViewOrder
-    //    - ข้าวราดแกง: price (ราคาฐาน บวกครั้งเดียว) + extraprice × จำนวนกับข้าวที่เลือก
-    //    - เมนูทั่วไป: ราคาเมนู + ผลรวมราคาตัวเลือกเสริม
-    // ═══════════════════════════════════════════════
     int finalPricePerUnit;
     if (isCurryDish) {
       final int riceBasePrice = item.menu?.price?.toInt() ?? 0;
@@ -136,15 +92,14 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
-    // 🎯 6. รูปเมนู — ให้ตรงกับ ViewOrder: ข้าวแกงเสมอโชว์ placeholder ไม่ใช้รูปจริง
     final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: const Color(0xFFF8F9FA),
         borderRadius: BorderRadius.circular(16),
-        border: Border(left: BorderSide(color: primaryGreen, width: 4)),
+        border: Border(left: BorderSide(color: primaryOrange, width: 4)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -168,29 +123,12 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          displayMenuName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "แก้ไข",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    displayMenuName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(
@@ -222,6 +160,17 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                       ),
                     ),
                   ],
+                  if (item.note.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      "หมายเหตุ: ${item.note}",
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 4),
                   Align(
                     alignment: Alignment.centerRight,
@@ -242,92 +191,96 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
     );
   }
 
-  Widget _buildTimelineDot(
-    String label,
-    bool isCompleted,
-    bool isLineCompleted, {
-    bool isFirst = false,
-    bool isLast = false,
-  }) {
-    return Expanded(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 4,
-                  color: isFirst
-                      ? Colors.transparent
-                      : (isCompleted
-                            ? const Color(0xFF64F02D)
-                            : Colors.grey.shade300),
-                ),
-              ),
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: isCompleted
-                      ? const Color(0xFF64F02D)
-                      : Colors.grey.shade300,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isCompleted
-                        ? const Color(0xFF2E7D32)
-                        : Colors.grey.shade400,
-                    width: 1,
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  height: 4,
-                  color: isLast
-                      ? Colors.transparent
-                      : (isLineCompleted
-                            ? const Color(0xFF64F02D)
-                            : Colors.grey.shade300),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 11,
-              color: isCompleted ? Colors.black87 : Colors.grey.shade500,
-              fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
-        ],
-      ),
+  // ── กดยืนยันรับออเดอร์จริง ──
+  Future<void> _confirmAcceptOrder() async {
+    if (_isAccepting) return;
+    setState(() => _isAccepting = true);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          const Center(child: CircularProgressIndicator(color: Colors.orange)),
     );
+
+    try {
+      String studentId = GlobalData.usernameRider;
+      await _orderService.confirmOrderByRider(
+        studentId,
+        widget.orderModel.orderId ?? 0,
+      );
+
+      if (!mounted) return;
+      Navigator.pop(context); // ปิด loading dialog
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            "รับคำสั่งซื้อสำเร็จ! เปลี่ยนสถานะเป็นรอร้านค้าแล้ว 🏍️🔥",
+          ),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      Navigator.pop(
+        context,
+        true,
+      ); // กลับไปหน้าลิสต์ พร้อมส่งค่า true บอกว่าสำเร็จ
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // ปิด loading dialog
+      setState(() => _isAccepting = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("🚨 ไม่สามารถรับออเดอร์ได้: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    double deliveryFee = widget.order.deliveryFee;
-    double totalPrice = widget.order.totalPrice;
+    final order = widget.orderModel;
+
+    final int rawOrderId = order.orderId ?? 0;
+    final String orderId = rawOrderId.toString().padLeft(6, '0');
+    final String restaurantName =
+        order.restaurant?.restaurantName ?? "ไม่ระบุชื่อร้าน";
+
+    // 🎯 RestaurantModel ไม่มี field ที่อยู่เป็นข้อความ มีแต่ latitude/longitude
+    //    เลยใช้พิกัดแสดงเป็นแผนที่แทน (เหมือนฝั่งที่อยู่ลูกค้า)
+    final double? restaurantLat = order.restaurant?.latitude;
+    final double? restaurantLng = order.restaurant?.longitude;
+    final bool hasRestaurantLocation =
+        restaurantLat != null && restaurantLng != null;
+    final LatLng? restaurantLocation = hasRestaurantLocation
+        ? LatLng(restaurantLat, restaurantLng)
+        : null;
+
+    String memberFullName = "ไม่ระบุชื่อผู้รับ";
+    if (order.member != null) {
+      final String firstName = order.member?.firstname ?? "";
+      final String lastName = order.member?.lastname ?? "";
+      if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        memberFullName = "$firstName $lastName".trim();
+      }
+    }
+    final String memberPhone = order.member?.phone ?? "-";
+
+    double deliveryFee = order.deliveryFee;
+    double totalPrice = order.totalPrice;
     double subtotalPrice = totalPrice - deliveryFee;
 
-    LatLng deliveryLocation = LatLng(
-      widget.order.latitude,
-      widget.order.longitude,
-    );
+    LatLng deliveryLocation = LatLng(order.latitude, order.longitude);
 
-    String status = (widget.order.orderStatus ?? "").toLowerCase();
-    int currentStep = 1;
-
-    if (status.contains("waitingrestaurant") || status.contains("cooking")) {
-      currentStep = 2;
-    } else if (status.contains("delivering") || status.contains("pickedup")) {
-      currentStep = 3;
-    } else if (status.contains("success") || status.contains("completed")) {
-      currentStep = 4;
+    String orderTimeText = "--:--";
+    if (order.orderdate != null) {
+      final DateTime dateTime = order.orderdate!;
+      orderTimeText =
+          "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} น.";
     }
 
     return Scaffold(
@@ -335,9 +288,9 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: IconThemeData(color: primaryGreen),
+        iconTheme: IconThemeData(color: primaryOrange),
         title: const Text(
-          "รายละเอียดคำสั่งซื้อ",
+          "รายละเอียดออเดอร์",
           style: TextStyle(
             color: Colors.black87,
             fontSize: 22,
@@ -364,122 +317,38 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                       style: TextStyle(color: Colors.black87),
                     ),
                     TextSpan(
-                      text:
-                          "K${widget.order.orderId?.toString().padLeft(6, '0') ?? '000000'}",
-                      style: TextStyle(color: primaryGreen),
+                      text: "K$orderId",
+                      style: TextStyle(color: primaryOrange),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-
-            const Text(
-              "จัดส่งโดย",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (widget.order.rider != null)
-              Row(
+            const SizedBox(height: 6),
+            Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(
-                    Icons.delivery_dining,
-                    size: 40,
-                    color: Colors.grey,
+                  Icon(
+                    Icons.access_time_rounded,
+                    size: 16,
+                    color: Colors.grey.shade600,
                   ),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "ชื่อ : ${widget.order.rider!.firstName ?? ''} ${widget.order.rider!.lastName ?? ''}",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "เบอร์โทรศัพท์ : ${widget.order.rider!.phone ?? '-'}",
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              )
-            else
-              Row(
-                children: [
-                  Icon(Icons.hourglass_empty, size: 30, color: primaryGreen),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 4),
                   Text(
-                    "สถานะ: กำลังรอผู้จัดส่งรับงาน...",
+                    "เวลาสั่งซื้อ: $orderTimeText",
                     style: TextStyle(
-                      fontSize: 15,
+                      fontSize: 13,
                       color: Colors.grey.shade700,
-                      fontWeight: FontWeight.bold,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
               ),
-            const SizedBox(height: 16),
-            const Divider(height: 1, color: Colors.black12),
-            const SizedBox(height: 16),
-
-            const Text(
-              "สถานะคำสั่งซื้อ",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFBFBFB),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTimelineDot(
-                    "รอผู้จัดส่ง\nรับงาน",
-                    currentStep >= 1,
-                    currentStep >= 2,
-                    isFirst: true,
-                  ),
-                  _buildTimelineDot(
-                    "รอร้านค้า\nยืนยัน",
-                    currentStep >= 2,
-                    currentStep >= 3,
-                  ),
-                  _buildTimelineDot(
-                    "กำลังจัดส่ง\n(Delivering)",
-                    currentStep >= 3,
-                    currentStep >= 4,
-                  ),
-                  _buildTimelineDot(
-                    "จัดส่ง\nสำเร็จ",
-                    currentStep >= 4,
-                    currentStep >= 5,
-                    isLast: true,
-                  ),
-                ],
-              ),
             ),
             const SizedBox(height: 24),
 
+            // ── ข้อมูลลูกค้า ────────────────────────────────
             const Text(
               "ข้อมูลผู้สั่งซื้อ",
               style: TextStyle(
@@ -491,7 +360,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             const SizedBox(height: 12),
             Row(
               children: [
-                // 🎯 บล็อกจุดแก้ไขปิดวงเล็บครอบ Row เกินเพี้ยนเรียบร้อยฉลุยครับ
                 Expanded(
                   child: Row(
                     children: [
@@ -512,7 +380,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                             ),
                           ),
                           Text(
-                            _loggedInMemberName,
+                            memberFullName,
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -543,7 +411,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                             ),
                           ),
                           Text(
-                            _loggedInMemberPhone,
+                            memberPhone,
                             style: const TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -560,14 +428,95 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
+            // ── ที่อยู่ร้านค้า (รับที่) ────────────────────────
             Row(
               children: [
                 const Text(
-                  "ที่อยู่จัดส่ง",
+                  "รับที่ (ร้านค้า)",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(width: 6),
-                Icon(Icons.location_on, color: primaryGreen, size: 22),
+                Icon(Icons.storefront_rounded, color: primaryOrange, size: 20),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Container(
+                  width: 12,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: primaryOrange,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    restaurantName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 🎯 แสดงตำแหน่งร้านเป็นแผนที่ย่อ (แทนข้อความที่อยู่ ซึ่งไม่มีเก็บไว้ใน RestaurantModel)
+            if (restaurantLocation != null)
+              Container(
+                height: 160,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade300, width: 1.5),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: restaurantLocation,
+                      zoom: 16.0,
+                    ),
+                    onMapCreated: (controller) =>
+                        _restaurantMapController = controller,
+                    zoomControlsEnabled: false,
+                    zoomGesturesEnabled: false,
+                    scrollGesturesEnabled: false,
+                    rotateGesturesEnabled: false,
+                    tiltGesturesEnabled: false,
+                    markers: {
+                      Marker(
+                        markerId: const MarkerId('restaurant_pos'),
+                        position: restaurantLocation,
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueOrange,
+                        ),
+                      ),
+                    },
+                  ),
+                ),
+              )
+            else
+              Text(
+                "ไม่พบตำแหน่งร้านค้าในระบบ",
+                style: TextStyle(fontSize: 13.5, color: Colors.grey[600]),
+              ),
+
+            const SizedBox(height: 20),
+            const Divider(height: 1, color: Colors.black12),
+            const SizedBox(height: 20),
+
+            // ── ที่อยู่จัดส่ง (ส่งที่) ────────────────────────
+            Row(
+              children: [
+                const Text(
+                  "ส่งที่ (ลูกค้า)",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(width: 6),
+                Icon(Icons.location_on, color: primaryOrange, size: 22),
               ],
             ),
             const SizedBox(height: 12),
@@ -593,7 +542,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                   tiltGesturesEnabled: false,
                   markers: {
                     Marker(
-                      markerId: const MarkerId('history_delivery_pos'),
+                      markerId: const MarkerId('delivery_pos'),
                       position: deliveryLocation,
                       icon: BitmapDescriptor.defaultMarkerWithHue(
                         BitmapDescriptor.hueRed,
@@ -604,7 +553,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               ),
             ),
             const SizedBox(height: 12),
-            if (widget.order.addressDetail.isNotEmpty) ...[
+            if (order.addressDetail.isNotEmpty) ...[
               Text(
                 "จุดสังเกต / รายละเอียดที่อยู่:",
                 style: TextStyle(
@@ -615,7 +564,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               ),
               const SizedBox(height: 4),
               Text(
-                widget.order.addressDetail,
+                order.addressDetail,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -626,6 +575,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
+            // ── รายการอาหาร ─────────────────────────────────
             const Text(
               "รายการอาหาร",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -634,13 +584,14 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: widget.order.items.length,
+              itemCount: order.items.length,
               itemBuilder: (context, index) {
-                return _buildOrderItemCard(widget.order.items[index]);
+                return _buildOrderItemCard(order.items[index]);
               },
             ),
             const SizedBox(height: 16),
 
+            // ── สรุปราคา ────────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -701,13 +652,53 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: primaryGreen,
+                    color: primaryOrange,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 40),
+            const SizedBox(
+              height: 100,
+            ), // เผื่อพื้นที่ให้ปุ่มด้านล่างไม่บังเนื้อหา
           ],
+        ),
+      ),
+
+      // ── ปุ่มยืนยันรับออเดอร์ ปักไว้ด้านล่างเสมอ ────────────
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+          child: SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: _isAccepting ? null : _confirmAcceptOrder,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF64FF20),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+              ),
+              child: _isAccepting
+                  ? const SizedBox(
+                      height: 22,
+                      width: 22,
+                      child: CircularProgressIndicator(
+                        color: Colors.black,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      "รับคำสั่งซื้อ",
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
         ),
       ),
     );

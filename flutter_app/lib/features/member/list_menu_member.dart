@@ -78,6 +78,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
         addonPrice: 0,
         totalPrice:
             pricePerUnit, // ราคาต่อจานที่รวมยอดคำนวณส่วนต่างแล้ว (เช่น 30 หรือ 35 บาท)
+
+        unitPrice:
+            pricePerUnit, // สำหรับข้าวราดแกง ราคาเริ่มต้นต่อหน่วยก็น่าจะเป็น pricePerUnit ที่คำนวณมาแล้ว
+        isExtraPrice: false,
       ),
     );
 
