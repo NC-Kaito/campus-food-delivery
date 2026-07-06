@@ -700,7 +700,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                 fontWeight: FontWeight.w600,
                               ),
                               labelPadding: const EdgeInsets.symmetric(
-                                horizontal: 18,
+                                horizontal: 50,
                                 vertical: 10,
                               ),
                               tabs: typeMenus.isEmpty

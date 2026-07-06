@@ -770,6 +770,7 @@ class _AddMenuState extends State<AddMenu> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               _fieldLabel("ราคาปกติ", required: true),
+                              const SizedBox(height: 5),
                               TextFormField(
                                 controller: priceController,
                                 keyboardType: TextInputType.number,
