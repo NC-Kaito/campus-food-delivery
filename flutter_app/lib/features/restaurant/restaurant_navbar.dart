@@ -89,8 +89,6 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
               const SizedBox(width: 4),
               _MenuButton(onTap: () => Scaffold.of(context).openDrawer()),
               const SizedBox(width: 8),
-              // 🎯 Badge สถานะเปิด/ปิดร้าน แสดงข้างปุ่มสามขีด
-              if (!_isLoadingProfile) _StoreStatusBadge(isOpen: _isStoreOpen),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -167,47 +165,6 @@ class _MenuButton extends StatelessWidget {
             size: 24,
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Badge แสดงสถานะเปิด/ปิดร้าน — ย้ายมาจากหน้า ProfileRestaurant
-/// เพื่อให้เห็นสถานะได้ทันทีจากทุกหน้าที่มี Navbar นี้ (read-only,
-/// สลับสถานะได้ที่เมนู Drawer เหมือนเดิม)
-class _StoreStatusBadge extends StatelessWidget {
-  final bool isOpen;
-  const _StoreStatusBadge({required this.isOpen});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isOpen ? const Color(0xFF16A34A) : Colors.grey[700],
-        borderRadius: BorderRadius.circular(30),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            isOpen ? "กำลังเปิดร้าน" : "ปิดร้านอยู่",
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -160,4 +160,39 @@ public class MenuAddonController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
+
+    //=====================================================================
+    // 🎯 รับ Request จาก Flutter เพื่ออัปเดตสถานะ "ใช้" / "เลิกใช้"
+    @PostMapping("/updateMenuMapping")
+    public ResponseEntity<?> updateMenuMapping(@RequestBody Map<String, Object> requestData) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // ดึงค่ามาจาก JSON ที่ Flutter ส่งมาให้
+            Integer menuId = (Integer) requestData.get("menuId");
+            List<Integer> addonGroupIds = (List<Integer>) requestData.get("addonGroupIds");
+
+            boolean isSuccess = menuService.updateMenuMapping(menuId, addonGroupIds);
+
+            if (isSuccess) {
+                response.put("status", "success");
+                response.put("message", "อัปเดตการเชื่อมโยงตัวเลือกเสริมสำเร็จ");
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("status", "error");
+                response.put("message", "ไม่สามารถบันทึกข้อมูลได้");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+        } catch (RuntimeException e) {
+            e.printStackTrace(); // ← เพิ่มไว้ดู stack trace จริงตอน debug (ลบออกทีหลังได้)
+            response.put("status", "error");
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            e.printStackTrace();
+            response.put("status", "error");
+            response.put("message", "เกิดข้อผิดพลาดที่ระบบส่วนกลาง: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 }

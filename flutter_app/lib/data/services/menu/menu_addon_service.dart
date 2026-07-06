@@ -133,4 +133,44 @@ class MenuAddonService {
       return []; // ค้นหาไม่ได้ก็แค่ไม่โชว์ suggestion เฉยๆ ไม่ต้อง throw ให้กระทบ UX
     }
   }
+
+  Future<bool> deleteAddonGroup(int groupId) async {
+    try {
+      final response = await DioClient.dio.delete(
+        '/v1/menuAddon/groups/$groupId',
+      );
+      return response.statusCode == 200 || response.statusCode == 204;
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'ไม่สามารถลบตัวเลือกเสริมได้',
+      );
+    }
+  }
+
+  // ✅ ฟังก์ชันสำหรับอัปเดตการผูกเมนูกับกลุ่มตัวเลือก (ตาราง menu_addongroups)
+  Future<void> updateMenuAddonMapping(
+    int menuId,
+    List<int> addonGroupIds,
+  ) async {
+    try {
+      // สมมติ Endpoint หลังบ้านชื่อ /v1/menuAddon/updateMenuMapping
+      // น้องนารีสามารถเปลี่ยนชื่อ Endpoint ให้ตรงกับ Controller ฝั่ง Java ได้เลยนะครับ
+      final response = await DioClient.dio.post(
+        "/v1/menuAddon/updateMenuMapping",
+        data: {
+          "menuId": menuId,
+          "addonGroupIds": addonGroupIds, // ส่งไปเป็น Array ของ ID
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw "บันทึกการผูกกลุ่มตัวเลือกไม่สำเร็จ";
+      }
+    } on DioException catch (e) {
+      throw e.response?.data?['message'] ??
+          "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์";
+    } catch (e) {
+      throw "Error: $e";
+    }
+  }
 }
