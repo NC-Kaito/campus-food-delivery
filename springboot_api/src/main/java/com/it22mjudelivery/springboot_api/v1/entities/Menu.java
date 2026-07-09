@@ -4,20 +4,26 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.util.Set;
 
 @Entity
-@Table(name="menu")
-@Data
+@Table(name = "menu")
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // ← เปลี่ยนจาก @Data กัน equals/hashCode วนลูปกับความสัมพันธ์
 public class Menu {
+
     @Id
-    @GeneratedValue (strategy = GenerationType.IDENTITY)
+    @EqualsAndHashCode.Include // ← ใช้แค่ id ในการเทียบ equals/hashCode
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int menuid;
 
     @Column(nullable = false)

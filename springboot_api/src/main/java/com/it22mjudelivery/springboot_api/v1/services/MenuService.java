@@ -17,5 +17,9 @@ public interface MenuService {
 
 
 
+    // เพิ่มบรรทัดนี้ลงใน interface MenuService
+    boolean updateMenuMapping(Integer menuId, List<Integer> addonGroupIds);
+
+
 
 }

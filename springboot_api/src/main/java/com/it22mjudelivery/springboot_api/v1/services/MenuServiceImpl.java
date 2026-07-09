@@ -256,4 +256,36 @@ public class MenuServiceImpl implements MenuService {
             return true;
         }).orElse(false);
     }
+
+
+    //==================================================================
+    // =============================================================================
+    // 🎯 เพิ่มฟังก์ชันสำหรับอัปเดตการผูกเมนูกับกลุ่มตัวเลือกเสริม (ตารางกลาง menu_addongroups)
+    @Transactional
+    @Override
+    public boolean updateMenuMapping(Integer menuId, List<Integer> addonGroupIds) {
+        try {
+            // 1. ค้นหา Menu เดิมจากฐานข้อมูล
+            Menu menu = menuRepository.findById(menuId)
+                    .orElseThrow(() -> new RuntimeException("ไม่พบเมนูที่ต้องการอัปเดตการผูกกลุ่มตัวเลือก"));
+
+            // 2. ดึงกลุ่มตัวเลือกทั้งหมดที่ผู้ใช้เพิ่งกด "ใช้"
+            Set<Menuaddongroup> selectedGroups = new HashSet<>();
+            if (addonGroupIds != null && !addonGroupIds.isEmpty()) {
+                // JPA มีคำสั่ง findAllById มาให้ใช้ได้เลย ประหยัดแรงมาก
+                List<Menuaddongroup> groups = menuaddongroupRepository.findAllById(addonGroupIds);
+                selectedGroups.addAll(groups);
+            }
+
+            // 3. อัปเดตความสัมพันธ์ให้ Menu (ทับของเก่าไปเลย JPA จะไปเคลียร์ตารางกลางให้อัตโนมัติ)
+            menu.setMenuAddonGroups(selectedGroups);
+            menuRepository.save(menu);
+
+            return true;
+        } catch (Exception e) {
+            e.printStackTrace(); // ← เพิ่มไว้ดู stack trace จริงตอน debug (ลบออกทีหลังได้)
+            System.err.println("เกิดข้อผิดพลาดในการอัปเดต Mapping ตารางกลาง: " + e.getMessage());
+            throw new RuntimeException("อัปเดตข้อมูลล้มเหลว: " + e.getMessage());
+        }
+    }
 }

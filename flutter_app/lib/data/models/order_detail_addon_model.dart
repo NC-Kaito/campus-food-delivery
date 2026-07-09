@@ -1,40 +1,43 @@
 // data/models/order_detail_addon_model.dart
+import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 
 class OrderDetailAddonModel {
   final int addonDetailId;
-  final double?
-  priceAtOrder; // 🎯 เพิ่มตัวแปรเก็บราคาท็อปปิ้ง ณ ตอนที่กดสั่งซื้อ (จากฐานข้อมูลหลังบ้าน)
+  final double? priceAtOrder;
+  final MenuAddonDetailModel?
+  menuAddonDetail; // ← เพิ่มใหม่: เก็บรายละเอียดเต็ม (มีชื่อ addon ซ้อนอยู่ข้างใน) ไว้ใช้แสดงผล
 
-  OrderDetailAddonModel({required this.addonDetailId, this.priceAtOrder});
+  OrderDetailAddonModel({
+    required this.addonDetailId,
+    this.priceAtOrder,
+    this.menuAddonDetail,
+  });
 
-  // 📥 ── ขารับเข้า (เสก JSON จากฐานข้อมูล Spring Boot ชั้นในสุดมาเป็น Object บน Flutter) ──
   factory OrderDetailAddonModel.fromJson(Map<String, dynamic> json) {
+    final rawDetail = json['menuaddondetail'];
+
     return OrderDetailAddonModel(
-      // 🎯 ดักจับกะเทาะเอา addondetailid ออกมาจากก้อนความสัมพันธ์ Object "menuaddondetail" จริงของหลังบ้าน
-      addonDetailId: json['menuaddondetail'] != null
-          ? (json['menuaddondetail']['addondetailid'] ??
-                json['menuaddondetail']['addonDetailId'] ??
-                0)
+      addonDetailId: rawDetail != null
+          ? (rawDetail['addondetailid'] ?? rawDetail['addonDetailId'] ?? 0)
           : (json['addondetailid'] ?? json['addonDetailId'] ?? 0),
 
-      // สอยค่าราคาประทับตราตอนสั่งซื้อมาด้วย
       priceAtOrder: json['priceAtOrder'] != null
           ? (json['priceAtOrder'] as num).toDouble()
           : (json['price_at_order'] != null
                 ? (json['price_at_order'] as num).toDouble()
                 : 0.0),
+
+      // ← เพิ่มบรรทัดนี้: parse object ทั้งก้อนเก็บไว้ (มีชื่อ addon อยู่ข้างใน)
+      menuAddonDetail: rawDetail != null
+          ? MenuAddonDetailModel.fromJson(rawDetail)
+          : null,
     );
   }
 
-  // 📤 ── ขาส่งออก (แปลงเป็น Map ให้ตรงกับโครงสร้าง JPA Entity ของระบบ Spring Boot) ──
-  // data/models/order_detail_addon_model.dart แก้เฉพาะ toJson
-  // data/models/order_detail_addon_model.dart
   Map<String, dynamic> toJson() {
     return {
-      'addondetailid':
-          addonDetailId, // 🎯 แก้ส่งไอดีแบบดิบๆ ไม่ต้องห่อซ้อนในคลาส menuaddondetail
-      'priceAtOrder':
-          priceAtOrder ?? 0.0, // 🎯 ใส่ 0.0 สแตนด์บายกันเหนียว Jackson 400
+      'addondetailid': addonDetailId,
+      'priceAtOrder': priceAtOrder ?? 0.0,
     };
   }
 }

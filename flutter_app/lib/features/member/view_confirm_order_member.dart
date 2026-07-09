@@ -110,10 +110,11 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
           .join(", ");
     }
 
-    // 🎯 4. ดึงรายการตัวเลือกเสริม — item.addons เป็น List<OrderDetailAddonModel> typed แล้ว
+    // 🎯 4. ดึงรายการตัวเลือกเสริม — ใช้ field จริง menuAddonDetail.addonMenu.addonName
+    //    (แก้จาก (addon as dynamic).addonMenu ที่ error เพราะ field นี้ไม่มีอยู่จริงใน OrderDetailAddonModel)
     String addonText = item.addons
-        .map((addon) => (addon as dynamic).addonMenu?.addonName ?? '')
-        .where((name) => name.toString().isNotEmpty)
+        .map((addon) => addon.menuAddonDetail?.addonMenu?.addonName ?? '')
+        .where((name) => name.isNotEmpty)
         .join(", ");
 
     // ═══════════════════════════════════════════════
@@ -130,7 +131,11 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
     } else {
       int addonsSum = 0;
       for (var addon in item.addons) {
-        addonsSum += ((addon as dynamic).addonPrice as num?)?.toInt() ?? 0;
+        // ใช้ราคาที่ล็อกไว้ ณ ตอนสั่ง (priceAtOrder) เป็นหลัก
+        // ถ้าไม่มีค่อย fallback ไปราคาปัจจุบันของ addon จาก menuAddonDetail
+        addonsSum +=
+            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
+                .toInt();
       }
       final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       finalPricePerUnit = baseMenuPrice + addonsSum;
@@ -168,29 +173,12 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          displayMenuName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        "แก้ไข",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade700,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    displayMenuName,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   Text(

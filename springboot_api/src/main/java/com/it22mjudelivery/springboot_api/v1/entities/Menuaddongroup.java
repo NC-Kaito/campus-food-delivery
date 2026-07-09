@@ -1,48 +1,53 @@
-    package com.it22mjudelivery.springboot_api.v1.entities;
+package com.it22mjudelivery.springboot_api.v1.entities;
 
-    import com.fasterxml.jackson.annotation.JsonIgnore;
-    import jakarta.persistence.*;
-    import lombok.AllArgsConstructor;
-    import lombok.Builder;
-    import lombok.Data;
-    import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-    import java.util.List;
-    import java.util.Set;
+import java.util.List;
+import java.util.Set;
 
-    @Entity
-    @Table(name="Menuaddongroup")
-    @Data
-    @AllArgsConstructor
-    @NoArgsConstructor
-    @Builder
-    public class Menuaddongroup {
-        @Id
-        @GeneratedValue(strategy = GenerationType.IDENTITY)
-        private int addongroupid;
+@Entity
+@Table(name = "Menuaddongroup")
+@Getter
+@Setter
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+@EqualsAndHashCode(onlyExplicitlyIncluded = true) // ← เปลี่ยนจาก @Data เช่นกัน
+public class Menuaddongroup {
 
-        @Column(length = 50, nullable = false)
-        private String addongroupname;
+    @Id
+    @EqualsAndHashCode.Include // ← ใช้แค่ id ในการเทียบ equals/hashCode
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int addongroupid;
 
-        @Column(nullable = false)
-        private boolean isRequired;
+    @Column(length = 50, nullable = false)
+    private String addongroupname;
 
-        @Column(nullable = false)
-        private int maxselect;
+    @Column(nullable = false)
+    private boolean isRequired;
 
-        @Column
-        private boolean status;
+    @Column(nullable = false)
+    private int maxselect;
 
-        @ManyToMany(mappedBy = "menuAddonGroups")
-        @JsonIgnore
-        private Set<Menu> menus;
+    @Column
+    private boolean status;
 
-        @OneToMany(mappedBy = "menuaddongroup", fetch = FetchType.EAGER)
-        private List<Menuaddondetail> menuaddondetails;
+    @ManyToMany(mappedBy = "menuAddonGroups")
+    @JsonIgnore
+    private Set<Menu> menus;
 
-        @JsonIgnore
-        @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "username", nullable = false)
-        private Restaurant username;
+    @OneToMany(mappedBy = "menuaddongroup", fetch = FetchType.EAGER)
+    private List<Menuaddondetail> menuaddondetails;
 
-    }
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "username", nullable = false)
+    private Restaurant username;
+}

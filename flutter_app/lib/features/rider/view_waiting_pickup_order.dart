@@ -73,8 +73,8 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     }
 
     String addonText = item.addons
-        .map((addon) => (addon as dynamic).addonMenu?.addonName ?? '')
-        .where((name) => name.toString().isNotEmpty)
+        .map((addon) => addon.menuAddonDetail?.addonMenu?.addonName ?? '')
+        .where((name) => name.isNotEmpty)
         .join(", ");
 
     int finalPricePerUnit;
@@ -86,7 +86,9 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     } else {
       int addonsSum = 0;
       for (var addon in item.addons) {
-        addonsSum += ((addon as dynamic).addonPrice as num?)?.toInt() ?? 0;
+        addonsSum +=
+            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
+                .toInt();
       }
       final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       finalPricePerUnit = baseMenuPrice + addonsSum;
