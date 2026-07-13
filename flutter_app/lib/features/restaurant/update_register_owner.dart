@@ -3,6 +3,7 @@ import 'package:dio/dio.dart' as dio_package;
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
@@ -15,11 +16,10 @@ class UpdateRegisterOwner extends StatefulWidget {
   final int? updatedTypeId;
   final double? updatedLatitude;
   final double? updatedLongitude;
-  final String? updatedOpenTime;
-  final String? updatedCloseTime;
-  final List<bool>? updatedSelectedDays;
   final File? updatedImage;
   final File? updatedOwnerImage;
+
+  final List<RestaurantOpeningHourModel>? updatedOpeningHours;
 
   const UpdateRegisterOwner({
     super.key,
@@ -30,9 +30,7 @@ class UpdateRegisterOwner extends StatefulWidget {
     this.updatedTypeId,
     this.updatedLatitude,
     this.updatedLongitude,
-    this.updatedOpenTime,
-    this.updatedCloseTime,
-    this.updatedSelectedDays,
+    this.updatedOpeningHours,
     this.updatedImage,
     this.updatedOwnerImage,
   });
@@ -127,14 +125,6 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
     }
   }
 
-  int _convertDaysToInt(List<bool> days) {
-    int result = 0;
-    for (int i = 0; i < days.length; i++) {
-      if (days[i]) result += (1 << i);
-    }
-    return result;
-  }
-
   Future<void> doUpdateRegisterData() async {
     if (formKey.currentState!.validate()) {
       setState(() => _isLoadingAction = true);
@@ -166,12 +156,9 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
           restaurantImage:
               newRestaurantImageUrl ?? widget.restaurantData?.restaurantImage,
           imagecardid: newOwnerImageUrl ?? widget.restaurantData?.imagecardid,
-          openTime: widget.updatedOpenTime ?? widget.restaurantData?.openTime,
-          closeTime:
-              widget.updatedCloseTime ?? widget.restaurantData?.closeTime,
-          openDay: widget.updatedSelectedDays != null
-              ? _convertDaysToInt(widget.updatedSelectedDays!)
-              : widget.restaurantData?.openDay,
+          openingHours:
+              widget.updatedOpeningHours ??
+              widget.restaurantData?.openingHours, // ✅ แก้ตรงนี้
           typerestaurantId:
               widget.updatedTypeId ?? widget.restaurantData?.typerestaurantId,
           latitude: widget.updatedLatitude ?? widget.restaurantData?.latitude,

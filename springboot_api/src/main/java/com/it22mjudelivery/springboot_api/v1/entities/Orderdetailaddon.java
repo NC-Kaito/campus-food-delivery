@@ -26,5 +26,9 @@ public class Orderdetailaddon {
     @JoinColumn(name = "addondetailid", nullable = false)
     private Menuaddondetail menuaddondetail;
 
+    @Column
     private double priceAtOrder;
+
+    @Column
+    private int qtyaddon;
 }

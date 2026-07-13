@@ -6,10 +6,12 @@ import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/features/restaurant/location_restaurant.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
+
 import 'package:dio/dio.dart'
     as dio_package; // 🎯 นำเข้า dio สำหรับอัปโหลดไฟล์รูปภาพ
 
@@ -44,9 +46,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
   LatLng? _restaurantLatLng;
 
   bool _obscurePassword = true;
-  // 🎯 สถานะเปิด/ปิดร้าน ยังเก็บไว้เพื่อส่งไปกับ payload ตอนบันทึก
-  // ส่วนการแสดงผล badge ถูกย้ายไปอยู่ที่ RestaurantNavbar แล้ว
-  // และปุ่มสลับสถานะยังคงอยู่ที่ RestaurantDrawer เหมือนเดิม
+  // 🎯 Status is kept to send with payload when saving
   bool _isStoreOpen = true;
   bool _isEditable = false;
 
@@ -61,12 +61,20 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
   late final TextEditingController emailController;
   late final TextEditingController phoneController;
 
-  final List<String> _days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-  final List<bool> _selectedDays = List.generate(7, (_) => false);
-
   List<TypeRestaurantModel> _typeList = [];
   String? _selectedType;
   int? _selectedTypeId;
+
+  List<RestaurantOpeningHourModel> _openingHours = RestaurantDayOfWeek.values
+      .map((day) {
+        return RestaurantOpeningHourModel(
+          dayOfWeek: day,
+          opentime: const TimeOfDay(hour: 8, minute: 0),
+          closetime: const TimeOfDay(hour: 18, minute: 0),
+          closed: false,
+        );
+      })
+      .toList();
 
   @override
   void initState() {
@@ -74,8 +82,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     usernameController = TextEditingController();
     passwordController = TextEditingController();
     restaurantnameController = TextEditingController();
-    opentimeController = TextEditingController();
-    closetimeController = TextEditingController();
     ownerfirstnameController = TextEditingController();
     ownerlastnameController = TextEditingController();
     emailController = TextEditingController();
@@ -88,8 +94,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     usernameController.dispose();
     passwordController.dispose();
     restaurantnameController.dispose();
-    opentimeController.dispose();
-    closetimeController.dispose();
     ownerfirstnameController.dispose();
     ownerlastnameController.dispose();
     emailController.dispose();
@@ -120,13 +124,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     }
   }
 
-  void _decodeopenDay(int? openDay) {
-    if (openDay == null) return;
-    for (int i = 0; i < 7; i++) {
-      _selectedDays[i] = (openDay & (1 << i)) != 0;
-    }
-  }
-
   Future<void> _fetchRestaurantProfile() async {
     try {
       final result = await restaurantService.getRestaurantByUsername(
@@ -146,13 +143,30 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
         usernameController.text = result.username ?? "";
         passwordController.text = result.password ?? "";
         restaurantnameController.text = result.restaurantName ?? "";
-        opentimeController.text = result.openTime ?? "";
-        closetimeController.text = result.closeTime ?? "";
         _isStoreOpen = result.statusOpen ?? true;
         ownerfirstnameController.text = result.ownerFirstName ?? "";
         ownerlastnameController.text = result.ownerLastName ?? "";
         emailController.text = result.email ?? "";
         phoneController.text = result.phone ?? "";
+
+        _openingHours = RestaurantDayOfWeek.values.map((day) {
+          final existing = result.openingHours?.firstWhere(
+            (h) => h.dayOfWeek == day,
+            orElse: () => RestaurantOpeningHourModel(
+              dayOfWeek: day,
+              opentime: const TimeOfDay(hour: 8, minute: 0),
+              closetime: const TimeOfDay(hour: 18, minute: 0),
+              closed: true,
+            ),
+          );
+          return existing ??
+              RestaurantOpeningHourModel(
+                dayOfWeek: day,
+                opentime: const TimeOfDay(hour: 8, minute: 0),
+                closetime: const TimeOfDay(hour: 18, minute: 0),
+                closed: true,
+              );
+        }).toList();
 
         final matchedById = _typeList
             .where((t) => t.id == result.typerestaurantId)
@@ -167,24 +181,25 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
         if (matched != null) {
           _selectedType = matched.name;
           _selectedTypeId = matched.id;
-          print("matched type: ${matched.name} (id=${matched.id})");
         } else {
           _selectedType = result.typerestaurantName;
           _selectedTypeId = result.typerestaurantId;
-          print("type not matched in list, fallback: $_selectedType");
         }
-
-        _decodeopenDay(result.openDay);
       });
     } catch (e) {
       print("Error fetching profile: $e");
     }
   }
 
-  Future<void> _selectTime(BuildContext context, bool isOpenTime) async {
+  Future<void> _selectDayTime(
+    BuildContext context,
+    int index,
+    bool isOpenTime,
+  ) async {
+    final hour = _openingHours[index];
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: isOpenTime ? hour.opentime : hour.closetime,
       builder: (context, child) {
         return Theme(
           data: Theme.of(
@@ -195,24 +210,13 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
       },
     );
     if (picked != null) {
-      final formatted =
-          "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00";
       setState(() {
-        if (isOpenTime) {
-          opentimeController.text = formatted;
-        } else {
-          closetimeController.text = formatted;
-        }
+        _openingHours[index] = hour.copyWith(
+          opentime: isOpenTime ? picked : null,
+          closetime: isOpenTime ? null : picked,
+        );
       });
     }
-  }
-
-  int _convertDaysToInt(List<bool> days) {
-    int result = 0;
-    for (int i = 0; i < days.length; i++) {
-      if (days[i]) result += (1 << i);
-    }
-    return result;
   }
 
   Future<void> _pickImage() async {
@@ -295,7 +299,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     );
   }
 
-  // 🎯 ปรับปรุงส่วนอัปโหลดรูปภาพร้านค้า: ยิงตรงผ่าน DioClient ยึดไอพีตัวแปรกลางสากล
   Future<String?> _uploadImage(File imageFile) async {
     try {
       String fileName = imageFile.path.split('/').last;
@@ -313,7 +316,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
       );
 
       if (response.statusCode == 200) {
-        return response.data['url']; // ได้รับพาธสั้นสากลกลับมาทันที
+        return response.data['url'];
       }
       return null;
     } catch (e) {
@@ -341,16 +344,13 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
           "latitude": _restaurantLatLng?.latitude ?? restaurantModel?.latitude,
           "longitude":
               _restaurantLatLng?.longitude ?? restaurantModel?.longitude,
-          "opentime": opentimeController.text,
-          "closetime": closetimeController.text,
-          "openday": _convertDaysToInt(_selectedDays),
+          "openingHours": _openingHours.map((e) => e.toJson()).toList(),
           "typeid": _selectedTypeId ?? restaurantModel?.typerestaurantId,
           "ownerfirstname": ownerfirstnameController.text,
           "ownerlastname": ownerlastnameController.text,
           "email": emailController.text,
           "phone": phoneController.text,
         };
-
         final response = await DioClient.dio.post(
           "/v1/restaurant/updateProfileRestaurant",
           data: updatePayload,
@@ -395,7 +395,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     }
   }
 
-  // 🎯 ฟังก์ชันเชื่อมสายพาร์ทรูปภาพ: ตรวจจับและคั่นสแลชกลางให้เรียบร้อยป้องกันปัญหาลิงก์ติดกันรูปพัง
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -557,7 +556,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
 
   @override
   Widget build(BuildContext context) {
-    // ดึงค่า URL ภาพที่ผ่านการเชื่อมไอพีส่วนกลางเรียบร้อยมาเตรียมรอวาดขึ้นจอ
     final String finalProfileUrl = _getFinalImageUrl(restaurantimage);
 
     return Scaffold(
@@ -619,8 +617,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 ),
                               ),
                             ),
-                            // 🎯 Badge สถานะเปิด/ปิดร้านถูกย้ายไปแสดงที่
-                            // RestaurantNavbar (ข้างปุ่มสามขีด) แล้ว จึงลบออกจากตรงนี้
                             if (_isEditable)
                               Positioned(
                                 top: 12,
@@ -669,7 +665,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 enabled: false,
                                 decoration: _inputDecoration(enabled: false),
                               ),
-
                               _buildLabel("รหัสผ่าน (Password)"),
                               TextFormField(
                                 controller: passwordController,
@@ -691,18 +686,18 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   ),
                                 ),
                               ),
-
                               _buildLabel("ชื่อร้านค้า (Restaurant Name)"),
-
                               TextFormField(
                                 controller: restaurantnameController,
                                 enabled: _isEditable,
                                 validator: _isEditable
                                     ? (v) {
-                                        if (v == null || v.trim().isEmpty)
+                                        if (v == null || v.trim().isEmpty) {
                                           return "กรุณากรอกชื่อร้านค้า";
-                                        if (v.length < 8)
+                                        }
+                                        if (v.length < 8) {
                                           return "ความยาว 8 ตัวอักษรขึ้นไป";
+                                        }
                                         return null;
                                       }
                                     : null,
@@ -710,12 +705,9 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   enabled: _isEditable,
                                 ),
                               ),
-
                               _buildLabel("ประเภทร้านค้า (Restaurant Type)"),
                               _buildDropdown(),
-
                               const SizedBox(height: 4),
-
                               _buildLabel("ปักหมุดที่อยู่ร้านค้า"),
                               GestureDetector(
                                 onTap: _isEditable
@@ -827,124 +819,134 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel("เวลาเปิดร้าน"),
-                                        TextFormField(
-                                          controller: opentimeController,
-                                          enabled: _isEditable,
-                                          onTap: _isEditable
-                                              ? () => _selectTime(context, true)
-                                              : null,
-                                          validator: _isEditable
-                                              ? (v) => (v == null || v.isEmpty)
-                                                    ? "กรุณาระบุเวลาเปิด"
-                                                    : null
-                                              : null,
-                                          decoration: _inputDecoration(
-                                            hint: "00:00:00",
-                                            enabled: _isEditable,
-                                            suffixIcon: Icon(
-                                              Icons.access_time,
-                                              color: Colors.grey[400],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        _buildLabel("เวลาปิดร้าน"),
-                                        TextFormField(
-                                          controller: closetimeController,
-                                          enabled: _isEditable,
-                                          onTap: _isEditable
-                                              ? () =>
-                                                    _selectTime(context, false)
-                                              : null,
-                                          validator: _isEditable
-                                              ? (v) => (v == null || v.isEmpty)
-                                                    ? "กรุณาระบุเวลาปิด"
-                                                    : null
-                                              : null,
-                                          decoration: _inputDecoration(
-                                            hint: "00:00:00",
-                                            enabled: _isEditable,
-                                            suffixIcon: Icon(
-                                              Icons.history_toggle_off,
-                                              color: Colors.grey[400],
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              _buildLabel("วันที่เปิดร้าน (Open Date)"),
+                              _buildLabel("เวลาเปิด-ปิดร้าน (แยกตามวัน)"),
                               const SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: List.generate(7, (i) {
-                                  return GestureDetector(
-                                    onTap: _isEditable
-                                        ? () => setState(
-                                            () => _selectedDays[i] =
-                                                !_selectedDays[i],
-                                          )
-                                        : null,
-                                    child: AnimatedContainer(
-                                      duration: const Duration(
-                                        milliseconds: 150,
+                              Column(
+                                children: List.generate(_openingHours.length, (
+                                  index,
+                                ) {
+                                  final hour = _openingHours[index];
+                                  return Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: !_isEditable
+                                          ? const Color(0xFFF0F1F3)
+                                          : hour.closed
+                                          ? Colors.grey.shade100
+                                          : _primary.withOpacity(0.05),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: hour.closed
+                                            ? Colors.grey.shade300
+                                            : _primary.withOpacity(0.3),
                                       ),
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: _selectedDays[i]
-                                            ? _accent
-                                            : Colors.white,
-                                        shape: BoxShape.circle,
-                                        border: Border.all(
-                                          color: _selectedDays[i]
-                                              ? _accent
-                                              : Colors.grey.shade300,
-                                        ),
-                                        boxShadow: _selectedDays[i]
-                                            ? [
-                                                BoxShadow(
-                                                  color: _accent.withOpacity(
-                                                    0.3,
-                                                  ),
-                                                  blurRadius: 6,
-                                                  offset: const Offset(0, 3),
-                                                ),
-                                              ]
-                                            : [],
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          _days[i],
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: _selectedDays[i]
-                                                ? Colors.white
-                                                : _textMuted,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        SizedBox(
+                                          width: 56,
+                                          child: Text(
+                                            hour.dayOfWeek.labelTh,
+                                            style: const TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: _textDark,
+                                            ),
                                           ),
                                         ),
-                                      ),
+                                        Expanded(
+                                          child: hour.closed
+                                              ? Text(
+                                                  "ปิดวันนี้",
+                                                  style: TextStyle(
+                                                    color: Colors.grey.shade500,
+                                                    fontSize: 13,
+                                                  ),
+                                                )
+                                              : Row(
+                                                  children: [
+                                                    Expanded(
+                                                      child: OutlinedButton(
+                                                        onPressed: _isEditable
+                                                            ? () =>
+                                                                  _selectDayTime(
+                                                                    context,
+                                                                    index,
+                                                                    true,
+                                                                  )
+                                                            : null,
+                                                        style: OutlinedButton.styleFrom(
+                                                          side: BorderSide(
+                                                            color: Colors
+                                                                .grey
+                                                                .shade300,
+                                                          ),
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                vertical: 8,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          '${hour.opentime.hour.toString().padLeft(2, '0')}:${hour.opentime.minute.toString().padLeft(2, '0')}',
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    const Padding(
+                                                      padding:
+                                                          EdgeInsets.symmetric(
+                                                            horizontal: 6,
+                                                          ),
+                                                      child: Text('-'),
+                                                    ),
+                                                    Expanded(
+                                                      child: OutlinedButton(
+                                                        onPressed: _isEditable
+                                                            ? () =>
+                                                                  _selectDayTime(
+                                                                    context,
+                                                                    index,
+                                                                    false,
+                                                                  )
+                                                            : null,
+                                                        style: OutlinedButton.styleFrom(
+                                                          side: BorderSide(
+                                                            color: Colors
+                                                                .grey
+                                                                .shade300,
+                                                          ),
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                vertical: 8,
+                                                              ),
+                                                        ),
+                                                        child: Text(
+                                                          '${hour.closetime.hour.toString().padLeft(2, '0')}:${hour.closetime.minute.toString().padLeft(2, '0')}',
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Switch(
+                                          value: !hour.closed,
+                                          activeColor: _primary,
+                                          onChanged: _isEditable
+                                              ? (isOpen) {
+                                                  setState(() {
+                                                    _openingHours[index] = hour
+                                                        .copyWith(
+                                                          closed: !isOpen,
+                                                        );
+                                                  });
+                                                }
+                                              : null,
+                                        ),
+                                      ],
                                     ),
                                   );
                                 }),
@@ -978,8 +980,9 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                           return "ต้องไม่มีเว้นวรรค";
                                         if (!RegExp(
                                           r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v))
+                                        ).hasMatch(v)) {
                                           return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
+                                        }
                                         if (v.length < 3 || v.length > 30)
                                           return "ความยาว 3-30 ตัวอักษร";
                                         return null;
@@ -989,7 +992,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   enabled: _isEditable,
                                 ),
                               ),
-
                               _buildLabel("นามสกุล (Lastname)"),
                               TextFormField(
                                 controller: ownerlastnameController,
@@ -1002,8 +1004,9 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                           return "ต้องไม่มีเว้นวรรค";
                                         if (!RegExp(
                                           r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v))
+                                        ).hasMatch(v)) {
                                           return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
+                                        }
                                         if (v.length < 3 || v.length > 30)
                                           return "ความยาว 3-30 ตัวอักษร";
                                         return null;
@@ -1013,7 +1016,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   enabled: _isEditable,
                                 ),
                               ),
-
                               _buildLabel("อีเมล (Email)"),
                               TextFormField(
                                 controller: emailController,
@@ -1027,8 +1029,9 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                           return "ต้องไม่มีช่องว่าง";
                                         if (!RegExp(
                                           r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                        ).hasMatch(v))
+                                        ).hasMatch(v)) {
                                           return "รูปแบบอีเมลไม่ถูกต้อง";
+                                        }
                                         return null;
                                       }
                                     : null,
@@ -1040,7 +1043,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                   ),
                                 ),
                               ),
-
                               _buildLabel("เบอร์โทรศัพท์ (Phone)"),
                               TextFormField(
                                 controller: phoneController,

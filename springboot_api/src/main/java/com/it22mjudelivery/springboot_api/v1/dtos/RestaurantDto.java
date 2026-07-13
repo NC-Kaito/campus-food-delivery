@@ -9,6 +9,7 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -19,9 +20,6 @@ public class RestaurantDto {
     private String password;
     private String restaurantname;
     private String restaurantimage;
-    private LocalTime opentime;
-    private LocalTime closetime;
-    private int openday;
     private Double latitude;
     private Double longitude;
     private String imagecardid;
@@ -33,4 +31,6 @@ public class RestaurantDto {
     private LocalDateTime registerdate;
     private String verificationstatus;
     private Integer typeid;
+
+    private List<OpeningHourDto> openingHours;
 }

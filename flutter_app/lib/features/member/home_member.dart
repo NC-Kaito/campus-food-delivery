@@ -14,6 +14,8 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/features/member/view_restaurant_member.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
+
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/global_data.dart'; // 🎯 ดึง GlobalData เพื่อเช็กโปรไฟล์สมาชิก
 
@@ -102,26 +104,81 @@ class _HomeMemberState extends State<HomeMember> {
     }
   }
 
-  String _getOpenDayText(int? bitwiseValue) {
-    if (bitwiseValue == null || bitwiseValue == 0) return "ไม่ระบุวันเปิด";
-    if (bitwiseValue == 127) return "เปิดทุกวัน";
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-    final dayMap = {
-      1: "อา.",
-      2: "จ.",
-      4: "อ.",
-      8: "พ.",
-      16: "พฤ.",
-      32: "ศ.",
-      64: "ส.",
+  // สรุปเวลาเปิด-ปิดทั้งสัปดาห์ จัดกลุ่มวันที่เวลาเหมือนกันติดกันไว้ด้วยกัน
+  String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
+    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาเปิด-ปิด";
+
+    const dayAbbr = {
+      RestaurantDayOfWeek.monday: "จ",
+      RestaurantDayOfWeek.tuesday: "อ",
+      RestaurantDayOfWeek.wednesday: "พ",
+      RestaurantDayOfWeek.thursday: "พฤ",
+      RestaurantDayOfWeek.friday: "ศ",
+      RestaurantDayOfWeek.saturday: "ส",
+      RestaurantDayOfWeek.sunday: "อา",
     };
 
-    List<String> days = [];
-    dayMap.forEach((key, value) {
-      if ((bitwiseValue & key) != 0) days.add(value);
-    });
+    // เรียงให้ครบ จ-อา เสมอ ถ้าวันไหนไม่มีข้อมูลให้ถือว่าปิด
+    final ordered = RestaurantDayOfWeek.values.map((d) {
+      return hours.firstWhere(
+        (h) => h.dayOfWeek == d,
+        orElse: () => RestaurantOpeningHourModel(
+          dayOfWeek: d,
+          opentime: const TimeOfDay(hour: 0, minute: 0),
+          closetime: const TimeOfDay(hour: 0, minute: 0),
+          closed: true,
+        ),
+      );
+    }).toList();
 
-    return "เปิดวัน: ${days.join(', ')}";
+    final List<String> groups = [];
+    int i = 0;
+    while (i < ordered.length) {
+      final start = ordered[i];
+      int j = i;
+      while (j + 1 < ordered.length &&
+          ordered[j + 1].closed == start.closed &&
+          ordered[j + 1].opentime.hour == start.opentime.hour &&
+          ordered[j + 1].opentime.minute == start.opentime.minute &&
+          ordered[j + 1].closetime.hour == start.closetime.hour &&
+          ordered[j + 1].closetime.minute == start.closetime.minute) {
+        j++;
+      }
+      final label = (i == j)
+          ? dayAbbr[ordered[i].dayOfWeek]!
+          : "${dayAbbr[ordered[i].dayOfWeek]}-${dayAbbr[ordered[j].dayOfWeek]}";
+
+      groups.add(
+        start.closed
+            ? "$label ปิด"
+            : "$label ${_formatTime(start.opentime)}-${_formatTime(start.closetime)}",
+      );
+
+      i = j + 1;
+    }
+    return groups.join(", ");
+  }
+
+  // บอกเวลาเปิด-ปิดของ "วันนี้" โดยเฉพาะ ไว้โชว์ในบรรทัดเวลา
+  String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
+    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลา";
+
+    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
+    final today = hours.firstWhere(
+      (h) => h.dayOfWeek == todayEnum,
+      orElse: () => RestaurantOpeningHourModel(
+        dayOfWeek: todayEnum,
+        opentime: const TimeOfDay(hour: 0, minute: 0),
+        closetime: const TimeOfDay(hour: 0, minute: 0),
+        closed: true,
+      ),
+    );
+
+    if (today.closed) return "วันนี้ปิด";
+    return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
   }
 
   String _getFinalImageUrl(String? rawPath) {
@@ -699,7 +756,7 @@ class _HomeMemberState extends State<HomeMember> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          _getOpenDayText(item.openDay),
+                          _getGroupedOpeningHoursText(item.openingHours),
                           style: TextStyle(
                             color: Colors.grey.shade700,
                             fontSize: 13,
@@ -725,7 +782,7 @@ class _HomeMemberState extends State<HomeMember> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              "${item.openTime?.substring(0, 5)} - ${item.closeTime?.substring(0, 5)} น.",
+                              _getTodayHoursText(item.openingHours),
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                                 fontSize: 13,

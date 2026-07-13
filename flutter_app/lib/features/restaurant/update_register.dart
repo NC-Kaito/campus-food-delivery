@@ -8,6 +8,8 @@ import 'package:flutter_app/features/member/test_map.dart';
 import 'package:flutter_app/features/restaurant/update_register_owner.dart';
 import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 เรียกใช้งานไอพีกลาง
 import 'package:flutter_app/global_data.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
+
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -35,8 +37,6 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
   late final TextEditingController usernameController;
   late final TextEditingController passwordController;
   late final TextEditingController restaurantNameController;
-  late final TextEditingController openTimeController;
-  late final TextEditingController closeTimeController;
 
   double? latitude;
   double? longitude;
@@ -51,10 +51,19 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
   String? restaurantImageNetwork;
   String? ownerImageNetwork; // 🎯 ตัวแปรเก็บเครือข่ายรูปหน้าเจ้าของร้าน
 
-  final List<String> _days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-  final List<bool> _selectedDays = List.generate(7, (index) => false);
   List<TypeRestaurantModel> typeList = [];
   final ImagePicker _picker = ImagePicker();
+
+  List<RestaurantOpeningHourModel> _openingHours = RestaurantDayOfWeek.values
+      .map((day) {
+        return RestaurantOpeningHourModel(
+          dayOfWeek: day,
+          opentime: const TimeOfDay(hour: 8, minute: 0),
+          closetime: const TimeOfDay(hour: 18, minute: 0),
+          closed: false,
+        );
+      })
+      .toList();
 
   @override
   void initState() {
@@ -62,8 +71,6 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
     usernameController = TextEditingController();
     passwordController = TextEditingController();
     restaurantNameController = TextEditingController();
-    openTimeController = TextEditingController();
-    closeTimeController = TextEditingController();
     _initData();
   }
 
@@ -72,8 +79,6 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
     usernameController.dispose();
     passwordController.dispose();
     restaurantNameController.dispose();
-    openTimeController.dispose();
-    closeTimeController.dispose();
     super.dispose();
   }
 
@@ -131,8 +136,6 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
         usernameController.text = result.username ?? "";
         passwordController.text = result.password ?? "";
         restaurantNameController.text = result.restaurantName ?? "";
-        openTimeController.text = result.openTime ?? "";
-        closeTimeController.text = result.closeTime ?? "";
 
         if (result.latitude != null && result.longitude != null) {
           _selectedLocation = "${result.latitude}, ${result.longitude}";
@@ -140,19 +143,16 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
           longitude = result.longitude;
         }
 
-        // 🎯 สลัดตรรกะ .replaceAll ทิ้งอย่างถาวร แล้วสวมฟังก์ชันผูกไอพีกลางแทน
         restaurantImageNetwork =
             result.restaurantImage != null && result.restaurantImage!.isNotEmpty
             ? _getFinalImageUrl(result.restaurantImage)
             : null;
 
-        // 🎯 สลัดคราบสัญญาเช่าผี เปลี่ยนมาดึงฟังก์ชันเซ็ตหัวไอพีรูปใบหน้าเจ้าของร้านค้าแทน
         ownerImageNetwork =
             result.imagecardid != null && result.imagecardid!.isNotEmpty
             ? _getFinalImageUrl(result.imagecardid)
             : null;
 
-        // จับคู่ประเภทร้านค้า
         final matched = typeList
             .where((t) => t.id == result.typerestaurantId)
             .firstOrNull;
@@ -164,31 +164,47 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
           _selectedTypeId = result.typerestaurantId;
         }
 
-        // แกะวันเปิดร้านเก่าลงปุ่มวงกลม
-        if (result.openDay != null) {
-          for (int i = 0; i < 7; i++) {
-            _selectedDays[i] = (result.openDay! & (1 << i)) != 0;
-          }
-        }
+        // เติมให้ครบ 7 วันเสมอ เผื่อ backend ส่งมาไม่ครบ
+        _openingHours = RestaurantDayOfWeek.values.map((day) {
+          final existing = result.openingHours?.firstWhere(
+            (h) => h.dayOfWeek == day,
+            orElse: () => RestaurantOpeningHourModel(
+              dayOfWeek: day,
+              opentime: const TimeOfDay(hour: 8, minute: 0),
+              closetime: const TimeOfDay(hour: 18, minute: 0),
+              closed: true,
+            ),
+          );
+          return existing ??
+              RestaurantOpeningHourModel(
+                dayOfWeek: day,
+                opentime: const TimeOfDay(hour: 8, minute: 0),
+                closetime: const TimeOfDay(hour: 18, minute: 0),
+                closed: true,
+              );
+        }).toList();
       });
     } catch (e) {
       print("Error fetching profile data: $e");
     }
   }
 
-  Future<void> _selectTime(BuildContext context, bool isOpenTime) async {
+  Future<void> _selectDayTime(
+    BuildContext context,
+    int index,
+    bool isOpenTime,
+  ) async {
+    final hour = _openingHours[index];
     final TimeOfDay? picked = await showTimePicker(
       context: context,
-      initialTime: TimeOfDay.now(),
+      initialTime: isOpenTime ? hour.opentime : hour.closetime,
     );
     if (picked != null) {
       setState(() {
-        String formattedTime =
-            "${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}:00";
-        if (isOpenTime)
-          openTimeController.text = formattedTime;
-        else
-          closeTimeController.text = formattedTime;
+        _openingHours[index] = hour.copyWith(
+          opentime: isOpenTime ? picked : null,
+          closetime: isOpenTime ? null : picked,
+        );
       });
     }
   }
@@ -370,87 +386,127 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                           ),
                         ],
                       ),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                      _buildLabel("เวลาเปิด-ปิดร้าน (แยกตามวัน)"),
+                      const SizedBox(height: 4),
+                      Column(
+                        children: List.generate(_openingHours.length, (index) {
+                          final hour = _openingHours[index];
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            decoration: BoxDecoration(
+                              color: !_isEditable
+                                  ? const Color(0xFFE0E0E0)
+                                  : hour.closed
+                                  ? Colors.grey.shade200
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.grey.shade400),
+                            ),
+                            child: Row(
                               children: [
-                                _buildLabel("เวลาเปิดร้าน"),
-                                TextFormField(
-                                  controller: openTimeController,
-                                  readOnly: true,
-                                  enabled: _isEditable,
-                                  onTap: () => _selectTime(context, true),
-                                  decoration: _inputDecoration(
-                                    enabled: _isEditable,
+                                SizedBox(
+                                  width: 56,
+                                  child: Text(
+                                    hour.dayOfWeek.labelTh,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
+                                ),
+                                Expanded(
+                                  child: hour.closed
+                                      ? Text(
+                                          "ปิดวันนี้",
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 13,
+                                          ),
+                                        )
+                                      : Row(
+                                          children: [
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                onPressed: _isEditable
+                                                    ? () => _selectDayTime(
+                                                        context,
+                                                        index,
+                                                        true,
+                                                      )
+                                                    : null,
+                                                style: OutlinedButton.styleFrom(
+                                                  side: BorderSide(
+                                                    color: Colors.grey.shade400,
+                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                      ),
+                                                ),
+                                                child: Text(
+                                                  '${hour.opentime.hour.toString().padLeft(2, '0')}:${hour.opentime.minute.toString().padLeft(2, '0')}',
+                                                ),
+                                              ),
+                                            ),
+                                            const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                              ),
+                                              child: Text('-'),
+                                            ),
+                                            Expanded(
+                                              child: OutlinedButton(
+                                                onPressed: _isEditable
+                                                    ? () => _selectDayTime(
+                                                        context,
+                                                        index,
+                                                        false,
+                                                      )
+                                                    : null,
+                                                style: OutlinedButton.styleFrom(
+                                                  side: BorderSide(
+                                                    color: Colors.grey.shade400,
+                                                  ),
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        vertical: 8,
+                                                      ),
+                                                ),
+                                                child: Text(
+                                                  '${hour.closetime.hour.toString().padLeft(2, '0')}:${hour.closetime.minute.toString().padLeft(2, '0')}',
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                ),
+                                const SizedBox(width: 8),
+                                Switch(
+                                  value: !hour.closed,
+                                  activeColor: const Color.fromARGB(
+                                    255,
+                                    230,
+                                    115,
+                                    0,
+                                  ),
+                                  onChanged: _isEditable
+                                      ? (isOpen) {
+                                          setState(() {
+                                            _openingHours[index] = hour
+                                                .copyWith(closed: !isOpen);
+                                          });
+                                        }
+                                      : null,
                                 ),
                               ],
-                            ),
-                          ),
-                          const SizedBox(width: 15),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildLabel("เวลาปิดร้าน"),
-                                TextFormField(
-                                  controller: closeTimeController,
-                                  readOnly: true,
-                                  enabled: _isEditable,
-                                  onTap: () => _selectTime(context, false),
-                                  decoration: _inputDecoration(
-                                    enabled: _isEditable,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      _buildLabel("วันที่เปิดร้าน (Open Date)"),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: List.generate(7, (index) {
-                          return GestureDetector(
-                            onTap: _isEditable
-                                ? () => setState(
-                                    () => _selectedDays[index] =
-                                        !_selectedDays[index],
-                                  )
-                                : null,
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: _selectedDays[index]
-                                    ? const Color.fromARGB(255, 230, 115, 0)
-                                    : Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.grey),
-                              ),
-                              child: Center(
-                                child: Text(
-                                  _days[index],
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: _selectedDays[index]
-                                        ? Colors.white
-                                        : Colors.black,
-                                  ),
-                                ),
-                              ),
                             ),
                           );
                         }),
                       ),
-                      const SizedBox(height: 30),
-
                       _buildActionButtons(isWaitStatus),
                     ],
                   ),
@@ -529,9 +585,8 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
           updatedTypeId: _selectedTypeId,
           updatedLatitude: latitude,
           updatedLongitude: longitude,
-          updatedOpenTime: openTimeController.text,
-          updatedCloseTime: closeTimeController.text,
-          updatedSelectedDays: _selectedDays,
+
+          updatedOpeningHours: _openingHours,
           updatedImage: _selectedImage,
           updatedOwnerImage: _selectedOwnerImage,
         ),

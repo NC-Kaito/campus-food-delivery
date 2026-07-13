@@ -9,7 +9,9 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 
 @Entity
 @Table(name="restaurant")
@@ -31,15 +33,6 @@ public class Restaurant {
 
     @Column(length = 200, nullable = false)
     private String restaurantimage;
-
-    @Column(nullable = false)
-    private LocalTime opentime;
-
-    @Column(nullable = false)
-    private LocalTime closetime;
-
-    @Column(nullable = false)
-    private int openDay;
 
     @Column(nullable = false)
     private double latitude;
@@ -77,4 +70,10 @@ public class Restaurant {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "typerestaurantId", nullable = false)
     private TypeRestaurant typerestaurant;
+
+    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<Restaurantopeninghour> openingHours = new ArrayList<>();
+
+
 }

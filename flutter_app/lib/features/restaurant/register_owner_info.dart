@@ -7,24 +7,23 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 
 class RegisterOwnerInfo extends StatefulWidget {
   final String? initialFirstName;
   final String? initialLastName;
   final String? initialEmail;
   final String? initialPhone;
-
   final String username;
   final String password;
   final String restaurantName;
   final int typeId;
   final double latitude;
   final double longitude;
-  final String openTime;
-  final String closeTime;
-  final List<bool> selectedDays;
   final File? restaurantImage;
   final File? imagecardid;
+
+  final List<RestaurantOpeningHourModel> openingHours;
 
   const RegisterOwnerInfo({
     super.key,
@@ -38,9 +37,8 @@ class RegisterOwnerInfo extends StatefulWidget {
     required this.typeId,
     required this.latitude,
     required this.longitude,
-    required this.openTime,
-    required this.closeTime,
-    required this.selectedDays,
+
+    required this.openingHours,
     this.restaurantImage,
     this.imagecardid,
   });
@@ -356,9 +354,8 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           restaurantName: widget.restaurantName,
           restaurantImage: restaurantImageUrl,
           imagecardid: imagecardIdUrl,
-          openTime: widget.openTime,
-          closeTime: widget.closeTime,
-          openDay: convertDaysToInt(widget.selectedDays),
+          openingHours: widget.openingHours,
+
           latitude: widget.latitude,
           longitude: widget.longitude,
           ownerFirstName: ownerFirstNameController.text,
@@ -481,16 +478,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
         (_) => _scrollToFirstInvalidField(),
       );
     }
-  }
-
-  int convertDaysToInt(List<bool> selectedDays) {
-    int result = 0;
-    for (int i = 0; i < selectedDays.length; i++) {
-      if (selectedDays[i]) {
-        result += (1 << i);
-      }
-    }
-    return result;
   }
 
   InputDecoration _inputDecoration({String hint = "", Widget? suffixIcon}) {

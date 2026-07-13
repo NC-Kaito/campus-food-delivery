@@ -127,11 +127,11 @@
         public ResponseEntity<?> updateProfileRestaurant(@RequestBody RestaurantDto restaurantDto){
             try {
                 boolean isResult = restaurantService.updateProfileRestaurant(
-                        restaurantDto.getUsername(),restaurantDto.getRestaurantname(),restaurantDto.getRestaurantimage(),restaurantDto.getTypeid(),
-                        restaurantDto.getLatitude(),restaurantDto.getLongitude(),
-                        restaurantDto.getOpentime(),
-                        restaurantDto.getClosetime(),restaurantDto.getOpenday(),restaurantDto.getOwnerfirstname(),
-                        restaurantDto.getOwnerlastname(),restaurantDto.getEmail(),restaurantDto.getPhone(),restaurantDto.getImagecardid());
+                        restaurantDto.getUsername(), restaurantDto.getRestaurantname(), restaurantDto.getRestaurantimage(), restaurantDto.getTypeid(),
+                        restaurantDto.getLatitude(), restaurantDto.getLongitude(),
+                        restaurantDto.getOpeningHours(),
+                        restaurantDto.getOwnerfirstname(),
+                        restaurantDto.getOwnerlastname(), restaurantDto.getEmail(), restaurantDto.getPhone(), restaurantDto.getImagecardid());
                 if (isResult) {
                     return ResponseEntity.ok("updateProfileRestaurant สำเร็จ");
                 }

@@ -27,6 +27,9 @@ public class Menuaddondetail {
     @Column
     private boolean status;
 
+    @Column
+    private boolean allowqtystatus;
+
     @JsonIgnore
     @OneToMany(mappedBy = "menuaddondetail", fetch = FetchType.LAZY)
     @Builder.Default

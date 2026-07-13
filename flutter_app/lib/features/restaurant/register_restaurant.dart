@@ -7,6 +7,8 @@ import 'package:flutter_app/features/member/test_map.dart';
 import 'package:flutter_app/features/restaurant/register_owner_info.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
+
 import 'dart:io';
 
 class RegisterRestaurant extends StatefulWidget {
@@ -34,8 +36,11 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   String? _locationError;
   String? _restaurantImageError;
   String? _typeError;
-  String? _openDayError;
   bool _obscureText = true;
+
+  late List<RestaurantOpeningHourModel> _openingHours;
+
+  String? _openingHoursError;
 
   // ── GlobalKey ของแต่ละช่อง ใช้สำหรับเลื่อนจอไปหาช่องแรกที่ยังไม่ได้กรอก ──
   final GlobalKey _usernameKey = GlobalKey();
@@ -44,9 +49,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   final GlobalKey _typeFieldKey = GlobalKey();
   final GlobalKey _locationKey = GlobalKey();
   final GlobalKey _imageKey = GlobalKey();
-  final GlobalKey _openTimeKey = GlobalKey();
-  final GlobalKey _closeTimeKey = GlobalKey();
-  final GlobalKey _openDayKey = GlobalKey();
+
+  final GlobalKey _openingHoursKey = GlobalKey();
 
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -57,8 +61,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   double? latilude;
   double? longitude;
 
-  late final TextEditingController openTimeController;
-  late final TextEditingController closeTimeController;
   final ImagePicker restaurantImage = ImagePicker();
 
   late final TextEditingController typeRestaurantController;
@@ -69,9 +71,16 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
     usernameController = TextEditingController();
     passwordController = TextEditingController();
     restaurantNameController = TextEditingController();
-    openTimeController = TextEditingController();
-    closeTimeController = TextEditingController();
     typeRestaurantController = TextEditingController();
+
+    _openingHours = RestaurantDayOfWeek.values.map((day) {
+      return RestaurantOpeningHourModel(
+        dayOfWeek: day,
+        opentime: const TimeOfDay(hour: 8, minute: 0),
+        closetime: const TimeOfDay(hour: 18, minute: 0),
+        closed: false,
+      );
+    }).toList();
 
     fetchTypes();
   }
@@ -81,14 +90,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
     usernameController.dispose();
     passwordController.dispose();
     restaurantNameController.dispose();
-    openTimeController.dispose();
-    closeTimeController.dispose();
     typeRestaurantController.dispose();
     super.dispose();
   }
-
-  final List<String> _days = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
-  final List<bool> _selectedDays = List.generate(7, (index) => false);
 
   List<TypeRestaurantModel> typeList = [];
   int? _selectedTypeId;
@@ -110,22 +114,17 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   }
 
   // 🎯 ฟังก์ชันเลือกเวลาแบบดรัมสไลด์เวอร์ชันอัปเกรดขยายขนาดใหญ่เต็มตา (1.3x)
-  void _selectTimeScrollWheel(BuildContext context, bool isOpenTime) {
-    Duration initialDuration = const Duration(hours: 8, minutes: 0);
-
-    if (isOpenTime && openTimeController.text.isNotEmpty) {
-      final parts = openTimeController.text.split(':');
-      initialDuration = Duration(
-        hours: int.parse(parts[0]),
-        minutes: int.parse(parts[1]),
-      );
-    } else if (!isOpenTime && closeTimeController.text.isNotEmpty) {
-      final parts = closeTimeController.text.split(':');
-      initialDuration = Duration(
-        hours: int.parse(parts[0]),
-        minutes: int.parse(parts[1]),
-      );
-    }
+  void _selectTimeScrollWheel(
+    BuildContext context,
+    int dayIndex,
+    bool isOpenTime,
+  ) {
+    final current = _openingHours[dayIndex];
+    final initialTime = isOpenTime ? current.opentime : current.closetime;
+    Duration tempDuration = Duration(
+      hours: initialTime.hour,
+      minutes: initialTime.minute,
+    );
 
     showModalBottomSheet(
       context: context,
@@ -134,10 +133,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       builder: (BuildContext context) {
-        Duration tempDuration = initialDuration;
         return SafeArea(
           child: SizedBox(
-            height: 380, // 🌟 ขยายความสูงกล่องรวมเพื่อรองรับวงล้อขนาดใหญ่
+            height: 380,
             child: Column(
               children: [
                 Container(
@@ -149,7 +147,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
-                // แถบเมนูกดยืนยันด้านบน (เพิ่มขนาดอักษรให้ใหญ่และหนาขึ้น)
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 20,
@@ -170,9 +167,11 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                         ),
                       ),
                       Text(
-                        isOpenTime ? "เลือกเวลาเปิดร้าน" : "เลือกเวลาปิดร้าน",
+                        isOpenTime
+                            ? "เลือกเวลาเปิด (${_openingHours[dayIndex].dayOfWeek.labelTh})"
+                            : "เลือกเวลาปิด (${_openingHours[dayIndex].dayOfWeek.labelTh})",
                         style: const TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
                           color: _textDark,
                         ),
@@ -180,13 +179,16 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                       TextButton(
                         onPressed: () {
                           setState(() {
-                            String formattedTime =
-                                "${tempDuration.inHours.toString().padLeft(2, '0')}:${(tempDuration.inMinutes % 60).toString().padLeft(2, '0')}";
-                            if (isOpenTime) {
-                              openTimeController.text = formattedTime;
-                            } else {
-                              closeTimeController.text = formattedTime;
-                            }
+                            final newTime = TimeOfDay(
+                              hour: tempDuration.inHours,
+                              minute: tempDuration.inMinutes % 60,
+                            );
+                            _openingHours[dayIndex] = _openingHours[dayIndex]
+                                .copyWith(
+                                  opentime: isOpenTime ? newTime : null,
+                                  closetime: isOpenTime ? null : newTime,
+                                );
+                            _openingHoursError = null;
                           });
                           Navigator.pop(context);
                         },
@@ -203,15 +205,13 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                   ),
                 ),
                 const Divider(height: 1, thickness: 1),
-
-                // 🌟 ขยายขนาดตัวเลขและช่องเลื่อนดรัมให้ใหญ่สะใจ 1.3 เท่า
                 Expanded(
                   child: Center(
                     child: Transform.scale(
-                      scale: 1.3, // 🎯 สั่งขยายสเกลตรงนี้เลยครับ
+                      scale: 1.3,
                       child: CupertinoTimerPicker(
                         mode: CupertinoTimerPickerMode.hm,
-                        initialTimerDuration: initialDuration,
+                        initialTimerDuration: tempDuration,
                         onTimerDurationChanged: (Duration newDuration) {
                           tempDuration = newDuration;
                         },
@@ -373,9 +373,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
       MapEntry(_typeFieldKey, _selectedTypeId == null),
       MapEntry(_locationKey, _selectedLocation == null),
       MapEntry(_imageKey, _restaurantImageError != null),
-      MapEntry(_openTimeKey, openTimeController.text.isEmpty),
-      MapEntry(_closeTimeKey, closeTimeController.text.isEmpty),
-      MapEntry(_openDayKey, _selectedDays.every((d) => !d)),
+      MapEntry(_openingHoursKey, _openingHours.every((h) => h.closed)),
     ];
 
     for (final check in checksInOrder) {
@@ -782,120 +780,133 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                           const SizedBox(height: 6),
 
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildLabel("เวลาเปิดร้าน"),
-                                    TextFormField(
-                                      key: _openTimeKey,
-                                      controller: openTimeController,
-                                      readOnly: true,
-                                      onTap: () =>
-                                          _selectTimeScrollWheel(context, true),
-                                      validator: (value) =>
-                                          (value == null || value.isEmpty)
-                                          ? "กรุณาระบุเวลาเปิด"
-                                          : null,
-                                      decoration: _inputDecoration(
-                                        hint: "00:00",
-                                        suffixIcon: Icon(
-                                          Icons.access_time_rounded,
-                                          color: Colors.grey[400],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _buildLabel("เวลาปิดร้าน"),
-                                    TextFormField(
-                                      key: _closeTimeKey,
-                                      controller: closeTimeController,
-                                      readOnly: true,
-                                      onTap: () => _selectTimeScrollWheel(
-                                        context,
-                                        false,
-                                      ),
-                                      validator: (value) =>
-                                          (value == null || value.isEmpty)
-                                          ? "กรุณาระบุเวลาปิด"
-                                          : null,
-                                      decoration: _inputDecoration(
-                                        hint: "00:00",
-                                        suffixIcon: Icon(
-                                          Icons.history_toggle_off_rounded,
-                                          color: Colors.grey[400],
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          _buildLabel("วันที่เปิดร้าน (Open Date)"),
+                          _buildLabel("เวลาเปิด-ปิดร้าน (แยกตามวัน)"),
                           const SizedBox(height: 4),
-                          Row(
-                            key: _openDayKey,
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: List.generate(7, (index) {
-                              final bool selected = _selectedDays[index];
-                              return GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _selectedDays[index] =
-                                        !_selectedDays[index];
-                                    _openDayError = null;
-                                  });
-                                },
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 150),
-                                  width: 40,
-                                  height: 40,
+                          Container(
+                            key: _openingHoursKey,
+                            child: Column(
+                              children: List.generate(_openingHours.length, (
+                                index,
+                              ) {
+                                final hour = _openingHours[index];
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
                                   decoration: BoxDecoration(
-                                    color: selected ? _accent : Colors.white,
-                                    shape: BoxShape.circle,
+                                    color: hour.closed
+                                        ? Colors.grey.shade100
+                                        : _primary.withOpacity(0.05),
+                                    borderRadius: BorderRadius.circular(14),
                                     border: Border.all(
-                                      color: selected
-                                          ? _accent
-                                          : Colors.grey.shade300,
+                                      color: hour.closed
+                                          ? Colors.grey.shade300
+                                          : _primary.withOpacity(0.3),
                                     ),
-                                    boxShadow: selected
-                                        ? [
-                                            BoxShadow(
-                                              color: _accent.withOpacity(0.3),
-                                              blurRadius: 6,
-                                              offset: const Offset(0, 3),
-                                            ),
-                                          ]
-                                        : [],
                                   ),
-                                  child: Center(
-                                    child: Text(
-                                      _days[index],
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: selected
-                                            ? Colors.white
-                                            : _textMuted,
+                                  child: Row(
+                                    children: [
+                                      SizedBox(
+                                        width: 56,
+                                        child: Text(
+                                          hour.dayOfWeek.labelTh,
+                                          style: const TextStyle(
+                                            fontSize: 13.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: _textDark,
+                                          ),
+                                        ),
                                       ),
-                                    ),
+                                      Expanded(
+                                        child: hour.closed
+                                            ? Text(
+                                                "ปิดวันนี้",
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade500,
+                                                  fontSize: 13,
+                                                ),
+                                              )
+                                            : Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: OutlinedButton(
+                                                      onPressed: () =>
+                                                          _selectTimeScrollWheel(
+                                                            context,
+                                                            index,
+                                                            true,
+                                                          ),
+                                                      style: OutlinedButton.styleFrom(
+                                                        side: BorderSide(
+                                                          color: Colors
+                                                              .grey
+                                                              .shade300,
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 8,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        '${hour.opentime.hour.toString().padLeft(2, '0')}:${hour.opentime.minute.toString().padLeft(2, '0')}',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const Padding(
+                                                    padding:
+                                                        EdgeInsets.symmetric(
+                                                          horizontal: 6,
+                                                        ),
+                                                    child: Text('-'),
+                                                  ),
+                                                  Expanded(
+                                                    child: OutlinedButton(
+                                                      onPressed: () =>
+                                                          _selectTimeScrollWheel(
+                                                            context,
+                                                            index,
+                                                            false,
+                                                          ),
+                                                      style: OutlinedButton.styleFrom(
+                                                        side: BorderSide(
+                                                          color: Colors
+                                                              .grey
+                                                              .shade300,
+                                                        ),
+                                                        padding:
+                                                            const EdgeInsets.symmetric(
+                                                              vertical: 8,
+                                                            ),
+                                                      ),
+                                                      child: Text(
+                                                        '${hour.closetime.hour.toString().padLeft(2, '0')}:${hour.closetime.minute.toString().padLeft(2, '0')}',
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Switch(
+                                        value: !hour.closed,
+                                        activeColor: _primary,
+                                        onChanged: (isOpen) {
+                                          setState(() {
+                                            _openingHours[index] = hour
+                                                .copyWith(closed: !isOpen);
+                                            _openingHoursError = null;
+                                          });
+                                        },
+                                      ),
+                                    ],
                                   ),
-                                ),
-                              );
-                            }),
+                                );
+                              }),
+                            ),
                           ),
-                          _fieldError(_openDayError),
+                          _fieldError(_openingHoursError),
                         ],
                       ),
                     ),
@@ -935,8 +946,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                 _selectedImage,
                                 "รูปร้านค้า",
                               );
-                              _openDayError = _selectedDays.every((d) => !d)
-                                  ? "กรุณาเลือกวันเปิดร้านอย่างน้อย 1 วัน"
+                              _openingHoursError =
+                                  _openingHours.every((h) => h.closed)
+                                  ? "กรุณาเปิดร้านอย่างน้อย 1 วัน"
                                   : null;
                             });
 
@@ -944,7 +956,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                 _typeError != null ||
                                 _locationError != null ||
                                 _restaurantImageError != null ||
-                                _openDayError != null) {
+                                _openingHoursError != null) {
                               // รอให้ error ใต้ช่องขึ้นแสดงก่อน 1 เฟรม แล้วค่อยเลื่อนจอ
                               // ไปหาช่องแรกสุดที่ยังไม่ได้กรอก/ยังไม่ถูกต้อง
                               WidgetsBinding.instance.addPostFrameCallback(
@@ -967,9 +979,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                   typeId: _selectedTypeId!,
                                   latitude: latilude!,
                                   longitude: longitude!,
-                                  openTime: openTimeController.text,
-                                  closeTime: closeTimeController.text,
-                                  selectedDays: _selectedDays,
+                                  openingHours: _openingHours, // ✅ แก้ตรงนี้
+
                                   restaurantImage: _selectedImage,
                                   imagecardid:
                                       _selectedOwnerImage, // ✅ ส่งตัวแปรที่ประกาศรองรับไว้สมบูรณ์แล้ว

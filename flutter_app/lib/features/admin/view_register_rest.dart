@@ -7,6 +7,7 @@ import 'package:flutter_app/features/admin/admin_navbar.dart';
 import 'package:flutter_app/features/admin/list_restaurant.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตดึงตัวแปรไอพีกลางเข้ามาร้อยสายรูปภาพสากล
 import 'package:flutter_app/features/admin/map_view_restaurant.dart'
     if (dart.library.html) 'package:flutter_app/utils/map_view_web.dart';
@@ -44,24 +45,82 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     }
   }
 
-  String getOpenDayText(int? openDay) {
-    if (openDay == null) return '-';
-    const days = [
-      'อาทิตย์',
-      'จันทร์',
-      'อังคาร',
-      'พุธ',
-      'พฤหัส',
-      'ศุกร์',
-      'เสาร์',
-    ];
-    List<String> open = [];
-    for (int i = 0; i < 7; i++) {
-      if ((openDay >> i) & 1 == 1) {
-        open.add(days[i]);
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  // สรุปเวลาเปิด-ปิดทั้งสัปดาห์ จัดกลุ่มวันที่เวลาเหมือนกันติดกันไว้ด้วยกัน
+  String getOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
+    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาเปิด-ปิด";
+
+    const dayFullName = {
+      RestaurantDayOfWeek.monday: "จันทร์",
+      RestaurantDayOfWeek.tuesday: "อังคาร",
+      RestaurantDayOfWeek.wednesday: "พุธ",
+      RestaurantDayOfWeek.thursday: "พฤหัส",
+      RestaurantDayOfWeek.friday: "ศุกร์",
+      RestaurantDayOfWeek.saturday: "เสาร์",
+      RestaurantDayOfWeek.sunday: "อาทิตย์",
+    };
+
+    // เรียงให้ครบ จ-อา เสมอ ถ้าวันไหนไม่มีข้อมูลให้ถือว่าปิด
+    final ordered = RestaurantDayOfWeek.values.map((d) {
+      return hours.firstWhere(
+        (h) => h.dayOfWeek == d,
+        orElse: () => RestaurantOpeningHourModel(
+          dayOfWeek: d,
+          opentime: const TimeOfDay(hour: 0, minute: 0),
+          closetime: const TimeOfDay(hour: 0, minute: 0),
+          closed: true,
+        ),
+      );
+    }).toList();
+
+    final List<String> groups = [];
+    int i = 0;
+    while (i < ordered.length) {
+      final start = ordered[i];
+      int j = i;
+      while (j + 1 < ordered.length &&
+          ordered[j + 1].closed == start.closed &&
+          ordered[j + 1].opentime.hour == start.opentime.hour &&
+          ordered[j + 1].opentime.minute == start.opentime.minute &&
+          ordered[j + 1].closetime.hour == start.closetime.hour &&
+          ordered[j + 1].closetime.minute == start.closetime.minute) {
+        j++;
       }
+      final label = (i == j)
+          ? dayFullName[ordered[i].dayOfWeek]!
+          : "${dayFullName[ordered[i].dayOfWeek]} - ${dayFullName[ordered[j].dayOfWeek]}";
+
+      groups.add(
+        start.closed
+            ? "$label: ปิด"
+            : "$label: ${_formatTime(start.opentime)} - ${_formatTime(start.closetime)} น.",
+      );
+
+      i = j + 1;
     }
-    return open.isEmpty ? '-' : open.join(' - ');
+    return groups.join(
+      '\n',
+    ); // ขึ้นบรรทัดใหม่ทีละกลุ่ม เหมาะกับหน้ารายละเอียด admin
+  }
+
+  String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
+    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลา";
+
+    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
+    final today = hours.firstWhere(
+      (h) => h.dayOfWeek == todayEnum,
+      orElse: () => RestaurantOpeningHourModel(
+        dayOfWeek: todayEnum,
+        opentime: const TimeOfDay(hour: 0, minute: 0),
+        closetime: const TimeOfDay(hour: 0, minute: 0),
+        closed: true,
+      ),
+    );
+
+    if (today.closed) return "วันนี้ปิด";
+    return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
   }
 
   // 🎯 ฟังก์ชันช่วยต่อสายเชื่อมพาร์ทรูปภาพสั้นเข้ากับไอพีฐานข้อมูลศูนย์กลางให้ถูกต้องสมบูรณ์
@@ -397,13 +456,13 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                                       Expanded(
                                         child: _labelValue(
                                           'วันที่เปิดทำการ',
-                                          getOpenDayText(r.openDay),
+                                          getOpeningHoursText(r.openingHours),
                                         ),
                                       ),
                                       Expanded(
                                         child: _labelValue(
                                           'เวลาเปิด - ปิด',
-                                          '${r.openTime ?? '-'} - ${r.closeTime ?? '-'} น.',
+                                          _getTodayHoursText(r.openingHours),
                                         ),
                                       ),
                                     ],

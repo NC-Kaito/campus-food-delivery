@@ -1,10 +1,9 @@
 package com.it22mjudelivery.springboot_api.v1.services;
 
-import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
+import com.it22mjudelivery.springboot_api.v1.dtos.OpeningHourDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
-import com.it22mjudelivery.springboot_api.v1.entities.Member;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
-import com.it22mjudelivery.springboot_api.v1.entities.Rider;
+import com.it22mjudelivery.springboot_api.v1.entities.Restaurantopeninghour;
 import com.it22mjudelivery.springboot_api.v1.entities.TypeRestaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.RestaurantRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.TypeRestaurantRepository;
@@ -12,11 +11,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class RestaurantServiceImpl implements RestaurantService{
+public class RestaurantServiceImpl implements RestaurantService {
     private final RestaurantRepository restaurantRepository;
     private final TypeRestaurantRepository typeRestaurantRepository;
 
@@ -30,7 +30,7 @@ public class RestaurantServiceImpl implements RestaurantService{
         return restaurant;
     }
 
-    public boolean doRegisterRestaurant(RestaurantDto restaurantDto){
+    public boolean doRegisterRestaurant(RestaurantDto restaurantDto) {
         if (restaurantRepository.existsByUsername(restaurantDto.getUsername())) {
             throw new RuntimeException("ชื่อผู้ใช้งานนี้ถูกใช้ไปแล้ว");
         }
@@ -46,9 +46,6 @@ public class RestaurantServiceImpl implements RestaurantService{
                 .longitude(restaurantDto.getLongitude())
                 .restaurantimage(restaurantDto.getRestaurantimage())
                 .imagecardid(restaurantDto.getImagecardid())
-                .opentime(restaurantDto.getOpentime())
-                .closetime(restaurantDto.getClosetime())
-                .openDay(restaurantDto.getOpenday())
                 .ownerfirstname(restaurantDto.getOwnerfirstname())
                 .ownerlastname(restaurantDto.getOwnerlastname())
                 .email(restaurantDto.getEmail())
@@ -58,17 +55,22 @@ public class RestaurantServiceImpl implements RestaurantService{
                 .verificationstatus("wait")
                 .build();
 
-        restaurantRepository.save(toSaveRestaurant);
+        // แปลง DTO -> Entity แล้วผูกกลับไปหา restaurant (สำคัญ เพราะ FK อยู่ฝั่ง opening hour)
+        List<Restaurantopeninghour> openingHours = toOpeningHourEntities(restaurantDto.getOpeningHours(), toSaveRestaurant);
+        toSaveRestaurant.setOpeningHours(openingHours);
+
+        restaurantRepository.save(toSaveRestaurant); // cascade = ALL จะเซฟ opening hours ให้อัตโนมัติ
         return true;
     }
 
-    public Restaurant getRestaurantByUsername(String username){
-        Restaurant restaurant = restaurantRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
-        return restaurant;
+    public Restaurant getRestaurantByUsername(String username) {
+        return restaurantRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
     }
 
-    public boolean updateStatusOpen(String username, boolean statusopen){
-        Restaurant restaurant = restaurantRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+    public boolean updateStatusOpen(String username, boolean statusopen) {
+        Restaurant restaurant = restaurantRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
         restaurant.setStatusopen(statusopen);
         restaurantRepository.save(restaurant);
         return true;
@@ -77,8 +79,8 @@ public class RestaurantServiceImpl implements RestaurantService{
     public boolean updateProfileRestaurant(String username, String restaurantname, String restaurantimage,
                                            int typeid,
                                            double latitude, double longitude,
-                                           LocalTime opentime,
-                                           LocalTime closetime, int openday, String ownerfirstname,
+                                           List<OpeningHourDto> openingHourDtos,
+                                           String ownerfirstname,
                                            String ownerlastname, String email, String phone, String ownerimage) {
 
         Restaurant restaurant = restaurantRepository.findByUsername(username)
@@ -88,23 +90,23 @@ public class RestaurantServiceImpl implements RestaurantService{
 
         restaurant.setRestaurantname(restaurantname);
         restaurant.setTyperestaurant(typeRestaurant);
-
         restaurant.setRestaurantimage(restaurantimage);
         restaurant.setLatitude(latitude);
         restaurant.setLongitude(longitude);
-        restaurant.setOpentime(opentime);
-        restaurant.setClosetime(closetime);
-        restaurant.setOpenDay(openday);
         restaurant.setOwnerfirstname(ownerfirstname);
         restaurant.setOwnerlastname(ownerlastname);
         restaurant.setEmail(email);
         restaurant.setPhone(phone);
         restaurant.setImagecardid(ownerimage);
 
+        // แก้ไข opening hours: เคลียร์ของเดิมแล้วใส่ใหม่ทั้งชุด
+        // (orphanRemoval = true ที่ฝั่ง Restaurant จะลบแถวเก่าที่ไม่อยู่ใน list ใหม่ให้อัตโนมัติ)
+        restaurant.getOpeningHours().clear();
+        restaurant.getOpeningHours().addAll(toOpeningHourEntities(openingHourDtos, restaurant));
+
         restaurantRepository.save(restaurant);
         return true;
     }
-
 
     public void doCloseAccount(String username) {
         Restaurant restaurant = restaurantRepository.findByUsername(username)
@@ -114,4 +116,21 @@ public class RestaurantServiceImpl implements RestaurantService{
         restaurantRepository.save(restaurant);
     }
 
+    // ---- helper: แปลง OpeningHourDto -> RestaurantOpeningHour entity ----
+    private List<Restaurantopeninghour> toOpeningHourEntities(List<OpeningHourDto> dtos, Restaurant restaurant) {
+        List<Restaurantopeninghour> result = new ArrayList<>();
+        if (dtos == null) {
+            return result;
+        }
+        for (OpeningHourDto dto : dtos) {
+            result.add(Restaurantopeninghour.builder()
+                    .dayOfWeek(dto.getDayOfWeek())
+                    .opentime(dto.getOpentime())
+                    .closetime(dto.getClosetime())
+                    .closed(dto.isClosed())
+                    .restaurant(restaurant)
+                    .build());
+        }
+        return result;
+    }
 }
