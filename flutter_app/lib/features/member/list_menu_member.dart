@@ -59,33 +59,25 @@ class _ListMenuMemberState extends State<ListMenuMember>
   }
 
   void _addMenuCurryToCart(double total, String note) {
-    // 1. ดึงกับข้าวตัวแรกที่เลือกมาเป็นตัวแทนเมนูหลัก เพื่อให้โครงสร้าง CartItem ทำงานได้ปกติ
-    final MenuModel mainCurryMenu = _selectedCurries.first;
-
-    // 2. คำนวณราคาต่อจาน (ราคาต่อหน่วย) แปลงเป็น int ให้ตรงกับโมเดล CartItem
+    final MenuModel mainCurryMenu = _selectedCurries.isNotEmpty
+        ? _selectedCurries.first
+        : MenuModel(menuName: "ข้าวเปล่า", price: 20.0);
     final int pricePerUnit = (total / _curryQty).toInt();
 
-    // 3. 🌟 เรียกใช้ CartManager เพื่อบันทึกข้อมูลลงตะกร้าส่วนกลางทันที
     CartManager().addToCart(
       CartItem(
         menu: mainCurryMenu,
-        selectedAddons: const [], // ข้าวราดแกงจานนี้ไม่มี Addon ปกติ
-        selectedCurries: List.from(
-          _selectedCurries,
-        ), // 🎯 ส่งลิสต์กับข้าวทั้งหมด [แกง1, แกง2, แกง4] เข้าเลนนี้
+        selectedAddons: const [],
+        selectedCurries: List.from(_selectedCurries),
         quantity: _curryQty,
-        note: note, // เก็บรายละเอียดเมนูราดแกงและตัวเลือกเสริมข้าวไว้ในช่องโน้ต
+        note: note,
         addonPrice: 0,
-        totalPrice:
-            pricePerUnit, // ราคาต่อจานที่รวมยอดคำนวณส่วนต่างแล้ว (เช่น 30 หรือ 35 บาท)
-
-        unitPrice:
-            pricePerUnit, // สำหรับข้าวราดแกง ราคาเริ่มต้นต่อหน่วยก็น่าจะเป็น pricePerUnit ที่คำนวณมาแล้ว
+        totalPrice: pricePerUnit,
+        unitPrice: pricePerUnit,
         isExtraPrice: false,
       ),
     );
 
-    // 4. แสดง Dialog แจ้งเตือนผู้ใช้ว่าเพิ่มลงตะกร้าสำเร็จแล้วเหมือนเดิม
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -105,16 +97,12 @@ class _ListMenuMemberState extends State<ListMenuMember>
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(ctx); // ปิด Dialog
-
-              // 🎯 ล้างค่าหน้าจอ (Reset State) กลับเป็นค่าเริ่มต้น เพื่อให้พร้อมกดสั่งจานใหม่ต่อ
+              Navigator.pop(ctx);
               setState(() {
                 _selectedCurries.clear();
                 _isExtraRice = false;
                 _curryQty = 1;
               });
-
-              // 🚀 แถมให้: กดย้อนกลับไปหน้าก่อนหน้า (เช่น หน้ารวมเมนู) เพื่อให้ผู้ใช้เลือกสั่งอย่างอื่นต่อได้เลย
               Navigator.pop(context);
             },
             child: const Text(
@@ -144,8 +132,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
             widget.restaurantModel.username!,
             cat.typemenuId!,
           );
-
-          // 🎯 ปลดล็อก: โชว์เมนูทั้งหมด รวมถึงเมนูที่หมด (status == false) ด้วย
           _categoryMenus[cat.typemenuId!] = menuData.toList();
         }
       }
@@ -359,14 +345,11 @@ class _ListMenuMemberState extends State<ListMenuMember>
                             String finalMenuUrl = _getFinalImageUrl(
                               rawMenuImage,
                             );
-
-                            // 🎯 เช็กสถานะว่ามีของหรือไม่
                             final isAvailable = menu.status ?? true;
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
-                                // 🎯 การ์ดสีเทาเมื่อเมนูหมด
                                 color: isAvailable
                                     ? const Color(0xFFF0F4E8)
                                     : Colors.grey.shade200,
@@ -376,7 +359,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                 padding: const EdgeInsets.all(12),
                                 child: Row(
                                   children: [
-                                    // 1. รูปภาพ
                                     ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
                                       child: SizedBox(
@@ -395,8 +377,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                                         _buildPlaceholderIcon(),
                                                   )
                                                 : _buildPlaceholderIcon(),
-
-                                            // 🎯 Overlay สีดำ + ป้ายหมด
                                             if (!isAvailable)
                                               Container(
                                                 color: Colors.black.withOpacity(
@@ -434,8 +414,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                       ),
                                     ),
                                     const SizedBox(width: 15),
-
-                                    // 2. ข้อความชื่อและราคา
                                     Expanded(
                                       child: Column(
                                         crossAxisAlignment:
@@ -446,7 +424,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
-                                              // 🎯 ดรอปสีตัวอักษรลง ไม่มีเส้นขีดทับ
                                               color: isAvailable
                                                   ? Colors.black
                                                   : Colors.grey.shade700,
@@ -466,10 +443,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                         ],
                                       ),
                                     ),
-
-                                    // 3. ปุ่มบวกสำหรับ Member
                                     IconButton(
-                                      // 🎯 ถ้าหมด กดไม่ได้ (null) สีกระดุมเทา
                                       onPressed: isAvailable
                                           ? () {
                                               Navigator.push(
@@ -518,23 +492,26 @@ class _ListMenuMemberState extends State<ListMenuMember>
 
     final int selectCount = _selectedCurries.length;
 
+    // 🎯 [FIXED LOGIC] ตอนเริ่มต้นไม่มีการจิ้มกับข้าว ให้ตั้งราคารวมฐานเป็น 0 บาทก่อน หากเริ่มจิ้มจึงจะเริ่มคิดเกณฑ์ขั้นบันไดมหาลัย
     double basePrice = 0;
     if (selectCount == 1) {
-      basePrice = 20;
-    } else if (selectCount == 2) {
       basePrice = 25;
-    } else if (selectCount >= 3) {
+    } else if (selectCount == 2) {
       basePrice = 30;
+    } else if (selectCount >= 3) {
+      basePrice = 35;
     }
 
-    final double extraCurryPrice = _selectedCurries.fold(
+    // คำนวณราคาส่วนต่างบวกเพิ่มสะสมของเมนูไข่
+    final double totalSurchargePrice = _selectedCurries.fold(
       0.0,
       (sum, curry) => sum + (curry.price ?? 0.0),
     );
 
-    final double optionPrice = _isExtraRice ? 10.0 : 0.0;
+    // ตัวเลือกเสริมจะคิดเงินต่อเมื่อมีการเลือกกับข้าวหลักแล้วเท่านั้น ป้องกันราคาบัคกรณีจานเปล่า
+    final double optionPrice = (selectCount > 0 && _isExtraRice) ? 5.0 : 0.0;
 
-    final double unitPrice = basePrice + extraCurryPrice + optionPrice;
+    final double unitPrice = basePrice + totalSurchargePrice + optionPrice;
     final double totalPrice = unitPrice * _curryQty;
 
     return Column(
@@ -545,24 +522,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.04),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                    border: Border.all(color: Colors.grey.shade100),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start),
-                ),
-
                 const Row(
                   children: [
                     Icon(
@@ -581,7 +540,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     ),
                   ],
                 ),
-
                 ListView.builder(
                   shrinkWrap: true,
                   padding: const EdgeInsets.only(top: 8),
@@ -596,6 +554,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     final imgUrl = _getFinalImageUrl(
                       curry.menuImage ?? (curry as dynamic).imageUrl,
                     );
+
+                    final double storedPrice = curry.price ?? 0.0;
+                    final bool isSpecialItem = storedPrice > 0.0;
+                    final double displayItemPrice = storedPrice + 5.0;
 
                     return AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
@@ -660,17 +622,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                       ),
                                     ),
                                   ),
-                                IgnorePointer(
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(
-                                        color: Colors.black.withOpacity(0.06),
-                                        width: 1,
-                                      ),
-                                    ),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -686,16 +637,15 @@ class _ListMenuMemberState extends State<ListMenuMember>
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
-                            (curry.price != null && curry.price! > 0)
-                                ? "เมนูพิเศษ +${curry.price!.toStringAsFixed(0)} บาท"
+                            isSpecialItem
+                                ? "เมนูพิเศษ +${displayItemPrice.toStringAsFixed(0)} บาท"
                                 : "รวมในราคาฐานแล้ว",
                             style: TextStyle(
-                              color: (curry.price != null && curry.price! > 0)
+                              color: isSpecialItem
                                   ? Colors.orange.shade800
                                   : Colors.grey.shade500,
                               fontSize: 12,
-                              fontWeight:
-                                  (curry.price != null && curry.price! > 0)
+                              fontWeight: isSpecialItem
                                   ? FontWeight.bold
                                   : FontWeight.normal,
                             ),
@@ -728,11 +678,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
             ),
           ),
         ),
-
-        // ═══════════════════════════════════════════════
-        // 🎯 Bottom bar — ปรับให้แสดง "จำนวน" + "ราคารวม" คู่กัน
-        //    ในสไตล์เดียวกับหน้า AddOrderMember
-        // ═══════════════════════════════════════════════
         Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           decoration: BoxDecoration(
@@ -751,7 +696,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ── ตัวเลือก "เพิ่มปริมาณข้าวสวย" ──────────────────
               Container(
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
@@ -769,7 +713,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   subtitle: const Text(
-                    "+10 บาท",
+                    "+5 บาท",
                     style: TextStyle(fontSize: 12),
                   ),
                   value: _isExtraRice,
@@ -778,12 +722,9 @@ class _ListMenuMemberState extends State<ListMenuMember>
                 ),
               ),
               const SizedBox(height: 16),
-
-              // ── แถวจำนวน (ซ้าย) + ราคารวม (ขวา) — สไตล์เดียวกับ AddOrderMember ──
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // ─── ฝั่งซ้าย: จำนวนที่สั่ง ───────────────
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -841,10 +782,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       ),
                     ],
                   ),
-
                   const Spacer(),
-
-                  // ─── ฝั่งขวา: ราคารวม ──────────────────────
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -883,10 +821,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
-
-              // ── ปุ่มเพิ่มลงตะกร้า เต็มความกว้าง ──────────────
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -900,18 +835,16 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
+                  // 🎯 หากยังไม่ติ๊กเลือกกับข้าวเลย ปุ่มจะกดไม่ได้ (เป็นค่า null สีเทา) เพื่อบังคับกระบวนการให้ถูกต้อง
                   onPressed: _selectedCurries.isEmpty
                       ? null
                       : () {
                           final curriesNames = _selectedCurries
                               .map((c) => c.menuName ?? "-")
                               .join(', ');
-
                           final additions = _isExtraRice ? 'เพิ่มข้าว' : '';
-
                           final finalNote =
-                              "ราดแกง: [$curriesNames] "
-                              "${additions.isNotEmpty ? '($additions)' : ''}";
+                              "ราดแกง: [$curriesNames] ${additions.isNotEmpty ? '($additions)' : ''}";
 
                           _addMenuCurryToCart(totalPrice, finalNote);
                         },

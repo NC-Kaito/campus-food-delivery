@@ -13,8 +13,7 @@ import 'package:flutter_app/features/restaurant/add_addon.dart';
 import 'package:flutter_app/features/restaurant/edit_addon.dart';
 // 🎯 หน้าแก้ไขเมนู — ปรับ path/ชื่อคลาสให้ตรงกับโปรเจกต์จริงถ้าไม่ตรงกัน
 import 'package:flutter_app/features/restaurant/edit_menu.dart';
-// 🎯 หน้าเชื่อมโยงตัวเลือกเสริมเข้ากับเมนู — ปรับ path/ชื่อคลาสให้ตรงกับ
-// โปรเจกต์จริงถ้าไม่ตรงกัน
+// 🎯 หน้าเชื่อมโยงตัวเลือกเสริมเข้ากับเมนู — ปรับ path/ชื่อคลาสให้ตรงกับโปรเจกต์จริงถ้าไม่ตรงกัน
 import 'package:flutter_app/features/restaurant/menu_to_addon.dart';
 import 'package:flutter_app/features/restaurant/restaurant_scaffold.dart';
 import 'package:flutter_app/features/restaurant/view_menu.dart';
@@ -67,8 +66,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   final Map<int, bool> _groupExpanded = {}; // groupId -> ขยาย/ย่อ
   final Map<int, bool> _itemChecked = {}; // itemKey -> ติ๊กเลือก (UI เท่านั้น)
 
-  // 🎯 menuId -> จำนวนกลุ่มตัวเลือกเสริมที่ผูกกับเมนูนั้นจริงๆ (นับสดจาก
-  // MenuAddonService.getAddonsByMenuId เพราะ MenuModel ไม่มีฟิลด์นี้ให้ใช้ตรงๆ)
+  // 🎯 menuId -> จำนวนกลุ่มตัวเลือกเสริมที่ผูกกับเมนูนั้นจริงๆ (นับสดจาก MenuAddonService.getAddonsByMenuId เพราะ MenuModel ไม่มีฟิลด์นี้ให้ใช้ตรงๆ)
   final Map<int, int> _menuAddonGroupCounts = {};
 
   @override
@@ -118,8 +116,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       restaurantModel!.username!,
     );
 
-    // 🎯 โหลดเมนูของทุกประเภทพร้อมกันก่อน แล้วเก็บไว้เฉพาะประเภทที่มี
-    // เมนูอยู่จริงอย่างน้อย 1 รายการ ประเภทที่ไม่มีเมนูจะไม่ถูกสร้างเป็นแท็บเลย
+    // 🎯 โหลดเมนูของทุกประเภทพร้อมกันก่อน แล้วเก็บไว้เฉพาะประเภทที่มี เมนูอยู่จริงอย่างน้อย 1 รายการ ประเภทที่ไม่มีเมนูจะไม่ถูกสร้างเป็นแท็บเลย
     final entries = await Future.wait(
       data.where((t) => t.typemenuId != null).map((type) async {
         final typeId = type.typemenuId!;
@@ -163,8 +160,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     _loadAddonCountsFor(validEntries.expand((e) => e.value).toList());
   }
 
-  // 🎯 สร้าง TabController ใหม่หลังหมวดหมู่ถูกเอาออก โดยพยายามคง index/แท็บ
-  // ที่ผู้ใช้กำลังดูอยู่ไว้ให้ใกล้เคียงเดิมที่สุด
+  // 🎯 สร้าง TabController ใหม่หลังหมวดหมู่ถูกเอาออก โดยพยายามคง index/แท็บ ที่ผู้ใช้กำลังดูอยู่ไว้ให้ใกล้เคียงเดิมที่สุด
   void _rebuildTabController({int? removedIndex}) {
     final int oldIndex = _tabController?.index ?? 0;
     _tabController?.dispose();
@@ -197,8 +193,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       );
 
       if (menuData.isEmpty) {
-        // 🎯 หมวดหมู่นี้ไม่มีเมนูเหลือแล้ว (เช่น เพิ่งลบเมนูสุดท้ายทิ้ง)
-        // เอาแท็บนี้ออกไปเลย แทนที่จะโชว์ "ไม่มีเมนูในหมวดหมู่นี้"
+        // 🎯 หมวดหมู่นี้ไม่มีเมนูเหลือแล้ว (เช่น เพิ่งลบเมนูสุดท้ายทิ้ง) เอาแท็บนี้ออกไปเลย แทนที่จะโชว์ "ไม่มีเมนูในหมวดหมู่นี้"
         final removedIndex = typeMenus.indexWhere(
           (t) => t.typemenuId == typeMenuId,
         );
@@ -902,6 +897,19 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     required bool isAvailable,
     required String finalMenuImgUrl,
   }) {
+    // 🎯 1. ดักจับหมวดหมู่ข้าวราดแกงจากชื่อตรง ๆ แทนเพื่อแก้ปัญหาไฟแดง (สอดคล้องกับ Logic ฝั่งลูกค้า)
+    final bool isRiceCurry = typeMenus.any(
+      (t) => t.typemenuId == typeId && t.typemenuName == "ข้าวราดแกง",
+    );
+
+    // 🎯 2. ตรรกะคัดกรองราคา: ทั่วไปราคาเป็น 0 ไม่โชว์, เมนูไข่ราคาไม่เป็น 0 (บันทึกไว้ 2 บาท) โชว์ราคาสำเร็จรูป 7 บาท
+    final double storedPrice = menu.price ?? 0.0;
+    final bool shouldShowPrice = !isRiceCurry || (storedPrice != 0.0);
+    final double displayPrice = isRiceCurry
+        ? (storedPrice +
+              5.0) // ฐานกับข้าวมหาลัย 5 บาท + ส่วนต่างหลังบ้าน 2 บาท = 7 บาท
+        : storedPrice;
+
     return GestureDetector(
       onTap: () {
         Navigator.push(
@@ -966,31 +974,40 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                     ],
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    "ราคา ${menu.price?.toStringAsFixed(0) ?? "-"} บาท",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: _primary,
+
+                  // 🎯 แสดงราคาเฉพาะกรณีที่เป็นเมนูปกติ หรือเป็นเมนูไข่ราดแกงที่มีราคาบวกเพิ่มส่วนต่าง (แสดงผล 7 บาท)
+                  if (shouldShowPrice)
+                    Text(
+                      "ราคา ${displayPrice.toStringAsFixed(0)} บาท",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _primary,
+                      ),
                     ),
-                  ),
+
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => goToMenuAddon(typeId, menu),
-                          child: Text(
-                            _addonCountLabel(menu),
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.w600,
+                      // 🎯 ซ่อนตัวเลือกเสริมออกไปทั้งหมดทันทีหากตรวจพบว่าเป็นหมวดหมู่ข้าวราดแกง
+                      if (!isRiceCurry)
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => goToMenuAddon(typeId, menu),
+                            child: Text(
+                              _addonCountLabel(menu),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: Colors.blueAccent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
+                      if (isRiceCurry)
+                        const Spacer(), // ปรับดันปุ่ม Action ไอคอนไปฝั่งขวาสุดแทนเมื่อซ่อนข้อความตัวเลือกเสริม
+
                       _buildIconAction(
                         icon: Icons.edit_outlined,
                         color: _textMuted,

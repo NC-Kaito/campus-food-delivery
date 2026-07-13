@@ -219,6 +219,62 @@ class _HomeMemberState extends State<HomeMember> {
     if (mounted) setState(() {});
   }
 
+  // แจ้งเตือนเมื่อกดเข้าร้านที่ปิดอยู่ (ปิดเอง หรือ อยู่นอกเวลาทำการ)
+  void _showClosedRestaurantDialog(RestaurantModel item) {
+    final bool manuallyClosedByOwner = item.statusOpen == false;
+    final String message = manuallyClosedByOwner
+        ? "ร้าน \"${item.restaurantName ?? 'นี้'}\" ปิดทำการในวันนี้"
+        : "ร้าน \"${item.restaurantName ?? 'นี้'}\" อยู่นอกเวลาทำการในขณะนี้ (${_getTodayHoursText(item.openingHours)})";
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline_rounded, color: Colors.orange),
+            SizedBox(width: 8),
+            Text(
+              "ร้านค้าปิดอยู่",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text(
+              "ปิด",
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ListMenuMember(restaurantModel: item),
+                ),
+              ).then((_) => _refreshCartBadge());
+            },
+            child: const Text(
+              "ดูเมนูต่อไป",
+              style: TextStyle(
+                color: Color(0xFF64F02D),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final int cartItemCount = CartManager().items.length;
@@ -597,6 +653,10 @@ class _HomeMemberState extends State<HomeMember> {
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () {
+          if (!_isCurrentlyOpen(item)) {
+            _showClosedRestaurantDialog(item);
+            return;
+          }
           Navigator.push(
             context,
             MaterialPageRoute(
