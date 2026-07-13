@@ -55,7 +55,6 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .verificationstatus("wait")
                 .build();
 
-        // แปลง DTO -> Entity แล้วผูกกลับไปหา restaurant (สำคัญ เพราะ FK อยู่ฝั่ง opening hour)
         List<Restaurantopeninghour> openingHours = toOpeningHourEntities(restaurantDto.getOpeningHours(), toSaveRestaurant);
         toSaveRestaurant.setOpeningHours(openingHours);
 

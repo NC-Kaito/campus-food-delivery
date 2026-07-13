@@ -37,8 +37,8 @@ class _HomeMemberState extends State<HomeMember> {
   Map<String, List<MenuModel>> _restaurantMenusIndex = {};
 
   bool _isLoading = true;
-  String? selectedType;
-  int? _selectedTypeId;
+  Set<int> _selectedTypeIds =
+      {}; // 🎯 ปรับตามแบบ HomeUser เพื่อให้รองรับ Multi-select ได้สมบูรณ์
 
   // 🎯 คุมโทนสีตัวอักษรของปุ่มเมนูแถบล่างให้เป็นสีเขียวใหม่สปอร์ต #64F02D
   final menuTextStyle = const TextStyle(
@@ -81,8 +81,10 @@ class _HomeMemberState extends State<HomeMember> {
 
     var data = await _restaurantService.searchRestaurant(keyword);
 
-    if (_selectedTypeId != null) {
-      data = data.where((r) => r.typerestaurantId == _selectedTypeId).toList();
+    if (_selectedTypeIds.isNotEmpty) {
+      data = data
+          .where((r) => _selectedTypeIds.contains(r.typerestaurantId))
+          .toList();
     }
 
     for (var rest in data) {
@@ -107,23 +109,26 @@ class _HomeMemberState extends State<HomeMember> {
   String _formatTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  // สรุปเวลาเปิด-ปิดทั้งสัปดาห์ จัดกลุ่มวันที่เวลาเหมือนกันติดกันไว้ด้วยกัน
+  // 🎯 [MAPPED FROM USER] ระบบจัดกลุ่มเวลาเปิด-ปิดสัปดาห์ทำงานแยกเฉพาะวันเปิดจริงให้อยู่แถวเดียวกัน
   String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาเปิด-ปิด";
+    if (hours == null || hours.isEmpty || hours.every((h) => h.closed)) {
+      return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
+    }
 
-    const dayAbbr = {
-      RestaurantDayOfWeek.monday: "จ",
-      RestaurantDayOfWeek.tuesday: "อ",
-      RestaurantDayOfWeek.wednesday: "พ",
-      RestaurantDayOfWeek.thursday: "พฤ",
-      RestaurantDayOfWeek.friday: "ศ",
-      RestaurantDayOfWeek.saturday: "ส",
-      RestaurantDayOfWeek.sunday: "อา",
+    const shortDayNames = {
+      RestaurantDayOfWeek.monday: "จ.",
+      RestaurantDayOfWeek.tuesday: "อ.",
+      RestaurantDayOfWeek.wednesday: "พ.",
+      RestaurantDayOfWeek.thursday: "พฤ.",
+      RestaurantDayOfWeek.friday: "ศ.",
+      RestaurantDayOfWeek.saturday: "ส.",
+      RestaurantDayOfWeek.sunday: "อา.",
     };
 
-    // เรียงให้ครบ จ-อา เสมอ ถ้าวันไหนไม่มีข้อมูลให้ถือว่าปิด
-    final ordered = RestaurantDayOfWeek.values.map((d) {
-      return hours.firstWhere(
+    final Map<String, List<String>> timeGroups = {};
+
+    for (var d in RestaurantDayOfWeek.values) {
+      final hour = hours.firstWhere(
         (h) => h.dayOfWeek == d,
         orElse: () => RestaurantOpeningHourModel(
           dayOfWeek: d,
@@ -132,39 +137,59 @@ class _HomeMemberState extends State<HomeMember> {
           closed: true,
         ),
       );
-    }).toList();
-
-    final List<String> groups = [];
-    int i = 0;
-    while (i < ordered.length) {
-      final start = ordered[i];
-      int j = i;
-      while (j + 1 < ordered.length &&
-          ordered[j + 1].closed == start.closed &&
-          ordered[j + 1].opentime.hour == start.opentime.hour &&
-          ordered[j + 1].opentime.minute == start.opentime.minute &&
-          ordered[j + 1].closetime.hour == start.closetime.hour &&
-          ordered[j + 1].closetime.minute == start.closetime.minute) {
-        j++;
+      if (!hour.closed) {
+        final String timeString =
+            "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
+        if (!timeGroups.containsKey(timeString)) {
+          timeGroups[timeString] = [];
+        }
+        timeGroups[timeString]!.add(shortDayNames[d]!);
       }
-      final label = (i == j)
-          ? dayAbbr[ordered[i].dayOfWeek]!
-          : "${dayAbbr[ordered[i].dayOfWeek]}-${dayAbbr[ordered[j].dayOfWeek]}";
-
-      groups.add(
-        start.closed
-            ? "$label ปิด"
-            : "$label ${_formatTime(start.opentime)}-${_formatTime(start.closetime)}",
-      );
-
-      i = j + 1;
     }
-    return groups.join(", ");
+
+    if (timeGroups.isEmpty) return "ปิดทำการทุกวัน";
+
+    final List<String> resultLines = [];
+    timeGroups.forEach((time, daysList) {
+      resultLines.add("${daysList.join(', ')} ($time)");
+    });
+
+    return resultLines.join(" | ");
   }
 
-  // บอกเวลาเปิด-ปิดของ "วันนี้" โดยเฉพาะ ไว้โชว์ในบรรทัดเวลา
+  // 🎯 [MAPPED FROM USER] แสดงเวลาเปิดทำการเจาะลึกเฉพาะของวันนี้เด่นชัดขึ้น
   String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลา";
+    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาทำการ";
+
+    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
+    final today = hours.firstWhere(
+      (h) => h.dayOfWeek == todayEnum,
+      orElse: () => RestaurantOpeningHourModel(
+        dayOfWeek: todayEnum,
+        opentime: const TimeOfDay(hour: 8, minute: 0),
+        closetime: const TimeOfDay(hour: 18, minute: 0),
+        closed: true,
+      ),
+    );
+
+    if (today.closed) return "วันนี้ร้านปิดทำการ";
+    return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
+  }
+
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+  }
+
+  // 🎯 [MAPPED FROM USER] ตรวจสอบสถานะการเปิดร้านอิงตามสวิตช์ปิดร้านด่วนและปฏิทินเวลาจริงบนเครื่อง
+  bool _isCurrentlyOpen(RestaurantModel item) {
+    if (item.statusOpen == false) return false;
+
+    final hours = item.openingHours;
+    if (hours == null || hours.isEmpty) return false;
 
     final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
     final today = hours.firstWhere(
@@ -177,39 +202,33 @@ class _HomeMemberState extends State<HomeMember> {
       ),
     );
 
-    if (today.closed) return "วันนี้ปิด";
-    return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
+    if (today.closed) return false;
+
+    final now = TimeOfDay.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
+    final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
+
+    if (openMinutes <= closeMinutes) {
+      return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+    }
+    return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
   }
 
-  String _getFinalImageUrl(String? rawPath) {
-    if (rawPath == null || rawPath.isEmpty) return "";
-    if (rawPath.startsWith('http')) return rawPath;
-
-    final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
-  }
-
-  // 🎯 ฟังก์ชันช่วย: เรียก setState เปล่าๆ เพื่อรีเฟรช badge ตะกร้า
-  // ใช้หลัง Navigator.push กลับมา เผื่อผู้ใช้ไปเพิ่ม/ลบของในตะกร้าจากหน้าอื่นมา
   void _refreshCartBadge() {
     if (mounted) setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🎯 จำนวนรายการทั้งหมดในตะกร้า (นับเป็น "รายการ" ไม่ใช่ผลรวมจำนวนจาน)
     final int cartItemCount = CartManager().items.length;
 
     return Scaffold(
-      backgroundColor: const Color(
-        0xFFF9FBF7,
-      ), // สีเบสเขียวอ่อนสบายตาแบบแอปเดลิเวอรีสากล
-      // 🌟 คงไว้ตามกฎ: เรียกใช้งานแอปบาร์ของ Member ด้านบนสุดตามฟังก์ชั่นหลัก
+      backgroundColor: const Color(0xFFF9FBF7),
       appBar: const NavbarMember(title: "หน้าหลัก"),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🛑 ส่วนบน: แผงเสิร์ชข้อมูลลอยตัวพร้อมมิติเงา BoxShadow คมชัด
           Container(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
             color: Colors.transparent,
@@ -237,9 +256,7 @@ class _HomeMemberState extends State<HomeMember> {
                           decoration: InputDecoration(
                             prefixIcon: const Icon(
                               Icons.search_rounded,
-                              color: Color(
-                                0xFF64F02D,
-                              ), // 🎯 ใช้สีเขียวใหม่สปอร์ต
+                              color: Color(0xFF64F02D),
                             ),
                             suffixIcon: searchController.text.isNotEmpty
                                 ? IconButton(
@@ -268,7 +285,6 @@ class _HomeMemberState extends State<HomeMember> {
                       ),
                     ),
                     const SizedBox(width: 10),
-                    // ปุ่มค้นหาวงกลมพร้อมใส่เงาเรืองแสงมีมิติมินิมอล
                     Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
@@ -283,9 +299,7 @@ class _HomeMemberState extends State<HomeMember> {
                       ),
                       child: CircleAvatar(
                         radius: 24,
-                        backgroundColor: const Color(
-                          0xFF64F02D,
-                        ), // 🎯 ใช้สีเขียวสปอร์ตตัวแรง
+                        backgroundColor: const Color(0xFF64F02D),
                         child: IconButton(
                           onPressed: () => _loadResults(searchController.text),
                           icon: const Icon(
@@ -302,7 +316,6 @@ class _HomeMemberState extends State<HomeMember> {
             ),
           ),
 
-          // 🛑 ส่วนตรงกลาง: แถบหมวดหมู่อาหาร Chip แนวนอน สไลด์เลือกข้างได้
           Padding(
             padding: const EdgeInsets.only(left: 16.0, bottom: 8.0, top: 4.0),
             child: Text(
@@ -321,12 +334,14 @@ class _HomeMemberState extends State<HomeMember> {
               runSpacing: 8,
               children: List.generate(typeList.length + 1, (index) {
                 final bool isAllTab = index == 0;
+                final int? typeId = isAllTab ? null : typeList[index - 1].id;
                 final String? typeName = isAllTab
                     ? null
                     : typeList[index - 1].name;
-                final bool isSelected =
-                    (isAllTab && selectedType == null) ||
-                    (selectedType == typeName);
+
+                final bool isSelected = isAllTab
+                    ? _selectedTypeIds.isEmpty
+                    : _selectedTypeIds.contains(typeId);
 
                 return ChoiceChip(
                   showCheckmark: false,
@@ -363,11 +378,11 @@ class _HomeMemberState extends State<HomeMember> {
                   onSelected: (bool selected) {
                     setState(() {
                       if (isAllTab) {
-                        selectedType = null;
-                        _selectedTypeId = null;
+                        _selectedTypeIds.clear();
+                      } else if (selected) {
+                        _selectedTypeIds.add(typeId!);
                       } else {
-                        selectedType = typeName;
-                        _selectedTypeId = typeList[index - 1].id;
+                        _selectedTypeIds.remove(typeId);
                       }
                     });
                     _loadResults(searchController.text);
@@ -379,12 +394,11 @@ class _HomeMemberState extends State<HomeMember> {
 
           const SizedBox(height: 10),
 
-          // แสดงสแตมป์สรุปยอดผลการค้นหาจำนวนร้านค้า
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Text(
-                searchController.text.trim().isEmpty && selectedType == null
+                searchController.text.trim().isEmpty && _selectedTypeIds.isEmpty
                     ? "🏪 ร้านอาหารพร้อมเสิร์ฟทั้งหมด (${_results.length} ร้าน)"
                     : "🔍 พบร้านค้าเด็ดตรงตามเงื่อนไข ${_results.length} ร้าน",
                 style: const TextStyle(
@@ -395,13 +409,10 @@ class _HomeMemberState extends State<HomeMember> {
               ),
             ),
 
-          // 🛑 ส่วนล่าง: โซนกางการ์ดแสดงผลรายชื่อร้านอาหารทั้งหมด
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(
-                      color: Color(0xFF64F02D),
-                    ), // 🎯 วงเวียนโหลดสีเขียวใหม่
+                    child: CircularProgressIndicator(color: Color(0xFF64F02D)),
                   )
                 : _results.isEmpty
                 ? Center(
@@ -450,12 +461,10 @@ class _HomeMemberState extends State<HomeMember> {
                 _buildNavItem(Icons.home, "หน้าหลัก", () {
                   searchController.clear();
                   setState(() {
-                    selectedType = null;
-                    _selectedTypeId = null;
+                    _selectedTypeIds.clear();
                   });
                   _loadResults("");
                 }, isActive: true),
-                // 🎯 เพิ่ม badgeCount ให้ปุ่มตะกร้า + รีเฟรชหลังกลับมาจากหน้าตะกร้า
                 _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
                   Navigator.push(
                     context,
@@ -493,7 +502,7 @@ class _HomeMemberState extends State<HomeMember> {
     String label,
     VoidCallback onTap, {
     bool isActive = false,
-    int badgeCount = 0, // 🎯 เพิ่มพารามิเตอร์ใหม่: จำนวนที่จะโชว์บน badge
+    int badgeCount = 0,
   }) {
     return InkWell(
       onTap: onTap,
@@ -503,7 +512,6 @@ class _HomeMemberState extends State<HomeMember> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 🎯 ห่อไอคอนด้วย Stack เพื่อวาง badge ตัวเลขไว้มุมขวาบน
             Stack(
               clipBehavior: Clip.none,
               children: [
@@ -555,7 +563,6 @@ class _HomeMemberState extends State<HomeMember> {
     );
   }
 
-  // 🏪 วาดการ์ดร้านค้าเวอร์ชั่นยกเครื่องสไตล์เดลิเวอรีพรีเมียม
   Widget _buildRestaurantCard(BuildContext context, RestaurantModel item) {
     final String finalImageUrl = _getFinalImageUrl(item.restaurantImage);
     final String keyword = searchController.text.trim().toLowerCase();
@@ -570,7 +577,6 @@ class _HomeMemberState extends State<HomeMember> {
         )
         .toList();
 
-    // 🎯 คุมโทนเฉดสีเขียวหลักประจำโปรเจกต์ 0xFF64F02D
     final Color primaryGreen = const Color(0xFF64F02D);
 
     return Container(
@@ -591,8 +597,6 @@ class _HomeMemberState extends State<HomeMember> {
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () {
-          // 🎯 เปิดหน้าเมนูร้านค้า แล้วรีเฟรช badge ตะกร้าหลังกลับมา
-          // เผื่อผู้ใช้ไปเพิ่มของลงตะกร้าจากหน้านี้
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -603,7 +607,6 @@ class _HomeMemberState extends State<HomeMember> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── ส่วนภาพของร้านอาหาร ───────────────────────────
             Stack(
               children: [
                 ClipRRect(
@@ -649,7 +652,6 @@ class _HomeMemberState extends State<HomeMember> {
                   ),
                 ),
 
-                // ป้ายแท็กประเภทหมวดหมู่ร้านค้า
                 if (item.typerestaurantName != null &&
                     item.typerestaurantName!.isNotEmpty)
                   Positioned(
@@ -663,7 +665,6 @@ class _HomeMemberState extends State<HomeMember> {
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.65),
                         borderRadius: BorderRadius.circular(10),
-                        // 🎯 ✅ แก้ไขแล้ว: ลบ blurRadius ออกจาก BoxDecoration
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -689,7 +690,6 @@ class _HomeMemberState extends State<HomeMember> {
               ],
             ),
 
-            // ─── รายละเอียดของร้านอาหาร ───────────────────────────
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -709,44 +709,58 @@ class _HomeMemberState extends State<HomeMember> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: primaryGreen.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        // 🎯 ✅ แก้ไขแล้ว: ลบ const หน้า Row ออก และย้ายมาใส่ตัวที่รองรับแทน
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: const BoxDecoration(
-                                color: Color(0xFF2E7D32),
-                                shape: BoxShape.circle,
-                              ),
+                      // 🎯 [MAPPED FROM USER] ระบบ Badge บ่งบอกสถานะการเปิดร้านอิงตามเงื่อนไขเวลาและปุ่มเปิด/ปิดด่วนแบบไดนามิก
+                      Builder(
+                        builder: (context) {
+                          final bool isOpen = _isCurrentlyOpen(item);
+                          final Color statusColor = isOpen
+                              ? const Color(0xFF2E7D32)
+                              : Colors.grey.shade600;
+                          final Color statusBg = isOpen
+                              ? primaryGreen.withOpacity(0.15)
+                              : Colors.grey.shade200;
+
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
                             ),
-                            const SizedBox(width: 6),
-                            const Text(
-                              "เปิดอยู่",
-                              style: TextStyle(
-                                color: Color(0xFF2E7D32),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
+                            decoration: BoxDecoration(
+                              color: statusBg,
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: statusColor,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isOpen ? "เปิดอยู่" : "ปิดอยู่",
+                                  style: TextStyle(
+                                    color: statusColor,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
                   const SizedBox(height: 14),
 
+                  // ── แถววันทำการภาพรวมทั้งสัปดาห์ (จับกลุ่มจัดรูปแบบอัตโนมัติ) ──
                   Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(
                         Icons.calendar_today_rounded,
@@ -760,15 +774,15 @@ class _HomeMemberState extends State<HomeMember> {
                           style: TextStyle(
                             color: Colors.grey.shade700,
                             fontSize: 13,
-                            fontWeight: FontWeight.w500,
+                            fontWeight: FontWeight.w600,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
 
+                  // ── แถวเวลาของวันนี้โดยเฉพาะ ──
                   Row(
                     children: [
                       Expanded(
@@ -786,7 +800,7 @@ class _HomeMemberState extends State<HomeMember> {
                               style: TextStyle(
                                 color: Colors.grey.shade700,
                                 fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ],
@@ -822,7 +836,6 @@ class _HomeMemberState extends State<HomeMember> {
               ),
             ),
 
-            // ─── แผงเมนูอาหารที่ค้นหาเจอ ─────────────────
             if (matchedMenus.isNotEmpty)
               Container(
                 width: double.infinity,

@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -36,5 +37,6 @@ public class Restaurantopeninghour {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_username", nullable = false)
+    @JsonIgnore
     private Restaurant restaurant;
 }

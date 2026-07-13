@@ -1,4 +1,5 @@
 // features/restaurant/profile_restaurant.dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
@@ -46,7 +47,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
   LatLng? _restaurantLatLng;
 
   bool _obscurePassword = true;
-  // 🎯 Status is kept to send with payload when saving
   bool _isStoreOpen = true;
   bool _isEditable = false;
 
@@ -65,16 +65,12 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
   String? _selectedType;
   int? _selectedTypeId;
 
-  List<RestaurantOpeningHourModel> _openingHours = RestaurantDayOfWeek.values
-      .map((day) {
-        return RestaurantOpeningHourModel(
-          dayOfWeek: day,
-          opentime: const TimeOfDay(hour: 8, minute: 0),
-          closetime: const TimeOfDay(hour: 18, minute: 0),
-          closed: false,
-        );
-      })
-      .toList();
+  List<RestaurantOpeningHourModel> _openingHours = [];
+
+  // ตัวแปรสำหรับการเพิ่มเวลา (Time Slot Generator)
+  List<RestaurantDayOfWeek> _tempSelectedDays = [];
+  TimeOfDay _slotOpenTime = const TimeOfDay(hour: 8, minute: 0);
+  TimeOfDay _slotCloseTime = const TimeOfDay(hour: 15, minute: 0);
 
   @override
   void initState() {
@@ -191,31 +187,222 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     }
   }
 
-  Future<void> _selectDayTime(
-    BuildContext context,
-    int index,
-    bool isOpenTime,
-  ) async {
-    final hour = _openingHours[index];
-    final TimeOfDay? picked = await showTimePicker(
+  void _addTimeSlot() {
+    if (_tempSelectedDays.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("กรุณาเลือกวันอย่างน้อย 1 วัน"),
+          backgroundColor: _danger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    List<String> duplicateDayNames = [];
+    for (var day in _tempSelectedDays) {
+      final existingHour = _openingHours.firstWhere((h) => h.dayOfWeek == day);
+      if (!existingHour.closed) {
+        duplicateDayNames.add(day.labelTh);
+      }
+    }
+
+    if (duplicateDayNames.isNotEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: _accent),
+              SizedBox(width: 8),
+              Text(
+                "วันซ้ำกัน",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ],
+          ),
+          content: Text(
+            "ไม่สามารถเพิ่มได้เนื่องจาก วัน${duplicateDayNames.join(', วัน')} มีการตั้งเวลาทำการอยู่แล้ว หากต้องการเปลี่ยนเวลา กรุณาลบรายการเดิมออกก่อน",
+            style: const TextStyle(color: _textDark, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "รับทราบ",
+                style: TextStyle(color: _primary, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      for (var day in _tempSelectedDays) {
+        final index = _openingHours.indexWhere((h) => h.dayOfWeek == day);
+        if (index != -1) {
+          _openingHours[index] = _openingHours[index].copyWith(
+            opentime: _slotOpenTime,
+            closetime: _slotCloseTime,
+            closed: false,
+          );
+        }
+      }
+      _tempSelectedDays.clear();
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("เพิ่มช่วงเวลาสำเร็จ"),
+        backgroundColor: _primary,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  void _removeGroupedTimeSlot(List<RestaurantOpeningHourModel> hoursInGroup) {
+    setState(() {
+      for (var item in hoursInGroup) {
+        final index = _openingHours.indexWhere(
+          (h) => h.dayOfWeek == item.dayOfWeek,
+        );
+        if (index != -1) {
+          _openingHours[index] = _openingHours[index].copyWith(closed: true);
+        }
+      }
+    });
+  }
+
+  void _selectTimeScrollWheel(
+    BuildContext context, {
+    required bool isOpenTime,
+  }) {
+    final initialTime = isOpenTime ? _slotOpenTime : _slotCloseTime;
+    Duration tempDuration = Duration(
+      hours: initialTime.hour,
+      minutes: initialTime.minute,
+    );
+
+    showModalBottomSheet(
       context: context,
-      initialTime: isOpenTime ? hour.opentime : hour.closetime,
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(
-            context,
-          ).copyWith(colorScheme: const ColorScheme.light(primary: _primary)),
-          child: child!,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: SizedBox(
+            height: 380,
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 14,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          "ยกเลิก",
+                          style: TextStyle(
+                            color: _textMuted,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        isOpenTime ? "เลือกเวลาเปิดทำการ" : "เลือกเวลาปิดทำการ",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: _textDark,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            final newTime = TimeOfDay(
+                              hour: tempDuration.inHours,
+                              minute: tempDuration.inMinutes % 60,
+                            );
+                            if (isOpenTime) {
+                              _slotOpenTime = newTime;
+                            } else {
+                              _slotCloseTime = newTime;
+                            }
+                          });
+                          Navigator.pop(context);
+                        },
+                        child: const Text(
+                          "ตกลง",
+                          style: TextStyle(
+                            color: _primary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1, thickness: 1),
+                Expanded(
+                  child: Center(
+                    child: Transform.scale(
+                      scale: 1.3,
+                      child: CupertinoTimerPicker(
+                        mode: CupertinoTimerPickerMode.hm,
+                        initialTimerDuration: tempDuration,
+                        onTimerDurationChanged: (Duration newDuration) {
+                          tempDuration = newDuration;
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
-    if (picked != null) {
-      setState(() {
-        _openingHours[index] = hour.copyWith(
-          opentime: isOpenTime ? picked : null,
-          closetime: isOpenTime ? null : picked,
-        );
-      });
+  }
+
+  String _getShortThDayName(RestaurantDayOfWeek day) {
+    switch (day) {
+      case RestaurantDayOfWeek.monday:
+        return "จ.";
+      case RestaurantDayOfWeek.tuesday:
+        return "อ.";
+      case RestaurantDayOfWeek.wednesday:
+        return "พ.";
+      case RestaurantDayOfWeek.thursday:
+        return "พฤ.";
+      case RestaurantDayOfWeek.friday:
+        return "ศ.";
+      case RestaurantDayOfWeek.saturday:
+        return "ส.";
+      case RestaurantDayOfWeek.sunday:
+        return "อา.";
     }
   }
 
@@ -314,7 +501,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
         '/v1/restaurant/uploadImage',
         data: formData,
       );
-
       if (response.statusCode == 200) {
         return response.data['url'];
       }
@@ -327,6 +513,17 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
 
   Future<void> doUpdateRestaurant() async {
     if (formKey.currentState!.validate()) {
+      if (_openingHours.every((h) => h.closed)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("กรุณาตั้งเวลาเปิดทำการอย่างน้อย 1 วัน"),
+            backgroundColor: _danger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
       setState(() => isLoadingAction = true);
       try {
         String? imageUrl;
@@ -405,6 +602,24 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     } else {
       return "$baseUrl/$rawPath";
     }
+  }
+
+  // 🎯 ฟังก์ชันวิเคราะห์จับกลุ่มข้อมูลเวลาที่เหมือนกันมารวมไว้แถวเดียวกัน
+  List<MapEntry<String, List<RestaurantOpeningHourModel>>>
+  _getGroupedOpeningHours() {
+    final Map<String, List<RestaurantOpeningHourModel>> groups = {};
+
+    for (var hour in _openingHours) {
+      if (hour.closed) continue; // ข้ามวันทีปิดทำการ
+
+      final String timeKey =
+          "${hour.opentime.hour}:${hour.opentime.minute}-${hour.closetime.hour}:${hour.closetime.minute}";
+      if (!groups.containsKey(timeKey)) {
+        groups[timeKey] = [];
+      }
+      groups[timeKey]!.add(hour);
+    }
+    return groups.entries.toList();
   }
 
   // ─── Widget Builders ────────────────────────────────────────────────────────
@@ -557,6 +772,8 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
   @override
   Widget build(BuildContext context) {
     final String finalProfileUrl = _getFinalImageUrl(restaurantimage);
+    final groupedOpeningHours =
+        _getGroupedOpeningHours(); // เรียกฟังก์ชันดึงก้อนกลุ่มเวลาด่วน
 
     return Scaffold(
       backgroundColor: _bg,
@@ -692,12 +909,10 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 enabled: _isEditable,
                                 validator: _isEditable
                                     ? (v) {
-                                        if (v == null || v.trim().isEmpty) {
+                                        if (v == null || v.trim().isEmpty)
                                           return "กรุณากรอกชื่อร้านค้า";
-                                        }
-                                        if (v.length < 8) {
+                                        if (v.length < 8)
                                           return "ความยาว 8 ตัวอักษรขึ้นไป";
-                                        }
                                         return null;
                                       }
                                     : null,
@@ -723,12 +938,11 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                                     ),
                                               ),
                                             );
-                                        if (pickedLocation != null) {
+                                        if (pickedLocation != null)
                                           setState(
                                             () => _restaurantLatLng =
                                                 pickedLocation,
                                           );
-                                        }
                                       }
                                     : null,
                                 child: Container(
@@ -819,137 +1033,363 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 ),
                               ),
                               const SizedBox(height: 10),
-                              _buildLabel("เวลาเปิด-ปิดร้าน (แยกตามวัน)"),
+
+                              // 🎯 [UX REPLACED & GROUPED] แผงตั้งเวลาสไตล์จัดกลุ่มอัจฉริยะแถวเดียวกันเมื่อเวลาตรงกัน
+                              _buildLabel("เวลาเปิด-ปิดร้านทำการ"),
                               const SizedBox(height: 4),
-                              Column(
-                                children: List.generate(_openingHours.length, (
-                                  index,
-                                ) {
-                                  final hour = _openingHours[index];
-                                  return Container(
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: !_isEditable
-                                          ? const Color(0xFFF0F1F3)
-                                          : hour.closed
-                                          ? Colors.grey.shade100
-                                          : _primary.withOpacity(0.05),
-                                      borderRadius: BorderRadius.circular(14),
-                                      border: Border.all(
-                                        color: hour.closed
-                                            ? Colors.grey.shade300
-                                            : _primary.withOpacity(0.3),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade50,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: Colors.grey.shade200,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (_isEditable) ...[
+                                      const Text(
+                                        "1. เลือกกลุ่มวันที่ต้องการตั้งเวลา:",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: _textDark,
+                                        ),
                                       ),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        SizedBox(
-                                          width: 56,
-                                          child: Text(
-                                            hour.dayOfWeek.labelTh,
-                                            style: const TextStyle(
-                                              fontSize: 13.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: _textDark,
+                                      const SizedBox(height: 12),
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: RestaurantDayOfWeek.values
+                                            .map((day) {
+                                              final isSelected =
+                                                  _tempSelectedDays.contains(
+                                                    day,
+                                                  );
+                                              return GestureDetector(
+                                                onTap: () {
+                                                  setState(() {
+                                                    if (isSelected) {
+                                                      _tempSelectedDays.remove(
+                                                        day,
+                                                      );
+                                                    } else {
+                                                      _tempSelectedDays.add(
+                                                        day,
+                                                      );
+                                                    }
+                                                  });
+                                                },
+                                                child: AnimatedContainer(
+                                                  duration: const Duration(
+                                                    milliseconds: 200,
+                                                  ),
+                                                  width: 38,
+                                                  height: 38,
+                                                  alignment: Alignment.center,
+                                                  decoration: BoxDecoration(
+                                                    color: isSelected
+                                                        ? _accent
+                                                        : Colors.white,
+                                                    shape: BoxShape.circle,
+                                                    border: Border.all(
+                                                      color: isSelected
+                                                          ? _accent
+                                                          : Colors
+                                                                .grey
+                                                                .shade300,
+                                                      width: 1.5,
+                                                    ),
+                                                    boxShadow: isSelected
+                                                        ? [
+                                                            BoxShadow(
+                                                              color: _accent
+                                                                  .withOpacity(
+                                                                    0.3,
+                                                                  ),
+                                                              blurRadius: 4,
+                                                            ),
+                                                          ]
+                                                        : [],
+                                                  ),
+                                                  child: Text(
+                                                    _getShortThDayName(day),
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      color: isSelected
+                                                          ? Colors.white
+                                                          : _textDark,
+                                                    ),
+                                                  ),
+                                                ),
+                                              );
+                                            })
+                                            .toList(),
+                                      ),
+                                      const SizedBox(height: 16),
+
+                                      const Text(
+                                        "2. ระบุช่วงเวลาทำการ:",
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.bold,
+                                          color: _textDark,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: OutlinedButton.icon(
+                                              icon: const Icon(
+                                                Icons.access_time_rounded,
+                                                size: 16,
+                                                color: _primary,
+                                              ),
+                                              label: Text(
+                                                '${_slotOpenTime.hour.toString().padLeft(2, '0')}:${_slotOpenTime.minute.toString().padLeft(2, '0')} น.',
+                                              ),
+                                              onPressed: () =>
+                                                  _selectTimeScrollWheel(
+                                                    context,
+                                                    isOpenTime: true,
+                                                  ),
+                                              style: OutlinedButton.styleFrom(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 10,
+                                                    ),
+                                                side: BorderSide(
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                          const Padding(
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 6,
+                                            ),
+                                            child: Text("ถึง"),
+                                          ),
+                                          Expanded(
+                                            child: OutlinedButton.icon(
+                                              icon: const Icon(
+                                                Icons.access_time_rounded,
+                                                size: 16,
+                                                color: _danger,
+                                              ),
+                                              label: Text(
+                                                '${_slotCloseTime.hour.toString().padLeft(2, '0')}:${_slotCloseTime.minute.toString().padLeft(2, '0')} น.',
+                                              ),
+                                              onPressed: () =>
+                                                  _selectTimeScrollWheel(
+                                                    context,
+                                                    isOpenTime: false,
+                                                  ),
+                                              style: OutlinedButton.styleFrom(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 10,
+                                                    ),
+                                                side: BorderSide(
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 12),
+
+                                      SizedBox(
+                                        width: double.infinity,
+                                        child: ElevatedButton.icon(
+                                          onPressed: _addTimeSlot,
+                                          icon: const Icon(
+                                            Icons.add_circle_outline_rounded,
+                                            size: 16,
+                                          ),
+                                          label: const Text(
+                                            "อัปเดตช่วงเวลานี้",
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: _primary,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(10),
                                             ),
                                           ),
                                         ),
-                                        Expanded(
-                                          child: hour.closed
-                                              ? Text(
-                                                  "ปิดวันนี้",
-                                                  style: TextStyle(
-                                                    color: Colors.grey.shade500,
-                                                    fontSize: 13,
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const Divider(),
+                                    ],
+
+                                    const SizedBox(height: 4),
+                                    const Text(
+                                      "รายการเวลาเปิดทำการของร้านค้าปัจจุบัน:",
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: _textMuted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+
+                                    // 🎯 [UI FIXED] แสดงผลพรีวิวแบบจัดกลุ่ม (Group) เวลาที่เหมือนกันเข้าแถวเดียวกันด่วนตามต้องการ
+                                    groupedOpeningHours.isNotEmpty
+                                        ? ListView.builder(
+                                            shrinkWrap: true,
+                                            physics:
+                                                const NeverScrollableScrollPhysics(),
+                                            itemCount:
+                                                groupedOpeningHours.length,
+                                            itemBuilder: (context, index) {
+                                              final entry =
+                                                  groupedOpeningHours[index];
+                                              final List<
+                                                RestaurantOpeningHourModel
+                                              >
+                                              hoursInGroup = entry.value;
+                                              final firstItem =
+                                                  hoursInGroup.first;
+
+                                              return Container(
+                                                margin: const EdgeInsets.only(
+                                                  bottom: 6,
+                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 8,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.white,
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  border: Border.all(
+                                                    color: Colors.grey.shade200,
                                                   ),
-                                                )
-                                              : Row(
+                                                ),
+                                                child: Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceBetween,
                                                   children: [
                                                     Expanded(
-                                                      child: OutlinedButton(
-                                                        onPressed: _isEditable
-                                                            ? () =>
-                                                                  _selectDayTime(
-                                                                    context,
-                                                                    index,
-                                                                    true,
-                                                                  )
-                                                            : null,
-                                                        style: OutlinedButton.styleFrom(
-                                                          side: BorderSide(
-                                                            color: Colors
-                                                                .grey
-                                                                .shade300,
+                                                      child: Row(
+                                                        children: [
+                                                          // วาด Chips แสดงกลุ่มวันทำการทั้งหมดที่มีเวลาตรงกัน
+                                                          Wrap(
+                                                            spacing: 4,
+                                                            children: hoursInGroup.map((
+                                                              h,
+                                                            ) {
+                                                              return Container(
+                                                                padding:
+                                                                    const EdgeInsets.symmetric(
+                                                                      horizontal:
+                                                                          6,
+                                                                      vertical:
+                                                                          3,
+                                                                    ),
+                                                                decoration: BoxDecoration(
+                                                                  color: _primary
+                                                                      .withOpacity(
+                                                                        0.12,
+                                                                      ),
+                                                                  borderRadius:
+                                                                      BorderRadius.circular(
+                                                                        6,
+                                                                      ),
+                                                                ),
+                                                                child: Text(
+                                                                  _getShortThDayName(
+                                                                    h.dayOfWeek,
+                                                                  ),
+                                                                  style: const TextStyle(
+                                                                    fontSize:
+                                                                        11,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                    color:
+                                                                        _primaryDark,
+                                                                  ),
+                                                                ),
+                                                              );
+                                                            }).toList(),
                                                           ),
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                vertical: 8,
+                                                          const SizedBox(
+                                                            width: 10,
+                                                          ),
+                                                          Expanded(
+                                                            child: Text(
+                                                              '${firstItem.opentime.hour.toString().padLeft(2, '0')}:${firstItem.opentime.minute.toString().padLeft(2, '0')} น. - ${firstItem.closetime.hour.toString().padLeft(2, '0')}:${firstItem.closetime.minute.toString().padLeft(2, '0')} น.',
+                                                              style: const TextStyle(
+                                                                fontSize: 12.5,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w500,
+                                                                color:
+                                                                    _textDark,
                                                               ),
-                                                        ),
-                                                        child: Text(
-                                                          '${hour.opentime.hour.toString().padLeft(2, '0')}:${hour.opentime.minute.toString().padLeft(2, '0')}',
-                                                        ),
+                                                            ),
+                                                          ),
+                                                        ],
                                                       ),
                                                     ),
-                                                    const Padding(
-                                                      padding:
-                                                          EdgeInsets.symmetric(
-                                                            horizontal: 6,
-                                                          ),
-                                                      child: Text('-'),
-                                                    ),
-                                                    Expanded(
-                                                      child: OutlinedButton(
-                                                        onPressed: _isEditable
-                                                            ? () =>
-                                                                  _selectDayTime(
-                                                                    context,
-                                                                    index,
-                                                                    false,
-                                                                  )
-                                                            : null,
-                                                        style: OutlinedButton.styleFrom(
-                                                          side: BorderSide(
-                                                            color: Colors
-                                                                .grey
-                                                                .shade300,
-                                                          ),
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                vertical: 8,
-                                                              ),
+                                                    if (_isEditable)
+                                                      IconButton(
+                                                        icon: const Icon(
+                                                          Icons
+                                                              .delete_outline_rounded,
+                                                          color: _danger,
+                                                          size: 20,
                                                         ),
-                                                        child: Text(
-                                                          '${hour.closetime.hour.toString().padLeft(2, '0')}:${hour.closetime.minute.toString().padLeft(2, '0')}',
-                                                        ),
+                                                        onPressed: () =>
+                                                            _removeGroupedTimeSlot(
+                                                              hoursInGroup,
+                                                            ), // ลบทั้งกลุ่มทีเดียว
+                                                        padding:
+                                                            EdgeInsets.zero,
+                                                        constraints:
+                                                            const BoxConstraints(),
                                                       ),
-                                                    ),
                                                   ],
                                                 ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Switch(
-                                          value: !hour.closed,
-                                          activeColor: _primary,
-                                          onChanged: _isEditable
-                                              ? (isOpen) {
-                                                  setState(() {
-                                                    _openingHours[index] = hour
-                                                        .copyWith(
-                                                          closed: !isOpen,
-                                                        );
-                                                  });
-                                                }
-                                              : null,
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }),
+                                              );
+                                            },
+                                          )
+                                        : Container(
+                                            width: double.infinity,
+                                            padding: const EdgeInsets.symmetric(
+                                              vertical: 16,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child: Text(
+                                              "- ร้านปิดทำการทุกวัน -",
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.grey.shade400,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
@@ -980,9 +1420,8 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                           return "ต้องไม่มีเว้นวรรค";
                                         if (!RegExp(
                                           r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v)) {
+                                        ).hasMatch(v))
                                           return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
-                                        }
                                         if (v.length < 3 || v.length > 30)
                                           return "ความยาว 3-30 ตัวอักษร";
                                         return null;
@@ -1004,9 +1443,8 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                           return "ต้องไม่มีเว้นวรรค";
                                         if (!RegExp(
                                           r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v)) {
+                                        ).hasMatch(v))
                                           return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
-                                        }
                                         if (v.length < 3 || v.length > 30)
                                           return "ความยาว 3-30 ตัวอักษร";
                                         return null;
@@ -1029,9 +1467,8 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                           return "ต้องไม่มีช่องว่าง";
                                         if (!RegExp(
                                           r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                        ).hasMatch(v)) {
+                                        ).hasMatch(v))
                                           return "รูปแบบอีเมลไม่ถูกต้อง";
-                                        }
                                         return null;
                                       }
                                     : null,
@@ -1085,6 +1522,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                             setState(() {
                                               _isEditable = false;
                                               _selectedImage = null;
+                                              _tempSelectedDays.clear();
                                             });
                                             _fetchRestaurantProfile();
                                           },
