@@ -1,23 +1,25 @@
 class AddonDetailRequestModel {
-  int? addonDetailId; // ← เพิ่มบรรทัดนี้ null = แถวใหม่, มีค่า = แถวเดิม
+  int? addonDetailId;
   String addonname;
   double addonprice;
   bool status;
+  bool allowqtystatus; // ← 1. เพิ่มตัวแปรนี้
 
   AddonDetailRequestModel({
-    this.addonDetailId, // ← เพิ่มบรรทัดนี้
+    this.addonDetailId,
     required this.addonname,
     required this.addonprice,
     this.status = true,
+    this.allowqtystatus = false, // ← 2. กำหนดค่าเริ่มต้น
   });
 
   Map<String, dynamic> toJson() {
     return {
-      if (addonDetailId != null)
-        "addondetailId": addonDetailId, // ← เพิ่มบรรทัดนี้
+      if (addonDetailId != null) "addondetailId": addonDetailId,
       "addonname": addonname,
       "addonprice": addonprice,
       "status": status,
+      "allowqtystatus": allowqtystatus, // ← 3. ส่งค่าแปลงเป็น JSON
     };
   }
 }
@@ -46,7 +48,7 @@ class AddonGroupRequestModel {
       if (addonGroupId != null) "addongroupid": addonGroupId,
       "restaurantUsername": restaurantUsername,
       "addongroupname": addongroupname,
-      "isRequired": isRequired,
+      "required": isRequired,
       "maxselect": maxselect,
       "status": status,
       "details": details.map((e) => e.toJson()).toList(),

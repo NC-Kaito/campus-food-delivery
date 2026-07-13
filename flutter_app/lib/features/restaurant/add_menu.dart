@@ -25,14 +25,18 @@ class _MenuTheme {
 }
 
 class CustomAddonItem {
-  final TextEditingController nameController;
-  final TextEditingController priceController;
+  TextEditingController nameController;
+  TextEditingController priceController;
   int? addonId;
+  bool allowqtystatus;
+  bool status; // <-- เพิ่มบรรทัดนี้
 
   CustomAddonItem({
     required this.nameController,
     required this.priceController,
     this.addonId,
+    this.allowqtystatus = false,
+    this.status = true, // <-- เพิ่มบรรทัดนี้ (กำหนดค่าเริ่มต้นเป็น true)
   });
 }
 

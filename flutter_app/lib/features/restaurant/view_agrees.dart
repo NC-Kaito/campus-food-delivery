@@ -13,7 +13,7 @@ class _ViewAgreesState extends State<ViewAgrees> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: const RestaurantNavbar(title: "ข้อตกลงการให้บริการ"),
+      appBar: const RestaurantNavbar(title: ""),
       body: SafeArea(
         child: Column(
           children: [

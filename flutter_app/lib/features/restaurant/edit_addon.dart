@@ -4,7 +4,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/addon_group_request_model.dart';
-
 import 'package:flutter_app/data/models/addon_menu_model.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart'
     show CustomAddonItem;
@@ -24,11 +23,29 @@ class _AddonTheme {
   static const Color border = Color(0xFFE7E8EC);
 }
 
+// เก็บค่าตัวเลือกย่อยแบบง่ายๆ (ไม่ผูกกับ Controller) สำหรับคืนค่าตอนกดยกเลิก
+class _AddonSnapshot {
+  final String name;
+  final String price;
+  final int? addonId;
+  final bool allowqtystatus;
+  final bool status;
+
+  _AddonSnapshot({
+    required this.name,
+    required this.price,
+    required this.addonId,
+    required this.allowqtystatus,
+    required this.status,
+  });
+}
+
 class EditAddon extends StatefulWidget {
   final int? groupId;
   final String? groupName;
   final bool isRequired;
   final int maxSelect;
+  final bool groupStatus; // เพิ่มตัวรับสถานะของกลุ่ม
   final List<MenuAddonDetailModel> details;
 
   const EditAddon({
@@ -37,6 +54,7 @@ class EditAddon extends StatefulWidget {
     required this.groupName,
     required this.isRequired,
     required this.maxSelect,
+    required this.groupStatus, // อย่าลืมส่งค่านี้มาจากหน้าก่อนหน้านะครับ
     required this.details,
   });
 
@@ -51,7 +69,11 @@ class _EditAddonState extends State<EditAddon> {
   late final TextEditingController groupNameController;
   late int maxSelect;
   late bool isRequired;
+  late bool groupStatus; // สถานะของกลุ่มตัวเลือก
+
   bool _isLoading = false;
+  bool _isEditMode = false; // ตัวควบคุมโหมด ดู/แก้ไข
+  bool _isTogglingGroupStatus = false;
 
   List<CustomAddonItem> selectedAddons = [];
 
@@ -61,7 +83,11 @@ class _EditAddonState extends State<EditAddon> {
   final Map<CustomAddonItem, List<AddonMenuModel>> _suggestions = {};
   Timer? _debounce;
 
-  final List<int> _deletedAddonIds = [];
+  // ─── สแนปช็อตของข้อมูลก่อนเข้าโหมดแก้ไข ใช้ตอนกด "ยกเลิก" เพื่อคืนค่าเดิม ───
+  String _originalGroupName = "";
+  int _originalMaxSelect = 1;
+  bool _originalIsRequired = true;
+  List<_AddonSnapshot> _originalAddons = [];
 
   @override
   void initState() {
@@ -73,6 +99,7 @@ class _EditAddonState extends State<EditAddon> {
     groupNameController = TextEditingController(text: widget.groupName ?? "");
     isRequired = widget.isRequired;
     maxSelect = widget.maxSelect;
+    groupStatus = widget.groupStatus; // ดึงค่าสถานะกลุ่ม
 
     if (widget.details.isEmpty) {
       _addNewCustomAddonRow();
@@ -86,6 +113,9 @@ class _EditAddonState extends State<EditAddon> {
             text: (d.addonPrice ?? 0).toString(),
           ),
           addonId: d.addonDetailId,
+          allowqtystatus:
+              d.allowqtystatus, // ถ้าใน model เป็น null จะรับค่า false มาให้
+          status: d.status ?? true, // ดึงค่าสถานะตัวเลือกย่อย
         );
       }).toList();
     }
@@ -110,6 +140,8 @@ class _EditAddonState extends State<EditAddon> {
         nameController: TextEditingController(),
         priceController: TextEditingController(),
         addonId: null,
+        allowqtystatus: false,
+        status: groupStatus, // ตั้งค่าเริ่มต้นตามสถานะกลุ่มเลยครับ
       );
       selectedAddons.add(newAddon);
 
@@ -124,13 +156,73 @@ class _EditAddonState extends State<EditAddon> {
     });
   }
 
+  // ─── กดปุ่ม "แก้ไขข้อมูล" ── เก็บสแนปช็อตของค่าปัจจุบันไว้ก่อนเข้าโหมดแก้ไข ───
+  void _enterEditMode() {
+    _originalGroupName = groupNameController.text;
+    _originalMaxSelect = maxSelect;
+    _originalIsRequired = isRequired;
+    _originalAddons = selectedAddons
+        .map(
+          (a) => _AddonSnapshot(
+            name: a.nameController.text,
+            price: a.priceController.text,
+            addonId: a.addonId,
+            allowqtystatus: a.allowqtystatus,
+            status: a.status,
+          ),
+        )
+        .toList();
+
+    setState(() => _isEditMode = true);
+  }
+
+  // ─── กดปุ่ม "ยกเลิก" ── คืนค่าทุกอย่างกลับไปเป็นก่อนกดแก้ไข ───
+  void _cancelEdit() {
+    // เคลียร์ focus node / overlay / controller ของแถวปัจจุบันทั้งหมดก่อน
+    for (var addon in selectedAddons) {
+      _removeOverlay(addon);
+      _nameFocusNodes[addon]?.dispose();
+      _nameFocusNodes.remove(addon);
+      _layerLinks.remove(addon);
+      _suggestions.remove(addon);
+      addon.nameController.dispose();
+      addon.priceController.dispose();
+    }
+
+    final restoredAddons = _originalAddons.map((snap) {
+      final item = CustomAddonItem(
+        nameController: TextEditingController(text: snap.name),
+        priceController: TextEditingController(text: snap.price),
+        addonId: snap.addonId,
+        allowqtystatus: snap.allowqtystatus,
+        status: snap.status,
+      );
+      final focusNode = FocusNode();
+      _nameFocusNodes[item] = focusNode;
+      _layerLinks[item] = LayerLink();
+      focusNode.addListener(() {
+        if (!focusNode.hasFocus) _removeOverlay(item);
+      });
+      return item;
+    }).toList();
+
+    setState(() {
+      groupNameController.text = _originalGroupName;
+      maxSelect = _originalMaxSelect;
+      isRequired = _originalIsRequired;
+      selectedAddons = restoredAddons;
+      _isEditMode = false;
+    });
+
+    // ล้าง error ของฟอร์มที่อาจค้างอยู่จากตอนแก้ไข
+    formKey.currentState?.reset();
+  }
+
+  // เอาไว้ลบแถวออกตอนอยู่ในโหมดแก้ไข (ให้พฤติกรรมเหมือนหน้า add_addon)
   void _removeAddonItemRow(int index) {
     if (selectedAddons.length <= 1) return;
     setState(() {
       final removed = selectedAddons[index];
-      if (removed.addonId != null) {
-        _deletedAddonIds.add(removed.addonId!);
-      }
 
       _removeOverlay(removed);
       _nameFocusNodes[removed]?.dispose();
@@ -145,7 +237,77 @@ class _EditAddonState extends State<EditAddon> {
   }
 
   // ============================================================
-  // Autocomplete: ค้นหาชื่อ addon จากคลังกลาง (debounce 350ms)
+  // เปิด/ปิด สถานะ — ทำงานได้ทันทีไม่ว่าจะอยู่โหมดดูหรือโหมดแก้ไข
+  // และอัปเดตไปที่ฐานข้อมูลทันทีที่กด (ไม่ต้องรอกดปุ่มบันทึก)
+  // ============================================================
+  Future<void> _toggleGroupStatus(bool value) async {
+    if (widget.groupId == null) {
+      setState(() => groupStatus = value);
+      return;
+    }
+
+    final previous = groupStatus;
+    setState(() {
+      groupStatus = value;
+      _isTogglingGroupStatus = true;
+    });
+
+    try {
+      await _addonService.toggleAddonGroupStatus(widget.groupId!, value);
+    } catch (e) {
+      if (mounted) {
+        setState(() => groupStatus = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("อัปเดตสถานะกลุ่มไม่สำเร็จ: $e"),
+            backgroundColor: _AddonTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTogglingGroupStatus = false);
+    }
+  }
+
+  Future<void> _toggleAddonDetailStatus(
+    CustomAddonItem addon,
+    bool value,
+  ) async {
+    final previous = addon.status;
+    setState(() => addon.status = value);
+
+    // แถวที่ยังไม่เคยบันทึก (ยังไม่มี addonId) ไม่ต้องยิง API
+    if (addon.addonId == null) return;
+
+    try {
+      // ⚠️ ใน MenuAddonService ปัจจุบันยังไม่มี endpoint สำหรับอัปเดตสถานะ
+      // ตัวเลือกย่อยรายตัว (มีแค่ toggleAddonGroupStatus สำหรับทั้งกลุ่ม)
+      // ต้องเพิ่ม method นี้ในฝั่ง service + endpoint หลังบ้านก่อน แล้วค่อยเรียกใช้ตรงนี้ เช่น:
+      // await _addonService.toggleAddonDetailStatus(addon.addonId!, value);
+      await _addonService.toggleAddonGroupStatus(widget.groupId!, value);
+    } catch (e) {
+      if (mounted) {
+        setState(() => addon.status = previous);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("อัปเดตสถานะตัวเลือกไม่สำเร็จ: $e"),
+            backgroundColor: _AddonTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  // ============================================================
+  // Autocomplete
   // ============================================================
   void _onAddonNameChanged(CustomAddonItem addon, String value) {
     _debounce?.cancel();
@@ -233,7 +395,7 @@ class _EditAddonState extends State<EditAddon> {
     final isFormValid = formKey.currentState!.validate();
     if (!isFormValid) return;
 
-    // ─── เช็กชื่อซ้ำก่อนส่ง ───────────────────────────
+    // เช็กชื่อซ้ำก่อนส่ง
     final names = selectedAddons
         .map((a) => a.nameController.text.trim().toLowerCase())
         .toList();
@@ -254,21 +416,21 @@ class _EditAddonState extends State<EditAddon> {
     setState(() => _isLoading = true);
 
     try {
-      // ─── สร้าง request model จาก form ───────────────────
       final request = AddonGroupRequestModel(
         addonGroupId: widget.groupId,
         restaurantUsername: GlobalData.usernameRestaurant ?? "",
         addongroupname: groupNameController.text.trim(),
         isRequired: isRequired,
         maxselect: maxSelect,
-        status: true,
+        status: groupStatus, // ส่งสถานะกลุ่ม
         details: selectedAddons.map((addon) {
           return AddonDetailRequestModel(
             addonDetailId: addon.addonId,
             addonname: addon.nameController.text.trim(),
             addonprice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
-            status: true,
+            status: addon.status, // ส่งสถานะตัวเลือกย่อย
+            allowqtystatus: addon.allowqtystatus,
           );
         }).toList(),
       );
@@ -307,7 +469,7 @@ class _EditAddonState extends State<EditAddon> {
   }
 
   // ============================================================
-  // Shared styles (เหมือนกับ AddAddon ทุกประการ)
+  // Shared styles
   // ============================================================
   InputDecoration _fieldDecoration({String hint = "", Widget? prefixIcon}) {
     return InputDecoration(
@@ -320,7 +482,7 @@ class _EditAddonState extends State<EditAddon> {
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       filled: true,
-      fillColor: _AddonTheme.fieldBg,
+      fillColor: _isEditMode ? _AddonTheme.surface : _AddonTheme.fieldBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -410,14 +572,61 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
-  // ============================================================
-  // Max-select stepper
-  // ============================================================
+  // ─── สวิตช์สถานะกลุ่ม พร้อมป้ายกำกับ "เปิดใช้งาน / ปิดใช้งาน" ───
+  // ใช้งานได้ตลอด ไม่ว่าจะอยู่โหมดดูหรือโหมดแก้ไข (แต่จะถูกซ่อนตอนกดแก้ไข
+  // ตามที่ขอ ให้เหมือนหน้า add_addon ที่ไม่มีสวิตช์นี้)
+  Widget _buildGroupStatusToggle() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(
+            color: groupStatus
+                ? _AddonTheme.accent.withOpacity(0.12)
+                : _AddonTheme.danger.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Text(
+            groupStatus ? "เปิดใช้งาน" : "ปิดใช้งาน",
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              color: groupStatus ? _AddonTheme.accent : _AddonTheme.danger,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        _isTogglingGroupStatus
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: Padding(
+                  padding: EdgeInsets.all(2.0),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: _AddonTheme.accent,
+                  ),
+                ),
+              )
+            : Transform.scale(
+                scale: 0.8,
+                child: Switch(
+                  value: groupStatus,
+                  onChanged: _toggleGroupStatus,
+                  activeColor: _AddonTheme.accent,
+                ),
+              ),
+      ],
+    );
+  }
+
   Widget _buildMaxSelectStepper() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       decoration: BoxDecoration(
-        color: _AddonTheme.fieldBg,
+        color: _isEditMode ? _AddonTheme.surface : _AddonTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
@@ -425,23 +634,29 @@ class _EditAddonState extends State<EditAddon> {
         children: [
           _stepperButton(
             icon: Icons.remove_rounded,
-            onTap: maxSelect > 1 ? () => setState(() => maxSelect--) : null,
+            onTap: (_isEditMode && maxSelect > 1)
+                ? () => setState(() => maxSelect--)
+                : null,
           ),
           SizedBox(
             width: 34,
             child: Text(
               '$maxSelect',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: _AddonTheme.textPrimary,
+                color: _isEditMode
+                    ? _AddonTheme.textPrimary
+                    : _AddonTheme.textSecondary,
               ),
             ),
           ),
           _stepperButton(
             icon: Icons.add_rounded,
-            onTap: maxSelect < 20 ? () => setState(() => maxSelect++) : null,
+            onTap: (_isEditMode && maxSelect < 20)
+                ? () => setState(() => maxSelect++)
+                : null,
           ),
         ],
       ),
@@ -460,17 +675,8 @@ class _EditAddonState extends State<EditAddon> {
           height: 30,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: enabled ? _AddonTheme.surface : Colors.transparent,
+            color: enabled ? _AddonTheme.fieldBg : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
-            boxShadow: enabled
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
           ),
           child: Icon(
             icon,
@@ -484,9 +690,6 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
-  // ============================================================
-  // segmented toggle: จำเป็น / ไม่บังคับ
-  // ============================================================
   Widget _buildRequiredSegment() {
     return Container(
       padding: const EdgeInsets.all(4),
@@ -500,12 +703,16 @@ class _EditAddonState extends State<EditAddon> {
           _segmentOption(
             label: "จำเป็น",
             selected: isRequired,
-            onTap: () => setState(() => isRequired = true),
+            onTap: _isEditMode
+                ? () => setState(() => isRequired = true)
+                : () {},
           ),
           _segmentOption(
             label: "ไม่บังคับ",
             selected: !isRequired,
-            onTap: () => setState(() => isRequired = false),
+            onTap: _isEditMode
+                ? () => setState(() => isRequired = false)
+                : () {},
           ),
         ],
       ),
@@ -523,7 +730,11 @@ class _EditAddonState extends State<EditAddon> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? _AddonTheme.primary : Colors.transparent,
+          color: selected
+              ? (_isEditMode
+                    ? _AddonTheme.primary
+                    : _AddonTheme.primary.withOpacity(0.6))
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(9),
         ),
         child: Text(
@@ -538,12 +749,41 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
+  // ─── ปุ่มลบแถว ใช้ตอนอยู่โหมดแก้ไข (แทนที่สวิตช์สถานะ) ───
+  Widget _buildDeleteButton(int index) {
+    final bool canDelete = selectedAddons.length > 1;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(9),
+        onTap: canDelete ? () => _removeAddonItemRow(index) : null,
+        child: Container(
+          width: 34,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: canDelete
+                ? _AddonTheme.danger.withOpacity(0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+          ),
+          child: Icon(
+            Icons.close_rounded,
+            size: 17,
+            color: canDelete
+                ? _AddonTheme.danger
+                : _AddonTheme.textSecondary.withOpacity(0.35),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ============================================================
   // แถวรายการตัวเลือกย่อย
   // ============================================================
   Widget _buildAddonRow(int index) {
     final addon = selectedAddons[index];
-    final bool canDelete = selectedAddons.length > 1;
 
     final layerLink = _layerLinks.putIfAbsent(addon, () => LayerLink());
     final focusNode = _nameFocusNodes.putIfAbsent(addon, () {
@@ -584,6 +824,8 @@ class _EditAddonState extends State<EditAddon> {
             ),
           ),
           const SizedBox(width: 10),
+
+          // ─── ช่องชื่อตัวเลือก ───
           Expanded(
             flex: 3,
             child: CompositedTransformTarget(
@@ -591,10 +833,17 @@ class _EditAddonState extends State<EditAddon> {
               child: TextFormField(
                 controller: addon.nameController,
                 focusNode: focusNode,
+                readOnly:
+                    !_isEditMode, // ดูข้อมูลอย่างเดียวเมื่อไม่ใช่โหมดแก้ไข
                 onChanged: (value) => _onAddonNameChanged(addon, value),
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
-                style: const TextStyle(fontSize: 14),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _isEditMode
+                      ? _AddonTheme.textPrimary
+                      : _AddonTheme.textSecondary,
+                ),
                 decoration: InputDecoration(
                   hintText: "ชื่อตัวเลือก",
                   hintStyle: const TextStyle(
@@ -607,50 +856,38 @@ class _EditAddonState extends State<EditAddon> {
                     vertical: 12,
                   ),
                   filled: true,
-                  fillColor: _AddonTheme.surface,
+                  fillColor: _isEditMode
+                      ? _AddonTheme.surface
+                      : Colors.transparent,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: _AddonTheme.primary,
-                      width: 1.4,
-                    ),
-                  ),
-                  errorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(color: _AddonTheme.danger),
-                  ),
-                  focusedErrorBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10),
-                    borderSide: const BorderSide(
-                      color: _AddonTheme.danger,
-                      width: 1.4,
-                    ),
                   ),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 8),
+
+          // ─── ช่องราคา ───
           Expanded(
             flex: 2,
             child: TextFormField(
               controller: addon.priceController,
               keyboardType: TextInputType.number,
+              readOnly: !_isEditMode, // ดูข้อมูลอย่างเดียวเมื่อไม่ใช่โหมดแก้ไข
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return "กรอกราคา";
                 if (double.tryParse(value.trim()) == null)
                   return "ตัวเลขเท่านั้น";
                 return null;
               },
-              style: const TextStyle(fontSize: 14),
+              style: TextStyle(
+                fontSize: 14,
+                color: _isEditMode
+                    ? _AddonTheme.textPrimary
+                    : _AddonTheme.textSecondary,
+              ),
               decoration: InputDecoration(
                 hintText: "0",
                 hintStyle: const TextStyle(
@@ -669,62 +906,86 @@ class _EditAddonState extends State<EditAddon> {
                   vertical: 12,
                 ),
                 filled: true,
-                fillColor: _AddonTheme.surface,
+                fillColor: _isEditMode
+                    ? _AddonTheme.surface
+                    : Colors.transparent,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: _AddonTheme.primary,
-                    width: 1.4,
-                  ),
-                ),
-                errorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: _AddonTheme.danger),
-                ),
-                focusedErrorBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: _AddonTheme.danger,
-                    width: 1.4,
-                  ),
                 ),
               ),
             ),
           ),
           const SizedBox(width: 6),
+
+          // ─── ปุ่ม +จำนวน ───
           Material(
             color: Colors.transparent,
             child: InkWell(
-              borderRadius: BorderRadius.circular(9),
-              onTap: canDelete ? () => _removeAddonItemRow(index) : null,
-              child: Container(
-                width: 34,
-                height: 34,
-                alignment: Alignment.center,
+              borderRadius: BorderRadius.circular(10),
+              onTap: _isEditMode
+                  ? () {
+                      setState(() {
+                        addon.allowqtystatus = !addon.allowqtystatus;
+                      });
+                    }
+                  : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 44,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
-                  color: canDelete
-                      ? _AddonTheme.danger.withOpacity(0.1)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(9),
+                  color: addon.allowqtystatus
+                      ? (_isEditMode
+                            ? _AddonTheme.accent.withOpacity(0.12)
+                            : _AddonTheme.accent.withOpacity(0.05))
+                      : (_isEditMode
+                            ? _AddonTheme.surface
+                            : Colors.transparent),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: addon.allowqtystatus && _isEditMode
+                        ? _AddonTheme.accent
+                        : Colors.transparent,
+                    width: 1.4,
+                  ),
                 ),
-                child: Icon(
-                  Icons.close_rounded,
-                  size: 17,
-                  color: canDelete
-                      ? _AddonTheme.danger
-                      : _AddonTheme.textSecondary.withOpacity(0.35),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      addon.allowqtystatus
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      size: 18,
+                      color: addon.allowqtystatus
+                          ? (_isEditMode
+                                ? _AddonTheme.accent
+                                : _AddonTheme.accent.withOpacity(0.6))
+                          : _AddonTheme.textSecondary.withOpacity(0.5),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+          const SizedBox(width: 6),
+
+          // ─── โหมดดู: สวิตช์เปิด/ปิดสถานะ (อัปเดต DB ทันที) ───
+          // ─── โหมดแก้ไข: ปุ่มลบ (เหมือนหน้า add_addon) ───
+          _isEditMode
+              ? _buildDeleteButton(index)
+              : SizedBox(
+                  width: 44,
+                  child: Transform.scale(
+                    scale: 0.8,
+                    child: Switch(
+                      value: addon.status,
+                      onChanged: (val) => _toggleAddonDetailStatus(addon, val),
+                      activeColor: _AddonTheme.accent,
+                    ),
+                  ),
+                ),
         ],
       ),
     );
@@ -766,29 +1027,34 @@ class _EditAddonState extends State<EditAddon> {
                         ),
                       ],
                     ),
-                    child: const Icon(
-                      Icons
-                          .edit_rounded, // ← เปลี่ยนไอคอนให้สื่อว่าเป็นการแก้ไข
+                    child: Icon(
+                      _isEditMode
+                          ? Icons.edit_rounded
+                          : Icons.visibility_rounded, // เปลี่ยนไอคอนตามโหมด
                       color: Colors.white,
                       size: 22,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          "แก้ไขตัวเลือกเสริม",
-                          style: TextStyle(
+                          _isEditMode
+                              ? "แก้ไขตัวเลือกเสริม"
+                              : "รายละเอียดตัวเลือกเสริม",
+                          style: const TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w800,
                             color: _AddonTheme.textPrimary,
                           ),
                         ),
                         Text(
-                          "ปรับปรุงกลุ่มตัวเลือกที่มีอยู่ให้ตรงกับเมนูของคุณ",
-                          style: TextStyle(
+                          _isEditMode
+                              ? "ปรับปรุงกลุ่มตัวเลือกที่มีอยู่ให้ตรงกับเมนูของคุณ"
+                              : "ดูข้อมูลกลุ่มตัวเลือก (กดปุ่มแก้ไขด้านล่างเพื่อปรับปรุง)",
+                          style: const TextStyle(
                             fontSize: 12.5,
                             color: _AddonTheme.textSecondary,
                           ),
@@ -809,17 +1075,26 @@ class _EditAddonState extends State<EditAddon> {
                     _sectionHeader(
                       icon: Icons.category_rounded,
                       title: "ข้อมูลกลุ่มตัวเลือก",
+                      // โหมดดู: แสดงป้าย + สวิตช์เปิด/ปิด (แก้ได้ทันที อัปเดต DB เลย)
+                      // โหมดแก้ไข: ซ่อนสวิตช์ ให้เหมือนหน้า add_addon
+                      trailing: _isEditMode ? null : _buildGroupStatusToggle(),
                     ),
                     const SizedBox(height: 16),
 
                     _fieldLabel("ชื่อกลุ่มตัวเลือก"),
                     TextFormField(
                       controller: groupNameController,
+                      readOnly: !_isEditMode,
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
                           ? "กรุณากรอกชื่อกลุ่มตัวเลือก"
                           : null,
-                      style: const TextStyle(fontSize: 14),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _isEditMode
+                            ? _AddonTheme.textPrimary
+                            : _AddonTheme.textSecondary,
+                      ),
                       decoration: _fieldDecoration(hint: "เช่น ประเภทข้าว"),
                     ),
 
@@ -893,7 +1168,7 @@ class _EditAddonState extends State<EditAddon> {
                     ),
                     const SizedBox(height: 14),
 
-                    // ── หัวตาราง: ชื่อตัวเลือก / ราคา ───────────────────
+                    // ── หัวตาราง ───────────────────
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
@@ -906,11 +1181,11 @@ class _EditAddonState extends State<EditAddon> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: _AddonTheme.textSecondary,
+                                color: Color.fromARGB(255, 0, 0, 0),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          const SizedBox(width: 45),
                           const Expanded(
                             flex: 2,
                             child: Text(
@@ -918,11 +1193,23 @@ class _EditAddonState extends State<EditAddon> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: _AddonTheme.textSecondary,
+                                color: Color.fromARGB(255, 0, 0, 0),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 40),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              // โหมดแก้ไขไม่มีสวิตช์แล้ว ให้เปลี่ยนหัวคอลัมน์เป็น "ลบ"
+                              _isEditMode ? "เพิ่มจำนวน" : "เพิ่มจำนวน",
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color.fromARGB(255, 0, 0, 0),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -937,44 +1224,48 @@ class _EditAddonState extends State<EditAddon> {
                       itemBuilder: (context, index) => _buildAddonRow(index),
                     ),
 
-                    Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(12),
-                        onTap: _addNewCustomAddonRow,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: _AddonTheme.accent.withOpacity(0.4),
-                              width: 1.3,
-                            ),
-                            color: _AddonTheme.accent.withOpacity(0.06),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.add_rounded,
-                                size: 18,
-                                color: _AddonTheme.accent,
+                    // ── ซ่อนปุ่ม "เพิ่มตัวเลือกเสริม" ถ้าย้งไม่ได้กดปุ่มแก้ไข ──
+                    if (_isEditMode) ...[
+                      const SizedBox(height: 10),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: _addNewCustomAddonRow,
+                          child: Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: _AddonTheme.accent.withOpacity(0.4),
+                                width: 1.3,
                               ),
-                              SizedBox(width: 6),
-                              Text(
-                                "เพิ่มตัวเลือกเสริม",
-                                style: TextStyle(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
+                              color: _AddonTheme.accent.withOpacity(0.06),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.add_rounded,
+                                  size: 18,
                                   color: _AddonTheme.accent,
                                 ),
-                              ),
-                            ],
+                                SizedBox(width: 6),
+                                Text(
+                                  "เพิ่มตัวเลือกเสริม",
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: _AddonTheme.accent,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -983,40 +1274,108 @@ class _EditAddonState extends State<EditAddon> {
         ),
       ),
 
-      // ── ปุ่มบันทึก ปักไว้ด้านล่างเสมอ ────────────────────────────
+      // ── ปุ่มบันทึก/แก้ไข/ยกเลิก ปักไว้ด้านล่างเสมอ ────────────────────────────
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : _doUpdateAddonGroup,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _AddonTheme.accent,
-                foregroundColor: Colors.white,
-                elevation: 6,
-                shadowColor: _AddonTheme.accent.withOpacity(0.35),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
+          child: _isEditMode
+              ? Row(
+                  children: [
+                    // ปุ่มยกเลิก — คืนค่าทุกอย่างกลับเป็นก่อนกดแก้ไข
+                    Expanded(
+                      child: SizedBox(
+                        height: 54,
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : _cancelEdit,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: _AddonTheme.textSecondary,
+                            side: const BorderSide(color: _AddonTheme.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.close_rounded, size: 19),
+                              SizedBox(width: 8),
+                              Text(
+                                "ยกเลิก",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    )
-                  : const Row(
+                    ),
+                    const SizedBox(width: 12),
+                    // ปุ่มบันทึกการแก้ไข
+                    Expanded(
+                      child: SizedBox(
+                        height: 54,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _doUpdateAddonGroup,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _AddonTheme.accent,
+                            foregroundColor: Colors.white,
+                            elevation: 6,
+                            shadowColor: _AddonTheme.accent.withOpacity(0.35),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.check_circle_rounded, size: 19),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      "บันทึกการแก้ไข",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: ElevatedButton(
+                    onPressed: _enterEditMode, // โหมดดู → กดเพื่อเข้าโหมดแก้ไข
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _AddonTheme.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 6,
+                      shadowColor: _AddonTheme.primary.withOpacity(0.35),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.check_circle_rounded, size: 19),
+                        Icon(Icons.edit_rounded, size: 19),
                         SizedBox(width: 8),
                         Text(
-                          "บันทึกการแก้ไข",
+                          "แก้ไขข้อมูล",
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w700,
@@ -1024,8 +1383,8 @@ class _EditAddonState extends State<EditAddon> {
                         ),
                       ],
                     ),
-            ),
-          ),
+                  ),
+                ),
         ),
       ),
     );

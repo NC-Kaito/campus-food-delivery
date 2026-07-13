@@ -214,8 +214,16 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                           children: [
                             const SizedBox(height: 10),
 
-                            // Username Field
-                            _buildLabel('ชื่อผู้ใช้ (Username)'),
+                            Text(
+                              "ชื่อผู้ใช้ (Username)",
+                              style: TextStyle(
+                                color: const Color.fromARGB(255, 0, 0, 0),
+                                fontSize: 14,
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+
                             _buildCustomTextField(
                               controller: usernameController,
                               hintText: 'กรอกชื่อผู้ใช้ของคุณ',
@@ -239,8 +247,16 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                             ),
                             const SizedBox(height: 20),
 
-                            // Password Field
-                            _buildLabel('รหัสผ่าน (Password)'),
+                            Text(
+                              "รหัสผ่าน (Password)",
+                              style: TextStyle(
+                                color: const Color.fromARGB(255, 0, 0, 0),
+                                fontSize: 14,
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+
                             _buildCustomTextField(
                               controller: passwordController,
                               hintText: 'กรอกรหัสผ่านของคุณ',
@@ -350,22 +366,6 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 8),
-      child: RichText(
-        text: TextSpan(
-          text: text,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
       ),
     );
   }

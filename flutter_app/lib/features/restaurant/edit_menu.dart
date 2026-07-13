@@ -22,6 +22,7 @@ class _MenuTheme {
   static const Color textPrimary = Color(0xFF1F2430);
   static const Color textSecondary = Color(0xFF8A8F98);
   static const Color fieldBg = Color(0xFFF4F5F7);
+  static const Color fieldBgDisabled = Color(0xFFEFF0F2);
   static const Color border = Color(0xFFE7E8EC);
 }
 
@@ -55,6 +56,9 @@ class _EditMenuState extends State<EditMenu> {
   bool _isInitialLoading = true;
   bool _isAddingNewType = false;
   bool _hasExtraPrice = false;
+
+  // 🎯 โหมดของหน้า: false = แค่โชว์ข้อมูล (view-only), true = แก้ไขได้
+  bool _isEditing = false;
 
   List<TypeMenuModel> typeMenuList = [];
 
@@ -92,6 +96,21 @@ class _EditMenuState extends State<EditMenu> {
     extraPriceController.text = _hasExtraPrice
         ? existingExtraPrice.toStringAsFixed(0)
         : "";
+  }
+
+  // 🎯 ยกเลิกการแก้ไข: รีเซ็ตทุกอย่างกลับไปเป็นค่าเดิม แล้วสลับกลับไปโหมดดูอย่างเดียว
+  void _cancelEditing() {
+    setState(() {
+      _initializeFromMenuModel();
+      _selectedImage = null;
+      _imageError = null;
+      _typeMenuError = null;
+      _isAddingNewType = false;
+      _newTypeName = null;
+      _newTypeNameController.clear();
+      _isEditing = false;
+    });
+    FocusScope.of(context).unfocus();
   }
 
   @override
@@ -133,6 +152,8 @@ class _EditMenuState extends State<EditMenu> {
   }
 
   Future<void> pickImage() async {
+    if (!_isEditing) return; // 🎯 กันแตะรูปตอนอยู่โหมดดูอย่างเดียว
+
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -391,7 +412,7 @@ class _EditMenuState extends State<EditMenu> {
             fontWeight: FontWeight.w600,
             color: _MenuTheme.textSecondary,
           ),
-          children: required
+          children: required && _isEditing
               ? const [
                   TextSpan(
                     text: ' *',
@@ -444,28 +465,32 @@ class _EditMenuState extends State<EditMenu> {
                               ),
                             ],
                           ),
-                          child: const Icon(
-                            Icons.edit_note_rounded,
+                          child: Icon(
+                            _isEditing
+                                ? Icons.edit_note_rounded
+                                : Icons.receipt_long_rounded,
                             color: Colors.white,
                             size: 24,
                           ),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "แก้ไขเมนู",
-                                style: TextStyle(
+                                _isEditing ? "แก้ไขเมนู" : "รายละเอียดเมนู",
+                                style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.w800,
                                   color: _MenuTheme.textPrimary,
                                 ),
                               ),
                               Text(
-                                "ปรับปรุงรายละเอียดเมนูให้ตรงกับข้อมูลล่าสุด",
-                                style: TextStyle(
+                                _isEditing
+                                    ? "ปรับปรุงรายละเอียดเมนูให้ตรงกับข้อมูลล่าสุด"
+                                    : "ข้อมูลเมนูปัจจุบัน กดปุ่มแก้ไขเพื่อเปลี่ยนแปลง",
+                                style: const TextStyle(
                                   fontSize: 12.5,
                                   color: _MenuTheme.textSecondary,
                                 ),
@@ -473,6 +498,24 @@ class _EditMenuState extends State<EditMenu> {
                             ],
                           ),
                         ),
+                        // 🎯 ปุ่มแก้ไขแบบไอคอน มุมขวาบน (โชว์เฉพาะตอนยังไม่ได้กดแก้ไข)
+                        if (!_isEditing)
+                          Material(
+                            color: _MenuTheme.primary.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => setState(() => _isEditing = true),
+                              child: const Padding(
+                                padding: EdgeInsets.all(10),
+                                child: Icon(
+                                  Icons.edit_rounded,
+                                  size: 18,
+                                  color: _MenuTheme.primary,
+                                ),
+                              ),
+                            ),
+                          ),
                       ],
                     ),
 
@@ -508,23 +551,25 @@ class _EditMenuState extends State<EditMenu> {
                                       child: _buildImagePreview(),
                                     ),
                                   ),
-                                  Positioned(
-                                    bottom: 6,
-                                    right: 6,
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: const BoxDecoration(
-                                        color: _MenuTheme.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.edit_rounded,
-                                        size: 16,
-                                        color: Colors.white,
+                                  // 🎯 ไอคอนดินสอมุมล่างขวา โชว์เฉพาะตอนกำลังแก้ไข
+                                  if (_isEditing)
+                                    Positioned(
+                                      bottom: 6,
+                                      right: 6,
+                                      child: Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: const BoxDecoration(
+                                          color: _MenuTheme.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.edit_rounded,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -560,6 +605,7 @@ class _EditMenuState extends State<EditMenu> {
                           _fieldLabel("ชื่อเมนู", required: true),
                           TextFormField(
                             controller: menuNameController,
+                            enabled: _isEditing,
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
                                 ? "กรุณากรอกชื่อเมนู"
@@ -567,6 +613,9 @@ class _EditMenuState extends State<EditMenu> {
                             style: const TextStyle(fontSize: 14),
                             decoration: _inputDecoration(
                               hint: "เช่น กระเพราหมูกรอบ",
+                              fillColor: _isEditing
+                                  ? _MenuTheme.fieldBg
+                                  : _MenuTheme.fieldBgDisabled,
                             ),
                           ),
 
@@ -576,72 +625,76 @@ class _EditMenuState extends State<EditMenu> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               _fieldLabel("ประเภทเมนู", required: true),
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(9),
-                                  onTap: () {
-                                    setState(() {
-                                      _isAddingNewType = !_isAddingNewType;
-                                      if (!_isAddingNewType) {
-                                        _newTypeNameController.clear();
-                                        _newTypeName = null;
-                                      } else {
-                                        _selectedTypeMenuId = null;
-                                        _selectedTypeMenuName = null;
+                              // 🎯 ปุ่ม "เพิ่มใหม่" ใช้ได้เฉพาะตอนแก้ไข
+                              if (_isEditing)
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(9),
+                                    onTap: () {
+                                      setState(() {
+                                        _isAddingNewType = !_isAddingNewType;
+                                        if (!_isAddingNewType) {
+                                          _newTypeNameController.clear();
+                                          _newTypeName = null;
+                                        } else {
+                                          _selectedTypeMenuId = null;
+                                          _selectedTypeMenuName = null;
+                                        }
+                                      });
+                                      if (_isAddingNewType) {
+                                        FocusScope.of(context).unfocus();
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              if (mounted) {
+                                                FocusScope.of(
+                                                  context,
+                                                ).requestFocus(
+                                                  _newTypeFocusNode,
+                                                );
+                                              }
+                                            });
                                       }
-                                    });
-                                    if (_isAddingNewType) {
-                                      FocusScope.of(context).unfocus();
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            if (mounted) {
-                                              FocusScope.of(
-                                                context,
-                                              ).requestFocus(_newTypeFocusNode);
-                                            }
-                                          });
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _isAddingNewType
-                                          ? _MenuTheme.primary
-                                          : _MenuTheme.fieldBg,
-                                      borderRadius: BorderRadius.circular(9),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _isAddingNewType
-                                              ? Icons.close_rounded
-                                              : Icons.add_rounded,
-                                          size: 14,
-                                          color: _isAddingNewType
-                                              ? Colors.white
-                                              : _MenuTheme.textSecondary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          "เพิ่มใหม่",
-                                          style: TextStyle(
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w700,
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _isAddingNewType
+                                            ? _MenuTheme.primary
+                                            : _MenuTheme.fieldBg,
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _isAddingNewType
+                                                ? Icons.close_rounded
+                                                : Icons.add_rounded,
+                                            size: 14,
                                             color: _isAddingNewType
                                                 ? Colors.white
                                                 : _MenuTheme.textSecondary,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "เพิ่มใหม่",
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: _isAddingNewType
+                                                  ? Colors.white
+                                                  : _MenuTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                           const SizedBox(height: 5),
@@ -700,6 +753,7 @@ class _EditMenuState extends State<EditMenu> {
                             TextFormField(
                               controller: _newTypeNameController,
                               focusNode: _newTypeFocusNode,
+                              enabled: _isEditing,
                               autofocus: true,
                               onChanged: (val) {
                                 setState(() {
@@ -735,10 +789,14 @@ class _EditMenuState extends State<EditMenu> {
                           _fieldLabel("รายละเอียด"),
                           TextFormField(
                             controller: descriptionController,
+                            enabled: _isEditing,
                             maxLines: 2,
                             style: const TextStyle(fontSize: 14),
                             decoration: _inputDecoration(
                               hint: "รายละเอียดอาหาร...",
+                              fillColor: _isEditing
+                                  ? _MenuTheme.fieldBg
+                                  : _MenuTheme.fieldBgDisabled,
                             ),
                           ),
 
@@ -755,6 +813,7 @@ class _EditMenuState extends State<EditMenu> {
                                     _fieldLabel("ราคาปกติ", required: true),
                                     TextFormField(
                                       controller: priceController,
+                                      enabled: _isEditing,
                                       keyboardType: TextInputType.number,
                                       validator: (value) {
                                         if (value == null ||
@@ -769,6 +828,9 @@ class _EditMenuState extends State<EditMenu> {
                                       style: const TextStyle(fontSize: 14),
                                       decoration: _inputDecoration(
                                         hint: "0",
+                                        fillColor: _isEditing
+                                            ? _MenuTheme.fieldBg
+                                            : _MenuTheme.fieldBgDisabled,
                                         suffixIcon: const Padding(
                                           padding: EdgeInsets.only(right: 12),
                                           child: Center(
@@ -810,7 +872,7 @@ class _EditMenuState extends State<EditMenu> {
                                     const SizedBox(height: 8),
                                     TextFormField(
                                       controller: extraPriceController,
-                                      enabled: _hasExtraPrice,
+                                      enabled: _isEditing && _hasExtraPrice,
                                       keyboardType: TextInputType.number,
                                       validator: (value) {
                                         if (!_hasExtraPrice) return null;
@@ -826,9 +888,9 @@ class _EditMenuState extends State<EditMenu> {
                                       style: const TextStyle(fontSize: 14),
                                       decoration: _inputDecoration(
                                         hint: "0",
-                                        fillColor: _hasExtraPrice
+                                        fillColor: _isEditing && _hasExtraPrice
                                             ? _MenuTheme.fieldBg
-                                            : _MenuTheme.border,
+                                            : _MenuTheme.fieldBgDisabled,
                                         suffixIcon: const Padding(
                                           padding: EdgeInsets.only(right: 12),
                                           child: Center(
@@ -858,42 +920,118 @@ class _EditMenuState extends State<EditMenu> {
               ),
             ),
 
-      // ── ปุ่มบันทึก ปักไว้ด้านล่างเสมอ ────────────────────────────
+      // ── แถบปุ่มด้านล่าง: โหมดดู → ปุ่มแก้ไข, โหมดแก้ไข → ยกเลิก/บันทึก ──
       bottomNavigationBar: _isInitialLoading
           ? null
           : SafeArea(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _doSaveMenu,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _MenuTheme.accent,
-                      foregroundColor: Colors.white,
-                      elevation: 6,
-                      shadowColor: _MenuTheme.accent.withOpacity(0.35),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
+                child: _isEditing
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 54,
+                              child: OutlinedButton(
+                                onPressed: _isLoading ? null : _cancelEditing,
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _MenuTheme.textSecondary,
+                                  side: const BorderSide(
+                                    color: _MenuTheme.border,
+                                    width: 1.4,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.close_rounded, size: 18),
+                                    SizedBox(width: 6),
+                                    Text(
+                                      "ยกเลิก",
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          )
-                        : const Row(
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: SizedBox(
+                              height: 54,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _doSaveMenu,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _MenuTheme.accent,
+                                  foregroundColor: Colors.white,
+                                  elevation: 6,
+                                  shadowColor: _MenuTheme.accent.withOpacity(
+                                    0.35,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 22,
+                                        width: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle_rounded,
+                                            size: 19,
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            "บันทึกการแก้ไข",
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: ElevatedButton(
+                          onPressed: () => setState(() => _isEditing = true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _MenuTheme.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 6,
+                            shadowColor: _MenuTheme.primary.withOpacity(0.35),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.check_circle_rounded, size: 19),
+                              Icon(Icons.edit_rounded, size: 19),
                               SizedBox(width: 8),
                               Text(
-                                "บันทึกการแก้ไข",
+                                "แก้ไขข้อมูล",
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700,
@@ -901,8 +1039,8 @@ class _EditMenuState extends State<EditMenu> {
                               ),
                             ],
                           ),
-                  ),
-                ),
+                        ),
+                      ),
               ),
             ),
     );
@@ -937,7 +1075,7 @@ class _EditMenuState extends State<EditMenu> {
           ),
           const SizedBox(height: 8),
           Text(
-            "แตะเพื่อเลือกรูป",
+            _isEditing ? "แตะเพื่อเลือกรูป" : "ยังไม่มีรูปภาพ",
             style: TextStyle(
               fontSize: 12.5,
               color: _MenuTheme.textSecondary.withOpacity(0.8),
@@ -962,14 +1100,17 @@ class _EditMenuState extends State<EditMenu> {
           inactiveThumbColor: Colors.white,
           inactiveTrackColor: Colors.grey.shade300,
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          onChanged: (value) {
-            setState(() {
-              _hasExtraPrice = value;
-              if (!_hasExtraPrice) {
-                extraPriceController.clear();
-              }
-            });
-          },
+          // 🎯 แตะสวิตช์ได้เฉพาะตอนกำลังแก้ไข
+          onChanged: _isEditing
+              ? (value) {
+                  setState(() {
+                    _hasExtraPrice = value;
+                    if (!_hasExtraPrice) {
+                      extraPriceController.clear();
+                    }
+                  });
+                }
+              : null,
         ),
       ),
     );
@@ -988,7 +1129,7 @@ class _EditMenuState extends State<EditMenu> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: _MenuTheme.fieldBg,
+        color: _isEditing ? _MenuTheme.fieldBg : _MenuTheme.fieldBgDisabled,
         borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButtonHideUnderline(
@@ -1008,8 +1149,8 @@ class _EditMenuState extends State<EditMenu> {
               child: Text(e, style: const TextStyle(fontSize: 14)),
             );
           }).toList(),
-          // ไม่มีประเภทให้เลือก → ปิดการกดดรอปดาว กันเปิดเมนูเปล่า
-          onChanged: isEmpty ? null : onChanged,
+          // ปิดดรอปดาวถ้ายังไม่ได้กดแก้ไข หรือไม่มีประเภทให้เลือก
+          onChanged: (isEmpty || !_isEditing) ? null : onChanged,
         ),
       ),
     );
