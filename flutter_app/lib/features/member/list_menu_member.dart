@@ -560,106 +560,8 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     ],
                     border: Border.all(color: Colors.grey.shade100),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "ข้าวราดแกงตามใจชอบ",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selectCount == 0
-                                      ? Colors.orange.shade50
-                                      : Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  "เลือกแล้ว $selectCount / $_maxCurrySelect อย่าง",
-                                  style: TextStyle(
-                                    color: selectCount == 0
-                                        ? Colors.orange.shade800
-                                        : Colors.green.shade800,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            "฿${totalPrice.toStringAsFixed(0)}",
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF4CAF50),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Divider(height: 1, color: Color(0xFFF5F5F5)),
-                      ),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            size: 14,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text("ราคาฐาน"),
-                          Text("฿${basePrice.toStringAsFixed(0)}"),
-                        ],
-                      ),
-                      if (extraCurryPrice > 0)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text("เมนูพิเศษ"),
-                            Text("+฿${extraCurryPrice.toStringAsFixed(0)}"),
-                          ],
-                        ),
-                      if (_isExtraRice)
-                        const Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [Text("เพิ่มข้าว"), Text("+฿10")],
-                        ),
-                      if (_curryQty > 1)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text("จำนวน x$_curryQty"),
-                            Text("฿${totalPrice.toStringAsFixed(0)}"),
-                          ],
-                        ),
-                    ],
-                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start),
                 ),
-                const SizedBox(height: 20),
 
                 const Row(
                   children: [
@@ -827,6 +729,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
           ),
         ),
 
+        // ═══════════════════════════════════════════════
+        // 🎯 Bottom bar — ปรับให้แสดง "จำนวน" + "ราคารวม" คู่กัน
+        //    ในสไตล์เดียวกับหน้า AddOrderMember
+        // ═══════════════════════════════════════════════
         Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           decoration: BoxDecoration(
@@ -845,6 +751,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // ── ตัวเลือก "เพิ่มปริมาณข้าวสวย" ──────────────────
               Container(
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
@@ -870,87 +777,149 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       setState(() => _isExtraRice = val ?? false),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
 
+              // ── แถวจำนวน (ซ้าย) + ราคารวม (ขวา) — สไตล์เดียวกับ AddOrderMember ──
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove,
-                            size: 20,
-                            color: Colors.black87,
-                          ),
-                          onPressed: _curryQty > 1
-                              ? () => setState(() => _curryQty--)
-                              : null,
+                  // ─── ฝั่งซ้าย: จำนวนที่สั่ง ───────────────
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "จำนวนที่สั่ง",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text(
-                            '$_curryQty',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.remove_circle_outline,
+                                size: 24,
+                                color: _curryQty > 1
+                                    ? Colors.black87
+                                    : Colors.grey.shade400,
+                              ),
+                              onPressed: _curryQty > 1
+                                  ? () => setState(() => _curryQty--)
+                                  : null,
                             ),
-                          ),
+                            SizedBox(
+                              width: 28,
+                              child: Text(
+                                "$_curryQty",
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                size: 24,
+                                color: Colors.black87,
+                              ),
+                              onPressed: () => setState(() => _curryQty++),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.add,
-                            size: 20,
-                            color: Colors.black87,
-                          ),
-                          onPressed: () => setState(() => _curryQty++),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40,
-                        vertical: 16,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ),
-                    onPressed: _selectedCurries.isEmpty
-                        ? null
-                        : () {
-                            final curriesNames = _selectedCurries
-                                .map((c) => c.menuName ?? "-")
-                                .join(', ');
 
-                            final additions = _isExtraRice ? 'เพิ่มข้าว' : '';
+                  const Spacer(),
 
-                            final finalNote =
-                                "ราดแกง: [$curriesNames] "
-                                "${additions.isNotEmpty ? '($additions)' : ''}";
-
-                            _addMenuCurryToCart(totalPrice, finalNote);
-                          },
-                    child: const Text(
-                      "เพิ่มลงตะกร้า",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
+                  // ─── ฝั่งขวา: ราคารวม ──────────────────────
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        "จำนวน $_curryQty จาน",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 6),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: "ราคารวม  ",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            TextSpan(
+                              text: "฿${totalPrice.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4CAF50),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── ปุ่มเพิ่มลงตะกร้า เต็มความกว้าง ──────────────
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  onPressed: _selectedCurries.isEmpty
+                      ? null
+                      : () {
+                          final curriesNames = _selectedCurries
+                              .map((c) => c.menuName ?? "-")
+                              .join(', ');
+
+                          final additions = _isExtraRice ? 'เพิ่มข้าว' : '';
+
+                          final finalNote =
+                              "ราดแกง: [$curriesNames] "
+                              "${additions.isNotEmpty ? '($additions)' : ''}";
+
+                          _addMenuCurryToCart(totalPrice, finalNote);
+                        },
+                  child: const Text(
+                    "เพิ่มลงตะกร้า",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
             ],
           ),

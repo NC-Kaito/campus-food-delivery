@@ -2,11 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/features/member/cart_manager_member.dart'; // ← เพิ่ม import นี้
 import 'package:flutter_app/features/member/home_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/global_data.dart';
-import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 เรียกใช้ไอพีตัวกลางเซิร์ฟเวอร์หลัก
+import 'package:flutter_app/core/network/dio_client.dart';
 
 class NavbarMember extends StatefulWidget implements PreferredSizeWidget {
   final String title;
@@ -22,7 +23,7 @@ class NavbarMember extends StatefulWidget implements PreferredSizeWidget {
   State<NavbarMember> createState() => _NavbarMemberState();
 }
 
-class _NavbarMemberState extends State<NavbarMember> {
+class _NavbarMemberState extends State<NavbarMember> with RouteAware {
   final MemberService memberService = MemberService();
   MemberModel? memberModel;
   String? memberImage;
@@ -33,7 +34,6 @@ class _NavbarMemberState extends State<NavbarMember> {
     loadMemberData();
   }
 
-  // ฟังก์ชันเชื่อมพาร์ทสั้นเข้าไอพีเซิร์ฟเวอร์ส่วนกลางหลัก
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -52,7 +52,6 @@ class _NavbarMemberState extends State<NavbarMember> {
         setState(() {
           if (member != null) {
             memberModel = member;
-            // 🎯 ปรับให้แมตช์เข้าสายแปลงพาร์ทผ่าน Base URL ไอพีกลาง ปลอดภัยรูปไม่หลุด
             memberImage = _getFinalImageUrl(member.profileimg);
           }
         });
@@ -64,6 +63,10 @@ class _NavbarMemberState extends State<NavbarMember> {
 
   @override
   Widget build(BuildContext context) {
+    // 🎯 ดึงจำนวนรายการในตะกร้าตรงนี้ทุกครั้งที่ build ใหม่
+    // (rebuild เกิดขึ้นอัตโนมัติเมื่อ Navigator.push กลับมาที่หน้านี้พอดี)
+    final int cartItemCount = CartManager().items.length;
+
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 4,
@@ -94,18 +97,59 @@ class _NavbarMemberState extends State<NavbarMember> {
       ),
 
       actions: [
-        IconButton(
-          icon: const Icon(
-            Icons.shopping_cart_outlined,
-            color: NavbarMember._orange,
-            size: 32,
-          ),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ListOrderMember()),
-            );
-          },
+        // 🎯 ห่อไอคอนตะกร้าด้วย Stack เพื่อวาง badge ตัวเลขมุมขวาบน
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.shopping_cart_outlined,
+                color: NavbarMember._orange,
+                size: 32,
+              ),
+              onPressed: () async {
+                // ใช้ await + then แบบง่ายด้วย setState หลังกลับมา
+                // เผื่อผู้ใช้ลบของออกจากตะกร้าแล้วเลขต้องอัปเดต
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ListOrderMember(),
+                  ),
+                );
+                if (mounted) setState(() {});
+              },
+            ),
+            if (cartItemCount > 0)
+              Positioned(
+                right: 4,
+                top: 4,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 5,
+                    vertical: 1,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 18,
+                    minHeight: 18,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white, width: 1.5),
+                  ),
+                  child: Text(
+                    cartItemCount > 99 ? '99+' : '$cartItemCount',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      height: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: 12),
 

@@ -552,26 +552,29 @@ class _ListMenuUserState extends State<ListMenuUser>
       );
     }
 
-    int selectCount = _selectedCurries.length;
+    final int selectCount = _selectedCurries.length;
 
     double basePrice = 0;
-    if (selectCount >= 1) {
+    if (selectCount == 1) {
+      basePrice = 20;
+    } else if (selectCount == 2) {
       basePrice = 25;
+    } else if (selectCount >= 3) {
+      basePrice = 30;
     }
 
-    double extraCurryPrice = 0;
-    if (selectCount > 1) {
-      extraCurryPrice = (selectCount - 1) * 5.0;
-    }
+    final double extraCurryPrice = _selectedCurries.fold(
+      0.0,
+      (sum, curry) => sum + (curry.price ?? 0.0),
+    );
 
-    double optionPrice = 0;
-    if (_isExtraRice) optionPrice += 5;
+    final double optionPrice = _isExtraRice ? 10.0 : 0.0;
 
-    double totalPrice = (basePrice + extraCurryPrice + optionPrice) * _curryQty;
+    final double unitPrice = basePrice + extraCurryPrice + optionPrice;
+    final double totalPrice = unitPrice * _curryQty;
 
     return Column(
       children: [
-        // ─── ส่วน scroll ───────────────────────────────────────
         Expanded(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -594,77 +597,8 @@ class _ListMenuUserState extends State<ListMenuUser>
                     ],
                     border: Border.all(color: Colors.grey.shade100),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "ข้าวราดแกงตามใจชอบ",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: selectCount == 0
-                                      ? Colors.orange.shade50
-                                      : Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Text(
-                                  "เลือกแล้ว $selectCount / $_maxCurrySelect อย่าง",
-                                  style: TextStyle(
-                                    color: selectCount == 0
-                                        ? Colors.orange.shade800
-                                        : Colors.green.shade800,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          Text(
-                            "฿${totalPrice.toStringAsFixed(0)}",
-                            style: const TextStyle(
-                              fontSize: 28,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF4CAF50),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Divider(height: 1, color: Color(0xFFF5F5F5)),
-                      ),
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.info_outline,
-                            size: 14,
-                            color: Colors.grey,
-                          ),
-                          const SizedBox(width: 6),
-                        ],
-                      ),
-                    ],
-                  ),
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start),
                 ),
-                const SizedBox(height: 20),
 
                 // 🍛 2. หัวข้อรายการกับข้าว
                 const Row(
@@ -809,7 +743,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                         value: isSelected,
                         onChanged:
                             (!isAvailable ||
-                                (isSelected == false &&
+                                (!isSelected &&
                                     _selectedCurries.length >= _maxCurrySelect))
                             ? null
                             : (bool? value) {
@@ -834,7 +768,9 @@ class _ListMenuUserState extends State<ListMenuUser>
           ),
         ),
 
-        // ─── Bottom Bar fixed ──────────────────────────────────
+        // ═══════════════════════════════════════════════
+        // 🎯 Bottom bar — สไตล์เดียวกับหน้า AddOrderMember/ListMenuMember
+        // ═══════════════════════════════════════════════
         Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           decoration: BoxDecoration(
@@ -853,7 +789,7 @@ class _ListMenuUserState extends State<ListMenuUser>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // ⚙️ ตัวเลือกเสริม
+              // ── ตัวเลือก "เพิ่มปริมาณข้าวสวย" ──────────────────
               Container(
                 decoration: BoxDecoration(
                   color: Colors.grey.shade50,
@@ -871,7 +807,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   subtitle: const Text(
-                    "+5 บาท",
+                    "+10 บาท",
                     style: TextStyle(fontSize: 12),
                   ),
                   value: _isExtraRice,
@@ -879,78 +815,137 @@ class _ListMenuUserState extends State<ListMenuUser>
                       setState(() => _isExtraRice = val ?? false),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 16),
 
-              // 🛒 จำนวน + ปุ่มลงตะกร้า
+              // ── แถวจำนวน (ซ้าย) + ราคารวม (ขวา) ──────────────
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove,
-                            size: 20,
-                            color: Colors.black87,
-                          ),
-                          onPressed: _curryQty > 1
-                              ? () => setState(() => _curryQty--)
-                              : null,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "จำนวนที่สั่ง",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
                         ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: Text(
-                            '$_curryQty',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade200),
+                        ),
+                        child: Row(
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.remove_circle_outline,
+                                size: 24,
+                                color: _curryQty > 1
+                                    ? Colors.black87
+                                    : Colors.grey.shade400,
+                              ),
+                              onPressed: _curryQty > 1
+                                  ? () => setState(() => _curryQty--)
+                                  : null,
                             ),
-                          ),
+                            SizedBox(
+                              width: 28,
+                              child: Text(
+                                "$_curryQty",
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                size: 24,
+                                color: Colors.black87,
+                              ),
+                              onPressed: () => setState(() => _curryQty++),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.add,
-                            size: 20,
-                            color: Colors.black87,
-                          ),
-                          onPressed: () => setState(() => _curryQty++),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4CAF50),
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade300,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 40,
-                        vertical: 16,
+
+                  const Spacer(),
+
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        "จำนวน $_curryQty จาน",
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
                       ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                      const SizedBox(height: 6),
+                      RichText(
+                        text: TextSpan(
+                          children: [
+                            const TextSpan(
+                              text: "ราคารวม  ",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
+                            ),
+                            TextSpan(
+                              text: "฿${totalPrice.toStringAsFixed(0)}",
+                              style: const TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF4CAF50),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      elevation: 0,
-                    ),
-                    onPressed: _selectedCurries.isEmpty
-                        ? null
-                        : () {
-                            _showLoginWarningDialog();
-                          },
-                    child: const Text(
-                      "เพิ่มลงตะกร้า",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
+                    ],
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── ปุ่ม — สำหรับ User ยังไม่ login ให้เด้งเตือนแทนการเพิ่มลงตะกร้า ──
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: Colors.grey.shade300,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                  onPressed: _selectedCurries.isEmpty
+                      ? null
+                      : () {
+                          _showLoginWarningDialog(); // 🎯 User ยังไม่ login ให้เตือนแทนการเพิ่มลงตะกร้าจริง
+                        },
+                  child: const Text(
+                    "เพิ่มลงตะกร้า",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,6 +1,7 @@
 // features/member/home_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
+import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/list_confirm_order_member.dart';
 import 'package:flutter_app/features/member/list_menu_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
@@ -131,8 +132,17 @@ class _HomeMemberState extends State<HomeMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
+  // 🎯 ฟังก์ชันช่วย: เรียก setState เปล่าๆ เพื่อรีเฟรช badge ตะกร้า
+  // ใช้หลัง Navigator.push กลับมา เผื่อผู้ใช้ไปเพิ่ม/ลบของในตะกร้าจากหน้าอื่นมา
+  void _refreshCartBadge() {
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 🎯 จำนวนรายการทั้งหมดในตะกร้า (นับเป็น "รายการ" ไม่ใช่ผลรวมจำนวนจาน)
+    final int cartItemCount = CartManager().items.length;
+
     return Scaffold(
       backgroundColor: const Color(
         0xFFF9FBF7,
@@ -388,14 +398,15 @@ class _HomeMemberState extends State<HomeMember> {
                   });
                   _loadResults("");
                 }, isActive: true),
+                // 🎯 เพิ่ม badgeCount ให้ปุ่มตะกร้า + รีเฟรชหลังกลับมาจากหน้าตะกร้า
                 _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ListOrderMember(),
                     ),
-                  );
-                }),
+                  ).then((_) => _refreshCartBadge());
+                }, badgeCount: cartItemCount),
                 _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
                   Navigator.push(
                     context,
@@ -425,6 +436,7 @@ class _HomeMemberState extends State<HomeMember> {
     String label,
     VoidCallback onTap, {
     bool isActive = false,
+    int badgeCount = 0, // 🎯 เพิ่มพารามิเตอร์ใหม่: จำนวนที่จะโชว์บน badge
   }) {
     return InkWell(
       onTap: onTap,
@@ -434,7 +446,46 @@ class _HomeMemberState extends State<HomeMember> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isActive ? const Color(0xFF64F02D) : Colors.grey),
+            // 🎯 ห่อไอคอนด้วย Stack เพื่อวาง badge ตัวเลขไว้มุมขวาบน
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(
+                  icon,
+                  color: isActive ? const Color(0xFF64F02D) : Colors.grey,
+                ),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             Text(
               label,
               style: menuTextStyle.copyWith(
@@ -483,12 +534,14 @@ class _HomeMemberState extends State<HomeMember> {
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () {
+          // 🎯 เปิดหน้าเมนูร้านค้า แล้วรีเฟรช badge ตะกร้าหลังกลับมา
+          // เผื่อผู้ใช้ไปเพิ่มของลงตะกร้าจากหน้านี้
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ListMenuMember(restaurantModel: item),
             ),
-          );
+          ).then((_) => _refreshCartBadge());
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
