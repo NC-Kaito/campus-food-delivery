@@ -77,6 +77,7 @@ class _AddAddonState extends State<AddAddon> {
         nameController: TextEditingController(),
         priceController: TextEditingController(),
         addonId: null,
+        allowqtystatus: false, // กำหนดค่าเริ่มต้น
       );
       selectedAddons.add(newAddon);
 
@@ -234,6 +235,7 @@ class _AddAddonState extends State<AddAddon> {
             addonprice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
             status: true,
+            allowqtystatus: addon.allowqtystatus, // ส่งค่าการอนุญาตเพิ่มจำนวน
           );
         }).toList(),
       );
@@ -269,8 +271,9 @@ class _AddAddonState extends State<AddAddon> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
-  } // ============================================================
+  }
 
+  // ============================================================
   // Shared styles
   // ============================================================
   InputDecoration _fieldDecoration({String hint = "", Widget? prefixIcon}) {
@@ -541,12 +544,11 @@ class _AddAddonState extends State<AddAddon> {
           Expanded(
             flex: 3,
             child: CompositedTransformTarget(
-              link: _layerLinks[addon]!, // ← ผูกกับ overlay ที่จะลอยใต้ช่องนี้
+              link: _layerLinks[addon]!,
               child: TextFormField(
                 controller: addon.nameController,
-                focusNode: _nameFocusNodes[addon], // ← เพิ่ม
-                onChanged: (value) =>
-                    _onAddonNameChanged(addon, value), // ← เพิ่ม
+                focusNode: _nameFocusNodes[addon],
+                onChanged: (value) => _onAddonNameChanged(addon, value),
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
                 style: const TextStyle(fontSize: 14),
@@ -599,7 +601,6 @@ class _AddAddonState extends State<AddAddon> {
           Expanded(
             flex: 2,
             child: TextFormField(
-              // ← ลบ SizedBox(height:42) ออก
               controller: addon.priceController,
               keyboardType: TextInputType.number,
               validator: (value) {
@@ -658,6 +659,64 @@ class _AddAddonState extends State<AddAddon> {
             ),
           ),
           const SizedBox(width: 6),
+
+          // ─── ปุ่ม +จำนวน (อนุญาตให้เพิ่ม qty) ───
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: () {
+                setState(() {
+                  addon.allowqtystatus = !addon.allowqtystatus;
+                });
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                height: 44, // ให้ความสูงพอดีกับช่องกรอกข้อความ
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: addon.allowqtystatus
+                      ? _AddonTheme.accent.withOpacity(0.12)
+                      : _AddonTheme.surface, // ใช้สีขาวให้เข้ากับกล่อง input
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: addon.allowqtystatus
+                        ? _AddonTheme.accent
+                        : Colors.transparent,
+                    width: 1.4,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      addon.allowqtystatus
+                          ? Icons.check_box_rounded
+                          : Icons.check_box_outline_blank_rounded,
+                      size: 18,
+                      color: addon.allowqtystatus
+                          ? _AddonTheme.accent
+                          : _AddonTheme.textSecondary,
+                    ),
+                    // const SizedBox(width: 4),
+                    // Text(
+                    //   "+จำนวน",
+                    //   style: TextStyle(
+                    //     fontSize: 12,
+                    //     fontWeight: FontWeight.w700,
+                    //     color: addon.allowqtystatus
+                    //         ? _AddonTheme.accent
+                    //         : _AddonTheme.textSecondary,
+                    //   ),
+                    // ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+
+          // ─── ปุ่มลบ ───
           Material(
             color: Colors.transparent,
             child: InkWell(
@@ -665,7 +724,7 @@ class _AddAddonState extends State<AddAddon> {
               onTap: canDelete ? () => _removeAddonItemRow(index) : null,
               child: Container(
                 width: 34,
-                height: 34,
+                height: 44, // ปรับให้สูงเท่ากัน
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: canDelete
@@ -854,36 +913,44 @@ class _AddAddonState extends State<AddAddon> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 36,
-                          ), // เว้นที่ให้ตรงกับเลขลำดับ (circle) ด้านล่าง
-                          const Expanded(
+                        children: const [
+                          SizedBox(width: 36),
+                          Expanded(
                             flex: 3,
                             child: Text(
                               "ชื่อตัวเลือก",
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: _AddonTheme.textSecondary,
+                                color: Color.fromARGB(255, 0, 0, 0),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          const Expanded(
+                          SizedBox(width: 45),
+                          Expanded(
                             flex: 2,
                             child: Text(
                               "ราคา",
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: _AddonTheme.textSecondary,
+                                color: Color.fromARGB(255, 0, 0, 0),
                               ),
                             ),
                           ),
-                          const SizedBox(
-                            width: 40,
-                          ), // เว้นที่ให้ตรงกับปุ่มลบ (×) ด้านล่าง
+                          // เว้นพื้นที่ให้ปุ่ม +จำนวน และ ปุ่มลบ
+                          SizedBox(width: 8),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              "เพิ่มจำนวน",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color.fromARGB(255, 0, 0, 0),
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),

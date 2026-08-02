@@ -23,7 +23,7 @@ class MenuAddonGroupModel {
     return MenuAddonGroupModel(
       addonGroupId: json['addongroupid'],
       addonGroupName: json['addongroupname'],
-      isRequired: json['isRequired'],
+      isRequired: json['required'],
       maxSelect: json['maxselect'],
       status: json['status'] ?? true,
       menuCount: json['menuCount'] ?? 0,

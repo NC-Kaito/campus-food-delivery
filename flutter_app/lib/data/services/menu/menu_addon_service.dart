@@ -136,7 +136,7 @@ class MenuAddonService {
 
   Future<bool> deleteAddonGroup(int groupId) async {
     try {
-      final response = await DioClient.dio.delete(
+      final response = await DioClient.dio.post(
         '/v1/menuAddon/groups/$groupId',
       );
       return response.statusCode == 200 || response.statusCode == 204;
@@ -171,6 +171,18 @@ class MenuAddonService {
           "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์";
     } catch (e) {
       throw "Error: $e";
+    }
+  }
+
+  Future<bool> toggleAddonDetailStatus(int addonDetailId, bool status) async {
+    try {
+      final response = await DioClient.dio.patch(
+        '/v1/menuAddon/details/$addonDetailId/status',
+        data: {'status': status},
+      );
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      throw Exception(e.response?.data['message'] ?? 'ไม่สามารถอัปเดตสถานะได้');
     }
   }
 }

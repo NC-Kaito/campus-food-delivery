@@ -548,12 +548,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
             fontWeight: FontWeight.w600,
             letterSpacing: 0.1,
           ),
-          children: const [
-            TextSpan(
-              text: ' *',
-              style: TextStyle(color: _danger),
-            ),
-          ],
         ),
       ),
     );
@@ -729,7 +723,16 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel("ชื่อผู้ใช้ (Username)"),
+                          const SizedBox(height: 10),
+
+                          Text(
+                            "ชื่อผู้ใช้ (Username)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           TextFormField(
                             key: _usernameKey,
                             controller: usernameController,
@@ -745,7 +748,16 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                             ),
                           ),
 
-                          _buildLabel("รหัสผ่าน (Password)"),
+                          const SizedBox(height: 15),
+
+                          Text(
+                            "รหัสผ่าน (Password)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           TextFormField(
                             key: _passwordKey,
                             controller: passwordController,
@@ -769,7 +781,16 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                             ),
                           ),
 
-                          _buildLabel("ชื่อร้านค้า (Restaurant Name)"),
+                          const SizedBox(height: 15),
+
+                          Text(
+                            "ชื่อร้านค้า (Restaurant Name)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
                           TextFormField(
                             key: _restaurantNameKey,
                             controller: restaurantNameController,
@@ -785,7 +806,17 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                             ),
                           ),
 
-                          _buildLabel("ประเภทร้านค้า (Restaurant Type)"),
+                          const SizedBox(height: 15),
+
+                          Text(
+                            "ประเภทร้านค้า (Restaurant Type)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
                           Container(
                             key: _typeFieldKey,
                             child: _buildDropdown(
@@ -804,7 +835,17 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                           ),
                           _fieldError(_typeError),
 
-                          _buildLabel("ที่ตั้งร้านค้า (Location)"),
+                          const SizedBox(height: 15),
+
+                          Text(
+                            "ที่ตั้งร้านค้า (Location)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+
                           InkWell(
                             key: _locationKey,
                             borderRadius: BorderRadius.circular(14),
@@ -884,21 +925,36 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                             ),
                           ),
                           _fieldError(_locationError),
+                          const SizedBox(height: 15),
 
-                          const SizedBox(height: 6),
-                          _buildUploadBox(
+                          Text(
                             "รูปภาพร้านค้า (Restaurant Image)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+
+                          _buildUploadBox(
+                            "",
                             _selectedImage,
                             () => pickImage(),
                             key: _imageKey,
                           ),
                           _fieldError(_restaurantImageError),
 
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 15),
 
-                          // ════════════════ UX ใหม่: ตัวสร้างและจัดกลุ่มช่วงเวลาเหมือนหน้า Profile ════════════════
-                          _buildLabel("ตั้งค่าเวลาเปิด-ปิดร้าน"),
-                          const SizedBox(height: 4),
+                          Text(
+                            "ตั้งค่าวันและเวลาเปิด-ปิดร้าน",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
 
                           Container(
                             key: _openingHoursKey,
@@ -913,7 +969,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                               children: [
                                 // 1. ปุ่มวงกลมอักษรย่อภาษาไทยเรียงตามวัน
                                 const Text(
-                                  "1. เลือกกลุ่มวันที่ต้องการตั้งเวลา:",
+                                  "1. เลือกวันที่เปิดร้านค้า (Open Date)",
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
@@ -929,16 +985,24 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                   ) {
                                     final isSelected = _tempSelectedDays
                                         .contains(day);
+                                    final existingHour = _openingHours
+                                        .firstWhere((h) => h.dayOfWeek == day);
+                                    // 🎯 วันที่ตั้งเวลาทำการไปแล้ว (closed == false)
+                                    // ให้แสดงเป็นสีทึบและกดเลือกซ้ำไม่ได้อีก
+                                    final isAlreadySet = !existingHour.closed;
+
                                     return GestureDetector(
-                                      onTap: () {
-                                        setState(() {
-                                          if (isSelected) {
-                                            _tempSelectedDays.remove(day);
-                                          } else {
-                                            _tempSelectedDays.add(day);
-                                          }
-                                        });
-                                      },
+                                      onTap: isAlreadySet
+                                          ? null
+                                          : () {
+                                              setState(() {
+                                                if (isSelected) {
+                                                  _tempSelectedDays.remove(day);
+                                                } else {
+                                                  _tempSelectedDays.add(day);
+                                                }
+                                              });
+                                            },
                                       child: AnimatedContainer(
                                         duration: const Duration(
                                           milliseconds: 200,
@@ -947,17 +1011,21 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                         height: 38,
                                         alignment: Alignment.center,
                                         decoration: BoxDecoration(
-                                          color: isSelected
-                                              ? _accent
-                                              : Colors.white,
+                                          color: isAlreadySet
+                                              ? Colors.grey.shade400
+                                              : (isSelected
+                                                    ? _accent
+                                                    : Colors.white),
                                           shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: isSelected
-                                                ? _accent
-                                                : Colors.grey.shade300,
+                                            color: isAlreadySet
+                                                ? Colors.grey.shade400
+                                                : (isSelected
+                                                      ? _accent
+                                                      : Colors.grey.shade300),
                                             width: 1.5,
                                           ),
-                                          boxShadow: isSelected
+                                          boxShadow: isSelected && !isAlreadySet
                                               ? [
                                                   BoxShadow(
                                                     color: _accent.withOpacity(
@@ -973,7 +1041,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                           style: TextStyle(
                                             fontSize: 12,
                                             fontWeight: FontWeight.bold,
-                                            color: isSelected
+                                            color: isAlreadySet || isSelected
                                                 ? Colors.white
                                                 : _textDark,
                                           ),
@@ -986,7 +1054,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                                 // 2. ระบุช่วงเวลาทำการดรัมสไลด์
                                 const Text(
-                                  "2. ระบุช่วงเวลาทำการ:",
+                                  "2. ระบุช่วงเวลาทำการ (Open time - Close time)",
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
@@ -1064,7 +1132,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                       size: 18,
                                     ),
                                     label: const Text(
-                                      "เพิ่มช่วงเวลานี้",
+                                      "ยืนยัน",
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                       ),
@@ -1381,7 +1449,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel(label),
+        if (label.isNotEmpty)
+          _buildLabel(label), // 👈 เพิ่มเงื่อนไข if เช็คตรงนี้ครับผม
         GestureDetector(
           onTap: onTap,
           child: Container(

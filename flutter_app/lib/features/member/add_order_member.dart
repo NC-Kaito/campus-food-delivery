@@ -5,7 +5,7 @@ import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
-import 'package:flutter_app/features/member/view_order_member.dart'; // 🎯 ดึงตัวแปรไอพีกลางสากลเข้ามาจัดการความชัวร์ของรูปภาพ
+import 'package:flutter_app/features/member/view_order_member.dart';
 
 class AddOrderMember extends StatefulWidget {
   final MenuModel menuModel;
@@ -24,10 +24,11 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   List<MenuAddonDetailModel> _allAddons = [];
   bool _isLoading = true;
 
-  // สำหรับเก็บรายการ Add-on ที่ผู้ใช้เลือกจิ้ม (Key: ID ของตัวเลือกย่อย, Value: วัตถุข้อมูล)
-  final Map<int, MenuAddonDetailModel> _selectedAddons = {};
+  // 🎯 เก็บจำนวนที่เลือกของแต่ละ Add-on (Key: addonDetailId, Value: จำนวนชิ้น)
+  final Map<int, int> _addonQuantities = {};
+  // 🎯 เก็บวัตถุข้อมูล Add-on ตัวจริงไว้ใช้อ้างอิงราคาและชื่อ
+  final Map<int, MenuAddonDetailModel> _addonModelsIndex = {};
 
-  // ── สถานะเลือกราคาปกติ/พิเศษ ──
   bool _useExtraPrice = false;
 
   @override
@@ -36,17 +37,12 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     _loadMenuAddons();
   }
 
-  // 🎯 ฟังก์ชันสากลช่วยกะเทาะและเชื่อมพาร์ทรูปสั้นเข้ากับ URL ไอพีกลางให้ถูกต้องสมบูรณ์
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-    if (rawPath.startsWith('/')) {
-      return "$baseUrl$rawPath";
-    } else {
-      return "$baseUrl/$rawPath";
-    }
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
   Future<void> _loadMenuAddons() async {
@@ -64,6 +60,11 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
     setState(() {
       _allAddons = addons;
+      for (var addon in addons) {
+        if (addon.addonDetailId != null) {
+          _addonModelsIndex[addon.addonDetailId!] = addon;
+        }
+      }
       _isLoading = false;
     });
   }
@@ -74,7 +75,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     super.dispose();
   }
 
-  // ฟังก์ชันช่วยจัดหมวดหมู่ข้อมูลกลุ่ม Addon เพื่อเตรียมวาด UI
   Map<String, List<MenuAddonDetailModel>> _groupAddons() {
     Map<String, List<MenuAddonDetailModel>> grouped = {};
     for (var addon in _allAddons) {
@@ -92,28 +92,23 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   Widget build(BuildContext context) {
     final int normalPrice = widget.menuModel.price?.toInt() ?? 0;
     final int extraPriceValue = widget.menuModel.extraprice?.toInt() ?? 0;
-    // มีราคาพิเศษให้เลือกก็ต่อเมื่อ extraprice ถูกตั้งไว้และมากกว่า 0
     final bool hasExtraPriceOption = extraPriceValue > 0;
 
     int basePrice = (hasExtraPriceOption && _useExtraPrice)
         ? extraPriceValue
         : normalPrice;
 
-    // เปลี่ยนมาใช้ฟิลด์ .addonprice (ตัว p เล็ก) ในการคำนวณราคารวมทั้งหมด
     double addonTotalPrice = 0;
-    _selectedAddons.forEach((id, detail) {
-      addonTotalPrice += detail.addonPrice ?? 0;
+    _addonQuantities.forEach((id, qty) {
+      final model = _addonModelsIndex[id];
+      if (model != null) {
+        addonTotalPrice += (model.addonPrice ?? 0) * qty;
+      }
     });
 
     int totalPrice = (basePrice + addonTotalPrice.toInt()) * _quantity;
-
-    String? rawMenuImage = widget.menuModel.menuImage;
-
-    // 🌟 ดึงผ่านฟังก์ชันต่อพาร์ทไอพีกลางสากล ปรับภาพอาหารจานเดี่ยวให้ขึ้นจอคมชัด
-    String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
-
+    String finalMenuUrl = _getFinalImageUrl(widget.menuModel.menuImage);
     final groupedAddons = _groupAddons();
-
     final String? description =
         (widget.menuModel.description?.trim().isNotEmpty == true)
         ? widget.menuModel.description
@@ -121,9 +116,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      extendBodyBehindAppBar: true, // 🎯 ให้ Body ทะลุขึ้นไปหลัง AppBar
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent, // 🎯 ปรับให้โปร่งใสเพื่อโชว์ภาพ
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
@@ -175,7 +170,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
           : Stack(
               children: [
-                // 🎯 1. ภาพพื้นหลังเต็มความกว้าง (ถอดแบบ ViewMenu)
                 SizedBox(
                   width: double.infinity,
                   height: 400,
@@ -190,12 +184,10 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                         )
                       : _buildPlaceholderBanner(),
                 ),
-
-                // 🎯 2. ส่วนเนื้อหาเลื่อนได้ (ถอดแบบ ViewMenu)
                 SingleChildScrollView(
                   child: Column(
                     children: [
-                      const SizedBox(height: 350), // ดันให้เห็นรูปภาพด้านบน
+                      const SizedBox(height: 350),
                       Container(
                         width: double.infinity,
                         decoration: const BoxDecoration(
@@ -233,10 +225,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 ),
                               ],
                             ),
-
-                            // ═══════════════════════════════════════════════
-                            // 🎯 ตัวเลือกราคา: ปกติ / พิเศษ (โชว์เฉพาะเมนูที่มี extraprice)
-                            // ═══════════════════════════════════════════════
                             if (hasExtraPriceOption) ...[
                               const SizedBox(height: 14),
                               Row(
@@ -264,7 +252,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 ],
                               ),
                             ],
-
                             if (description != null) ...[
                               const SizedBox(height: 8),
                               Text(
@@ -276,13 +263,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 ),
                               ),
                             ],
-
                             const SizedBox(height: 24),
-
-                            // =========================================================
-                            // ส่วนยิงวาดกลุ่มข้อมูล Add-on แบบ Dynamic
-                            // 🎯 ปรับแต่งเส้นสีเขียวด้านข้างให้เหมือน ViewMenu
-                            // =========================================================
                             if (groupedAddons.isNotEmpty) ...[
                               ...groupedAddons.entries.toList().asMap().entries.map((
                                 mapEntry,
@@ -310,7 +291,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                       )
                                     else
                                       const SizedBox(height: 8),
-
                                     Row(
                                       mainAxisAlignment:
                                           MainAxisAlignment.spaceBetween,
@@ -336,8 +316,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                       ],
                                     ),
                                     const SizedBox(height: 8),
-
-                                    // 🎯 IntrinsicHeight + Row ให้เส้นเขียวยาวคลุมทุก item ในกลุ่ม
                                     IntrinsicHeight(
                                       child: Row(
                                         crossAxisAlignment:
@@ -369,7 +347,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 );
                               }),
                             ],
-
                             const SizedBox(height: 10),
                             const Text(
                               "ระบุเพิ่มเติม",
@@ -404,9 +381,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 ),
                               ),
                             ),
-                            const SizedBox(
-                              height: 40,
-                            ), // พื้นที่เผื่อแผงล่างสุด
+                            const SizedBox(height: 40),
                           ],
                         ),
                       ),
@@ -439,7 +414,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // ─── ฝั่งซ้าย: จำนวนที่สั่ง ───────────────
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -497,10 +471,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     ),
                   ],
                 ),
-
                 const Spacer(),
-
-                // ─── ฝั่งขวา: ราคารวม ──────────────────────
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -539,9 +510,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
-
             SizedBox(
               width: double.infinity,
               height: 50,
@@ -556,7 +525,8 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     if (isRequired) {
                       bool hasSelection = items.any(
                         (item) =>
-                            _selectedAddons.containsKey(item.addonDetailId),
+                            _addonQuantities.containsKey(item.addonDetailId) &&
+                            _addonQuantities[item.addonDetailId]! > 0,
                       );
                       if (!hasSelection) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -573,9 +543,19 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     }
                   }
 
+                  final List<MenuAddonDetailModel> finalSelectedAddonsList = [];
+                  _addonQuantities.forEach((id, qty) {
+                    final model = _addonModelsIndex[id];
+                    if (model != null && qty > 0) {
+                      for (int i = 0; i < qty; i++) {
+                        finalSelectedAddonsList.add(model);
+                      }
+                    }
+                  });
+
                   final cartItem = CartItem(
                     menu: widget.menuModel,
-                    selectedAddons: _selectedAddons.values.toList(),
+                    selectedAddons: finalSelectedAddonsList,
                     quantity: _quantity,
                     note: _noteController.text,
                     addonPrice: addonTotalPrice.toInt(),
@@ -599,15 +579,13 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => ViewOrderMember(
-                        // 🎯 ใส่ข้อมูลร้านค้า (คุณอาจจะต้องดึงจาก widget.menuModel หรือตัวแปรที่เก็บไว้)
                         storeUsername:
                             widget.menuModel.restaurant?.username ?? '',
                         storeName:
                             widget.menuModel.restaurant?.restaurantName ??
                             'ออเดอร์ของคุณ',
                         storeItems: CartManager().items,
-                        isFromAddOrder:
-                            true, // 🌟 ส่งค่า true ไปเพื่อปลดล็อกปุ่ม "สั่งอาหารต่อ"[cite: 4]
+                        isFromAddOrder: true,
                       ),
                     ),
                   );
@@ -634,96 +612,239 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
   Widget _buildAddonItemOption(MenuAddonDetailModel detail, int maxSelect) {
     int id = detail.addonDetailId ?? 0;
-    bool isSelected = _selectedAddons.containsKey(id);
+    int currentQty = _addonQuantities[id] ?? 0;
+    bool isSelected = currentQty > 0;
 
     String title = detail.addonMenu?.addonName ?? "ไม่มีชื่อ";
     int price = detail.addonPrice?.toInt() ?? 0;
     int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
 
-    int currentSelectedInGroupCount = _selectedAddons.values
-        .where(
-          (element) => element.menuAddonGroup?.addonGroupId == currentGroupId,
-        )
-        .length;
+    // คำนวณจำนวนรวมทั้งหมดที่ถูกเลือกไปแล้วในกลุ่มแอดออนนี้
+    // (รวมทั้งจากการติ๊กตัวหน้าและจากสเต็ปเปอร์ + / - ของทุกตัวในกลุ่มเดียวกัน)
+    int currentSelectedInGroupCount = 0;
+    _addonQuantities.forEach((key, qty) {
+      final model = _addonModelsIndex[key];
+      if (model != null &&
+          model.menuAddonGroup?.addonGroupId == currentGroupId) {
+        currentSelectedInGroupCount += qty;
+      }
+    });
 
-    return InkWell(
-      onTap: () {
-        setState(() {
-          if (isSelected) {
-            _selectedAddons.remove(id);
+    // 🎯 โควตาของกลุ่มนี้เต็มแล้วหรือยัง (ไม่ว่าจะมาจากตัวเดียวที่เพิ่มจำนวน
+    // จนครบ หรือติ๊กหลายตัวรวมกันจนครบก็ตาม)
+    bool isGroupQuotaFull = currentSelectedInGroupCount >= maxSelect;
+    // 🎯 ตัวที่ "ยังไม่ถูกเลือก" จะถูกล็อกทันทีเมื่อโควตาของกลุ่มเต็มแล้ว
+    bool isAlternativeItemDisabled = isGroupQuotaFull && !isSelected;
+
+    // ── ติ๊ก/ยกเลิกติ๊กตัวหน้า ──────────────────────────────────────
+    // ถ้าโดนล็อกอยู่ (โควตาเต็มและยังไม่ได้เลือกตัวนี้) ให้เด้งแจ้งเตือน
+    // แทนที่จะปล่อยให้กดแล้วไม่มีอะไรเกิดขึ้นเฉยๆ
+    void handleFrontTap() {
+      if (isAlternativeItemDisabled) {
+        _showMaxSelectWarning(maxSelect);
+        return;
+      }
+      setState(() {
+        if (isSelected) {
+          _addonQuantities.remove(id);
+        } else {
+          if (maxSelect == 1) {
+            _addonQuantities.removeWhere((key, value) {
+              final model = _addonModelsIndex[key];
+              return model?.menuAddonGroup?.addonGroupId == currentGroupId;
+            });
+            _addonQuantities[id] = 1;
           } else {
-            if (maxSelect == 1) {
-              _selectedAddons.removeWhere(
-                (key, value) =>
-                    value.menuAddonGroup?.addonGroupId == currentGroupId,
-              );
-              _selectedAddons[id] = detail;
-            } else {
-              if (currentSelectedInGroupCount >= maxSelect) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      "⛔ เลือกได้สูงสุด $maxSelect รายการเท่านั้นครับ",
-                    ),
-                    backgroundColor: Colors.amber[800],
-                    duration: const Duration(seconds: 1),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              } else {
-                _selectedAddons[id] = detail;
-              }
-            }
+            _addonQuantities[id] = 1;
           }
-        });
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 20,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    shape: maxSelect == 1
-                        ? BoxShape.circle
-                        : BoxShape.rectangle,
-                    borderRadius: maxSelect == 1
-                        ? null
-                        : BorderRadius.circular(4),
-                    border: Border.all(color: Colors.black, width: 1.5),
-                  ),
-                  child: isSelected
-                      ? Center(
-                          child: Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              shape: maxSelect == 1
-                                  ? BoxShape.circle
-                                  : BoxShape.rectangle,
-                              borderRadius: maxSelect == 1
-                                  ? null
-                                  : BorderRadius.circular(2),
-                              color: Colors.orange,
-                            ),
-                          ),
-                        )
-                      : null,
+        }
+      });
+    }
+
+    // ── กดปุ่ม "+" เพิ่มจำนวนของตัวเลือกนี้ ────────────────────────
+    // ต้องติ๊กตัวหน้าก่อนเสมอ (ไม่ติ๊ก = ปุ่มนี้กดไม่ได้เลยจริงๆ) และถ้า
+    // โควตาของกลุ่มเต็มแล้ว (ไม่ว่าจะเต็มเพราะตัวอื่นหรือตัวเอง) ให้เตือน
+    void handlePlusTap() {
+      if (isGroupQuotaFull) {
+        _showMaxSelectWarning(maxSelect);
+        return;
+      }
+      setState(() {
+        _addonQuantities[id] = currentQty + 1;
+      });
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // ── ฝั่งซ้าย: ปุ่มติ๊กหน้าสุด + ข้อความ + ราคา ──
+          Row(
+            children: [
+              InkWell(
+                // 🎯 กดได้เสมอ แต่ข้างในจะดักเช็คเองว่าล็อกอยู่หรือเปล่า
+                // เพื่อให้แจ้งเตือนได้แทนที่จะเงียบไปเฉยๆ ตอนโดนล็อก
+                onTap: handleFrontTap,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: maxSelect == 1
+                            ? BoxShape.circle
+                            : BoxShape.rectangle,
+                        borderRadius: maxSelect == 1
+                            ? null
+                            : BorderRadius.circular(4),
+                        border: Border.all(
+                          color: isAlternativeItemDisabled
+                              ? Colors.grey.shade300
+                              : Colors.black,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: isSelected
+                          ? Center(
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  shape: maxSelect == 1
+                                      ? BoxShape.circle
+                                      : BoxShape.rectangle,
+                                  borderRadius: maxSelect == 1
+                                      ? null
+                                      : BorderRadius.circular(2),
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: isAlternativeItemDisabled
+                            ? Colors.grey.shade400
+                            : Colors.black87,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(title, style: const TextStyle(fontSize: 15)),
-              ],
+              ),
+              const SizedBox(width: 10),
+              // 🎯 [SWAPPED] ย้ายราคาบวกเพิ่มมาอยู่ฝั่งซ้ายต่อท้ายชื่ออาหารทันทีตามสั่ง
+              Text(
+                "(+$price)",
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isAlternativeItemDisabled
+                      ? Colors.grey.shade300
+                      : Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+
+          // ── ฝั่งขวา: แผงปุ่มสเต็ปเปอร์เพิ่ม/ลดจำนวน (แสดงเฉพาะกลุ่มที่มี maxSelect > 1) ──
+          if (maxSelect > 1)
+            Container(
+              height: 32,
+              decoration: BoxDecoration(
+                color: isAlternativeItemDisabled
+                    ? Colors.grey.shade100
+                    : Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isAlternativeItemDisabled
+                      ? Colors.grey.shade200
+                      : Colors.grey.shade200,
+                ),
+              ),
+              child: Row(
+                children: [
+                  // ปุ่มลบชิ้นย่อย (กดลดจำนวนลง)
+                  // 🎯 ถ้ายังไม่ติ๊กตัวหน้า (ไม่ได้เลือก) ปุ่มนี้กดไม่ได้จริงๆ
+                  // (ไม่ต้องแจ้งเตือน เพราะไม่มีอะไรให้ลดอยู่แล้ว)
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    icon: Icon(
+                      Icons.remove,
+                      size: 16,
+                      color: isSelected ? Colors.black87 : Colors.grey.shade300,
+                    ),
+                    onPressed: isSelected
+                        ? () {
+                            setState(() {
+                              if (_addonQuantities[id]! <= 1) {
+                                _addonQuantities.remove(id);
+                              } else {
+                                _addonQuantities[id] =
+                                    _addonQuantities[id]! - 1;
+                              }
+                            });
+                          }
+                        : null,
+                  ),
+
+                  // ตัวเลขแสดงจำนวนปัจจุบัน
+                  Container(
+                    alignment: Alignment.center,
+                    width: 20,
+                    child: Text(
+                      "$currentQty",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected
+                            ? Colors.black87
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+
+                  // ปุ่มบวกชิ้นย่อย
+                  // 🎯 ยังไม่ติ๊กตัวหน้า = กดไม่ได้เลยจริงๆ (onPressed: null)
+                  // ติ๊กแล้วแต่โควตากลุ่มเต็ม = กดได้แต่จะเด้งแจ้งเตือนแทน
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    icon: Icon(
+                      Icons.add,
+                      size: 16,
+                      color: (isSelected && !isGroupQuotaFull)
+                          ? Colors.black87
+                          : Colors.grey.shade300,
+                    ),
+                    onPressed: isSelected ? handlePlusTap : null,
+                  ),
+                ],
+              ),
             ),
-            Text(
-              "+$price",
-              style: const TextStyle(fontSize: 15, color: Colors.grey),
-            ),
-          ],
-        ),
+        ],
+      ),
+    );
+  }
+
+  void _showMaxSelectWarning(int maxSelect) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("⛔ เลือกได้สูงสุด $maxSelect รายการเท่านั้นครับ"),
+        backgroundColor: Colors.amber[800],
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -786,7 +907,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     );
   }
 
-  // 🎯 ใช้ Banner กว้างเต็มจอสำหรับตอนไม่มีรูป
   Widget _buildPlaceholderBanner() {
     return Container(
       width: double.infinity,

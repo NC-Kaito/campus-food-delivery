@@ -185,6 +185,7 @@ class _HomeMemberState extends State<HomeMember> {
   }
 
   // 🎯 [MAPPED FROM USER] ตรวจสอบสถานะการเปิดร้านอิงตามสวิตช์ปิดร้านด่วนและปฏิทินเวลาจริงบนเครื่อง
+  // 🎯 [FIXED BUG] ปรับปรุงระบบตรวจสอบสถานะเปิด-ปิดร้านค้าอิงตามปฏิทินเวลาจริงให้รองรับช่วงเวลาข้ามวัน
   bool _isCurrentlyOpen(RestaurantModel item) {
     if (item.statusOpen == false) return false;
 
@@ -202,6 +203,7 @@ class _HomeMemberState extends State<HomeMember> {
       ),
     );
 
+    // หากระบบถูกระบุว่าเป็นวันปิดทำการของร้านชัดเจน ให้ส่งกลับค่าเท็จ
     if (today.closed) return false;
 
     final now = TimeOfDay.now();
@@ -209,9 +211,12 @@ class _HomeMemberState extends State<HomeMember> {
     final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
     final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
 
+    // ตรรกะกรณีเวลาเปิด-ปิดอยู่ในวันเดียวกันปกติ (เช่น 08:00 - 18:00 น.)
     if (openMinutes <= closeMinutes) {
       return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
     }
+
+    // ตรรกะกรณีเวลาร้านค้าตั้งช่วงเปิดคาบเกี่ยวข้ามวัน (เช่น 17:00 - 02:00 น. ของอีกวัน)
     return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
   }
 

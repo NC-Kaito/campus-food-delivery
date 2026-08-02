@@ -11,4 +11,5 @@ public interface AddonService {
     public boolean updateAddonGroupTemplate(AddonGroupRequestDTO requestDTO);
 
     List<Addonmenu> searchAddonByName(String keyword);
+    boolean deleteAddonGroup(Integer groupId);
 }

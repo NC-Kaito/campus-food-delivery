@@ -20,6 +20,7 @@ public class AddonGroupRequestDTO {
         private String addonname;  // ชื่อวัตถุดิบ เช่น "ไข่ดาว", "ไข่เจียว"
         private double addonprice; // ราคาที่บวกเพิ่ม
         private boolean status;    // สถานะเปิด/ปิดใช้งาน
+        private boolean allowqtystatus;
     }
 
 

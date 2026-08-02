@@ -426,8 +426,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
             (_) => _scrollToFirstInvalidField(),
           );
         } else if (duplicateField == 'username') {
-          // username ถูกกรอกไว้ตั้งแต่หน้าแรก (register_restaurant.dart)
-          // หน้านี้แก้ไขไม่ได้ จึงแจ้งให้กดย้อนกลับไปเปลี่ยนแทน
           if (mounted) {
             showDialog(
               context: context,
@@ -519,12 +517,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
             fontWeight: FontWeight.w600,
             letterSpacing: 0.1,
           ),
-          children: const [
-            TextSpan(
-              text: ' *',
-              style: TextStyle(color: _danger),
-            ),
-          ],
         ),
       ),
     );
@@ -715,7 +707,17 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildLabel("ชื่อจริง (FirstName)"),
+                          const SizedBox(height: 10),
+
+                          Text(
+                            "ชื่อจริง (First Name)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
                           TextFormField(
                             key: _firstNameKey,
                             controller: ownerFirstNameController,
@@ -731,7 +733,17 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                             ),
                           ),
 
-                          _buildLabel("นามสกุล (Lastname)"),
+                          const SizedBox(height: 10),
+
+                          Text(
+                            "นามสกุล (Last Name)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
                           TextFormField(
                             key: _lastNameKey,
                             controller: ownerLastnameController,
@@ -747,7 +759,17 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                             ),
                           ),
 
-                          _buildLabel("อีเมล (Email)"),
+                          const SizedBox(height: 10),
+
+                          Text(
+                            "อีเมล (Email)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
                           TextFormField(
                             key: _emailKey,
                             controller: emailController,
@@ -770,7 +792,17 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                             ),
                           ),
 
-                          _buildLabel("เบอร์โทรศัพท์ (Phone)"),
+                          const SizedBox(height: 10),
+
+                          Text(
+                            "เบอร์โทรศัพท์ (Phone)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
                           TextFormField(
                             key: _phoneKey,
                             controller: phoneController,
@@ -793,11 +825,21 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                             ),
                           ),
 
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 10),
+
+                          Text(
+                            "รูปภาพบัตรประชาชน (CardID Image)",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 0, 0),
+                              fontSize: 14,
+                            ),
+                          ),
+
+                          const SizedBox(height: 10),
 
                           // 🎯 ย้ายกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านมาสแตนด์บายฝั่งขวาหน้าจอนี้เรียบร้อยครับ
                           _buildUploadBox(
-                            "รูปภาพบัตรประชาชน (CardID Image)",
+                            "",
                             _selectedOwnerImage,
                             pickOwnerImage,
                             key: _ownerImageKey,
@@ -920,7 +962,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildLabel(label),
+        if (label.isNotEmpty) _buildLabel(label),
         GestureDetector(
           onTap: onTap,
           child: Container(
@@ -998,7 +1040,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(
-                          Icons.badge_outlined,
+                          Icons.add_a_photo_outlined,
                           color: _primary,
                           size: 24,
                         ),

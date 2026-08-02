@@ -4,7 +4,8 @@ import 'package:flutter_app/data/models/menu_addon_group_model.dart';
 class MenuAddonDetailModel {
   int? addonDetailId;
   double? addonPrice;
-  bool? status; // ← ขาด (ใช้แสดง checkbox ในรูป)
+  bool? status;
+  bool allowqtystatus;
   MenuAddonGroupModel? menuAddonGroup;
   AddonMenuModel? addonMenu;
 
@@ -12,6 +13,7 @@ class MenuAddonDetailModel {
     this.addonDetailId,
     this.addonPrice,
     this.status,
+    this.allowqtystatus = false,
     this.menuAddonGroup,
     this.addonMenu,
   });
@@ -21,6 +23,7 @@ class MenuAddonDetailModel {
       addonDetailId: json['addondetailid'],
       addonPrice: (json['addonprice'] as num?)?.toDouble(),
       status: json['status'], // ← เพิ่ม
+      allowqtystatus: json['allowqtystatus'],
       menuAddonGroup: json['menuaddongroup'] != null
           ? MenuAddonGroupModel.fromJson(json['menuaddongroup'])
           : null,

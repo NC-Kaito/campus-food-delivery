@@ -58,6 +58,7 @@ public class AddonServiceImpl implements AddonService {
                     Menuaddondetail detail = Menuaddondetail.builder()
                             .addonprice(detailDTO.getAddonprice())
                             .status(detailDTO.isStatus())
+                            .allowqtystatus(detailDTO.isAllowqtystatus())
                             .menuaddongroup(savedGroup)
                             .addonmenu(addonmenu)
                             .build();
@@ -91,6 +92,7 @@ public class AddonServiceImpl implements AddonService {
             existingGroup.setRequired(request.isRequired()); // ← แก้จาก setI(...)
             existingGroup.setMaxselect(request.getMaxselect());
             existingGroup.setStatus(request.isStatus());
+
             Menuaddongroup savedGroup = menuaddongroupRepository.save(existingGroup);
 
             // ── 2. ดึงแถว detail เดิมทั้งหมดของกลุ่มนี้มาก่อน ──
@@ -160,5 +162,23 @@ public class AddonServiceImpl implements AddonService {
         }
         // จำกัดผลลัพธ์แค่ 5 รายการ ด้วย PageRequest.of(0, 5)
         return addonmenuRepository.searchByKeyword(keyword.trim(), PageRequest.of(0, 5));
+    }
+
+    @Transactional
+    public boolean deleteAddonGroup(Integer groupId) {
+        try {
+            Menuaddongroup group = menuaddongroupRepository.findById(groupId)
+                    .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริมที่ต้องการลบ"));
+
+            // ลบ detail ลูกทั้งหมดก่อน (กัน foreign key constraint)
+            List<Menuaddondetail> details = menuaddondetailRepository.findByMenuaddongroup(group);
+            menuaddondetailRepository.deleteAll(details);
+
+            menuaddongroupRepository.delete(group);
+            return true;
+        } catch (Exception e) {
+            System.err.println("เกิดข้อผิดพลาดในการลบกลุ่มท็อปปิ้ง: " + e.getMessage());
+            throw new RuntimeException("ลบกลุ่มท็อปปิ้งล้มเหลว: " + e.getMessage());
+        }
     }
 }
