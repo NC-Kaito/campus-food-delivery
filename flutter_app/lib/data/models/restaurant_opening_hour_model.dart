@@ -45,13 +45,13 @@ class RestaurantOpeningHourModel {
   final RestaurantDayOfWeek dayOfWeek;
   final TimeOfDay opentime;
   final TimeOfDay closetime;
-  final bool closed;
+  final bool open;
 
   const RestaurantOpeningHourModel({
     required this.dayOfWeek,
     required this.opentime,
     required this.closetime,
-    required this.closed,
+    required this.open,
   });
 
   factory RestaurantOpeningHourModel.fromJson(Map<String, dynamic> json) {
@@ -59,7 +59,7 @@ class RestaurantOpeningHourModel {
       dayOfWeek: RestaurantDayOfWeek.fromApiValue(json['dayOfWeek'] as String),
       opentime: _timeOfDayFromString(json['opentime'] as String),
       closetime: _timeOfDayFromString(json['closetime'] as String),
-      closed: json['closed'] as bool? ?? false,
+      open: json['open'] as bool? ?? false,
     );
   }
 
@@ -68,7 +68,7 @@ class RestaurantOpeningHourModel {
       'dayOfWeek': dayOfWeek.toApiValue(),
       'opentime': _timeOfDayToString(opentime),
       'closetime': _timeOfDayToString(closetime),
-      'closed': closed,
+      'open': open,
     };
   }
 
@@ -82,7 +82,7 @@ class RestaurantOpeningHourModel {
       dayOfWeek: dayOfWeek ?? this.dayOfWeek,
       opentime: opentime ?? this.opentime,
       closetime: closetime ?? this.closetime,
-      closed: closed ?? this.closed,
+      open: closed ?? this.open,
     );
   }
 

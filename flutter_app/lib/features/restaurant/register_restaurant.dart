@@ -79,7 +79,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
         dayOfWeek: day,
         opentime: const TimeOfDay(hour: 8, minute: 0),
         closetime: const TimeOfDay(hour: 18, minute: 0),
-        closed: true,
+        open: true,
       );
     }).toList();
 
@@ -128,7 +128,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
     List<String> duplicateDayNames = [];
     for (var day in _tempSelectedDays) {
       final existingHour = _openingHours.firstWhere((h) => h.dayOfWeek == day);
-      if (!existingHour.closed) {
+      if (!existingHour.open) {
         duplicateDayNames.add(day.labelTh);
       }
     }
@@ -340,7 +340,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
     final Map<String, List<RestaurantOpeningHourModel>> groups = {};
 
     for (var hour in _openingHours) {
-      if (hour.closed) continue;
+      if (hour.open) continue;
 
       final String timeKey =
           "${hour.opentime.hour}:${hour.opentime.minute}-${hour.closetime.hour}:${hour.closetime.minute}";
@@ -490,7 +490,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
       MapEntry(_typeFieldKey, _selectedTypeId == null),
       MapEntry(_locationKey, _selectedLocation == null),
       MapEntry(_imageKey, _restaurantImageError != null),
-      MapEntry(_openingHoursKey, _openingHours.every((h) => h.closed)),
+      MapEntry(_openingHoursKey, _openingHours.every((h) => h.open)),
     ];
 
     for (final check in checksInOrder) {
@@ -989,7 +989,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                         .firstWhere((h) => h.dayOfWeek == day);
                                     // 🎯 วันที่ตั้งเวลาทำการไปแล้ว (closed == false)
                                     // ให้แสดงเป็นสีทึบและกดเลือกซ้ำไม่ได้อีก
-                                    final isAlreadySet = !existingHour.closed;
+                                    final isAlreadySet = !existingHour.open;
 
                                     return GestureDetector(
                                       onTap: isAlreadySet
@@ -1334,7 +1334,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                                 "รูปร้านค้า",
                               );
                               _openingHoursError =
-                                  _openingHours.every((h) => h.closed)
+                                  _openingHours.every((h) => h.open)
                                   ? "กรุณาเปิดร้านอย่างน้อย 1 วัน"
                                   : null;
                             });

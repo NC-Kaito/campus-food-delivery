@@ -152,7 +152,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
               dayOfWeek: day,
               opentime: const TimeOfDay(hour: 8, minute: 0),
               closetime: const TimeOfDay(hour: 18, minute: 0),
-              closed: true,
+              open: true,
             ),
           );
           return existing ??
@@ -160,7 +160,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                 dayOfWeek: day,
                 opentime: const TimeOfDay(hour: 8, minute: 0),
                 closetime: const TimeOfDay(hour: 18, minute: 0),
-                closed: true,
+                open: true,
               );
         }).toList();
 
@@ -202,7 +202,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     List<String> duplicateDayNames = [];
     for (var day in _tempSelectedDays) {
       final existingHour = _openingHours.firstWhere((h) => h.dayOfWeek == day);
-      if (!existingHour.closed) {
+      if (!existingHour.open) {
         duplicateDayNames.add(day.labelTh);
       }
     }
@@ -513,7 +513,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
 
   Future<void> doUpdateRestaurant() async {
     if (formKey.currentState!.validate()) {
-      if (_openingHours.every((h) => h.closed)) {
+      if (_openingHours.every((h) => h.open)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("กรุณาตั้งเวลาเปิดทำการอย่างน้อย 1 วัน"),
@@ -610,7 +610,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     final Map<String, List<RestaurantOpeningHourModel>> groups = {};
 
     for (var hour in _openingHours) {
-      if (hour.closed) continue; // ข้ามวันทีปิดทำการ
+      if (hour.open) continue; // ข้ามวันทีปิดทำการ
 
       final String timeKey =
           "${hour.opentime.hour}:${hour.opentime.minute}-${hour.closetime.hour}:${hour.closetime.minute}";

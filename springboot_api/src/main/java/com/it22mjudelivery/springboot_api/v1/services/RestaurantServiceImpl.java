@@ -3,7 +3,7 @@ package com.it22mjudelivery.springboot_api.v1.services;
 import com.it22mjudelivery.springboot_api.v1.dtos.OpeningHourDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
-import com.it22mjudelivery.springboot_api.v1.entities.Restaurantopeninghour;
+import com.it22mjudelivery.springboot_api.v1.entities.Restaurantopendate;
 import com.it22mjudelivery.springboot_api.v1.entities.TypeRestaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.RestaurantRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.TypeRestaurantRepository;
@@ -55,7 +55,7 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .verificationstatus("wait")
                 .build();
 
-        List<Restaurantopeninghour> openingHours = toOpeningHourEntities(restaurantDto.getOpeningHours(), toSaveRestaurant);
+        List<Restaurantopendate> openingHours = toOpeningHourEntities(restaurantDto.getOpeningHours(), toSaveRestaurant);
         toSaveRestaurant.setOpeningHours(openingHours);
 
         restaurantRepository.save(toSaveRestaurant); // cascade = ALL จะเซฟ opening hours ให้อัตโนมัติ
@@ -99,7 +99,6 @@ public class RestaurantServiceImpl implements RestaurantService {
         restaurant.setImagecardid(ownerimage);
 
         // แก้ไข opening hours: เคลียร์ของเดิมแล้วใส่ใหม่ทั้งชุด
-        // (orphanRemoval = true ที่ฝั่ง Restaurant จะลบแถวเก่าที่ไม่อยู่ใน list ใหม่ให้อัตโนมัติ)
         restaurant.getOpeningHours().clear();
         restaurant.getOpeningHours().addAll(toOpeningHourEntities(openingHourDtos, restaurant));
 
@@ -115,18 +114,18 @@ public class RestaurantServiceImpl implements RestaurantService {
         restaurantRepository.save(restaurant);
     }
 
-    // ---- helper: แปลง OpeningHourDto -> RestaurantOpeningHour entity ----
-    private List<Restaurantopeninghour> toOpeningHourEntities(List<OpeningHourDto> dtos, Restaurant restaurant) {
-        List<Restaurantopeninghour> result = new ArrayList<>();
+    // ---- helper: แปลง OpeningHourDto -> Restaurantopendate entity ----
+    private List<Restaurantopendate> toOpeningHourEntities(List<OpeningHourDto> dtos, Restaurant restaurant) {
+        List<Restaurantopendate> result = new ArrayList<>();
         if (dtos == null) {
             return result;
         }
         for (OpeningHourDto dto : dtos) {
-            result.add(Restaurantopeninghour.builder()
+            result.add(Restaurantopendate.builder()
                     .dayOfWeek(dto.getDayOfWeek())
                     .opentime(dto.getOpentime())
                     .closetime(dto.getClosetime())
-                    .closed(dto.isClosed())
+                    .open(!dto.isOpen())
                     .restaurant(restaurant)
                     .build());
         }

@@ -33,9 +33,6 @@ public class Menuaddongroup {
     @Column(nullable = false)
     private boolean isRequired;
 
-    @Column(nullable = false)
-    private int maxselect;
-
     @Column
     private boolean status;
 

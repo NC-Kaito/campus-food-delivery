@@ -60,7 +60,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
           dayOfWeek: day,
           opentime: const TimeOfDay(hour: 8, minute: 0),
           closetime: const TimeOfDay(hour: 18, minute: 0),
-          closed: false,
+          open: false,
         );
       })
       .toList();
@@ -172,7 +172,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
               dayOfWeek: day,
               opentime: const TimeOfDay(hour: 8, minute: 0),
               closetime: const TimeOfDay(hour: 18, minute: 0),
-              closed: true,
+              open: true,
             ),
           );
           return existing ??
@@ -180,7 +180,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                 dayOfWeek: day,
                 opentime: const TimeOfDay(hour: 8, minute: 0),
                 closetime: const TimeOfDay(hour: 18, minute: 0),
-                closed: true,
+                open: true,
               );
         }).toList();
       });
@@ -400,7 +400,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                             decoration: BoxDecoration(
                               color: !_isEditable
                                   ? const Color(0xFFE0E0E0)
-                                  : hour.closed
+                                  : hour.open
                                   ? Colors.grey.shade200
                                   : Colors.white,
                               borderRadius: BorderRadius.circular(10),
@@ -419,7 +419,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                                   ),
                                 ),
                                 Expanded(
-                                  child: hour.closed
+                                  child: hour.open
                                       ? Text(
                                           "ปิดวันนี้",
                                           style: TextStyle(
@@ -486,7 +486,7 @@ class _UpdateRegisterFieldsState extends State<UpdateRegisterFields> {
                                 ),
                                 const SizedBox(width: 8),
                                 Switch(
-                                  value: !hour.closed,
+                                  value: !hour.open,
                                   activeColor: const Color.fromARGB(
                                     255,
                                     230,

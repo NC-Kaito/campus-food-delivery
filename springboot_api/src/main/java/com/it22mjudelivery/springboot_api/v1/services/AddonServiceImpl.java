@@ -33,7 +33,6 @@ public class AddonServiceImpl implements AddonService {
             Menuaddongroup group = Menuaddongroup.builder()
                     .addongroupname(request.getAddongroupname())
                     .isRequired(request.isRequired())
-                    .maxselect(request.getMaxselect())
                     .status(request.isStatus())
                     .username(restaurant)
                     .build();
@@ -89,8 +88,7 @@ public class AddonServiceImpl implements AddonService {
 
             // ── 1. อัปเดตข้อมูลของกลุ่ม ──
             existingGroup.setAddongroupname(request.getAddongroupname());
-            existingGroup.setRequired(request.isRequired()); // ← แก้จาก setI(...)
-            existingGroup.setMaxselect(request.getMaxselect());
+            existingGroup.setRequired(request.isRequired());
             existingGroup.setStatus(request.isStatus());
 
             Menuaddongroup savedGroup = menuaddongroupRepository.save(existingGroup);

@@ -98,7 +98,6 @@ public class MenuServiceImpl implements MenuService {
                     // 🎯 แก้จุดบั๊ก: เอา .menu(menu) ออกไปเนื่องจากเปลี่ยนโครงสร้างเป็น @ManyToMany แล้ว
                     Menuaddongroup group = Menuaddongroup.builder()
                             .addongroupname((String) groupMap.get("addongroupname"))
-                            .maxselect((int) groupMap.get("maxselect"))
                             .isRequired((boolean) groupMap.get("isRequired"))
                             .build();
 

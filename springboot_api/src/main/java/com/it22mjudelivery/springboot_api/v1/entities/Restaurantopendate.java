@@ -1,6 +1,7 @@
 package com.it22mjudelivery.springboot_api.v1.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -11,12 +12,12 @@ import java.time.DayOfWeek;
 import java.time.LocalTime;
 
 @Entity
-    @Table(name = "restaurantopeninghour")
+    @Table(name = "Restaurantopendate")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Restaurantopeninghour {
+public class Restaurantopendate {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -32,6 +33,7 @@ public class Restaurantopeninghour {
     @Column(nullable = false)
     private LocalTime closetime;
 
+    @JsonProperty("open")
     @Column(nullable = false)
     private boolean open;
 

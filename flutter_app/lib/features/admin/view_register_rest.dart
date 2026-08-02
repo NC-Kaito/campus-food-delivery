@@ -70,7 +70,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
           dayOfWeek: d,
           opentime: const TimeOfDay(hour: 0, minute: 0),
           closetime: const TimeOfDay(hour: 0, minute: 0),
-          closed: true,
+          open: true,
         ),
       );
     }).toList();
@@ -81,7 +81,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
       final start = ordered[i];
       int j = i;
       while (j + 1 < ordered.length &&
-          ordered[j + 1].closed == start.closed &&
+          ordered[j + 1].open == start.open &&
           ordered[j + 1].opentime.hour == start.opentime.hour &&
           ordered[j + 1].opentime.minute == start.opentime.minute &&
           ordered[j + 1].closetime.hour == start.closetime.hour &&
@@ -93,7 +93,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
           : "${dayFullName[ordered[i].dayOfWeek]} - ${dayFullName[ordered[j].dayOfWeek]}";
 
       groups.add(
-        start.closed
+        start.open
             ? "$label: ปิด"
             : "$label: ${_formatTime(start.opentime)} - ${_formatTime(start.closetime)} น.",
       );
@@ -115,11 +115,11 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
         dayOfWeek: todayEnum,
         opentime: const TimeOfDay(hour: 0, minute: 0),
         closetime: const TimeOfDay(hour: 0, minute: 0),
-        closed: true,
+        open: true,
       ),
     );
 
-    if (today.closed) return "วันนี้ปิด";
+    if (today.open) return "วันนี้ปิด";
     return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
   }
 

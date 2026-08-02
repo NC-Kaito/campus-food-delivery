@@ -6,18 +6,18 @@ import 'package:flutter_app/features/member/list_confirm_order_member.dart';
 import 'package:flutter_app/features/member/list_menu_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
-import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
+import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/features/member/view_restaurant_member.dart';
 import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 
 import 'package:flutter_app/core/network/dio_client.dart';
-import 'package:flutter_app/global_data.dart'; // 🎯 ดึง GlobalData เพื่อเช็กโปรไฟล์สมาชิก
+import 'package:flutter_app/global_data.dart';
 
 class HomeMember extends StatefulWidget {
   const HomeMember({super.key});
@@ -37,10 +37,8 @@ class _HomeMemberState extends State<HomeMember> {
   Map<String, List<MenuModel>> _restaurantMenusIndex = {};
 
   bool _isLoading = true;
-  Set<int> _selectedTypeIds =
-      {}; // 🎯 ปรับตามแบบ HomeUser เพื่อให้รองรับ Multi-select ได้สมบูรณ์
+  Set<int> _selectedTypeIds = {};
 
-  // 🎯 คุมโทนสีตัวอักษรของปุ่มเมนูแถบล่างให้เป็นสีเขียวใหม่สปอร์ต #64F02D
   final menuTextStyle = const TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.bold,
@@ -109,9 +107,9 @@ class _HomeMemberState extends State<HomeMember> {
   String _formatTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  // 🎯 [MAPPED FROM USER] ระบบจัดกลุ่มเวลาเปิด-ปิดสัปดาห์ทำงานแยกเฉพาะวันเปิดจริงให้อยู่แถวเดียวกัน
+  // 🎯 [FIXED - เหมือน HomeUser] จัดกลุ่มวันเวลาเปิด-ปิดทำการ (ถ้า hour.open == true คือวันนั้นเปิดร้าน)
   String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty || hours.every((h) => h.closed)) {
+    if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
       return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
     }
 
@@ -134,10 +132,12 @@ class _HomeMemberState extends State<HomeMember> {
           dayOfWeek: d,
           opentime: const TimeOfDay(hour: 0, minute: 0),
           closetime: const TimeOfDay(hour: 0, minute: 0),
-          closed: true,
+          open: false,
         ),
       );
-      if (!hour.closed) {
+
+      // 🎯 ดึงเฉพาะวันเวลาที่เปิดร้านจริง (open == true)
+      if (hour.open) {
         final String timeString =
             "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
         if (!timeGroups.containsKey(timeString)) {
@@ -157,7 +157,7 @@ class _HomeMemberState extends State<HomeMember> {
     return resultLines.join(" | ");
   }
 
-  // 🎯 [MAPPED FROM USER] แสดงเวลาเปิดทำการเจาะลึกเฉพาะของวันนี้เด่นชัดขึ้น
+  // 🎯 [FIXED - เหมือน HomeUser] แสดงเวลาเปิด-ปิดของวันนี้โดยเฉพาะ
   String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
     if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาทำการ";
 
@@ -168,11 +168,11 @@ class _HomeMemberState extends State<HomeMember> {
         dayOfWeek: todayEnum,
         opentime: const TimeOfDay(hour: 8, minute: 0),
         closetime: const TimeOfDay(hour: 18, minute: 0),
-        closed: true,
+        open: false,
       ),
     );
 
-    if (today.closed) return "วันนี้ร้านปิดทำการ";
+    if (!today.open) return "วันนี้ร้านปิดทำการ";
     return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
   }
 
@@ -184,8 +184,7 @@ class _HomeMemberState extends State<HomeMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // 🎯 [MAPPED FROM USER] ตรวจสอบสถานะการเปิดร้านอิงตามสวิตช์ปิดร้านด่วนและปฏิทินเวลาจริงบนเครื่อง
-  // 🎯 [FIXED BUG] ปรับปรุงระบบตรวจสอบสถานะเปิด-ปิดร้านค้าอิงตามปฏิทินเวลาจริงให้รองรับช่วงเวลาข้ามวัน
+  // 🎯 [FIXED - เหมือน HomeUser] ตรวจสอบสถานะเปิดอยู่จริง ณ เวลาปัจจุบัน
   bool _isCurrentlyOpen(RestaurantModel item) {
     if (item.statusOpen == false) return false;
 
@@ -199,24 +198,20 @@ class _HomeMemberState extends State<HomeMember> {
         dayOfWeek: todayEnum,
         opentime: const TimeOfDay(hour: 0, minute: 0),
         closetime: const TimeOfDay(hour: 0, minute: 0),
-        closed: true,
+        open: false,
       ),
     );
 
-    // หากระบบถูกระบุว่าเป็นวันปิดทำการของร้านชัดเจน ให้ส่งกลับค่าเท็จ
-    if (today.closed) return false;
+    if (!today.open) return false;
 
     final now = TimeOfDay.now();
     final nowMinutes = now.hour * 60 + now.minute;
     final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
     final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
 
-    // ตรรกะกรณีเวลาเปิด-ปิดอยู่ในวันเดียวกันปกติ (เช่น 08:00 - 18:00 น.)
     if (openMinutes <= closeMinutes) {
       return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
     }
-
-    // ตรรกะกรณีเวลาร้านค้าตั้งช่วงเปิดคาบเกี่ยวข้ามวัน (เช่น 17:00 - 02:00 น. ของอีกวัน)
     return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
   }
 
@@ -224,7 +219,6 @@ class _HomeMemberState extends State<HomeMember> {
     if (mounted) setState(() {});
   }
 
-  // แจ้งเตือนเมื่อกดเข้าร้านที่ปิดอยู่ (ปิดเอง หรือ อยู่นอกเวลาทำการ)
   void _showClosedRestaurantDialog(RestaurantModel item) {
     final bool manuallyClosedByOwner = item.statusOpen == false;
     final String message = manuallyClosedByOwner
@@ -774,7 +768,6 @@ class _HomeMemberState extends State<HomeMember> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      // 🎯 [MAPPED FROM USER] ระบบ Badge บ่งบอกสถานะการเปิดร้านอิงตามเงื่อนไขเวลาและปุ่มเปิด/ปิดด่วนแบบไดนามิก
                       Builder(
                         builder: (context) {
                           final bool isOpen = _isCurrentlyOpen(item);
@@ -823,7 +816,7 @@ class _HomeMemberState extends State<HomeMember> {
                   ),
                   const SizedBox(height: 14),
 
-                  // ── แถววันทำการภาพรวมทั้งสัปดาห์ (จับกลุ่มจัดรูปแบบอัตโนมัติ) ──
+                  // ── แถววันทำการภาพรวมทั้งสัปดาห์ ──
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

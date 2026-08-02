@@ -1,12 +1,12 @@
 // features/user/home_user.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/features/admin/list_restaurant.dart';
 import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
-import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/features/user/list_menu_user.dart';
 import 'package:flutter_app/features/user/view_restaurant_user.dart';
@@ -33,7 +33,6 @@ class _HomeUserState extends State<HomeUser> {
   bool _isLoading = true;
   Set<int> _selectedTypeIds = {};
 
-  // 🎯 ปรับแต่งสีข้อความเมนูแถบล่างให้เป็นสีเขียวใหม่ #64F02D
   final menuTextStyle = const TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.bold,
@@ -104,9 +103,9 @@ class _HomeUserState extends State<HomeUser> {
   String _formatTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  // 🎯 [FIXED] แก้ไขตรรกะจับกลุ่มเวลาทำการอัจฉริยะ ให้แยกแสดงผลเฉพาะวันเปิด และกรุ๊ปเวลาที่ตรงกันให้อยู่แถวเดียวกัน
+  // 🎯 [FIXED] จัดกลุ่มวันเวลาเปิด-ปิดทำการ (ถ้า hour.open == true คือวันนั้นเปิดร้าน)
   String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty || hours.every((h) => h.closed)) {
+    if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
       return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
     }
 
@@ -120,23 +119,21 @@ class _HomeUserState extends State<HomeUser> {
       RestaurantDayOfWeek.sunday: "อา.",
     };
 
-    // จัดกลุ่มตามช่วงเวลาเปิด-ปิดทำการ (คีย์คือช่วงเวลาเปิด-ปิด เช่น "08:00-15:00")
     final Map<String, List<String>> timeGroups = {};
 
-    // คัดกรองและเรียงตามวัน จ.-อา. เสมอเพื่อความเป็นระเบียบเรียบร้อยใน UI
     for (var d in RestaurantDayOfWeek.values) {
       final hour = hours.firstWhere(
         (h) => h.dayOfWeek == d,
         orElse: () => RestaurantOpeningHourModel(
           dayOfWeek: d,
           opentime: const TimeOfDay(hour: 0, minute: 0),
-          closetime: const Color(0).alpha == 0
-              ? const TimeOfDay(hour: 0, minute: 0)
-              : const TimeOfDay(hour: 0, minute: 0),
-          closed: true,
+          closetime: const TimeOfDay(hour: 0, minute: 0),
+          open: false,
         ),
       );
-      if (!hour.closed) {
+
+      // 🎯 ร้านเปิดทำการในวันนี้ (open == true)
+      if (hour.open) {
         final String timeString =
             "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
         if (!timeGroups.containsKey(timeString)) {
@@ -148,7 +145,6 @@ class _HomeUserState extends State<HomeUser> {
 
     if (timeGroups.isEmpty) return "ปิดทำการทุกวัน";
 
-    // รวมกลุ่มวันที่มีเวลาเท่ากันมาต่อ String
     final List<String> resultLines = [];
     timeGroups.forEach((time, daysList) {
       resultLines.add("${daysList.join(', ')} ($time)");
@@ -157,11 +153,10 @@ class _HomeUserState extends State<HomeUser> {
     return resultLines.join(" | ");
   }
 
-  // บอกเวลาเปิด-ปิดของ "วันนี้" โดยเฉพาะ ไว้โชว์ในบรรทัดเวลา
+  // 🎯 [FIXED] แสดงเวลาเปิด-ปิดของวันนี้โดยเฉพาะ
   String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
     if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาทำการ";
 
-    // ปรับเทียบให้วันทำงานของระบบตรงกับ DateTime.now().weekday สากล
     final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
     final today = hours.firstWhere(
       (h) => h.dayOfWeek == todayEnum,
@@ -169,27 +164,16 @@ class _HomeUserState extends State<HomeUser> {
         dayOfWeek: todayEnum,
         opentime: const TimeOfDay(hour: 8, minute: 0),
         closetime: const TimeOfDay(hour: 18, minute: 0),
-        closed: true,
+        open: false,
       ),
     );
 
-    if (today.closed) return "วันนี้ร้านปิดทำการ";
+    // 🎯 ถ้า !today.open ( open == false ) แปลว่าวันนี้ปิดทำการ
+    if (!today.open) return "วันนี้ร้านปิดทำการ";
     return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
   }
 
-  String _getFinalImageUrl(String? rawPath) {
-    if (rawPath == null || rawPath.isEmpty) return "";
-    if (rawPath.startsWith('http')) return rawPath;
-
-    final String baseUrl = DioClient.dio.options.baseUrl;
-    if (rawPath.startsWith('/')) {
-      return "$baseUrl$rawPath";
-    } else {
-      return "$baseUrl/$rawPath";
-    }
-  }
-
-  // เช็คว่าตอนนี้ร้านเปิดอยู่จริงไหม จากทั้ง statusOpen และ openingHours
+  // 🎯 [FIXED] ตรวจสอบสถานะเปิดอยู่จริง ณ เวลาปัจจุบัน
   bool _isCurrentlyOpen(RestaurantModel item) {
     if (item.statusOpen == false) return false;
 
@@ -203,11 +187,11 @@ class _HomeUserState extends State<HomeUser> {
         dayOfWeek: todayEnum,
         opentime: const TimeOfDay(hour: 0, minute: 0),
         closetime: const TimeOfDay(hour: 0, minute: 0),
-        closed: true,
+        open: false,
       ),
     );
 
-    if (today.closed) return false;
+    if (!today.open) return false;
 
     final now = TimeOfDay.now();
     final nowMinutes = now.hour * 60 + now.minute;
@@ -218,6 +202,18 @@ class _HomeUserState extends State<HomeUser> {
       return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
     }
     return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+  }
+
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    if (rawPath.startsWith('/')) {
+      return "$baseUrl$rawPath";
+    } else {
+      return "$baseUrl/$rawPath";
+    }
   }
 
   @override

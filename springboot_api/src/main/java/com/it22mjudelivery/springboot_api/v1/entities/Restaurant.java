@@ -71,9 +71,9 @@ public class Restaurant {
     @JoinColumn(name = "typerestaurantId", nullable = false)
     private TypeRestaurant typerestaurant;
 
-    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
-    private List<Restaurantopeninghour> openingHours = new ArrayList<>();
+    private List<Restaurantopendate> openingHours = new ArrayList<>();
 
 
 }
