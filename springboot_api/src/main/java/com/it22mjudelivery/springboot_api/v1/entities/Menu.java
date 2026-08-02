@@ -38,9 +38,6 @@ public class Menu {
     @Column(nullable = false)
     private double price;
 
-    @Column(nullable = true)
-    private double extraprice;
-
     @Column(nullable = false)
     private boolean status;
 
