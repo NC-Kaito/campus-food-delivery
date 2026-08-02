@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.dtos;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import java.util.List;
 
@@ -8,8 +9,9 @@ public class AddonGroupRequestDTO {
     private Integer addongroupid;
     private String restaurantUsername; // ชื่อผู้ใช้ร้านค้าที่เป็นเจ้าของกลุ่มนี้
     private String addongroupname;     // ชื่อกลุ่ม เช่น "เลือกท็อปปิ้ง (ไข่)"
-    private boolean isRequired;        // บังคับเลือกหรือไม่
-    private int maxselect;             // เลือกได้สูงสุดกี่อย่าง
+
+    @JsonProperty("is_multiple_choice")
+    private boolean is_multiple_choice;        // บังคับเลือกหรือไม่
     private boolean status;            // สถานะเปิด/ปิดใช้งาน
 
     private List<AddonDetailDTO> details; // รายการช้อยส์ย่อยในกลุ่ม

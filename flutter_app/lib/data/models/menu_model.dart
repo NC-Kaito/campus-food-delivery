@@ -7,7 +7,6 @@ class MenuModel {
   String? description;
   String? menuImage;
   double? price;
-  double? extraprice;
   bool? status;
   String? restaurantId;
   int? typeMenuId;
@@ -21,7 +20,6 @@ class MenuModel {
     this.description,
     this.menuImage,
     this.price,
-    this.extraprice,
     this.status,
     this.restaurantId,
     this.typeMenuId,
@@ -37,7 +35,6 @@ class MenuModel {
       description: json['description'],
       menuImage: json['imageurl'],
       price: json['price']?.toDouble(),
-      extraprice: json['extraprice']?.toDouble(),
       status: json['status'],
 
       restaurantId: json['restaurant'] != null
@@ -65,7 +62,6 @@ class MenuModel {
       'description': description,
       'imageurl': menuImage,
       'price': price,
-      'extraprice': extraprice,
       'status': status,
       // ส่งโครงสร้างความสัมพันธ์ความเชื่อมโยงเป็น Object ซ้อนตามสไตล์ JPA/Hibernate
       if (restaurantId != null) 'restaurant': {'username': restaurantId},

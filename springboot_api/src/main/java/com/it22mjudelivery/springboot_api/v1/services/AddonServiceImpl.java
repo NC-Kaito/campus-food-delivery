@@ -32,7 +32,7 @@ public class AddonServiceImpl implements AddonService {
 
             Menuaddongroup group = Menuaddongroup.builder()
                     .addongroupname(request.getAddongroupname())
-                    .isRequired(request.isRequired())
+                    .is_multiple_choice(request.is_multiple_choice())
                     .status(request.isStatus())
                     .username(restaurant)
                     .build();
@@ -88,7 +88,7 @@ public class AddonServiceImpl implements AddonService {
 
             // ── 1. อัปเดตข้อมูลของกลุ่ม ──
             existingGroup.setAddongroupname(request.getAddongroupname());
-            existingGroup.setRequired(request.isRequired());
+            existingGroup.set_multiple_choice(request.is_multiple_choice());
             existingGroup.setStatus(request.isStatus());
 
             Menuaddongroup savedGroup = menuaddongroupRepository.save(existingGroup);
@@ -115,13 +115,17 @@ public class AddonServiceImpl implements AddonService {
                             )
                     );
 
-                    if (detailDTO.getAddondetailId() != null // ← แก้จาก getAddondetailid()
+                    if (detailDTO.getAddondetailId() != null
                             && currentDetailMap.containsKey(detailDTO.getAddondetailId())) {
                         // ── UPDATE แถวเดิม ──
                         Menuaddondetail existingDetail = currentDetailMap.get(detailDTO.getAddondetailId());
                         existingDetail.setAddonprice(detailDTO.getAddonprice());
                         existingDetail.setStatus(detailDTO.isStatus());
                         existingDetail.setAddonmenu(addonmenu);
+
+                        // 🎯 [แก้ไข] เพิ่มบรรทัดนี้ลงไปครับ ไม่งั้น allowqtystatus จะไม่ยอมอัปเดต
+                        existingDetail.setAllowqtystatus(detailDTO.isAllowqtystatus());
+
                         menuaddondetailRepository.save(existingDetail);
 
                         keepIds.add(detailDTO.getAddondetailId());
@@ -130,6 +134,7 @@ public class AddonServiceImpl implements AddonService {
                         Menuaddondetail newDetail = Menuaddondetail.builder()
                                 .addonprice(detailDTO.getAddonprice())
                                 .status(detailDTO.isStatus())
+                                .allowqtystatus(detailDTO.isAllowqtystatus()) // 🎯 [แก้ไข] เช็คตรงสร้างใหม่ด้วยว่ามีบรรทัดนี้แล้ว
                                 .menuaddongroup(savedGroup)
                                 .addonmenu(addonmenu)
                                 .build();

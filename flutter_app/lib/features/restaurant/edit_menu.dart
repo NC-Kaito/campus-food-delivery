@@ -85,13 +85,6 @@ class _EditMenuState extends State<EditMenu> {
     _existingImageUrl = widget.menuModel.menuImage;
     _selectedTypeMenuId = widget.menuModel.typeMenuId;
     _selectedTypeMenuName = widget.menuModel.typeMenuName;
-
-    // 🎯 ราคาพิเศษเดิม (ถ้ามีและมากกว่า 0 ให้เปิด toggle ไว้ให้อัตโนมัติ)
-    final double existingExtraPrice = widget.menuModel.extraprice ?? 0;
-    _hasExtraPrice = existingExtraPrice > 0;
-    extraPriceController.text = _hasExtraPrice
-        ? existingExtraPrice.toStringAsFixed(0)
-        : "";
   }
 
   @override

@@ -63,10 +63,12 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     if (isCurryDish) {
       curriesText = item.orderDetailCurries!
           .map((e) {
-            final map = e as Map<String, dynamic>;
-            final menuMap = map['menu'] as Map<String, dynamic>?;
-            return (menuMap?['menuname'] ?? menuMap?['menuName'] ?? '')
-                .toString();
+            if (e is Map<String, dynamic>) {
+              final menuMap = e['menu'] as Map<String, dynamic>?;
+              return (menuMap?['menuname'] ?? menuMap?['menuName'] ?? '')
+                  .toString();
+            }
+            return '';
           })
           .where((name) => name.isNotEmpty)
           .join(", ");
@@ -77,12 +79,22 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
         .where((name) => name.isNotEmpty)
         .join(", ");
 
+    // ═══════════════════════════════════════════════
+    // 🎯 คำนวณราคาต่อหน่วย (ตัด extraprice ออกแล้ว)
+    //    - ข้าวราดแกง: ราคาฐานจานข้าว + ผลรวมราคากับข้าวแต่ละอย่างที่เลือก (priceAtOrder)
+    //    - เมนูทั่วไป: ราคาเมนู + ผลรวมราคาตัวเลือกเสริม
+    // ═══════════════════════════════════════════════
     int finalPricePerUnit;
     if (isCurryDish) {
+      int curriesSum = 0;
+      for (var curry in item.orderDetailCurries!) {
+        if (curry is Map<String, dynamic>) {
+          final num? price = curry['priceAtOrder'] as num?;
+          curriesSum += (price ?? 0).toInt();
+        }
+      }
       final int riceBasePrice = item.menu?.price?.toInt() ?? 0;
-      final int extraPricePerCurry = item.menu?.extraprice?.toInt() ?? 0;
-      final int curryCount = item.orderDetailCurries!.length;
-      finalPricePerUnit = riceBasePrice + (curryCount * extraPricePerCurry);
+      finalPricePerUnit = riceBasePrice + curriesSum;
     } else {
       int addonsSum = 0;
       for (var addon in item.addons) {
@@ -252,8 +264,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     final String restaurantName =
         order.restaurant?.restaurantName ?? "ไม่ระบุชื่อร้าน";
 
-    // 🎯 RestaurantModel ไม่มี field ที่อยู่เป็นข้อความ มีแต่ latitude/longitude
-    //    เลยใช้พิกัดแสดงเป็นแผนที่แทน (เหมือนฝั่งที่อยู่ลูกค้า)
     final double? restaurantLat = order.restaurant?.latitude;
     final double? restaurantLng = order.restaurant?.longitude;
     final bool hasRestaurantLocation =
@@ -465,7 +475,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
               ],
             ),
             const SizedBox(height: 12),
-            // 🎯 แสดงตำแหน่งร้านเป็นแผนที่ย่อ (แทนข้อความที่อยู่ ซึ่งไม่มีเก็บไว้ใน RestaurantModel)
             if (restaurantLocation != null)
               Container(
                 height: 160,
@@ -659,9 +668,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                 ),
               ],
             ),
-            const SizedBox(
-              height: 100,
-            ), // เผื่อพื้นที่ให้ปุ่มด้านล่างไม่บังเนื้อหา
+            const SizedBox(height: 100),
           ],
         ),
       ),

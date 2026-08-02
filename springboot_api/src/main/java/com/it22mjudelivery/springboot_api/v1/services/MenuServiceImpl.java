@@ -80,7 +80,6 @@ public class MenuServiceImpl implements MenuService {
                     .menuname((String) requestData.get("menuname"))
                     .description((String) requestData.get("description"))
                     .price(Double.parseDouble(requestData.get("price").toString()))
-                    .extraprice(extractExtraPrice(requestData))
                     .imageurl(finalImageUrl)
                     .status((boolean) requestData.get("status"))
                     .restaurant(restaurant)
@@ -98,7 +97,7 @@ public class MenuServiceImpl implements MenuService {
                     // 🎯 แก้จุดบั๊ก: เอา .menu(menu) ออกไปเนื่องจากเปลี่ยนโครงสร้างเป็น @ManyToMany แล้ว
                     Menuaddongroup group = Menuaddongroup.builder()
                             .addongroupname((String) groupMap.get("addongroupname"))
-                            .isRequired((boolean) groupMap.get("isRequired"))
+                            .is_multiple_choice((boolean) groupMap.get("is_multiple_choice"))
                             .build();
 
                     Menuaddongroup savedGroup = menuaddongroupRepository.save(group);
@@ -178,7 +177,6 @@ public class MenuServiceImpl implements MenuService {
                     .description((String) requestData.get("description"))
                     .price(Double.parseDouble(requestData.get("price").toString()))
 //                    .extraprice(Double.parseDouble(requestData.get("extraprice".toString())))
-                    .extraprice(extractExtraPrice(requestData))
                     .imageurl(finalImageUrl)
                     .status((boolean) requestData.get("status"))
                     .restaurant(restaurant)
@@ -206,7 +204,6 @@ public class MenuServiceImpl implements MenuService {
             menu.setMenuname((String) requestData.get("menuname"));
             menu.setDescription((String) requestData.get("description"));
             menu.setPrice(Double.parseDouble(requestData.get("price").toString()));
-            menu.setExtraprice(extractExtraPrice(requestData));
             menu.setStatus((boolean) requestData.get("status"));
 
             if (requestData.containsKey("imageUrl")) {

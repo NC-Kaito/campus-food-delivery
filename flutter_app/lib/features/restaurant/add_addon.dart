@@ -3,7 +3,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/addon_menu_model.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/addon_group_request_model.dart';
 
 import 'package:flutter_app/features/restaurant/add_menu.dart'
@@ -13,7 +12,7 @@ import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/global_data.dart';
 
 // ============================================================
-// 🎨 Design tokens — สีและระยะห่างที่ใช้ทั้งหน้า ปรับที่นี่ที่เดียว
+// 🎨 Design tokens — สีและระยะห่างที่ใช้ทั้งหน้า
 // ============================================================
 class _AddonTheme {
   static const Color primary = Color(0xFFFF8A00); // ส้ม — โทนหลักของแบรนด์
@@ -24,7 +23,6 @@ class _AddonTheme {
   static const Color textPrimary = Color(0xFF1F2430);
   static const Color textSecondary = Color(0xFF8A8F98);
   static const Color fieldBg = Color(0xFFF4F5F7);
-  static const Color border = Color(0xFFE7E8EC);
 }
 
 class AddAddon extends StatefulWidget {
@@ -40,8 +38,8 @@ class _AddAddonState extends State<AddAddon> {
 
   final TextEditingController groupNameController = TextEditingController();
 
-  int maxSelect = 1; // 🎯 ควบคุมด้วย stepper แทนช่องกรอกตัวเลข
-  bool isRequired = true;
+  // 🎯 ปรับใช้ is_multiple_choice แทน maxSelect และ isRequired
+  bool isMultipleChoice = false;
   bool _isLoading = false;
 
   List<CustomAddonItem> selectedAddons = [];
@@ -77,16 +75,14 @@ class _AddAddonState extends State<AddAddon> {
         nameController: TextEditingController(),
         priceController: TextEditingController(),
         addonId: null,
-        allowqtystatus: false, // กำหนดค่าเริ่มต้น
+        allowqtystatus: false,
       );
       selectedAddons.add(newAddon);
 
-      // สร้าง focus node + layer link ผูกกับแถวนี้
       final focusNode = FocusNode();
       _nameFocusNodes[newAddon] = focusNode;
       _layerLinks[newAddon] = LayerLink();
 
-      // ปิด dropdown อัตโนมัติเมื่อออกจากช่อง (เผื่อผู้ใช้แตะที่อื่นโดยไม่เลือก suggestion)
       focusNode.addListener(() {
         if (!focusNode.hasFocus) {
           _removeOverlay(newAddon);
@@ -112,9 +108,6 @@ class _AddAddonState extends State<AddAddon> {
     });
   }
 
-  // ============================================================
-  // Autocomplete: ค้นหาชื่อ addon จากคลังกลาง (debounce 350ms)
-  // ============================================================
   void _onAddonNameChanged(CustomAddonItem addon, String value) {
     _debounce?.cancel();
 
@@ -130,7 +123,7 @@ class _AddAddonState extends State<AddAddon> {
       _suggestions[addon] = results;
 
       if (results.isEmpty) {
-        _removeOverlay(addon); // ไม่เจอ → ปิด dropdown ให้พิมพ์ต่อแบบปกติ
+        _removeOverlay(addon);
       } else {
         _showOverlay(addon);
       }
@@ -138,18 +131,18 @@ class _AddAddonState extends State<AddAddon> {
   }
 
   void _showOverlay(CustomAddonItem addon) {
-    _removeOverlay(addon); // ปิดของเก่าก่อนสร้างใหม่ กันซ้อนกัน
+    _removeOverlay(addon);
 
     final layerLink = _layerLinks[addon];
     if (layerLink == null) return;
 
     final overlay = OverlayEntry(
       builder: (context) => Positioned(
-        width: 240, // ← ปรับตามความกว้างช่องชื่อจริงถ้าต้องการ
+        width: 240,
         child: CompositedTransformFollower(
           link: layerLink,
           showWhenUnlinked: false,
-          offset: const Offset(0, 48), // เลื่อนลงมาใต้ช่อง input
+          offset: const Offset(0, 48),
           child: Material(
             elevation: 4,
             borderRadius: BorderRadius.circular(10),
@@ -194,14 +187,13 @@ class _AddAddonState extends State<AddAddon> {
   void _selectSuggestion(CustomAddonItem addon, AddonMenuModel item) {
     addon.nameController.text = item.addonName ?? "";
     _removeOverlay(addon);
-    _nameFocusNodes[addon]?.unfocus(); // ปิดคีย์บอร์ดหลังเลือก
+    _nameFocusNodes[addon]?.unfocus();
   }
 
   Future<void> _doSaveAddonGroup() async {
     final isFormValid = formKey.currentState!.validate();
     if (!isFormValid) return;
 
-    // ─── เช็กชื่อซ้ำก่อนส่ง ───────────────────────────
     final names = selectedAddons
         .map((a) => a.nameController.text.trim().toLowerCase())
         .toList();
@@ -222,12 +214,11 @@ class _AddAddonState extends State<AddAddon> {
     setState(() => _isLoading = true);
 
     try {
-      // ─── สร้าง request model จาก form ───────────────────
+      // 🎯 ส่งค่า is_multiple_choice ไปยัง Backend
       final request = AddonGroupRequestModel(
         restaurantUsername: GlobalData.usernameRestaurant ?? "",
         addongroupname: groupNameController.text.trim(),
-        isRequired: isRequired,
-        maxselect: maxSelect,
+        is_multiple_choice: isMultipleChoice,
         status: true,
         details: selectedAddons.map((addon) {
           return AddonDetailRequestModel(
@@ -235,7 +226,7 @@ class _AddAddonState extends State<AddAddon> {
             addonprice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
             status: true,
-            allowqtystatus: addon.allowqtystatus, // ส่งค่าการอนุญาตเพิ่มจำนวน
+            allowqtystatus: addon.allowqtystatus,
           );
         }).toList(),
       );
@@ -378,129 +369,51 @@ class _AddAddonState extends State<AddAddon> {
   }
 
   // ============================================================
-  // Max-select stepper — แทนช่องกรอกตัวเลขด้วยปุ่ม -/+ ให้กดง่ายบนมือถือ
+  // Toggle สวิตช์: เลือกได้หลายอย่าง (is_multiple_choice)
   // ============================================================
-  Widget _buildMaxSelectStepper() {
+  Widget _buildMultipleChoiceSwitch() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: _AddonTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _stepperButton(
-            icon: Icons.remove_rounded,
-            onTap: maxSelect > 1 ? () => setState(() => maxSelect--) : null,
-          ),
-          SizedBox(
-            width: 34,
-            child: Text(
-              '$maxSelect',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: _AddonTheme.textPrimary,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "เลือกได้หลายอย่าง",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: _AddonTheme.textPrimary,
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Text(
+                isMultipleChoice
+                    ? "ลูกค้าสามารถเลือกตัวเลือกได้มากกว่า 1 ข้อ"
+                    : "ลูกค้าเลือกได้เพียง 1 ข้อเท่านั้น",
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: _AddonTheme.textSecondary,
+                ),
+              ),
+            ],
           ),
-          _stepperButton(
-            icon: Icons.add_rounded,
-            onTap: maxSelect < 20 ? () => setState(() => maxSelect++) : null,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _stepperButton({required IconData icon, VoidCallback? onTap}) {
-    final bool enabled = onTap != null;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(9),
-        onTap: onTap,
-        child: Container(
-          width: 30,
-          height: 30,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: enabled ? _AddonTheme.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
-            boxShadow: enabled
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.06),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Icon(
-            icon,
-            size: 16,
-            color: enabled
-                ? _AddonTheme.textPrimary
-                : _AddonTheme.textSecondary.withOpacity(0.4),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ============================================================
-  // segmented toggle: จำเป็น / ไม่บังคับ
-  // ============================================================
-  Widget _buildRequiredSegment() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: _AddonTheme.fieldBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _segmentOption(
-            label: "จำเป็น",
-            selected: isRequired,
-            onTap: () => setState(() => isRequired = true),
-          ),
-          _segmentOption(
-            label: "ไม่บังคับ",
-            selected: !isRequired,
-            onTap: () => setState(() => isRequired = false),
+          Switch(
+            value: isMultipleChoice,
+            activeColor: _AddonTheme.accent,
+            onChanged: (value) {
+              setState(() {
+                isMultipleChoice = value;
+              });
+            },
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _segmentOption({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected ? _AddonTheme.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : _AddonTheme.textSecondary,
-          ),
-        ),
       ),
     );
   }
@@ -540,6 +453,7 @@ class _AddAddonState extends State<AddAddon> {
             ),
           ),
           const SizedBox(width: 10),
+
           // ─── ช่องชื่อตัวเลือก ───
           Expanded(
             flex: 3,
@@ -660,7 +574,7 @@ class _AddAddonState extends State<AddAddon> {
           ),
           const SizedBox(width: 6),
 
-          // ─── ปุ่ม +จำนวน (อนุญาตให้เพิ่ม qty) ───
+          // ─── ปุ่ม +จำนวน ───
           Material(
             color: Colors.transparent,
             child: InkWell(
@@ -672,12 +586,12 @@ class _AddAddonState extends State<AddAddon> {
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                height: 44, // ให้ความสูงพอดีกับช่องกรอกข้อความ
+                height: 44,
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 decoration: BoxDecoration(
                   color: addon.allowqtystatus
                       ? _AddonTheme.accent.withOpacity(0.12)
-                      : _AddonTheme.surface, // ใช้สีขาวให้เข้ากับกล่อง input
+                      : _AddonTheme.surface,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
                     color: addon.allowqtystatus
@@ -698,17 +612,6 @@ class _AddAddonState extends State<AddAddon> {
                           ? _AddonTheme.accent
                           : _AddonTheme.textSecondary,
                     ),
-                    // const SizedBox(width: 4),
-                    // Text(
-                    //   "+จำนวน",
-                    //   style: TextStyle(
-                    //     fontSize: 12,
-                    //     fontWeight: FontWeight.w700,
-                    //     color: addon.allowqtystatus
-                    //         ? _AddonTheme.accent
-                    //         : _AddonTheme.textSecondary,
-                    //   ),
-                    // ),
                   ],
                 ),
               ),
@@ -724,7 +627,7 @@ class _AddAddonState extends State<AddAddon> {
               onTap: canDelete ? () => _removeAddonItemRow(index) : null,
               child: Container(
                 width: 34,
-                height: 44, // ปรับให้สูงเท่ากัน
+                height: 44,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: canDelete
@@ -841,41 +744,8 @@ class _AddAddonState extends State<AddAddon> {
 
                     const SizedBox(height: 16),
 
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            "จำนวนที่เลือกได้สูงสุด",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _AddonTheme.textSecondary,
-                            ),
-                          ),
-                        ),
-                        _buildMaxSelectStepper(),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            "บังคับให้ลูกค้าเลือก",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _AddonTheme.textSecondary,
-                            ),
-                          ),
-                        ),
-                        _buildRequiredSegment(),
-                      ],
-                    ),
+                    // 🎯 การ์ดสวิตช์เลือกได้หลายอย่าง
+                    _buildMultipleChoiceSwitch(),
                   ],
                 ),
               ),
@@ -909,7 +779,6 @@ class _AddAddonState extends State<AddAddon> {
                     ),
                     const SizedBox(height: 14),
 
-                    // ── หัวตาราง: ชื่อตัวเลือก / ราคา ───────────────────
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
@@ -938,7 +807,6 @@ class _AddAddonState extends State<AddAddon> {
                               ),
                             ),
                           ),
-                          // เว้นพื้นที่ให้ปุ่ม +จำนวน และ ปุ่มลบ
                           SizedBox(width: 8),
                           Expanded(
                             flex: 2,
@@ -1011,7 +879,7 @@ class _AddAddonState extends State<AddAddon> {
         ),
       ),
 
-      // ── ปุ่มบันทึก ปักไว้ด้านล่างเสมอ ────────────────────────────
+      // ── ปุ่มบันทึก ────────────────────────────
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),

@@ -22,7 +22,8 @@ class MenuAddonService {
             groupJson,
           );
 
-          groupModel.isRequired = groupJson['required'] == true;
+          groupModel.is_multiple_choice =
+              groupJson['is_multiple_choice'] == true;
 
           if (groupJson['menuaddondetails'] != null) {
             List<dynamic> detailsJsonList = groupJson['menuaddondetails'];

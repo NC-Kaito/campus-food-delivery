@@ -29,8 +29,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   // 🎯 เก็บวัตถุข้อมูล Add-on ตัวจริงไว้ใช้อ้างอิงราคาและชื่อ
   final Map<int, MenuAddonDetailModel> _addonModelsIndex = {};
 
-  bool _useExtraPrice = false;
-
   @override
   void initState() {
     super.initState();
@@ -90,13 +88,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
   @override
   Widget build(BuildContext context) {
-    final int normalPrice = widget.menuModel.price?.toInt() ?? 0;
-    final int extraPriceValue = widget.menuModel.extraprice?.toInt() ?? 0;
-    final bool hasExtraPriceOption = extraPriceValue > 0;
-
-    int basePrice = (hasExtraPriceOption && _useExtraPrice)
-        ? extraPriceValue
-        : normalPrice;
+    final int basePrice = widget.menuModel.price?.toInt() ?? 0;
 
     double addonTotalPrice = 0;
     _addonQuantities.forEach((id, qty) {
@@ -225,33 +217,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 ),
                               ],
                             ),
-                            if (hasExtraPriceOption) ...[
-                              const SizedBox(height: 14),
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: _buildPriceOptionCard(
-                                      label: "ราคาปกติ",
-                                      price: normalPrice,
-                                      isSelected: !_useExtraPrice,
-                                      onTap: () => setState(
-                                        () => _useExtraPrice = false,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: _buildPriceOptionCard(
-                                      label: "ราคาพิเศษ",
-                                      price: extraPriceValue,
-                                      isSelected: _useExtraPrice,
-                                      onTap: () =>
-                                          setState(() => _useExtraPrice = true),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
                             if (description != null) ...[
                               const SizedBox(height: 8),
                               Text(
@@ -274,11 +239,13 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 String groupName = entry.key;
                                 List<MenuAddonDetailModel> items = entry.value;
 
-                                bool isRequired =
-                                    items.first.menuAddonGroup?.isRequired ??
+                                // 🎯 ดึงค่า is_multiple_choice ตรงจาก Model ใหม่
+                                bool isMultipleChoice =
+                                    items
+                                        .first
+                                        .menuAddonGroup
+                                        ?.is_multiple_choice ??
                                     false;
-                                int maxSelect =
-                                    items.first.menuAddonGroup?.maxSelect ?? 1;
 
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -291,29 +258,13 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                       )
                                     else
                                       const SizedBox(height: 8),
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          groupName,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Text(
-                                          isRequired
-                                              ? "จำเป็น (สูงสุด $maxSelect)"
-                                              : "ไม่จำเป็น (สูงสุด $maxSelect)",
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: isRequired
-                                                ? Colors.orange[400]
-                                                : Colors.grey[500],
-                                          ),
-                                        ),
-                                      ],
+
+                                    Text(
+                                      groupName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     const SizedBox(height: 8),
                                     IntrinsicHeight(
@@ -333,7 +284,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                                     (addonDetail) =>
                                                         _buildAddonItemOption(
                                                           addonDetail,
-                                                          maxSelect,
+                                                          isMultipleChoice,
                                                         ),
                                                   )
                                                   .toList(),
@@ -516,33 +467,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  for (var entry in groupedAddons.entries) {
-                    String groupName = entry.key;
-                    List<MenuAddonDetailModel> items = entry.value;
-                    bool isRequired =
-                        items.first.menuAddonGroup?.isRequired ?? false;
-
-                    if (isRequired) {
-                      bool hasSelection = items.any(
-                        (item) =>
-                            _addonQuantities.containsKey(item.addonDetailId) &&
-                            _addonQuantities[item.addonDetailId]! > 0,
-                      );
-                      if (!hasSelection) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              "⚠️ กรุณาเลือกรายการเสริมในหัวข้อ '$groupName'",
-                            ),
-                            backgroundColor: Colors.redAccent,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                        return;
-                      }
-                    }
-                  }
-
                   final List<MenuAddonDetailModel> finalSelectedAddonsList = [];
                   _addonQuantities.forEach((id, qty) {
                     final model = _addonModelsIndex[id];
@@ -561,7 +485,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     addonPrice: addonTotalPrice.toInt(),
                     totalPrice: totalPrice,
                     unitPrice: basePrice,
-                    isExtraPrice: hasExtraPriceOption && _useExtraPrice,
+                    isExtraPrice: false,
                   );
 
                   CartManager().addToCart(cartItem);
@@ -610,7 +534,10 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     );
   }
 
-  Widget _buildAddonItemOption(MenuAddonDetailModel detail, int maxSelect) {
+  Widget _buildAddonItemOption(
+    MenuAddonDetailModel detail,
+    bool isMultipleChoice,
+  ) {
     int id = detail.addonDetailId ?? 0;
     int currentQty = _addonQuantities[id] ?? 0;
     bool isSelected = currentQty > 0;
@@ -619,36 +546,13 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     int price = detail.addonPrice?.toInt() ?? 0;
     int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
 
-    // คำนวณจำนวนรวมทั้งหมดที่ถูกเลือกไปแล้วในกลุ่มแอดออนนี้
-    // (รวมทั้งจากการติ๊กตัวหน้าและจากสเต็ปเปอร์ + / - ของทุกตัวในกลุ่มเดียวกัน)
-    int currentSelectedInGroupCount = 0;
-    _addonQuantities.forEach((key, qty) {
-      final model = _addonModelsIndex[key];
-      if (model != null &&
-          model.menuAddonGroup?.addonGroupId == currentGroupId) {
-        currentSelectedInGroupCount += qty;
-      }
-    });
-
-    // 🎯 โควตาของกลุ่มนี้เต็มแล้วหรือยัง (ไม่ว่าจะมาจากตัวเดียวที่เพิ่มจำนวน
-    // จนครบ หรือติ๊กหลายตัวรวมกันจนครบก็ตาม)
-    bool isGroupQuotaFull = currentSelectedInGroupCount >= maxSelect;
-    // 🎯 ตัวที่ "ยังไม่ถูกเลือก" จะถูกล็อกทันทีเมื่อโควตาของกลุ่มเต็มแล้ว
-    bool isAlternativeItemDisabled = isGroupQuotaFull && !isSelected;
-
-    // ── ติ๊ก/ยกเลิกติ๊กตัวหน้า ──────────────────────────────────────
-    // ถ้าโดนล็อกอยู่ (โควตาเต็มและยังไม่ได้เลือกตัวนี้) ให้เด้งแจ้งเตือน
-    // แทนที่จะปล่อยให้กดแล้วไม่มีอะไรเกิดขึ้นเฉยๆ
     void handleFrontTap() {
-      if (isAlternativeItemDisabled) {
-        _showMaxSelectWarning(maxSelect);
-        return;
-      }
       setState(() {
         if (isSelected) {
           _addonQuantities.remove(id);
         } else {
-          if (maxSelect == 1) {
+          // 🎯 ถ้าเป็น Single Choice (!isMultipleChoice) ให้สลับตัวเลือกในกลุ่มเดียวกันออกอัตโนมัติ
+          if (!isMultipleChoice) {
             _addonQuantities.removeWhere((key, value) {
               final model = _addonModelsIndex[key];
               return model?.menuAddonGroup?.addonGroupId == currentGroupId;
@@ -661,14 +565,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
       });
     }
 
-    // ── กดปุ่ม "+" เพิ่มจำนวนของตัวเลือกนี้ ────────────────────────
-    // ต้องติ๊กตัวหน้าก่อนเสมอ (ไม่ติ๊ก = ปุ่มนี้กดไม่ได้เลยจริงๆ) และถ้า
-    // โควตาของกลุ่มเต็มแล้ว (ไม่ว่าจะเต็มเพราะตัวอื่นหรือตัวเอง) ให้เตือน
     void handlePlusTap() {
-      if (isGroupQuotaFull) {
-        _showMaxSelectWarning(maxSelect);
-        return;
-      }
       setState(() {
         _addonQuantities[id] = currentQty + 1;
       });
@@ -679,12 +576,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // ── ฝั่งซ้าย: ปุ่มติ๊กหน้าสุด + ข้อความ + ราคา ──
           Row(
             children: [
               InkWell(
-                // 🎯 กดได้เสมอ แต่ข้างในจะดักเช็คเองว่าล็อกอยู่หรือเปล่า
-                // เพื่อให้แจ้งเตือนได้แทนที่จะเงียบไปเฉยๆ ตอนโดนล็อก
                 onTap: handleFrontTap,
                 child: Row(
                   children: [
@@ -692,18 +586,13 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                       width: 20,
                       height: 20,
                       decoration: BoxDecoration(
-                        shape: maxSelect == 1
-                            ? BoxShape.circle
-                            : BoxShape.rectangle,
-                        borderRadius: maxSelect == 1
-                            ? null
-                            : BorderRadius.circular(4),
-                        border: Border.all(
-                          color: isAlternativeItemDisabled
-                              ? Colors.grey.shade300
-                              : Colors.black,
-                          width: 1.5,
-                        ),
+                        shape: isMultipleChoice
+                            ? BoxShape.rectangle
+                            : BoxShape.circle,
+                        borderRadius: isMultipleChoice
+                            ? BorderRadius.circular(4)
+                            : null,
+                        border: Border.all(color: Colors.black, width: 1.5),
                       ),
                       child: isSelected
                           ? Center(
@@ -711,12 +600,12 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 width: 10,
                                 height: 10,
                                 decoration: BoxDecoration(
-                                  shape: maxSelect == 1
-                                      ? BoxShape.circle
-                                      : BoxShape.rectangle,
-                                  borderRadius: maxSelect == 1
-                                      ? null
-                                      : BorderRadius.circular(2),
+                                  shape: isMultipleChoice
+                                      ? BoxShape.rectangle
+                                      : BoxShape.circle,
+                                  borderRadius: isMultipleChoice
+                                      ? BorderRadius.circular(2)
+                                      : null,
                                   color: Colors.orange,
                                 ),
                               ),
@@ -726,51 +615,37 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     const SizedBox(width: 12),
                     Text(
                       title,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 15,
-                        color: isAlternativeItemDisabled
-                            ? Colors.grey.shade400
-                            : Colors.black87,
+                        color: Colors.black87,
                       ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 10),
-              // 🎯 [SWAPPED] ย้ายราคาบวกเพิ่มมาอยู่ฝั่งซ้ายต่อท้ายชื่ออาหารทันทีตามสั่ง
               Text(
                 "(+$price)",
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 14,
-                  color: isAlternativeItemDisabled
-                      ? Colors.grey.shade300
-                      : Colors.grey,
+                  color: Colors.grey,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ],
           ),
 
-          // ── ฝั่งขวา: แผงปุ่มสเต็ปเปอร์เพิ่ม/ลดจำนวน (แสดงเฉพาะกลุ่มที่มี maxSelect > 1) ──
-          if (maxSelect > 1)
+          // 🎯 ปุ่มบวก/ลบจำนวนชิ้นย่อย เปิดให้ใช้เฉพาะกลุ่มที่เป็น is_multiple_choice == true เท่านั้น
+          if (isMultipleChoice)
             Container(
               height: 32,
               decoration: BoxDecoration(
-                color: isAlternativeItemDisabled
-                    ? Colors.grey.shade100
-                    : Colors.grey.shade50,
+                color: Colors.grey.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: isAlternativeItemDisabled
-                      ? Colors.grey.shade200
-                      : Colors.grey.shade200,
-                ),
+                border: Border.all(color: Colors.grey.shade200),
               ),
               child: Row(
                 children: [
-                  // ปุ่มลบชิ้นย่อย (กดลดจำนวนลง)
-                  // 🎯 ถ้ายังไม่ติ๊กตัวหน้า (ไม่ได้เลือก) ปุ่มนี้กดไม่ได้จริงๆ
-                  // (ไม่ต้องแจ้งเตือน เพราะไม่มีอะไรให้ลดอยู่แล้ว)
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
@@ -795,8 +670,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                           }
                         : null,
                   ),
-
-                  // ตัวเลขแสดงจำนวนปัจจุบัน
                   Container(
                     alignment: Alignment.center,
                     width: 20,
@@ -811,10 +684,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                       ),
                     ),
                   ),
-
-                  // ปุ่มบวกชิ้นย่อย
-                  // 🎯 ยังไม่ติ๊กตัวหน้า = กดไม่ได้เลยจริงๆ (onPressed: null)
-                  // ติ๊กแล้วแต่โควตากลุ่มเต็ม = กดได้แต่จะเด้งแจ้งเตือนแทน
                   IconButton(
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
@@ -824,9 +693,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     icon: Icon(
                       Icons.add,
                       size: 16,
-                      color: (isSelected && !isGroupQuotaFull)
-                          ? Colors.black87
-                          : Colors.grey.shade300,
+                      color: isSelected ? Colors.black87 : Colors.grey.shade300,
                     ),
                     onPressed: isSelected ? handlePlusTap : null,
                   ),
@@ -834,75 +701,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  void _showMaxSelectWarning(int maxSelect) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("⛔ เลือกได้สูงสุด $maxSelect รายการเท่านั้นครับ"),
-        backgroundColor: Colors.amber[800],
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  Widget _buildPriceOptionCard({
-    required String label,
-    required int price,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.orange.withOpacity(0.1) : Colors.grey[50],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected ? Colors.orange : Colors.grey.shade300,
-            width: isSelected ? 1.6 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              isSelected
-                  ? Icons.radio_button_checked_rounded
-                  : Icons.radio_button_off_rounded,
-              size: 18,
-              color: isSelected ? Colors.orange : Colors.grey[400],
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: isSelected ? Colors.orange[800] : Colors.black87,
-                    ),
-                  ),
-                  Text(
-                    "฿$price",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.orange : Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

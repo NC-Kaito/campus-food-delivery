@@ -21,7 +21,6 @@ public class menuDto {
     private String description;
     private String imageurl;
     private Double price;
-    private Double extraprice;
     private boolean status;
     private String restaurantid;
     private Integer typeMenuId; // เปลี่ยนจาก int -> Integer

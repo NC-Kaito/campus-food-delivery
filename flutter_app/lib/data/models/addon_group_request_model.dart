@@ -28,8 +28,7 @@ class AddonGroupRequestModel {
   int? addonGroupId;
   String restaurantUsername;
   String addongroupname;
-  bool isRequired;
-  int maxselect;
+  bool is_multiple_choice;
   bool status;
   List<AddonDetailRequestModel> details;
 
@@ -37,8 +36,7 @@ class AddonGroupRequestModel {
     this.addonGroupId,
     required this.restaurantUsername,
     required this.addongroupname,
-    required this.isRequired,
-    required this.maxselect,
+    required this.is_multiple_choice,
     this.status = true,
     required this.details,
   });
@@ -48,8 +46,7 @@ class AddonGroupRequestModel {
       if (addonGroupId != null) "addongroupid": addonGroupId,
       "restaurantUsername": restaurantUsername,
       "addongroupname": addongroupname,
-      "required": isRequired,
-      "maxselect": maxselect,
+      "is_multiple_choice": is_multiple_choice,
       "status": status,
       "details": details.map((e) => e.toJson()).toList(),
     };

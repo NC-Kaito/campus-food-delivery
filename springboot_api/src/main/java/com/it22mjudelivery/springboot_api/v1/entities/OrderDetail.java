@@ -1,6 +1,7 @@
 package com.it22mjudelivery.springboot_api.v1.entities;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -14,10 +15,11 @@ import java.util.Set;
 @NoArgsConstructor
 @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class OrderDetail {
 
     @Id
-    @GeneratedValue (strategy = GenerationType.IDENTITY)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer orderdetailid;
 
     @Column(nullable = false)
@@ -34,16 +36,20 @@ public class OrderDetail {
     @JsonIgnore
     private Order order;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "menu_id", nullable = false)
+    @JsonIgnoreProperties({"restaurant", "hibernateLazyInitializer", "handler"})
     private Menu menu;
 
-    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    // 🎯 แก้ไข: กำหนด FetchType.EAGER ป้องกัน Proxy สะดุด
+    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @JsonIgnoreProperties({"orderDetail", "hibernateLazyInitializer", "handler"})
     @Builder.Default
     private Set<Orderdetailaddon> orderDetailAddons = new HashSet<>();
 
-    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true)
+    // 🎯 แก้ไข: กำหนด FetchType.EAGER ป้องกัน Proxy สะดุด
+    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @JsonIgnoreProperties({"orderDetail", "hibernateLazyInitializer", "handler"})
     @Builder.Default
     private Set<Orderdetailcurry> orderDetailCurries = new HashSet<>();
 }
-

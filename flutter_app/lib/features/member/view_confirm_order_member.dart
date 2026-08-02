@@ -25,7 +25,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
 
   final MemberService memberService = MemberService();
 
-  // 🎯 คุมชุดเฉดสีเขียวประจำธีมแอปพลิเคชัน #64F02D ของเรา
   final Color primaryGreen = const Color(0xFF64F02D);
 
   @override
@@ -89,50 +88,53 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
         (item.orderDetailCurries != null &&
         item.orderDetailCurries!.isNotEmpty);
 
-    // 🎯 2. จัดรูปแบบชื่อเมนูให้ตรงกับ ViewOrder (เช่น "ข้าวราดแกง (1 อย่าง)")
+    // 🎯 2. จัดรูปแบบชื่อเมนูให้ตรงกับ ViewOrder
     String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
       displayMenuName = "ข้าวราดแกง (${item.orderDetailCurries!.length} อย่าง)";
     }
 
-    // 🎯 3. ดึงรายการกับข้าวที่ราด — แต่ละ item เป็น Map ดิบจาก JSON
-    //    ต้องใช้ bracket notation ['menu']['menuname'] ไม่ใช่ .menu?.menuName
+    // 🎯 3. ดึงรายการกับข้าวที่ราด
     String curriesText = "";
     if (isCurryDish) {
       curriesText = item.orderDetailCurries!
           .map((e) {
-            final map = e as Map<String, dynamic>;
-            final menuMap = map['menu'] as Map<String, dynamic>?;
-            return (menuMap?['menuname'] ?? menuMap?['menuName'] ?? '')
-                .toString();
+            if (e is Map<String, dynamic>) {
+              final menuMap = e['menu'] as Map<String, dynamic>?;
+              return (menuMap?['menuname'] ?? menuMap?['menuName'] ?? '')
+                  .toString();
+            }
+            return '';
           })
           .where((name) => name.isNotEmpty)
           .join(", ");
     }
 
-    // 🎯 4. ดึงรายการตัวเลือกเสริม — ใช้ field จริง menuAddonDetail.addonMenu.addonName
-    //    (แก้จาก (addon as dynamic).addonMenu ที่ error เพราะ field นี้ไม่มีอยู่จริงใน OrderDetailAddonModel)
+    // 🎯 4. ดึงรายการตัวเลือกเสริม
     String addonText = item.addons
         .map((addon) => addon.menuAddonDetail?.addonMenu?.addonName ?? '')
         .where((name) => name.isNotEmpty)
         .join(", ");
 
     // ═══════════════════════════════════════════════
-    // 🎯 5. คำนวณราคาต่อหน่วย ตามสูตรที่ยืนยัน + สไตล์เดียวกับหน้า ViewOrder
-    //    - ข้าวราดแกง: price (ราคาฐาน บวกครั้งเดียว) + extraprice × จำนวนกับข้าวที่เลือก
+    // 🎯 5. คำนวณราคาต่อหน่วย (ตัด extraprice ออกแล้ว)
+    //    - ข้าวราดแกง: ราคาฐานจานข้าว + ผลรวมราคากับข้าวแต่ละอย่างที่เลือก (priceAtOrder)
     //    - เมนูทั่วไป: ราคาเมนู + ผลรวมราคาตัวเลือกเสริม
     // ═══════════════════════════════════════════════
     int finalPricePerUnit;
     if (isCurryDish) {
+      int curriesSum = 0;
+      for (var curry in item.orderDetailCurries!) {
+        if (curry is Map<String, dynamic>) {
+          final num? price = curry['priceAtOrder'] as num?;
+          curriesSum += (price ?? 0).toInt();
+        }
+      }
       final int riceBasePrice = item.menu?.price?.toInt() ?? 0;
-      final int extraPricePerCurry = item.menu?.extraprice?.toInt() ?? 0;
-      final int curryCount = item.orderDetailCurries!.length;
-      finalPricePerUnit = riceBasePrice + (curryCount * extraPricePerCurry);
+      finalPricePerUnit = riceBasePrice + curriesSum;
     } else {
       int addonsSum = 0;
       for (var addon in item.addons) {
-        // ใช้ราคาที่ล็อกไว้ ณ ตอนสั่ง (priceAtOrder) เป็นหลัก
-        // ถ้าไม่มีค่อย fallback ไปราคาปัจจุบันของ addon จาก menuAddonDetail
         addonsSum +=
             (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
                 .toInt();
@@ -141,7 +143,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
-    // 🎯 6. รูปเมนู — ให้ตรงกับ ViewOrder: ข้าวแกงเสมอโชว์ placeholder ไม่ใช้รูปจริง
     final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
 
     return Container(
@@ -479,7 +480,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             const SizedBox(height: 12),
             Row(
               children: [
-                // 🎯 บล็อกจุดแก้ไขปิดวงเล็บครอบ Row เกินเพี้ยนเรียบร้อยฉลุยครับ
                 Expanded(
                   child: Row(
                     children: [

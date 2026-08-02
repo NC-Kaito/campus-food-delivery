@@ -4,7 +4,6 @@ import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/view_confirm_order_member.dart';
-import 'package:flutter_app/features/member/view_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -39,7 +38,12 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     setState(() => _isLoading = true);
 
     try {
-      String username = GlobalData.usernameMember;
+      String username = GlobalData.usernameMember.trim();
+      if (username.isEmpty) {
+        if (mounted) setState(() => _isLoading = false);
+        return;
+      }
+
       final history = await _orderService.getConfirmOrdersByMember(username);
 
       if (mounted) {
@@ -64,74 +68,207 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
+  // 🎯 แปลงสถานะย่อยจาก Backend เป็นข้อความภาษาไทยภาษาพูด + กำหนดโทนสี
+  Map<String, dynamic> _getDetailedStatusInfo(String? rawStatus) {
+    final status = (rawStatus ?? '').trim();
+
+    switch (status) {
+      case 'WaitingRider':
+        return {
+          'text': 'รอผู้จัดส่งรับงาน',
+          'color': Colors.orange[800]!,
+          'bgColor': Colors.orange[50]!,
+          'icon': Icons.directions_bike_rounded,
+        };
+      case 'WaitingRestaurant':
+        return {
+          'text': 'รอร้านค้ายืนยัน',
+          'color': Colors.blue[800]!,
+          'bgColor': Colors.blue[50]!,
+          'icon': Icons.storefront_rounded,
+        };
+      case 'Cooking':
+      case 'Preparing':
+        return {
+          'text': 'ร้านกำลังปรุงอาหาร',
+          'color': Colors.deepOrange[800]!,
+          'bgColor': Colors.deepOrange[50]!,
+          'icon': Icons.soup_kitchen_rounded,
+        };
+      case 'Delivering':
+      case 'OnTheWay':
+        return {
+          'text': 'กำลังจัดส่ง',
+          'color': Colors.indigo[800]!,
+          'bgColor': Colors.indigo[50]!,
+          'icon': Icons.local_shipping_rounded,
+        };
+      case 'Success':
+      case 'Completed':
+        return {
+          'text': 'จัดส่งสำเร็จแล้ว',
+          'color': Colors.green[800]!,
+          'bgColor': Colors.green[50]!,
+          'icon': Icons.check_circle_rounded,
+        };
+      case 'Cancel':
+      case 'Cancelled':
+        return {
+          'text': 'ยกเลิกคำสั่งซื้อแล้ว',
+          'color': Colors.red[800]!,
+          'bgColor': Colors.red[50]!,
+          'icon': Icons.cancel_rounded,
+        };
+      default:
+        return {
+          'text': status.isEmpty ? 'ไม่ระบุสถานะ' : status,
+          'color': Colors.grey[800]!,
+          'bgColor': Colors.grey[100]!,
+          'icon': Icons.info_outline_rounded,
+        };
+    }
+  }
+
+  // 🎯 กรองออเดอร์เข้า 3 แถบหลัก
+  List<OrderModel> _filterOrders(String type) {
+    return _orderHistoryList.where((order) {
+      final status = (order.orderStatus ?? '').toLowerCase();
+      if (type == 'pending') {
+        return status != 'success' &&
+            status != 'completed' &&
+            status != 'cancel' &&
+            status != 'cancelled';
+      } else if (type == 'success') {
+        return status == 'success' || status == 'completed';
+      } else if (type == 'cancel') {
+        return status == 'cancel' || status == 'cancelled';
+      }
+      return true;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: const NavbarMember(title: "ประวัติคำสั่งซื้อ"),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.green))
-          : _orderHistoryList.isEmpty
-          ? const Center(
-              child: Text(
-                "ไม่มีรายการคำสั่งซื้อในฐานข้อมูล",
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Colors.grey,
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: Colors.grey[50],
+        appBar: const NavbarMember(title: "รายการคำสั่งซื้อ"),
+        body: Column(
+          children: [
+            Container(
+              color: Colors.white,
+              child: TabBar(
+                indicatorColor: const Color(0xFF64F02D),
+                indicatorWeight: 3,
+                labelColor: const Color(0xFF2E7D32),
+                unselectedLabelColor: Colors.grey[600],
+                labelStyle: const TextStyle(
                   fontWeight: FontWeight.bold,
+                  fontSize: 14,
                 ),
+                tabs: const [
+                  Tab(text: "กำลังดำเนินการ"),
+                  Tab(text: "สำเร็จแล้ว"),
+                  Tab(text: "ยกเลิก"),
+                ],
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20.0,
-                vertical: 15.0,
-              ),
-              itemCount: _orderHistoryList.length,
-              itemBuilder: (context, index) {
-                return _buildOrderHistoryCard(_orderHistoryList[index]);
-              },
             ),
+            Expanded(
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: Colors.green),
+                    )
+                  : TabBarView(
+                      children: [
+                        _buildOrderListView(
+                          _filterOrders('pending'),
+                          "ไม่มีคำสั่งซื้อที่กำลังดำเนินการ",
+                        ),
+                        _buildOrderListView(
+                          _filterOrders('success'),
+                          "ไม่มีคำสั่งซื้อที่สำเร็จแล้ว",
+                        ),
+                        _buildOrderListView(
+                          _filterOrders('cancel'),
+                          "ไม่มีคำสั่งซื้อที่ยกเลิก",
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
 
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(Icons.home, "หน้าหลัก", () {
-                  Navigator.popUntil(context, (route) => route.isFirst);
-                }),
-                _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ListOrderMember(),
-                    ),
-                  );
-                }),
-                _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
-                  _fetchOrderHistory();
-                }, isActive: true),
-                _buildNavItem(Icons.person, "โปรไฟล์", () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ProfileMember(),
-                    ),
-                  );
-                }),
-              ],
+        bottomNavigationBar: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Card(
+            elevation: 4,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildNavItem(Icons.home, "หน้าหลัก", () {
+                    Navigator.popUntil(context, (route) => route.isFirst);
+                  }),
+                  _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ListOrderMember(),
+                      ),
+                    );
+                  }),
+                  _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
+                    _fetchOrderHistory();
+                  }, isActive: true),
+                  _buildNavItem(Icons.person, "โปรไฟล์", () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ProfileMember(),
+                      ),
+                    );
+                  }),
+                ],
+              ),
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildOrderListView(List<OrderModel> orders, String emptyText) {
+    if (orders.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox_rounded, size: 60, color: Colors.grey[300]),
+            const SizedBox(height: 10),
+            Text(
+              emptyText,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.grey[600],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 15.0),
+      itemCount: orders.length,
+      itemBuilder: (context, index) {
+        return _buildOrderHistoryCard(orders[index]);
+      },
     );
   }
 
@@ -168,19 +305,21 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
       totalItems += item.qty;
     }
 
-    // 🎯 ดึงชื่อร้านค้าและรูปภาพทะลุผ่าน RestaurantModel ตัวใหม่
     String storeName =
         order.restaurant?.restaurantName ?? order.restaurantUsername;
     String finalImageUrl = _getFinalImageUrl(order.restaurant?.restaurantImage);
 
+    // 🎯 ดึงข้อมูลสถานะย่อยสำหรับแสดง Badge บนการ์ด
+    final statusInfo = _getDetailedStatusInfo(order.orderStatus);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 20.0),
+      margin: const EdgeInsets.only(bottom: 16.0),
       decoration: BoxDecoration(
         color: const Color(0xFFE8FCD0),
         borderRadius: BorderRadius.circular(16.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
+            color: Colors.grey.withOpacity(0.12),
             spreadRadius: 1,
             blurRadius: 6,
             offset: const Offset(0, 3),
@@ -214,7 +353,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                       )
                     : _buildPlaceholderIcon(),
               ),
-              const SizedBox(width: 20),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -223,13 +362,52 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                     Text(
                       storeName,
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.black,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    const SizedBox(height: 4),
+
+                    // 🎯 [สถานะย่อย] Badge บอกสถานะละเอียด เช่น "รอผู้จัดส่งรับงาน", "รอร้านค้ายืนยัน", "กำลังจัดส่ง"
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: statusInfo['bgColor'],
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: (statusInfo['color'] as Color).withOpacity(
+                            0.3,
+                          ),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            statusInfo['icon'] as IconData,
+                            size: 13,
+                            color: statusInfo['color'],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            statusInfo['text'],
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: statusInfo['color'],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                     const SizedBox(height: 6),
                     Text(
                       "รหัสบิล: #${order.orderId ?? '-'}",
@@ -246,7 +424,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                         Text(
                           "จำนวน $totalItems รายการ",
                           style: TextStyle(
-                            fontSize: 15,
+                            fontSize: 13,
                             color: Colors.grey[800],
                             fontWeight: FontWeight.w500,
                           ),

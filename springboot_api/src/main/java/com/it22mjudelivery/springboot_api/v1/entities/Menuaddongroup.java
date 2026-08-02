@@ -31,7 +31,8 @@ public class Menuaddongroup {
     private String addongroupname;
 
     @Column(nullable = false)
-    private boolean isRequired;
+    @com.fasterxml.jackson.annotation.JsonProperty("is_multiple_choice")
+    private boolean is_multiple_choice;
 
     @Column
     private boolean status;

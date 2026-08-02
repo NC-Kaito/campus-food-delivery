@@ -1,5 +1,6 @@
 // features/restaurant/home_restaurant.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/menu_addon_group_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
@@ -8,22 +9,15 @@ import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
-import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/add_addon.dart';
+import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/edit_addon.dart';
-// 🎯 หน้าแก้ไขเมนู — ปรับ path/ชื่อคลาสให้ตรงกับโปรเจกต์จริงถ้าไม่ตรงกัน
 import 'package:flutter_app/features/restaurant/edit_menu.dart';
-// 🎯 หน้าเชื่อมโยงตัวเลือกเสริมเข้ากับเมนู — ปรับ path/ชื่อคลาสให้ตรงกับ
-// โปรเจกต์จริงถ้าไม่ตรงกัน
 import 'package:flutter_app/features/restaurant/menu_to_addon.dart';
-// 🎯 เลิกใช้ RestaurantScaffold (ซึ่งพ่วง Drawer มาด้วย) เปลี่ยนมาใช้
-// Scaffold ธรรมดา + RestaurantNavbar ตรงๆ แทน
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
-import 'package:flutter_app/features/restaurant/sales_restaurant.dart';
 import 'package:flutter_app/features/restaurant/review_restaurant.dart';
-import 'package:flutter_app/features/restaurant/view_menu.dart';
+import 'package:flutter_app/features/restaurant/sales_restaurant.dart';
 import 'package:flutter_app/global_data.dart';
-import 'package:flutter_app/core/network/dio_client.dart';
 
 class HomeRestaurant extends StatefulWidget {
   const HomeRestaurant({super.key});
@@ -34,10 +28,9 @@ class HomeRestaurant extends StatefulWidget {
 
 class _HomeRestaurantState extends State<HomeRestaurant>
     with TickerProviderStateMixin {
-  // ── ธีมสีหลักของหน้า (ชุดเดียวกับหน้าอื่นๆ ในแอปเพื่อความสม่ำเสมอ) ──────
-  static const Color _primary = Color(0xFF16A34A); // เขียวหลัก
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _primaryDark = Color(0xFF0F7A38);
-  static const Color _accent = Color(0xFFEA7C1E); // ส้มสำหรับหัวข้อ/แบรนด์
+  static const Color _accent = Color(0xFFEA7C1E);
   static const Color _bg = Color(0xFFF5F6F8);
   static const Color _textDark = Color(0xFF1E1E24);
   static const Color _textMuted = Color(0xFF8A8D93);
@@ -47,7 +40,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
   final RestaurantService restaurantService = RestaurantService();
   final MenuService menuService = MenuService();
-  // 🎯 ใช้วิธีดึงข้อมูลเดียวกับ _ViewMenuState
   final MenuAddonService _addonService = MenuAddonService();
 
   RestaurantModel? restaurantModel;
@@ -60,21 +52,15 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   Map<int, List<MenuModel>> categoryMenus = {};
   Map<int, bool> categoryLoading = {};
 
-  // 🎯 แถบบนสุด: เมนู / ตัวเลือกเพิ่มเติม (ควบคุมด้วยปุ่มไอคอนในการ์ดหัวข้อแทน
-  // แท็บสวิตช์แบบเดิม)
   int _mainTabIndex = 0;
 
-  // --- state สำหรับหน้า "ตัวเลือกเพิ่มเติม" ---
   bool _isLoadingAddons = false;
   bool _addonsLoaded = false;
   List<_AddonGroupAggregate> _addonGroups = [];
-  final Map<int, bool> _groupEnabled =
-      {}; // groupId -> เปิด/ปิดกลุ่ม (UI เท่านั้น)
-  final Map<int, bool> _groupExpanded = {}; // groupId -> ขยาย/ย่อ
-  final Map<int, bool> _itemChecked = {}; // itemKey -> ติ๊กเลือก (UI เท่านั้น)
+  final Map<int, bool> _groupEnabled = {};
+  final Map<int, bool> _groupExpanded = {};
+  final Map<int, bool> _itemChecked = {};
 
-  // 🎯 menuId -> จำนวนกลุ่มตัวเลือกเสริมที่ผูกกับเมนูนั้นจริงๆ (นับสดจาก
-  // MenuAddonService.getAddonsByMenuId เพราะ MenuModel ไม่มีฟิลด์นี้ให้ใช้ตรงๆ)
   final Map<int, int> _menuAddonGroupCounts = {};
 
   @override
@@ -124,8 +110,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       restaurantModel!.username!,
     );
 
-    // 🎯 โหลดเมนูของทุกประเภทพร้อมกันก่อน แล้วเก็บไว้เฉพาะประเภทที่มี
-    // เมนูอยู่จริงอย่างน้อย 1 รายการ ประเภทที่ไม่มีเมนูจะไม่ถูกสร้างเป็นแท็บเลย
     final entries = await Future.wait(
       data.where((t) => t.typemenuId != null).map((type) async {
         final typeId = type.typemenuId!;
@@ -165,12 +149,9 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       _tabController = newController;
     });
 
-    // 🎯 นับจำนวนตัวเลือกเสริมของทุกเมนูที่โหลดมา (ไม่ต้องรอ ให้ทำงานเบื้องหลัง)
     _loadAddonCountsFor(validEntries.expand((e) => e.value).toList());
   }
 
-  // 🎯 สร้าง TabController ใหม่หลังหมวดหมู่ถูกเอาออก โดยพยายามคง index/แท็บ
-  // ที่ผู้ใช้กำลังดูอยู่ไว้ให้ใกล้เคียงเดิมที่สุด
   void _rebuildTabController({int? removedIndex}) {
     final int oldIndex = _tabController?.index ?? 0;
     _tabController?.dispose();
@@ -203,8 +184,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       );
 
       if (menuData.isEmpty) {
-        // 🎯 หมวดหมู่นี้ไม่มีเมนูเหลือแล้ว (เช่น เพิ่งลบเมนูสุดท้ายทิ้ง)
-        // เอาแท็บนี้ออกไปเลย แทนที่จะโชว์ "ไม่มีเมนูในหมวดหมู่นี้"
         final removedIndex = typeMenus.indexWhere(
           (t) => t.typemenuId == typeMenuId,
         );
@@ -219,7 +198,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
           categoryMenus[typeMenuId] = menuData;
           categoryLoading[typeMenuId] = false;
         });
-        // 🎯 นับจำนวนตัวเลือกเสริมของเมนูที่เพิ่งโหลด/รีเฟรชมาใหม่
         _loadAddonCountsFor(menuData);
       }
     } catch (e) {
@@ -256,7 +234,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
-  // 🎯 ไปหน้าแก้ไขเมนู แล้วรีโหลดข้อมูลตอนกลับมา
   Future<void> goToEditMenu(int typeMenuId, MenuModel menu) async {
     await Navigator.push(
       context,
@@ -265,25 +242,20 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     await loadMenusByType(typeMenuId);
   }
 
-  // 🎯 ไปหน้า "menu_to_addon" เพื่อจัดการตัวเลือกเสริมที่ผูกกับเมนูนี้
   Future<void> goToMenuAddon(int typeMenuId, MenuModel menu) async {
     final isUpdated = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => MenuToAddon(menuModel: menu)),
     );
 
-    // หากมีการกดบันทึกและย้อนกลับมา (isUpdated == true)
     if (isUpdated == true && menu.menuId != null) {
       setState(() {
-        // ลบความจำจำนวนตัวเลือกเสริมของเมนูนี้ออก เพื่อบังคับให้นับใหม่
         _menuAddonGroupCounts.remove(menu.menuId);
       });
-      // สั่งดึงข้อมูลและนับใหม่เฉพาะเมนูนี้เมนูเดียว (ทำงานรวดเร็วมาก)
       await _loadAddonCountsFor([menu]);
     }
   }
 
-  // 🎯 นับจำนวนกลุ่มตัวเลือกเสริมที่ผูกอยู่กับเมนูนี้
   Future<void> _loadAddonCountsFor(List<MenuModel> menus) async {
     final idsToLoad = menus
         .where(
@@ -325,7 +297,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     return count > 0 ? "มี $count กลุ่มตัวเลือกเสริม" : "ไม่มีตัวเลือกเสริม";
   }
 
-  // 🎯 ลบเมนู พร้อม dialog ยืนยัน
   Future<void> confirmDeleteMenu(int typeMenuId, MenuModel menu) async {
     final confirmed = await _showConfirmDialog(
       title: "ลบเมนูนี้?",
@@ -335,7 +306,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     if (confirmed != true || menu.menuId == null) return;
 
     try {
-      // 🎯 ใช้ key 'menuid' ให้ตรงกับ updateMenuStatus (menuDto ฝั่ง Java)
       await menuService.deleteMenu({'menuid': menu.menuId});
       await loadMenusByType(typeMenuId);
     } catch (e) {
@@ -347,7 +317,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
-  // 🎯 ลบกลุ่มตัวเลือกเสริม พร้อม dialog ยืนยัน (คู่กับปุ่มถังขยะแบบใหม่)
   Future<void> confirmDeleteAddonGroup(_AddonGroupAggregate agg) async {
     final groupId = agg.group.addonGroupId;
     if (groupId == null) return;
@@ -361,7 +330,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     if (confirmed != true) return;
 
     try {
-      final success = await _addonService.deleteAddonGroup(groupId); // ✅ ถูก
+      final success = await _addonService.deleteAddonGroup(groupId);
       if (success) {
         _addonsLoaded = false;
         await _loadAddonOptions();
@@ -379,35 +348,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
-  // 🎯 เปิด/ปิดกลุ่มตัวเลือกเสริม — อัปเดต UI ทันที (optimistic)
-  Future<void> _toggleAddonGroupEnabled(int groupId, bool newValue) async {
-    final bool previousValue = _groupEnabled[groupId] ?? true;
-    setState(() => _groupEnabled[groupId] = newValue);
-
-    try {
-      final success = await _addonService.toggleAddonGroupStatus(
-        groupId,
-        newValue,
-      );
-      if (!success) {
-        setState(() => _groupEnabled[groupId] = previousValue);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("ไม่สามารถอัปเดตสถานะได้")),
-          );
-        }
-      }
-    } catch (e) {
-      setState(() => _groupEnabled[groupId] = previousValue);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("$e".replaceFirst('Exception: ', ''))),
-        );
-      }
-    }
-  }
-
-  // ── กล่อง dialog ยืนยันแบบเดียวกันทั้งหน้า (สไตล์เดียวกับหน้าอื่นในแอป) ──
   Future<bool?> _showConfirmDialog({
     required String title,
     required String message,
@@ -508,8 +448,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         GlobalData.usernameRestaurant ?? "",
       );
 
-      debugPrint("📦 addon groups: ${groups.length} กลุ่ม");
-
       if (!mounted) return;
 
       setState(() {
@@ -544,7 +482,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         _addonsLoaded = true;
       });
     } catch (e) {
-      debugPrint("❌ โหลด addon groups ผิดพลาด: $e");
       if (mounted) {
         setState(() => _isLoadingAddons = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -587,7 +524,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             SliverToBoxAdapter(
               child: Column(
                 children: [
-                  // --- ส่วนหัวรูปภาพร้านค้า ---
                   Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -641,7 +577,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                     ],
                   ),
 
-                  // --- ชื่อร้าน + การ์ดปุ่มลัด 4 อัน + แถบประเภทเมนู ---
                   Container(
                     width: double.infinity,
                     color: Colors.white,
@@ -668,14 +603,12 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         ),
                         const SizedBox(height: 16),
 
-                        // --- การ์ดปุ่มลัด 4 อัน: เมนู / กลุ่มตัวเลือก / ยอดขาย / รีวิว ---
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _buildQuickActionsRow(),
                         ),
                         const SizedBox(height: 16),
 
-                        // --- แถบประเภทเมนู (TabBar) แสดงเฉพาะแท็บ "เมนู" ---
                         if (_mainTabIndex == 0)
                           Container(
                             decoration: const BoxDecoration(
@@ -745,7 +678,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
           ];
         },
 
-        // --- CONTENT: เมนู (TabBarView) หรือ ตัวเลือกเพิ่มเติม (list กลุ่ม addon) ---
         body: _mainTabIndex == 0
             ? TabBarView(
                 controller: _tabController!,
@@ -837,7 +769,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               )
             : _buildAddonOptionsBody(),
       ),
-      // 🎯 ปุ่มด้านล่างสลับตามแท็บ: "เพิ่มเมนู" / "เพิ่มตัวเลือก"
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -902,7 +833,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // --- การ์ดรายการเมนู 1 รายการ ---
   Widget _buildMenuCard({
     required int typeId,
     required int index,
@@ -910,16 +840,12 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     required bool isAvailable,
     required String finalMenuImgUrl,
   }) {
-    // 🎯 1. ตรวจสอบว่าเมนูนี้จัดอยู่ในกลุ่มประเภท "ข้าวราดแกง" หรือไม่ โดยเช็กผ่านชื่อหมวดหมู่ของแท็บโดยตรง[cite: 11]
     final bool isRiceCurry = typeMenus.any(
       (t) => t.typemenuId == typeId && t.typemenuName == "ข้าวราดแกง",
     );
 
-    // 🎯 2. ตรรกะคัดกรองราคาควบคุม: ถ้าไม่ใช่ข้าวราดแกงให้โชว์ปกติ หรือถ้าเป็นข้าวราดแกงแต่ราคาไม่ใช่ 0 (เมนูไข่ดาว/ไข่เจียว) ให้โชว์ราคา[cite: 11]
     final double storedPrice = menu.price ?? 0.0;
     final bool shouldShowPrice = !isRiceCurry || (storedPrice != 0.0);
-
-    // คำนวณราคาสำหรับเมนูไข่ฝั่งร้านค้า: ส่วนต่างหลังบ้าน + ราคาฐาน 5 บาทของมหาวิทยาลัย = 7 บาท[cite: 11]
     final double displayPrice = isRiceCurry ? (storedPrice + 5.0) : storedPrice;
 
     return GestureDetector(
@@ -987,7 +913,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                   ),
                   const SizedBox(height: 4),
 
-                  // 🎯 แสดงผลเฉพาะกรณีที่เป็นเมนูปกติ หรือเป็นเมนูไข่ราดแกงที่มีราคาไม่เป็น 0 (จะโชว์ 7 บาท)[cite: 11]
                   if (shouldShowPrice)
                     Text(
                       "ราคา ${displayPrice.toStringAsFixed(0)} บาท",
@@ -1001,7 +926,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      // 🎯 ซ่อนข้อมูลและปุ่มเชื่อมโยงตัวเลือกเสริมทั้งหมดทันทีเมื่อระบุเป็นประเภทข้าวราดแกง[cite: 11]
                       if (!isRiceCurry)
                         Expanded(
                           child: GestureDetector(
@@ -1018,7 +942,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           ),
                         )
                       else
-                        const Spacer(), // ใช้ Spacer ดันส่วนไอคอนจัดการไปไว้ทางฝั่งขวาสุดแทน[cite: 11]
+                        const Spacer(),
 
                       const SizedBox(width: 4),
                       _buildIconAction(
@@ -1037,7 +961,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // ปุ่มไอคอนเล็กๆ ใช้ซ้ำสำหรับ แก้ไข/ลบ ทั้งการ์ดเมนูและกลุ่มตัวเลือกเสริม
   Widget _buildIconAction({
     required IconData icon,
     required Color color,
@@ -1053,8 +976,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // ── การ์ดปุ่มลัด 4 อัน: เมนู / กลุ่มตัวเลือก / ยอดขาย / รีวิว ──────────
-  // (แทนที่แถบสวิตช์ "เมนู/ตัวเลือกเพิ่มเติม" เดิม ตามดีไซน์ใหม่)
   Widget _buildQuickActionsRow() {
     return Row(
       children: [
@@ -1107,7 +1028,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // ปุ่มลัด 1 อัน ในรูปแบบ ไอคอน + ป้ายชื่อ ในกล่องขอบมน
   Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -1180,7 +1100,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // 🎯 badge เล็กๆ ไว้โชว์ "เลือกได้สูงสุด" กับ "จำเป็น/ไม่บังคับ"
+  // 🎯 badge โชว์ "เลือกได้หลายอย่าง" / "เลือกได้ 1 อย่าง"
   Widget _buildAddonMetaBadge({
     required IconData icon,
     required String label,
@@ -1210,7 +1130,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // ปุ่มลูกศรขยาย/ย่อทรงวงกลม กดง่ายกว่าปุ่มไอคอนเดิม
   Widget _buildCircleExpandButton({
     required bool expanded,
     required VoidCallback onTap,
@@ -1242,8 +1161,9 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final int groupId = agg.group.addonGroupId ?? -1;
     final bool enabled = _groupEnabled[groupId] ?? true;
     final bool expanded = _groupExpanded[groupId] ?? false;
-    final bool isRequired = agg.group.isRequired ?? false;
-    final int maxSelect = agg.group.maxSelect ?? 1;
+
+    // 🎯 อ่านค่า is_multiple_choice จาก Model ใหม่
+    final bool isMultipleChoice = agg.group.is_multiple_choice ?? false;
     final items = agg.items.values.toList();
 
     return GestureDetector(
@@ -1254,8 +1174,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             builder: (context) => EditAddon(
               groupId: agg.group.addonGroupId,
               groupName: agg.group.addonGroupName,
-              isRequired: agg.group.isRequired ?? true,
-              maxSelect: agg.group.maxSelect ?? 1, // เติมกลับมา
+              isMultipleChoice:
+                  isMultipleChoice, // 🎯 ส่งค่าใหม่ไปยัง EditAddon
               groupStatus: agg.group.status ?? true,
               details: items,
             ),
@@ -1282,7 +1202,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── แถวหัว group ────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
               child: Row(
@@ -1310,24 +1229,18 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // 🎯 badge: เลือกได้สูงสุด + จำเป็น/ไม่บังคับ
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            _buildAddonMetaBadge(
-                              icon: Icons.playlist_add_check_rounded,
-                              label: "เลือกได้สูงสุด $maxSelect",
-                              color: _linkBlue,
-                            ),
-                            _buildAddonMetaBadge(
-                              icon: isRequired
-                                  ? Icons.check_circle_outline_rounded
-                                  : Icons.check_circle_outline_rounded,
-                              label: isRequired ? "จำเป็น" : "ไม่บังคับ",
-                              color: isRequired ? _danger : _textMuted,
-                            ),
-                          ],
+
+                        // 🎯 แสดง badge "เลือกได้หลายอย่าง" หรือ "เลือกได้ 1 อย่าง"
+                        _buildAddonMetaBadge(
+                          icon: isMultipleChoice
+                              ? Icons.check_box_outlined
+                              : Icons.radio_button_checked_rounded,
+                          label: isMultipleChoice
+                              ? "เลือกได้หลายอย่าง"
+                              : "เลือกได้ 1 อย่าง",
+                          color: isMultipleChoice
+                              ? _linkBlue
+                              : Colors.orange[800]!,
                         ),
                       ],
                     ),
@@ -1353,13 +1266,11 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               ),
             ),
 
-            // ── รายการ addon detail (ขยายได้) ───────────────
             if (expanded && items.isNotEmpty) ...[
               Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 10, 14, 12),
                 child: Container(
-                  // 🎯 เส้นซ้ายยาวต่อเนื่องครอบทุกแถว แบบเดียวกับหน้า menu_to_addon
                   decoration: BoxDecoration(
                     border: Border(
                       left: BorderSide(
@@ -1391,7 +1302,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          // ชื่อ addon
           Expanded(
             child: Text(
               detail.addonMenu?.addonName ?? "ไม่มีชื่อ",
@@ -1403,8 +1313,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               overflow: TextOverflow.ellipsis,
             ),
           ),
-
-          // ราคา
           Text(
             "ราคา ${detail.addonPrice?.toInt() ?? 0} บาท",
             style: const TextStyle(fontSize: 13, color: _textMuted),
@@ -1432,7 +1340,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // ── ปุ่มสถานะ "มี/หมด" ทรงแคปซูลลอยมุมขวาบนของการ์ดเมนู ────────────────
   Widget _buildInlineStatusButton({
     required bool isAvailable,
     required VoidCallback onTap,
@@ -1479,8 +1386,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   );
 }
 
-// 🎯 คลาสช่วยรวมข้อมูล addon detail ที่กระจายอยู่ตามเมนูต่าง ๆ
-// ให้กลายเป็น "1 กลุ่ม = 1 การ์ด" สำหรับหน้าตัวเลือกเพิ่มเติม
 class _AddonGroupAggregate {
   final MenuAddonGroupModel group;
   final Map<int, MenuAddonDetailModel> items = {};

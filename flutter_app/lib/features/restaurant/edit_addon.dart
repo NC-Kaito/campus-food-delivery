@@ -20,10 +20,8 @@ class _AddonTheme {
   static const Color textPrimary = Color(0xFF1F2430);
   static const Color textSecondary = Color(0xFF8A8F98);
   static const Color fieldBg = Color(0xFFF4F5F7);
-  static const Color border = Color(0xFFE7E8EC);
 }
 
-// เก็บค่าตัวเลือกย่อยแบบง่ายๆ (ไม่ผูกกับ Controller) สำหรับคืนค่าตอนกดยกเลิก
 class _AddonSnapshot {
   final String name;
   final String price;
@@ -43,18 +41,16 @@ class _AddonSnapshot {
 class EditAddon extends StatefulWidget {
   final int? groupId;
   final String? groupName;
-  final bool isRequired;
-  final int maxSelect;
-  final bool groupStatus; // เพิ่มตัวรับสถานะของกลุ่ม
+  final bool isMultipleChoice;
+  final bool groupStatus;
   final List<MenuAddonDetailModel> details;
 
   const EditAddon({
     super.key,
     required this.groupId,
     required this.groupName,
-    required this.isRequired,
-    required this.maxSelect,
-    required this.groupStatus, // อย่าลืมส่งค่านี้มาจากหน้าก่อนหน้านะครับ
+    required this.isMultipleChoice,
+    required this.groupStatus,
     required this.details,
   });
 
@@ -67,12 +63,11 @@ class _EditAddonState extends State<EditAddon> {
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   late final TextEditingController groupNameController;
-  late int maxSelect;
-  late bool isRequired;
-  late bool groupStatus; // สถานะของกลุ่มตัวเลือก
+  late bool isMultipleChoice;
+  late bool groupStatus;
 
   bool _isLoading = false;
-  bool _isEditMode = false; // ตัวควบคุมโหมด ดู/แก้ไข
+  bool _isEditMode = false;
   bool _isTogglingGroupStatus = false;
 
   List<CustomAddonItem> selectedAddons = [];
@@ -83,10 +78,8 @@ class _EditAddonState extends State<EditAddon> {
   final Map<CustomAddonItem, List<AddonMenuModel>> _suggestions = {};
   Timer? _debounce;
 
-  // ─── สแนปช็อตของข้อมูลก่อนเข้าโหมดแก้ไข ใช้ตอนกด "ยกเลิก" เพื่อคืนค่าเดิม ───
   String _originalGroupName = "";
-  int _originalMaxSelect = 1;
-  bool _originalIsRequired = true;
+  bool _originalIsMultipleChoice = false;
   List<_AddonSnapshot> _originalAddons = [];
 
   @override
@@ -97,9 +90,8 @@ class _EditAddonState extends State<EditAddon> {
 
   void _prefillFromExistingData() {
     groupNameController = TextEditingController(text: widget.groupName ?? "");
-    isRequired = widget.isRequired;
-    maxSelect = widget.maxSelect;
-    groupStatus = widget.groupStatus; // ดึงค่าสถานะกลุ่ม
+    isMultipleChoice = widget.isMultipleChoice;
+    groupStatus = widget.groupStatus;
 
     if (widget.details.isEmpty) {
       _addNewCustomAddonRow();
@@ -113,9 +105,8 @@ class _EditAddonState extends State<EditAddon> {
             text: (d.addonPrice ?? 0).toString(),
           ),
           addonId: d.addonDetailId,
-          allowqtystatus:
-              d.allowqtystatus, // ถ้าใน model เป็น null จะรับค่า false มาให้
-          status: d.status ?? true, // ดึงค่าสถานะตัวเลือกย่อย
+          allowqtystatus: d.allowqtystatus,
+          status: d.status ?? true,
         );
       }).toList();
     }
@@ -141,7 +132,7 @@ class _EditAddonState extends State<EditAddon> {
         priceController: TextEditingController(),
         addonId: null,
         allowqtystatus: false,
-        status: groupStatus, // ตั้งค่าเริ่มต้นตามสถานะกลุ่มเลยครับ
+        status: groupStatus,
       );
       selectedAddons.add(newAddon);
 
@@ -156,11 +147,9 @@ class _EditAddonState extends State<EditAddon> {
     });
   }
 
-  // ─── กดปุ่ม "แก้ไขข้อมูล" ── เก็บสแนปช็อตของค่าปัจจุบันไว้ก่อนเข้าโหมดแก้ไข ───
   void _enterEditMode() {
     _originalGroupName = groupNameController.text;
-    _originalMaxSelect = maxSelect;
-    _originalIsRequired = isRequired;
+    _originalIsMultipleChoice = isMultipleChoice;
     _originalAddons = selectedAddons
         .map(
           (a) => _AddonSnapshot(
@@ -176,9 +165,7 @@ class _EditAddonState extends State<EditAddon> {
     setState(() => _isEditMode = true);
   }
 
-  // ─── กดปุ่ม "ยกเลิก" ── คืนค่าทุกอย่างกลับไปเป็นก่อนกดแก้ไข ───
   void _cancelEdit() {
-    // เคลียร์ focus node / overlay / controller ของแถวปัจจุบันทั้งหมดก่อน
     for (var addon in selectedAddons) {
       _removeOverlay(addon);
       _nameFocusNodes[addon]?.dispose();
@@ -208,17 +195,14 @@ class _EditAddonState extends State<EditAddon> {
 
     setState(() {
       groupNameController.text = _originalGroupName;
-      maxSelect = _originalMaxSelect;
-      isRequired = _originalIsRequired;
+      isMultipleChoice = _originalIsMultipleChoice;
       selectedAddons = restoredAddons;
       _isEditMode = false;
     });
 
-    // ล้าง error ของฟอร์มที่อาจค้างอยู่จากตอนแก้ไข
     formKey.currentState?.reset();
   }
 
-  // เอาไว้ลบแถวออกตอนอยู่ในโหมดแก้ไข (ให้พฤติกรรมเหมือนหน้า add_addon)
   void _removeAddonItemRow(int index) {
     if (selectedAddons.length <= 1) return;
     setState(() {
@@ -236,10 +220,6 @@ class _EditAddonState extends State<EditAddon> {
     });
   }
 
-  // ============================================================
-  // เปิด/ปิด สถานะ — ทำงานได้ทันทีไม่ว่าจะอยู่โหมดดูหรือโหมดแก้ไข
-  // และอัปเดตไปที่ฐานข้อมูลทันทีที่กด (ไม่ต้องรอกดปุ่มบันทึก)
-  // ============================================================
   Future<void> _toggleGroupStatus(bool value) async {
     if (widget.groupId == null) {
       setState(() => groupStatus = value);
@@ -280,14 +260,9 @@ class _EditAddonState extends State<EditAddon> {
     final previous = addon.status;
     setState(() => addon.status = value);
 
-    // แถวที่ยังไม่เคยบันทึก (ยังไม่มี addonId) ไม่ต้องยิง API
     if (addon.addonId == null) return;
 
     try {
-      // ⚠️ ใน MenuAddonService ปัจจุบันยังไม่มี endpoint สำหรับอัปเดตสถานะ
-      // ตัวเลือกย่อยรายตัว (มีแค่ toggleAddonGroupStatus สำหรับทั้งกลุ่ม)
-      // ต้องเพิ่ม method นี้ในฝั่ง service + endpoint หลังบ้านก่อน แล้วค่อยเรียกใช้ตรงนี้ เช่น:
-      // await _addonService.toggleAddonDetailStatus(addon.addonId!, value);
       await _addonService.toggleAddonGroupStatus(widget.groupId!, value);
     } catch (e) {
       if (mounted) {
@@ -306,9 +281,6 @@ class _EditAddonState extends State<EditAddon> {
     }
   }
 
-  // ============================================================
-  // Autocomplete
-  // ============================================================
   void _onAddonNameChanged(CustomAddonItem addon, String value) {
     _debounce?.cancel();
 
@@ -395,7 +367,6 @@ class _EditAddonState extends State<EditAddon> {
     final isFormValid = formKey.currentState!.validate();
     if (!isFormValid) return;
 
-    // เช็กชื่อซ้ำก่อนส่ง
     final names = selectedAddons
         .map((a) => a.nameController.text.trim().toLowerCase())
         .toList();
@@ -420,16 +391,15 @@ class _EditAddonState extends State<EditAddon> {
         addonGroupId: widget.groupId,
         restaurantUsername: GlobalData.usernameRestaurant ?? "",
         addongroupname: groupNameController.text.trim(),
-        isRequired: isRequired,
-        maxselect: maxSelect,
-        status: groupStatus, // ส่งสถานะกลุ่ม
+        is_multiple_choice: isMultipleChoice,
+        status: groupStatus,
         details: selectedAddons.map((addon) {
           return AddonDetailRequestModel(
             addonDetailId: addon.addonId,
             addonname: addon.nameController.text.trim(),
             addonprice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
-            status: addon.status, // ส่งสถานะตัวเลือกย่อย
+            status: addon.status,
             allowqtystatus: addon.allowqtystatus,
           );
         }).toList(),
@@ -468,9 +438,6 @@ class _EditAddonState extends State<EditAddon> {
     }
   }
 
-  // ============================================================
-  // Shared styles
-  // ============================================================
   InputDecoration _fieldDecoration({String hint = "", Widget? prefixIcon}) {
     return InputDecoration(
       hintText: hint,
@@ -572,9 +539,6 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
-  // ─── สวิตช์สถานะกลุ่ม พร้อมป้ายกำกับ "เปิดใช้งาน / ปิดใช้งาน" ───
-  // ใช้งานได้ตลอด ไม่ว่าจะอยู่โหมดดูหรือโหมดแก้ไข (แต่จะถูกซ่อนตอนกดแก้ไข
-  // ตามที่ขอ ให้เหมือนหน้า add_addon ที่ไม่มีสวิตช์นี้)
   Widget _buildGroupStatusToggle() {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -622,40 +586,49 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
-  Widget _buildMaxSelectStepper() {
+  Widget _buildMultipleChoiceSwitch() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: _isEditMode ? _AddonTheme.surface : _AddonTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
+        border: _isEditMode ? Border.all(color: Colors.grey.shade300) : null,
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _stepperButton(
-            icon: Icons.remove_rounded,
-            onTap: (_isEditMode && maxSelect > 1)
-                ? () => setState(() => maxSelect--)
-                : null,
-          ),
-          SizedBox(
-            width: 34,
-            child: Text(
-              '$maxSelect',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: _isEditMode
-                    ? _AddonTheme.textPrimary
-                    : _AddonTheme.textSecondary,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "เลือกได้หลายอย่าง",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: _AddonTheme.textPrimary,
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Text(
+                isMultipleChoice
+                    ? "ลูกค้าสามารถเลือกตัวเลือกได้มากกว่า 1 ข้อ"
+                    : "ลูกค้าเลือกได้เพียง 1 ข้อเท่านั้น",
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: _AddonTheme.textSecondary,
+                ),
+              ),
+            ],
           ),
-          _stepperButton(
-            icon: Icons.add_rounded,
-            onTap: (_isEditMode && maxSelect < 20)
-                ? () => setState(() => maxSelect++)
+          Switch(
+            value: isMultipleChoice,
+            activeColor: _AddonTheme.accent,
+            onChanged: _isEditMode
+                ? (value) {
+                    setState(() {
+                      isMultipleChoice = value;
+                    });
+                  }
                 : null,
           ),
         ],
@@ -663,93 +636,6 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
-  Widget _stepperButton({required IconData icon, VoidCallback? onTap}) {
-    final bool enabled = onTap != null;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(9),
-        onTap: onTap,
-        child: Container(
-          width: 30,
-          height: 30,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: enabled ? _AddonTheme.fieldBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
-          ),
-          child: Icon(
-            icon,
-            size: 16,
-            color: enabled
-                ? _AddonTheme.textPrimary
-                : _AddonTheme.textSecondary.withOpacity(0.4),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRequiredSegment() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: _AddonTheme.fieldBg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _segmentOption(
-            label: "จำเป็น",
-            selected: isRequired,
-            onTap: _isEditMode
-                ? () => setState(() => isRequired = true)
-                : () {},
-          ),
-          _segmentOption(
-            label: "ไม่บังคับ",
-            selected: !isRequired,
-            onTap: _isEditMode
-                ? () => setState(() => isRequired = false)
-                : () {},
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _segmentOption({
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: selected
-              ? (_isEditMode
-                    ? _AddonTheme.primary
-                    : _AddonTheme.primary.withOpacity(0.6))
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(9),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: selected ? Colors.white : _AddonTheme.textSecondary,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─── ปุ่มลบแถว ใช้ตอนอยู่โหมดแก้ไข (แทนที่สวิตช์สถานะ) ───
   Widget _buildDeleteButton(int index) {
     final bool canDelete = selectedAddons.length > 1;
     return Material(
@@ -779,9 +665,6 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
-  // ============================================================
-  // แถวรายการตัวเลือกย่อย
-  // ============================================================
   Widget _buildAddonRow(int index) {
     final addon = selectedAddons[index];
 
@@ -824,17 +707,14 @@ class _EditAddonState extends State<EditAddon> {
             ),
           ),
           const SizedBox(width: 10),
-
-          // ─── ช่องชื่อตัวเลือก ───
           Expanded(
             flex: 3,
             child: CompositedTransformTarget(
-              link: _layerLinks[addon]!,
+              link: layerLink,
               child: TextFormField(
                 controller: addon.nameController,
                 focusNode: focusNode,
-                readOnly:
-                    !_isEditMode, // ดูข้อมูลอย่างเดียวเมื่อไม่ใช่โหมดแก้ไข
+                readOnly: !_isEditMode,
                 onChanged: (value) => _onAddonNameChanged(addon, value),
                 validator: (value) =>
                     (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
@@ -868,14 +748,12 @@ class _EditAddonState extends State<EditAddon> {
             ),
           ),
           const SizedBox(width: 8),
-
-          // ─── ช่องราคา ───
           Expanded(
             flex: 2,
             child: TextFormField(
               controller: addon.priceController,
               keyboardType: TextInputType.number,
-              readOnly: !_isEditMode, // ดูข้อมูลอย่างเดียวเมื่อไม่ใช่โหมดแก้ไข
+              readOnly: !_isEditMode,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return "กรอกราคา";
                 if (double.tryParse(value.trim()) == null)
@@ -917,8 +795,6 @@ class _EditAddonState extends State<EditAddon> {
             ),
           ),
           const SizedBox(width: 6),
-
-          // ─── ปุ่ม +จำนวน ───
           Material(
             color: Colors.transparent,
             child: InkWell(
@@ -970,9 +846,6 @@ class _EditAddonState extends State<EditAddon> {
             ),
           ),
           const SizedBox(width: 6),
-
-          // ─── โหมดดู: สวิตช์เปิด/ปิดสถานะ (อัปเดต DB ทันที) ───
-          // ─── โหมดแก้ไข: ปุ่มลบ (เหมือนหน้า add_addon) ───
           _isEditMode
               ? _buildDeleteButton(index)
               : SizedBox(
@@ -1005,8 +878,6 @@ class _EditAddonState extends State<EditAddon> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 100),
-
-              // ── Hero header ────────────────────────────────────
               Row(
                 children: [
                   Container(
@@ -1030,7 +901,7 @@ class _EditAddonState extends State<EditAddon> {
                     child: Icon(
                       _isEditMode
                           ? Icons.edit_rounded
-                          : Icons.visibility_rounded, // เปลี่ยนไอคอนตามโหมด
+                          : Icons.visibility_rounded,
                       color: Colors.white,
                       size: 22,
                     ),
@@ -1064,10 +935,7 @@ class _EditAddonState extends State<EditAddon> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 22),
-
-              // ── Section: ข้อมูลกลุ่มตัวเลือก ────────────────────
               _sectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1075,12 +943,9 @@ class _EditAddonState extends State<EditAddon> {
                     _sectionHeader(
                       icon: Icons.category_rounded,
                       title: "ข้อมูลกลุ่มตัวเลือก",
-                      // โหมดดู: แสดงป้าย + สวิตช์เปิด/ปิด (แก้ได้ทันที อัปเดต DB เลย)
-                      // โหมดแก้ไข: ซ่อนสวิตช์ ให้เหมือนหน้า add_addon
                       trailing: _isEditMode ? null : _buildGroupStatusToggle(),
                     ),
                     const SizedBox(height: 16),
-
                     _fieldLabel("ชื่อกลุ่มตัวเลือก"),
                     TextFormField(
                       controller: groupNameController,
@@ -1097,49 +962,11 @@ class _EditAddonState extends State<EditAddon> {
                       ),
                       decoration: _fieldDecoration(hint: "เช่น ประเภทข้าว"),
                     ),
-
                     const SizedBox(height: 16),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            "จำนวนที่เลือกได้สูงสุด",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _AddonTheme.textSecondary,
-                            ),
-                          ),
-                        ),
-                        _buildMaxSelectStepper(),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        const Expanded(
-                          child: Text(
-                            "บังคับให้ลูกค้าเลือก",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _AddonTheme.textSecondary,
-                            ),
-                          ),
-                        ),
-                        _buildRequiredSegment(),
-                      ],
-                    ),
+                    _buildMultipleChoiceSwitch(),
                   ],
                 ),
               ),
-
-              // ── Section: รายการตัวเลือก ─────────────────────────
               _sectionCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1167,14 +994,12 @@ class _EditAddonState extends State<EditAddon> {
                       ),
                     ),
                     const SizedBox(height: 14),
-
-                    // ── หัวตาราง ───────────────────
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
-                        children: [
-                          const SizedBox(width: 36),
-                          const Expanded(
+                        children: const [
+                          SizedBox(width: 36),
+                          Expanded(
                             flex: 3,
                             child: Text(
                               "ชื่อตัวเลือก",
@@ -1185,8 +1010,8 @@ class _EditAddonState extends State<EditAddon> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 45),
-                          const Expanded(
+                          SizedBox(width: 45),
+                          Expanded(
                             flex: 2,
                             child: Text(
                               "ราคา",
@@ -1197,13 +1022,12 @@ class _EditAddonState extends State<EditAddon> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Expanded(
                             flex: 2,
                             child: Text(
-                              // โหมดแก้ไขไม่มีสวิตช์แล้ว ให้เปลี่ยนหัวคอลัมน์เป็น "ลบ"
-                              _isEditMode ? "เพิ่มจำนวน" : "เพิ่มจำนวน",
-                              style: const TextStyle(
+                              "เพิ่มจำนวน",
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
                                 color: Color.fromARGB(255, 0, 0, 0),
@@ -1214,7 +1038,6 @@ class _EditAddonState extends State<EditAddon> {
                       ),
                     ),
                     const SizedBox(height: 8),
-
                     ListView.builder(
                       shrinkWrap: true,
                       primary: false,
@@ -1223,8 +1046,6 @@ class _EditAddonState extends State<EditAddon> {
                       itemCount: selectedAddons.length,
                       itemBuilder: (context, index) => _buildAddonRow(index),
                     ),
-
-                    // ── ซ่อนปุ่ม "เพิ่มตัวเลือกเสริม" ถ้าย้งไม่ได้กดปุ่มแก้ไข ──
                     if (_isEditMode) ...[
                       const SizedBox(height: 10),
                       Material(
@@ -1273,15 +1094,12 @@ class _EditAddonState extends State<EditAddon> {
           ),
         ),
       ),
-
-      // ── ปุ่มบันทึก/แก้ไข/ยกเลิก ปักไว้ด้านล่างเสมอ ────────────────────────────
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: _isEditMode
               ? Row(
                   children: [
-                    // ปุ่มยกเลิก — คืนค่าทุกอย่างกลับเป็นก่อนกดแก้ไข
                     Expanded(
                       child: SizedBox(
                         height: 54,
@@ -1289,7 +1107,7 @@ class _EditAddonState extends State<EditAddon> {
                           onPressed: _isLoading ? null : _cancelEdit,
                           style: OutlinedButton.styleFrom(
                             foregroundColor: _AddonTheme.textSecondary,
-                            side: const BorderSide(color: _AddonTheme.border),
+                            side: BorderSide(color: Colors.grey.shade300),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
@@ -1312,7 +1130,6 @@ class _EditAddonState extends State<EditAddon> {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // ปุ่มบันทึกการแก้ไข
                     Expanded(
                       child: SizedBox(
                         height: 54,
@@ -1359,7 +1176,7 @@ class _EditAddonState extends State<EditAddon> {
                   width: double.infinity,
                   height: 54,
                   child: ElevatedButton(
-                    onPressed: _enterEditMode, // โหมดดู → กดเพื่อเข้าโหมดแก้ไข
+                    onPressed: _enterEditMode,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _AddonTheme.primary,
                       foregroundColor: Colors.white,

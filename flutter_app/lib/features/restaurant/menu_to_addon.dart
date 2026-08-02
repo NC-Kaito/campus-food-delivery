@@ -18,8 +18,6 @@ class MenuToAddon extends StatefulWidget {
 }
 
 class _MenuToAddonState extends State<MenuToAddon> {
-  // ── ธีมสีหลักของหน้า (ใช้ชุดเดียวกับ home_restaurant.dart เพื่อความ
-  // สม่ำเสมอของทั้งแอป แทนสีเขียวสดที่ไม่ match กับหน้าอื่น) ────────────
   static const Color _primary = Color(0xFF16A34A);
   static const Color _primaryDark = Color(0xFF0F7A38);
   static const Color _bg = Color(0xFFF5F6F8);
@@ -52,8 +50,6 @@ class _MenuToAddonState extends State<MenuToAddon> {
     _loadData();
     _searchFocusNode.addListener(() {
       if (_searchFocusNode.hasFocus) {
-        // 🎯 พอโฟกัสช่องค้นหา ให้โชว์กลุ่มตัวเลือกเสริมทั้งหมดของร้าน (ที่ยังไม่ได้
-        // ผูกกับเมนูนี้) ขึ้นมาก่อนเลย โดยยังไม่ต้องพิมพ์อะไร
         _updateSearchResults(_searchController.text);
       } else {
         _removeSearchOverlay();
@@ -131,9 +127,6 @@ class _MenuToAddonState extends State<MenuToAddon> {
     });
   }
 
-  // 🎯 กรองกลุ่มตัวเลือกเสริมที่ยังไม่ได้ผูกกับเมนูนี้ — ถ้าช่องค้นหายังว่างอยู่
-  // (เช่น เพิ่งกดโฟกัส ยังไม่พิมพ์อะไร) ให้แสดงกลุ่มทั้งหมดของร้านเลย
-  // ถ้าพิมพ์คำค้นหาแล้ว ก็กรองตามชื่อกลุ่มตามปกติ
   void _updateSearchResults(String value) {
     final query = value.trim().toLowerCase();
     final results = _allGroups.where((agg) {
@@ -340,11 +333,9 @@ class _MenuToAddonState extends State<MenuToAddon> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                   children: [
-                    // ── หัวข้อหน้า ───────────────────────────────────
                     _buildPageHeader(),
                     const SizedBox(height: 14),
 
-                    // ── การ์ดข้อมูลเมนู ─────────────────────────────
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
@@ -436,7 +427,6 @@ class _MenuToAddonState extends State<MenuToAddon> {
                     ),
                     const SizedBox(height: 20),
 
-                    // ── ช่องค้นหา ─────────────────────────────────
                     CompositedTransformTarget(
                       link: _searchLayerLink,
                       child: Container(
@@ -616,7 +606,6 @@ class _MenuToAddonState extends State<MenuToAddon> {
     );
   }
 
-  // ── การ์ดหัวข้อหน้า: กล่องไอคอนสี + ชื่อหัวข้อ + คำอธิบายย่อย ──────────
   Widget _buildPageHeader() {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -704,7 +693,7 @@ class _MenuToAddonState extends State<MenuToAddon> {
     );
   }
 
-  // 🎯 badge เล็กๆ ไว้โชว์ "เลือกได้สูงสุด" กับ "จำเป็น/ไม่บังคับ"
+  // 🎯 Badge โชว์สถานะ "เลือกได้หลายอย่าง" / "เลือกได้ 1 อย่าง"
   Widget _buildAddonMetaBadge({
     required IconData icon,
     required String label,
@@ -734,7 +723,6 @@ class _MenuToAddonState extends State<MenuToAddon> {
     );
   }
 
-  // ปุ่มลูกศรขยาย/ย่อทรงวงกลม กดง่ายกว่าปุ่มไอคอนเดิม
   Widget _buildCircleExpandButton({
     required bool expanded,
     required VoidCallback onTap,
@@ -765,8 +753,9 @@ class _MenuToAddonState extends State<MenuToAddon> {
   Widget _buildActiveAddonGroupCard(_AddonGroupAggregate agg) {
     final groupId = agg.group.addonGroupId ?? -1;
     final isExpanded = _groupExpanded[groupId] ?? false;
-    final isRequired = agg.group.isRequired ?? false;
-    final maxSelect = agg.group.maxSelect ?? 1;
+
+    // 🎯 อ่านค่า is_multiple_choice
+    final isMultipleChoice = agg.group.is_multiple_choice ?? false;
     final items = agg.items.values.toList();
 
     return Container(
@@ -814,24 +803,18 @@ class _MenuToAddonState extends State<MenuToAddon> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        // 🎯 badge: เลือกได้สูงสุด + จำเป็น/ไม่บังคับ
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: [
-                            _buildAddonMetaBadge(
-                              icon: Icons.playlist_add_check_rounded,
-                              label: "เลือกได้สูงสุด $maxSelect",
-                              color: _linkBlue,
-                            ),
-                            _buildAddonMetaBadge(
-                              icon: isRequired
-                                  ? Icons.check_circle_outline_rounded
-                                  : Icons.check_circle_outline_rounded,
-                              label: isRequired ? "จำเป็น" : "ไม่บังคับ",
-                              color: isRequired ? _danger : _textMuted,
-                            ),
-                          ],
+
+                        // 🎯 แสดงเฉพาะ Badge รูปแบบการเลือก
+                        _buildAddonMetaBadge(
+                          icon: isMultipleChoice
+                              ? Icons.check_box_outlined
+                              : Icons.radio_button_checked_rounded,
+                          label: isMultipleChoice
+                              ? "เลือกได้หลายอย่าง"
+                              : "เลือกได้ 1 อย่าง",
+                          color: isMultipleChoice
+                              ? _linkBlue
+                              : Colors.orange[800]!,
                         ),
                       ],
                     ),
@@ -883,7 +866,6 @@ class _MenuToAddonState extends State<MenuToAddon> {
                   const SizedBox(height: 10),
                   if (items.isNotEmpty)
                     Container(
-                      // 🎯 เส้นเขียวเส้นเดียวยาวต่อเนื่องครอบทุกแถว แทนการแยกเส้นทีละแถว
                       decoration: BoxDecoration(
                         border: Border(
                           left: BorderSide(

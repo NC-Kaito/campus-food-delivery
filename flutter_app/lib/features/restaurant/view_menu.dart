@@ -165,11 +165,6 @@ class _ViewMenuState extends State<ViewMenu> {
                                 final entry = mapEntry.value;
                                 String groupName = entry.key;
                                 List<MenuAddonDetailModel> items = entry.value;
-                                bool isRequired =
-                                    items.first.menuAddonGroup?.isRequired ??
-                                    false;
-                                int maxSelect =
-                                    items.first.menuAddonGroup?.maxSelect ?? 1;
 
                                 return Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -184,30 +179,13 @@ class _ViewMenuState extends State<ViewMenu> {
                                     else
                                       const SizedBox(height: 8),
 
-                                    // หัวกลุ่ม
-                                    Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          groupName,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        Text(
-                                          isRequired
-                                              ? "จำเป็น (สูงสุด $maxSelect)"
-                                              : "ไม่จำเป็น (สูงสุด $maxSelect)",
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: isRequired
-                                                ? Colors.orange[400]
-                                                : Colors.grey[500],
-                                          ),
-                                        ),
-                                      ],
+                                    // 🎯 หัวกลุ่ม (แสดงเฉพาะชื่อกลุ่ม)
+                                    Text(
+                                      groupName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
                                     const SizedBox(height: 8),
 
