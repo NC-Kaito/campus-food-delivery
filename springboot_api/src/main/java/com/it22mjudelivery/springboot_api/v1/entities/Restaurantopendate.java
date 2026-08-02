@@ -33,7 +33,7 @@ public class Restaurantopeninghour {
     private LocalTime closetime;
 
     @Column(nullable = false)
-    private boolean closed; // true = วันนี้ร้านปิดทั้งวัน (ไม่ต้องดู opentime/closetime)
+    private boolean open;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "restaurant_username", nullable = false)
