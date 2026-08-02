@@ -6,6 +6,8 @@ import 'package:flutter_app/features/member/view_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
+import 'package:flutter_app/global_data.dart'; // 🎯 นำเข้า GlobalData เพื่อใช้ดึงชื่อผู้ใช้
 
 class ListOrderMember extends StatefulWidget {
   const ListOrderMember({super.key});
@@ -16,6 +18,9 @@ class ListOrderMember extends StatefulWidget {
 
 class _ListOrderMemberState extends State<ListOrderMember> {
   late Map<String, List<CartItem>> _groupedCart;
+  final OrderService _orderService =
+      OrderService(); // 🎯 สร้าง Instance ของ OrderService
+  int _activeOrderCount = 0; // 🎯 ตัวแปรเก็บจำนวนออเดอร์ที่กำลังดำเนินการ
 
   // สไตล์ข้อความของเมนูด้านล่าง (เหมือนกับหน้า Home)
   final menuTextStyle = TextStyle(
@@ -29,6 +34,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     super.initState();
     // ดึงข้อมูลรายการอาหารในตะกร้าที่จัดกลุ่มตามร้านค้า
     _groupedCart = CartManager().getGroupedByStore();
+    _fetchActiveOrderCount(); // 🎯 เรียกดึงข้อมูลจำนวนคำสั่งซื้อเมื่อเปิดหน้า
   }
 
   // 🎯 ฟังก์ชันช่วยต่อหัวเชื่อมต่อรูปภาพร้านค้า ป้องกันลิงก์ชิดติดกันจนพังหน้าจอ
@@ -44,8 +50,41 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     }
   }
 
+  // 🎯 ฟังก์ชันดึงจำนวน "คำสั่งซื้อที่กำลังดำเนินการ"
+  Future<void> _fetchActiveOrderCount() async {
+    try {
+      String username = GlobalData.usernameMember.trim();
+      if (username.isEmpty) return;
+
+      final history = await _orderService.getConfirmOrdersByMember(username);
+
+      int count = 0;
+      for (var order in history) {
+        final status = (order.orderStatus ?? '').toLowerCase();
+        // คัดกรองเฉพาะออเดอร์ที่ยังไม่เสร็จสิ้น หรือ ยังไม่ถูกยกเลิก
+        if (status != 'success' &&
+            status != 'completed' &&
+            status != 'cancel' &&
+            status != 'cancelled') {
+          count++;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _activeOrderCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการโหลดจำนวนออเดอร์หน้าตะกร้า: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final int cartItemCount =
+        CartManager().items.length; // 🎯 จำนวนตะกร้าปัจจุบัน
+
     return Scaffold(
       backgroundColor: Colors.white,
       // 🌟 แถบ Navbar บน (เหมือนหน้า Home)
@@ -79,7 +118,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
               },
             ),
 
-      // 🌟 1. เพิ่ม Bottom Navigation Bar ของหน้า Home เข้ามาประกบที่นี่
+      // 🌟 Bottom Navigation Bar
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Card(
@@ -106,15 +145,22 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                     });
                   },
                   isActive: true,
-                ), // 🎯 ตั้งค่าให้ปุ่มตะกร้าทำงานและเป็นสีเขียว
-                _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const ListConfirmOrderMember(),
-                    ),
-                  );
-                }),
+                  badgeCount: cartItemCount, // 🎯 เพิ่ม Badge ตะกร้า
+                ),
+                _buildNavItem(
+                  Icons.list_alt,
+                  "คำสั่งซื้อ",
+                  () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ListConfirmOrderMember(),
+                      ),
+                    );
+                  },
+                  badgeCount:
+                      _activeOrderCount, // 🎯 เพิ่ม Badge ออเดอร์ที่กำลังดำเนินการ
+                ),
                 _buildNavItem(Icons.person, "โปรไฟล์", () {
                   // กดเปิดหน้า Profile สมาชิก
                   Navigator.pushReplacement(
@@ -132,12 +178,13 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     );
   }
 
-  // 🌟 2. เพิ่มฟังก์ชันสำหรับสร้างปุ่มไอเทมเมนู (Copy มาจากหน้า Home เป๊ะๆ)
+  // 🌟 ฟังก์ชันสำหรับสร้างปุ่มไอเทมเมนู (อัปเดตให้รองรับ badgeCount เหมือนหน้า Home)
   Widget _buildNavItem(
     IconData icon,
     String label,
     VoidCallback onTap, {
     bool isActive = false,
+    int badgeCount = 0, // 🎯 รับค่า badgeCount
   }) {
     return InkWell(
       onTap: onTap,
@@ -147,7 +194,42 @@ class _ListOrderMemberState extends State<ListOrderMember> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isActive ? Colors.green : Colors.grey),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, color: isActive ? Colors.green : Colors.grey),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             Text(
               label,
               style: menuTextStyle.copyWith(
@@ -257,7 +339,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
               ),
               const SizedBox(width: 8),
 
-              // 🌟 3. ปุ่ม/ไอคอน นำทางบอกให้รู้ว่ากดสั่งอาหารได้ (เพิ่มใหม่ตรงนี้)
+              // 🌟 3. ปุ่ม/ไอคอน นำทางบอกให้รู้ว่ากดสั่งอาหารได้
               Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,

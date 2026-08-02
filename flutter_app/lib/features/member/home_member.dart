@@ -9,6 +9,7 @@ import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
+import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
@@ -31,6 +32,8 @@ class _HomeMemberState extends State<HomeMember> {
   final RestaurantService _restaurantService = RestaurantService();
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final MenuService _menuService = MenuService();
+  final OrderService _orderService =
+      OrderService(); // 🎯 เพิ่ม Service สำหรับคำสั่งซื้อ
 
   List<RestaurantModel> _results = [];
   List<TypeRestaurantModel> typeList = [];
@@ -38,6 +41,7 @@ class _HomeMemberState extends State<HomeMember> {
 
   bool _isLoading = true;
   Set<int> _selectedTypeIds = {};
+  int _activeOrderCount = 0; // 🎯 ตัวแปรเก็บจำนวนออเดอร์ที่กำลังดำเนินการ
 
   final menuTextStyle = const TextStyle(
     fontSize: 12,
@@ -59,7 +63,38 @@ class _HomeMemberState extends State<HomeMember> {
 
   Future<void> _initData() async {
     await fetchTypes();
+    await _fetchActiveOrderCount(); // 🎯 โหลดจำนวนออเดอร์เมื่อเปิดหน้า
     await _loadResults("");
+  }
+
+  // 🎯 ฟังก์ชันดึงจำนวน "คำสั่งซื้อที่กำลังดำเนินการ"
+  Future<void> _fetchActiveOrderCount() async {
+    try {
+      String username = GlobalData.usernameMember.trim();
+      if (username.isEmpty) return;
+
+      final history = await _orderService.getConfirmOrdersByMember(username);
+
+      int count = 0;
+      for (var order in history) {
+        final status = (order.orderStatus ?? '').toLowerCase();
+        // คัดกรองเฉพาะออเดอร์ที่ยังไม่เสร็จสิ้น หรือ ยังไม่ถูกยกเลิก
+        if (status != 'success' &&
+            status != 'completed' &&
+            status != 'cancel' &&
+            status != 'cancelled') {
+          count++;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _activeOrderCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการโหลดจำนวนออเดอร์: $e");
+    }
   }
 
   Future<void> fetchTypes() async {
@@ -107,7 +142,6 @@ class _HomeMemberState extends State<HomeMember> {
   String _formatTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  // 🎯 [FIXED - เหมือน HomeUser] จัดกลุ่มวันเวลาเปิด-ปิดทำการ (ถ้า hour.open == true คือวันนั้นเปิดร้าน)
   String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
     if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
       return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
@@ -136,7 +170,6 @@ class _HomeMemberState extends State<HomeMember> {
         ),
       );
 
-      // 🎯 ดึงเฉพาะวันเวลาที่เปิดร้านจริง (open == true)
       if (hour.open) {
         final String timeString =
             "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
@@ -157,7 +190,6 @@ class _HomeMemberState extends State<HomeMember> {
     return resultLines.join(" | ");
   }
 
-  // 🎯 [FIXED - เหมือน HomeUser] แสดงเวลาเปิด-ปิดของวันนี้โดยเฉพาะ
   String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
     if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาทำการ";
 
@@ -184,7 +216,6 @@ class _HomeMemberState extends State<HomeMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // 🎯 [FIXED - เหมือน HomeUser] ตรวจสอบสถานะเปิดอยู่จริง ณ เวลาปัจจุบัน
   bool _isCurrentlyOpen(RestaurantModel item) {
     if (item.statusOpen == false) return false;
 
@@ -215,7 +246,9 @@ class _HomeMemberState extends State<HomeMember> {
     return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
   }
 
-  void _refreshCartBadge() {
+  // 🎯 ปรับปรุงให้โหลดทั้งจำนวนตะกร้าและคำสั่งซื้อใหม่พร้อมกันเมื่อกลับมาหน้าหลัก
+  void _refreshBadges() {
+    _fetchActiveOrderCount();
     if (mounted) setState(() {});
   }
 
@@ -259,7 +292,7 @@ class _HomeMemberState extends State<HomeMember> {
                 MaterialPageRoute(
                   builder: (context) => ListMenuMember(restaurantModel: item),
                 ),
-              ).then((_) => _refreshCartBadge());
+              ).then((_) => _refreshBadges());
             },
             child: const Text(
               "ดูเมนูต่อไป",
@@ -526,16 +559,17 @@ class _HomeMemberState extends State<HomeMember> {
                     MaterialPageRoute(
                       builder: (context) => const ListOrderMember(),
                     ),
-                  ).then((_) => _refreshCartBadge());
+                  ).then((_) => _refreshBadges());
                 }, badgeCount: cartItemCount),
+                // 🎯 เพิ่ม badge แจ้งเตือนออเดอร์ที่ดำเนินการอยู่
                 _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => const ListConfirmOrderMember(),
                     ),
-                  );
-                }),
+                  ).then((_) => _refreshBadges());
+                }, badgeCount: _activeOrderCount),
                 _buildNavItem(Icons.person, "โปรไฟล์", () {
                   Navigator.push(
                     context,
@@ -661,7 +695,7 @@ class _HomeMemberState extends State<HomeMember> {
             MaterialPageRoute(
               builder: (context) => ListMenuMember(restaurantModel: item),
             ),
-          ).then((_) => _refreshCartBadge());
+          ).then((_) => _refreshBadges());
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -816,7 +850,6 @@ class _HomeMemberState extends State<HomeMember> {
                   ),
                   const SizedBox(height: 14),
 
-                  // ── แถววันทำการภาพรวมทั้งสัปดาห์ ──
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -840,7 +873,6 @@ class _HomeMemberState extends State<HomeMember> {
                   ),
                   const SizedBox(height: 8),
 
-                  // ── แถวเวลาของวันนี้โดยเฉพาะ ──
                   Row(
                     children: [
                       Expanded(

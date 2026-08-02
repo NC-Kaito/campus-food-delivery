@@ -6,6 +6,7 @@ import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/view_confirm_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
+import 'package:flutter_app/features/member/cart_manager_member.dart'; // 🎯 นำเข้า CartManager สำหรับนับตะกร้า
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/global_data.dart';
 
@@ -149,6 +150,10 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
   @override
   Widget build(BuildContext context) {
+    // 🎯 ดึงจำนวนตะกร้า และ ออเดอร์ที่ดำเนินการอยู่ (Pending)
+    final int cartItemCount = CartManager().items.length;
+    final int activeOrderCount = _filterOrders('pending').length;
+
     return DefaultTabController(
       length: 3,
       child: Scaffold(
@@ -214,17 +219,29 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                   _buildNavItem(Icons.home, "หน้าหลัก", () {
                     Navigator.popUntil(context, (route) => route.isFirst);
                   }),
-                  _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ListOrderMember(),
-                      ),
-                    );
-                  }),
-                  _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
-                    _fetchOrderHistory();
-                  }, isActive: true),
+                  _buildNavItem(
+                    Icons.shopping_basket,
+                    "ตะกร้าอาหาร",
+                    () {
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const ListOrderMember(),
+                        ),
+                      );
+                    },
+                    badgeCount: cartItemCount, // 🎯 เพิ่มแจ้งเตือนตะกร้า
+                  ),
+                  _buildNavItem(
+                    Icons.list_alt,
+                    "คำสั่งซื้อ",
+                    () {
+                      _fetchOrderHistory();
+                    },
+                    isActive: true,
+                    badgeCount:
+                        activeOrderCount, // 🎯 เพิ่มแจ้งเตือนคำสั่งซื้อที่กำลังทำ
+                  ),
                   _buildNavItem(Icons.person, "โปรไฟล์", () {
                     Navigator.pushReplacement(
                       context,
@@ -272,11 +289,13 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     );
   }
 
+  // 🎯 อัปเดตฟังก์ชันเพื่อรองรับพารามิเตอร์ badgeCount
   Widget _buildNavItem(
     IconData icon,
     String label,
     VoidCallback onTap, {
     bool isActive = false,
+    int badgeCount = 0, // 🎯 เพิ่มตัวรับค่า badge
   }) {
     return InkWell(
       onTap: onTap,
@@ -286,7 +305,42 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isActive ? Colors.green : Colors.grey),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, color: isActive ? Colors.green : Colors.grey),
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -6,
+                    top: -4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             Text(
               label,
               style: menuTextStyle.copyWith(
@@ -334,7 +388,10 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
             MaterialPageRoute(
               builder: (context) => ViewConfirmOrderMember(order: order),
             ),
-          );
+          ).then((_) {
+            // โหลดข้อมูลใหม่เมื่อกลับมาจากหน้า View
+            _fetchOrderHistory();
+          });
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
