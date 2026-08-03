@@ -68,6 +68,17 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/rider/{username}/active")
+    public ResponseEntity<?> getActiveOrdersForRider(@PathVariable String username) {
+        try {
+            List<Order> activeOrders = orderService.getActiveOrdersByRider(username);
+            return ResponseEntity.ok(activeOrders);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+
     @PostMapping("/confirmOrderByRider")
     public ResponseEntity<?> confirmOrderByRider(@RequestBody Map<String, Object> data){
         try{
@@ -93,4 +104,54 @@ public class OrderController {
             ));
         }
     }
+
+    /// //////////////// Restaurant
+    @GetMapping("/restaurant/{username}/waitingOrdersByRestaurant")
+    public ResponseEntity<?> getWaitingOrdersByRestaurant(@PathVariable String username) {
+        try {
+            List<Order> orders = orderService.getWaitingOrdersByRestaurant(username);
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error",
+                    "message", "เกิดข้อผิดพลาด: " + e.getMessage()
+            ));
+        }
+    }
+
+    @PostMapping("/confirmOrderByRestaurant")
+    public ResponseEntity<?> confirmOrderByRestaurant(@RequestBody Map<String, Object> data){
+        try{
+            int orderId = (int) data.get("orderId");
+
+            boolean isResult = orderService.doConfirmOrderByRestaurant(orderId);
+            if (isResult) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "message", "รับคำสั่งซื้อสำเร็จเรียบร้อยแล้ว!"
+                ));
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                        "status", "error",
+                        "message", "ไม่สามารถรับออเดอร์นี้ได้ กรุณาลองใหม่อีกครั้ง"
+                ));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error",
+                    "message", "เกิดข้อผิดพลาดในระบบ (Controller): " + e.getMessage()
+            ));
+        }
+    }
+
+    @GetMapping("/restaurant/{username}/active")
+    public ResponseEntity<?> getActiveOrdersByRestaurant(@PathVariable String username) {
+        try {
+            List<Order> activeOrders = orderService.getActiveOrdersByRestaurant(username);
+            return ResponseEntity.ok(activeOrders);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
 }

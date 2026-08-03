@@ -18,4 +18,9 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
     List<Order> findOrdersByMemberUsername(@Param("username") String username);
 
     List<Order> findByOrderstatusOrderByOrderidDesc(String orderstatus);
+
+    List<Order> findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(String username, List<String> status);
+
+    List<Order> findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(String username, List<String> status);
+
 }

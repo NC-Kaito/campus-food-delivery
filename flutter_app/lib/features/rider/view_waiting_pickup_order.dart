@@ -6,6 +6,8 @@ import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:dio/dio.dart'; // 🎯 นำเข้า Dio สำหรับยิง API ของ Google
+import 'dart:math' show min, max;
 
 class ViewWaitingPickupOrder extends StatefulWidget {
   final OrderModel orderModel;
@@ -20,16 +22,138 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
   final OrderService _orderService = OrderService();
   bool _isAccepting = false;
 
-  GoogleMapController? _miniMapController;
-  GoogleMapController? _restaurantMapController;
-
+  GoogleMapController? _mapController;
   final Color primaryOrange = Colors.orange;
+
+  // 🎯 ตัวแปรสำหรับวาดเส้นทางตามถนนจริง
+  Set<Polyline> _polylines = {};
+  String _drivingDistance = "กำลังคำนวณ...";
+  String _drivingDuration = "...";
+
+  // 🚨 ข้อสำคัญ: นำ API Key ของ Google Maps ที่เปิดใช้งาน Directions API มาใส่ตรงนี้
+  final String googleMapsApiKey = "ใส่_API_KEY_ของคุณที่นี่";
+
+  @override
+  void initState() {
+    super.initState();
+    _calculateDrivingRoute();
+  }
 
   @override
   void dispose() {
-    _miniMapController?.dispose();
-    _restaurantMapController?.dispose();
+    _mapController?.dispose();
     super.dispose();
+  }
+
+  // ── 🎯 ฟังก์ชันดึงเส้นทางขับรถจริงจาก Google Directions API ──
+  Future<void> _calculateDrivingRoute() async {
+    final order = widget.orderModel;
+    final double? restaurantLat = order.restaurant?.latitude;
+    final double? restaurantLng = order.restaurant?.longitude;
+
+    if (restaurantLat == null || restaurantLng == null) {
+      setState(() => _drivingDistance = "ไม่พบพิกัดร้านค้า");
+      return;
+    }
+
+    final String origin = "$restaurantLat,$restaurantLng";
+    final String destination = "${order.latitude},${order.longitude}";
+    final String url =
+        "https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&key=$googleMapsApiKey&language=th";
+
+    try {
+      // 🎯 ใช้ Dio ยิงขอข้อมูลจาก Google ตรงๆ
+      Response response = await Dio().get(url);
+      final data = response.data;
+
+      if (data['status'] == 'OK') {
+        final route = data['routes'][0];
+        final leg = route['legs'][0];
+
+        // ดึงข้อความระยะทาง และ เวลา
+        final distanceText = leg['distance']['text']; // e.g., "3.5 กม."
+        final durationText = leg['duration']['text']; // e.g., "12 นาที"
+
+        // ดึงพิกัดเส้นถนน (Encoded Polyline)
+        final encodedPolyline = route['overview_polyline']['points'];
+        List<LatLng> polylineCoordinates = _decodePolyline(encodedPolyline);
+
+        if (mounted) {
+          setState(() {
+            _drivingDistance = distanceText;
+            _drivingDuration = durationText;
+            _polylines.add(
+              Polyline(
+                polylineId: const PolylineId("driving_route"),
+                color: primaryOrange,
+                width: 5,
+                points: polylineCoordinates,
+                jointType: JointType.round,
+                startCap: Cap.roundCap,
+                endCap: Cap.roundCap,
+              ),
+            );
+          });
+        }
+      } else {
+        setState(() => _drivingDistance = "ไม่สามารถคำนวณเส้นทางได้");
+      }
+    } catch (e) {
+      setState(() => _drivingDistance = "ข้อผิดพลาดในการโหลดเส้นทาง");
+      debugPrint("Error fetching directions: $e");
+    }
+  }
+
+  // ── 🎯 ฟังก์ชันถอดรหัส Polyline ของ Google กลับเป็นพิกัด LatLng ──
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> poly = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1f) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      poly.add(LatLng((lat / 1E5).toDouble(), (lng / 1E5).toDouble()));
+    }
+    return poly;
+  }
+
+  // ── ปรับกล้องให้ครอบคลุมทั้งหมุดร้านค้าและลูกค้า ──
+  void _setMapBounds(LatLng pos1, LatLng pos2) {
+    if (_mapController == null) return;
+
+    double minLat = min(pos1.latitude, pos2.latitude);
+    double maxLat = max(pos1.latitude, pos2.latitude);
+    double minLng = min(pos1.longitude, pos2.longitude);
+    double maxLng = max(pos1.longitude, pos2.longitude);
+
+    LatLngBounds bounds = LatLngBounds(
+      southwest: LatLng(minLat, minLng),
+      northeast: LatLng(maxLat, maxLng),
+    );
+
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngBounds(bounds, 50.0), // Padding 50
+      );
+    });
   }
 
   String _getFinalImageUrl(String? rawPath) {
@@ -48,7 +172,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     );
   }
 
-  // ── การ์ดแต่ละรายการเมนู (รองรับทั้งข้าวราดแกงและเมนูทั่วไป) ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
     final bool isCurryDish =
         (item.orderDetailCurries != null &&
@@ -79,11 +202,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
         .where((name) => name.isNotEmpty)
         .join(", ");
 
-    // ═══════════════════════════════════════════════
-    // 🎯 คำนวณราคาต่อหน่วย (ตัด extraprice ออกแล้ว)
-    //    - ข้าวราดแกง: ราคาฐานจานข้าว + ผลรวมราคากับข้าวแต่ละอย่างที่เลือก (priceAtOrder)
-    //    - เมนูทั่วไป: ราคาเมนู + ผลรวมราคาตัวเลือกเสริม
-    // ═══════════════════════════════════════════════
     int finalPricePerUnit;
     if (isCurryDish) {
       int curriesSum = 0;
@@ -205,7 +323,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     );
   }
 
-  // ── กดยืนยันรับออเดอร์จริง ──
   Future<void> _confirmAcceptOrder() async {
     if (_isAccepting) return;
     setState(() => _isAccepting = true);
@@ -225,7 +342,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
       );
 
       if (!mounted) return;
-      Navigator.pop(context); // ปิด loading dialog
+      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -237,13 +354,10 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
         ),
       );
 
-      Navigator.pop(
-        context,
-        true,
-      ); // กลับไปหน้าลิสต์ พร้อมส่งค่า true บอกว่าสำเร็จ
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // ปิด loading dialog
+      Navigator.pop(context);
       setState(() => _isAccepting = false);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -360,124 +474,41 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             ),
             const SizedBox(height: 24),
 
-            // ── ข้อมูลลูกค้า ────────────────────────────────
-            const Text(
-              "ข้อมูลผู้สั่งซื้อ",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-            const SizedBox(height: 12),
+            // ── แผนที่เส้นทางพร้อมข้อมูลถนนจริง ────────────────────
             Row(
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.person_outline,
-                        size: 28,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "ชื่อผู้รับ",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          Text(
-                            memberFullName,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.phone_in_talk_outlined,
-                        size: 28,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(width: 8),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "เบอร์โทรศัพท์",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
-                            ),
-                          ),
-                          Text(
-                            memberPhone,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1, color: Colors.black12),
-            const SizedBox(height: 16),
-
-            // ── ที่อยู่ร้านค้า (รับที่) ────────────────────────
-            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "รับที่ (ร้านค้า)",
+                  "เส้นทางจัดส่ง",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(width: 6),
-                Icon(Icons.storefront_rounded, color: primaryOrange, size: 20),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: primaryOrange,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    restaurantName,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                if (restaurantLocation != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: primaryOrange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      _drivingDuration != "..."
+                          ? "≈ $_drivingDistance ($_drivingDuration)"
+                          : _drivingDistance,
+                      style: TextStyle(
+                        color: primaryOrange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             const SizedBox(height: 12),
             if (restaurantLocation != null)
               Container(
-                height: 160,
+                height: 220,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
@@ -488,21 +519,31 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                   child: GoogleMap(
                     initialCameraPosition: CameraPosition(
                       target: restaurantLocation,
-                      zoom: 16.0,
+                      zoom: 14.0,
                     ),
-                    onMapCreated: (controller) =>
-                        _restaurantMapController = controller,
+                    onMapCreated: (controller) {
+                      _mapController = controller;
+                      _setMapBounds(restaurantLocation, deliveryLocation);
+                    },
                     zoomControlsEnabled: false,
-                    zoomGesturesEnabled: false,
-                    scrollGesturesEnabled: false,
-                    rotateGesturesEnabled: false,
-                    tiltGesturesEnabled: false,
+                    scrollGesturesEnabled: true,
+                    // 🎯 นำ Polylines เส้นถนนที่คำนวณมาแสดง
+                    polylines: _polylines,
                     markers: {
                       Marker(
                         markerId: const MarkerId('restaurant_pos'),
                         position: restaurantLocation,
+                        infoWindow: const InfoWindow(title: 'ร้านค้า'),
                         icon: BitmapDescriptor.defaultMarkerWithHue(
                           BitmapDescriptor.hueOrange,
+                        ),
+                      ),
+                      Marker(
+                        markerId: const MarkerId('delivery_pos'),
+                        position: deliveryLocation,
+                        infoWindow: const InfoWindow(title: 'ลูกค้า'),
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          BitmapDescriptor.hueRed,
                         ),
                       ),
                     },
@@ -519,70 +560,101 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 20),
 
-            // ── ที่อยู่จัดส่ง (ส่งที่) ────────────────────────
+            // ── ข้อมูลการรับส่ง ────────────────────────────────
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  "ส่งที่ (ลูกค้า)",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                Column(
+                  children: [
+                    Icon(
+                      Icons.storefront_rounded,
+                      color: primaryOrange,
+                      size: 24,
+                    ),
+                    Container(
+                      height: 30,
+                      width: 2,
+                      color: Colors.grey.shade300,
+                    ),
+                    Icon(
+                      Icons.location_on,
+                      color: Colors.red.shade500,
+                      size: 24,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Icon(Icons.location_on, color: primaryOrange, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "รับที่ร้าน",
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      Text(
+                        restaurantName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      const Text(
+                        "ส่งให้ลูกค้า",
+                        style: TextStyle(fontSize: 13, color: Colors.grey),
+                      ),
+                      Text(
+                        memberFullName,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.phone, color: Colors.green),
+                  onPressed: () {},
+                ),
               ],
             ),
-            const SizedBox(height: 12),
-            Container(
-              height: 180,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade300, width: 1.5),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: deliveryLocation,
-                    zoom: 16.0,
-                  ),
-                  onMapCreated: (controller) => _miniMapController = controller,
-                  zoomControlsEnabled: false,
-                  zoomGesturesEnabled: false,
-                  scrollGesturesEnabled: false,
-                  rotateGesturesEnabled: false,
-                  tiltGesturesEnabled: false,
-                  markers: {
-                    Marker(
-                      markerId: const MarkerId('delivery_pos'),
-                      position: deliveryLocation,
-                      icon: BitmapDescriptor.defaultMarkerWithHue(
-                        BitmapDescriptor.hueRed,
+
+            if (order.addressDetail.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "จุดสังเกต / รายละเอียดที่อยู่:",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  },
+                    const SizedBox(height: 4),
+                    Text(
+                      order.addressDetail,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            if (order.addressDetail.isNotEmpty) ...[
-              Text(
-                "จุดสังเกต / รายละเอียดที่อยู่:",
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                order.addressDetail,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
             ],
+
+            const SizedBox(height: 20),
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
@@ -673,7 +745,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
         ),
       ),
 
-      // ── ปุ่มยืนยันรับออเดอร์ ปักไว้ด้านล่างเสมอ ────────────
+      // ── ปุ่มยืนยันรับออเดอร์ ────────────
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),

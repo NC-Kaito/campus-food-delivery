@@ -17,6 +17,7 @@ import 'package:flutter_app/features/restaurant/menu_to_addon.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/review_restaurant.dart';
 import 'package:flutter_app/features/restaurant/sales_restaurant.dart';
+import 'package:flutter_app/features/restaurant/list_order_restaurant.dart'; // 🎯 นำเข้าหน้า ListOrderRestaurant
 import 'package:flutter_app/global_data.dart';
 
 class HomeRestaurant extends StatefulWidget {
@@ -604,7 +605,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         const SizedBox(height: 16),
 
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: _buildQuickActionsRow(),
                         ),
                         const SizedBox(height: 16),
@@ -976,31 +977,41 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
+  // 🎯 ปรับแต่งแถบปุ่ม Quick Actions ให้มีปุ่ม "คำสั่งซื้อ" (เปิดไปหน้า ListOrderRestaurant)
   Widget _buildQuickActionsRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _buildQuickAction(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildQuickAction(
             icon: Icons.receipt_long_rounded,
             label: "เมนู",
             iconColor: _mainTabIndex == 0 ? _primary : _textDark,
             active: _mainTabIndex == 0,
             onTap: () => _onSelectMainTab(0),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildQuickAction(
+          const SizedBox(width: 8),
+          _buildQuickAction(
             icon: Icons.playlist_add_check_rounded,
-            label: "กลุ่มตัวเลือกเสริม",
+            label: "ตัวเลือกเสริม",
             iconColor: _mainTabIndex == 1 ? _primary : _textDark,
             active: _mainTabIndex == 1,
             onTap: () => _onSelectMainTab(1),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildQuickAction(
+          const SizedBox(width: 8),
+          // 🎯 ปุ่มคำสั่งซื้อที่เพิ่มเข้ามาใหม่
+          _buildQuickAction(
+            icon: Icons.shopping_bag_outlined,
+            label: "คำสั่งซื้อ",
+            iconColor: _primary,
+            active: false,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ListOrderRestaurant()),
+            ),
+          ),
+          const SizedBox(width: 8),
+          _buildQuickAction(
             icon: Icons.attach_money_rounded,
             label: "ยอดขาย",
             iconColor: _primary,
@@ -1010,10 +1021,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               MaterialPageRoute(builder: (_) => const SalesRestaurant()),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildQuickAction(
+          const SizedBox(width: 8),
+          _buildQuickAction(
             icon: Icons.star_rounded,
             label: "รีวิว",
             iconColor: _reviewYellow,
@@ -1023,8 +1032,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               MaterialPageRoute(builder: (_) => const ReviewRestaurant()),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -1038,7 +1047,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+        width: 80, // กำหนดความกว้างของปุ่มแต่ละอันให้เท่ากัน
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
           color: active ? _primary.withOpacity(0.08) : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -1058,7 +1068,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 11.5,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: active ? _primary : _textDark,
               ),
@@ -1100,7 +1110,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // 🎯 badge โชว์ "เลือกได้หลายอย่าง" / "เลือกได้ 1 อย่าง"
   Widget _buildAddonMetaBadge({
     required IconData icon,
     required String label,
@@ -1162,7 +1171,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final bool enabled = _groupEnabled[groupId] ?? true;
     final bool expanded = _groupExpanded[groupId] ?? false;
 
-    // 🎯 อ่านค่า is_multiple_choice จาก Model ใหม่
     final bool isMultipleChoice = agg.group.is_multiple_choice ?? false;
     final items = agg.items.values.toList();
 
@@ -1174,8 +1182,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             builder: (context) => EditAddon(
               groupId: agg.group.addonGroupId,
               groupName: agg.group.addonGroupName,
-              isMultipleChoice:
-                  isMultipleChoice, // 🎯 ส่งค่าใหม่ไปยัง EditAddon
+              isMultipleChoice: isMultipleChoice,
               groupStatus: agg.group.status ?? true,
               details: items,
             ),
@@ -1230,7 +1237,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         ),
                         const SizedBox(height: 8),
 
-                        // 🎯 แสดง badge "เลือกได้หลายอย่าง" หรือ "เลือกได้ 1 อย่าง"
                         _buildAddonMetaBadge(
                           icon: isMultipleChoice
                               ? Icons.check_box_outlined

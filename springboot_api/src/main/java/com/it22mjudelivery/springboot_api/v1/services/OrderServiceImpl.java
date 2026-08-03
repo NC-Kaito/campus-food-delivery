@@ -11,8 +11,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Array;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.Arrays;
 import java.util.List;
 
 @Service
@@ -162,6 +164,16 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<Order> getActiveOrdersByRider(String username) {
+        try {
+            List<String> activeOrderStatus = Arrays.asList("WaitingRestaurant", "delivery");
+            return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, activeOrderStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รอไรเดอร์ได้: " + e.getMessage());
+        }
+    }
+
+    @Override
     public boolean doConfirmOrderByRider(String studentId, int orderId) {
         try{
         Rider rider = riderRepo.findByStudentid(studentId).orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบชื่อผู้ใช้งาน"));
@@ -178,4 +190,42 @@ public class OrderServiceImpl implements OrderService {
             return false;
         }
     }
+
+
+    //---- Restaurant ----
+
+    @Override
+    public List<Order> getWaitingOrdersByRestaurant(String username) {
+        try {
+            List<String> order = Arrays.asList("WaitingRestaurant");
+            return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, order);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รอไรเดอร์ได้: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public boolean doConfirmOrderByRestaurant(int orderId) {
+        try{
+            Order order = orderRepo.findById(orderId).orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบรายการคำสั่งซื้อในระบบ"));
+
+            order.setOrderstatus("delivery");
+            orderRepo.save(order);
+            return true;
+        }catch (Exception e){
+            System.err.println("Error confirmOrderByRestaurant: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public List<Order> getActiveOrdersByRestaurant(String username) {
+        try {
+            List<String> activeOrderStatus = Arrays.asList("delivery");
+            return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, activeOrderStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่ต้องทำได้: " + e.getMessage());
+        }
+    }
+
 }

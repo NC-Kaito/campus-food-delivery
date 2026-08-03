@@ -313,7 +313,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
 
     if (status.contains("waitingrestaurant") || status.contains("cooking")) {
       currentStep = 2;
-    } else if (status.contains("delivering") || status.contains("pickedup")) {
+    } else if (status.contains("delivery") || status.contains("pickedup")) {
       currentStep = 3;
     } else if (status.contains("success") || status.contains("completed")) {
       currentStep = 4;
@@ -454,7 +454,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     currentStep >= 3,
                   ),
                   _buildTimelineDot(
-                    "กำลังจัดส่ง\n(Delivering)",
+                    "กำลังจัดส่ง",
                     currentStep >= 3,
                     currentStep >= 4,
                   ),

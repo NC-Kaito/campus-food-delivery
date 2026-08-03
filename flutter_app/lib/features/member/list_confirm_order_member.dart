@@ -96,7 +96,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
           'bgColor': Colors.deepOrange[50]!,
           'icon': Icons.soup_kitchen_rounded,
         };
-      case 'Delivering':
+      case 'delivery':
       case 'OnTheWay':
         return {
           'text': 'กำลังจัดส่ง',

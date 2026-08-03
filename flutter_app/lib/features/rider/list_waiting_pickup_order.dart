@@ -1,5 +1,5 @@
 // features/rider/list_waiting_pickup_order.dart
-import 'dart:async'; // 🎯 1. อิมพอร์ตตัวนี้เข้ามาเพื่อใช้งาน Timer คุมเวลา
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/services/rider/rider_service.dart';
@@ -8,6 +8,7 @@ import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/global_data.dart';
 
 import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart';
+import 'package:flutter_app/features/rider/view_delivery_detail.dart'; // 🎯 1. นำเข้าหน้า ViewDeliveryDetail ที่คุณสร้างขึ้น
 
 class ListWaitingPickupOrder extends StatefulWidget {
   const ListWaitingPickupOrder({super.key});
@@ -16,50 +17,54 @@ class ListWaitingPickupOrder extends StatefulWidget {
   State<ListWaitingPickupOrder> createState() => _ListWaitingPickupOrderState();
 }
 
-class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
+class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
+    with SingleTickerProviderStateMixin {
   final RiderService _riderService = RiderService();
   final OrderService _orderService = OrderService();
 
-  // 🎯 ตัวแปรสถานะ
   bool _isReady = false;
   bool _isUpdating = false;
   bool _isLoadingOrders = false;
   bool _isLoadingStatus = true;
   int _selectedTabIndex = 0;
 
+  // 🎯 ใช้ TabController จริงแทนปุ่ม chip เดิม เพื่อให้ UX/UI ของแถบแท็บ
+  // เหมือนกับฝั่ง member (list_confirm_order_member.dart) เป๊ะๆ
+  late final TabController _tabController;
+
   List<dynamic> _realOrders = [];
 
-  // 🎯 2. ประกาศตัวแปรจับเวลาแบบ Global ในระดับหน้าจอนี้
   Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _fetchRiderStatus();
   }
 
-  // 🎯 4. เขียนฟังก์ชันสั่งเริ่มจับเวลารีเฟรชหน้าจอ
   void _startAutoRefresh() {
-    // ล้าง Timer เก่าออกก่อน (ถ้ามี) ป้องกันตัวจับเวลาทำงานซ้ำซ้อน
     _autoRefreshTimer?.cancel();
 
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      // 🔒 ดักจับเงื่อนไขความปลอดภัย:
-      // ระบบจะยอม Query ก็ต่อเมื่อ ไรเดอร์ออนไลน์อยู่ (_isReady) และระบบไม่ได้กำลังโหลดงานรอบเก่าค้างอยู่
-      if (_isReady &&
-          !_isLoadingOrders &&
-          !_isUpdating &&
-          _selectedTabIndex == 0) {
-        _fetchWaitingOrdersBackground();
+      if (_isReady && !_isLoadingOrders && !_isUpdating) {
+        _fetchOrdersBackground();
       }
     });
   }
 
-  // 🎯 5. เพิ่มฟังก์ชันดึงออเดอร์แบบเงียบๆ เบื้องหลัง (Background Fetch)
-  Future<void> _fetchWaitingOrdersBackground() async {
+  // 🎯 ดึงข้อมูลเบื้องหลังตามแท็บที่เลือก
+  Future<void> _fetchOrdersBackground() async {
     if (!_isReady) return;
     try {
-      final orders = await _orderService.getWaitingOrders();
+      List<dynamic> orders = [];
+      if (_selectedTabIndex == 0) {
+        orders = await _orderService.getWaitingOrders();
+      } else if (_selectedTabIndex == 1) {
+        String studentId = GlobalData.usernameRider;
+        orders = await _orderService.getActiveOrders(studentId);
+      }
+
       if (mounted) {
         setState(() {
           _realOrders = orders;
@@ -70,15 +75,13 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     }
   }
 
-  // 🎯 6. ฟังก์ชันทำลาย Timer เมื่อไรเดอร์กดออกจากหน้านี้ (สำคัญที่สุด!!!)
   @override
   void dispose() {
-    _autoRefreshTimer
-        ?.cancel(); // 🛑 สั่งตัดท่อลูปเวลาทิ้งทันที เพื่อประหยัด RAM และป้องกันเมโมรีรั่ว
+    _autoRefreshTimer?.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
-  // 🎯 ฟังก์ชันดึงสถานะปัจจุบันของไรเดอร์จากฐานข้อมูลหลังบ้าน
   Future<void> _fetchRiderStatus() async {
     try {
       String studentId = GlobalData.usernameRider;
@@ -91,8 +94,8 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
         });
 
         if (_isReady) {
-          _fetchWaitingOrders();
-          _startAutoRefresh(); // เริ่มการทำงาน Auto Refresh ทันทีถ้า Rider ออนไลน์อยู่แล้ว
+          _fetchOrders();
+          _startAutoRefresh();
         }
       }
     } catch (e) {
@@ -110,8 +113,8 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     }
   }
 
-  // ฟังก์ชันดึงข้อมูลออเดอร์จริงแบบเปิด Loading Indicator
-  Future<void> _fetchWaitingOrders() async {
+  // 🎯 ดึงข้อมูลออเดอร์แยกตามแท็บแบบแสดง Loading
+  Future<void> _fetchOrders() async {
     if (!_isReady) return;
 
     setState(() {
@@ -119,7 +122,19 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     });
 
     try {
-      final orders = await _orderService.getWaitingOrders();
+      List<dynamic> orders = [];
+      if (_selectedTabIndex == 0) {
+        // แท็บ 0: งานใหม่ที่ยังไม่มีใครรับ
+        orders = await _orderService.getWaitingOrders();
+      } else if (_selectedTabIndex == 1) {
+        // แท็บ 1: งานที่ไรเดอร์คนนี้รับมาแล้วกำลังดำเนินการ
+        String studentId = GlobalData.usernameRider;
+        orders = await _orderService.getActiveOrders(studentId);
+      } else {
+        // แท็บ 2: จัดส่งสำเร็จ
+        orders = [];
+      }
+
       if (mounted) {
         setState(() {
           _realOrders = orders;
@@ -141,7 +156,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     }
   }
 
-  // ฟังก์ชันสลับสถานะออนไลน์พร้อมทำงานของไรเดอร์
   Future<void> _toggleActiveStatus(bool newStatus) async {
     if (_isUpdating) return;
 
@@ -175,11 +189,10 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
         );
 
         if (newStatus) {
-          _fetchWaitingOrders();
-          _startAutoRefresh(); // รีสตาร์ตระบบลูปจับเวลาใหม่เมื่อไรเดอร์กลับมาเปิดระบบ
+          _fetchOrders();
+          _startAutoRefresh();
         } else {
-          _autoRefreshTimer
-              ?.cancel(); // ถ้าปิดรับงาน ให้หยุดนาฬิกาลูปดึงงานทันที
+          _autoRefreshTimer?.cancel();
         }
       }
     } catch (e) {
@@ -197,58 +210,24 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     }
   }
 
-  // ฟังก์ชันสำหรับการกดรับคำสั่งซื้อ
-  Future<void> _acceptOrderAction(int orderId) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-          const Center(child: CircularProgressIndicator(color: Colors.orange)),
-    );
-
-    try {
-      String studentId = GlobalData.usernameRider;
-      await _orderService.confirmOrderByRider(studentId, orderId);
-
-      if (mounted) {
-        Navigator.pop(context); // เอา Loading Dialog ออก
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              "รับคำสั่งซื้อสำเร็จ! เปลี่ยนสถานะเป็นรอร้านค้าแล้ว 🏍️🔥",
-            ),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-
-        _fetchWaitingOrders(); // สั่งดึงข้อมูลสดทันทีหลังเคลมสำเร็จ
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("🚨 ไม่สามารถรับออเดอร์ได้: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
+  // 🎯 2. ปรับฟังก์ชันเปิดหน้ารายละเอียด ให้แยกตามแท็บ (Tab 0 ไปหน้า ViewWaitingPickupOrder, Tab 1 ไปหน้า ViewDeliveryDetail)
   Future<void> _openOrderDetail(OrderModel orderModel) async {
+    Widget targetPage;
+
+    if (_selectedTabIndex == 0) {
+      targetPage = ViewWaitingPickupOrder(orderModel: orderModel);
+    } else {
+      targetPage = ViewDeliveryDetail(orderModel: orderModel);
+    }
+
     final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => ViewWaitingPickupOrder(orderModel: orderModel),
-      ),
+      MaterialPageRoute(builder: (context) => targetPage),
     );
 
-    // ถ้ารับออเดอร์สำเร็จจากหน้ารายละเอียด (คืนค่า true) ให้รีเฟรชลิสต์ทันที
-    if (result == true) {
-      _fetchWaitingOrders();
+    // รีเฟรชลิสต์เมื่อกลับมาจากหน้ารายละเอียด
+    if (result == true || _selectedTabIndex == 1) {
+      _fetchOrders();
     }
   }
 
@@ -265,45 +244,32 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     }
   }
 
-  Widget _buildTab(String title, int index) {
-    bool isActive = _selectedTabIndex == index;
-    return GestureDetector(
-      onTap: () {
-        if (_selectedTabIndex == index) return;
-        setState(() {
-          _selectedTabIndex = index;
-        });
-        _fetchWaitingOrders();
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive
-              ? const Color(0xFFFFF9C4)
-              : const Color(0xFFFFF9C4).withOpacity(0.6),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.3),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Text(
-          title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black,
-            fontSize: 14,
-          ),
-        ),
+  // 🎯 แถบแท็บสไตล์เดียวกับฝั่ง member: พื้นขาว ตัวหนังสือหนา + เส้นขีดใต้
+  // แท็บที่กำลังเลือกอยู่ (แทนปุ่ม chip สีเหลืองแบบเดิม)
+  Widget _buildTabBar() {
+    return Container(
+      color: Colors.white,
+      child: TabBar(
+        controller: _tabController,
+        indicatorColor: const Color(0xFF64FF20),
+        indicatorWeight: 3,
+        labelColor: const Color(0xFF2E7D32),
+        unselectedLabelColor: Colors.grey[600],
+        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        onTap: (index) {
+          if (_selectedTabIndex == index) return;
+          setState(() => _selectedTabIndex = index);
+          _fetchOrders(); // 🎯 โหลดข้อมูลใหม่เมื่อเปลี่ยนแท็บ
+        },
+        tabs: const [
+          Tab(text: "งานใหม่"),
+          Tab(text: "รายการจัดส่ง"),
+          Tab(text: "จัดส่งสำเร็จ"),
+        ],
       ),
     );
   }
 
-  // 🧩 ฟังก์ชันสร้างการ์ดออเดอร์ (เวอร์ชั่นปรับปรุง: นำ "ส่งที่ (ลูกค้า)" ด้านล่างออก)
-  // 🧩 ฟังก์ชันสร้างการ์ดออเดอร์ (เวอร์ชั่นปรับปรุง: นำ "ส่งที่ (ลูกค้า)" ด้านล่างออก + เพิ่มเวลาที่สั่ง)
   Widget _buildOrderCard(dynamic order) {
     final orderModel = OrderModel.fromJson(order);
 
@@ -312,7 +278,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
     final String restaurantName =
         orderModel.restaurant?.restaurantName ?? "ไม่ระบุชื่อร้าน";
 
-    // 👤 ดึงข้อมูลโปรไฟล์ของลูกค้า (Member) ผ่าน Object Model
     String memberFullName = "ไม่ระบุชื่อผู้รับ";
     String finalImgUrl = "";
 
@@ -329,7 +294,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
       memberFullName = order["customerName"];
     }
 
-    // 🎯 คำนวณจำนวนรายการ (items) ทั้งหมดภายในออเดอร์นี้
     int totalItems = 0;
     if (order["orderDetails"] != null && order["orderDetails"] is List) {
       totalItems = (order["orderDetails"] as List).length;
@@ -337,7 +301,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
       totalItems = (order["items"] as List).length;
     }
 
-    // ⏰ ดึงและฟอร์แมตเวลาที่ลูกค้าสั่ง (เอาเฉพาะ ชม. กับ นาที)
     String orderTimeText = "--:--";
     if (orderModel.orderdate != null) {
       final DateTime dateTime = orderModel.orderdate!;
@@ -345,6 +308,11 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
       final String minute = dateTime.minute.toString().padLeft(2, '0');
       orderTimeText = "$hour:$minute น.";
     }
+
+    // 🎯 กำหนดคำที่ปุ่มให้ตรงกับบริบทของแท็บ
+    String buttonText = _selectedTabIndex == 0
+        ? "ดูรายละเอียดเพื่อรับงาน"
+        : "ดูเส้นทาง / สถานะจัดส่ง";
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -469,13 +437,10 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
               ),
             ),
             const SizedBox(height: 12),
-
-            // 📦 ส่วนแสดงจำนวนรายการ และ เวลาที่สั่งซื้อด้านล่างรายการ
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment
-                    .spaceBetween, // ดันยอดรายการไปซ้าย เวลาไปขวา
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Row(
                     children: [
@@ -495,7 +460,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
                       ),
                     ],
                   ),
-                  // 🕒 บล็อกเวลาที่เพิ่มเข้ามาใหม่ อยู่ข้างล่างรายการ
                   Row(
                     children: [
                       Icon(
@@ -524,9 +488,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => _openOrderDetail(
-                    orderModel,
-                  ), // ← เปลี่ยนจากรับตรงๆ เป็นเปิดดูรายละเอียดก่อน
+                  onPressed: () => _openOrderDetail(orderModel),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF64FF20),
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -535,9 +497,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
                     ),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    "ดูรายละเอียด", // ← เปลี่ยนข้อความ เพราะกดแล้วไม่ได้รับเลยทันที
-                    style: TextStyle(
+                  child: Text(
+                    buttonText,
+                    style: const TextStyle(
                       color: Colors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -700,17 +662,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
                     ],
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildTab("งานใหม่", 0),
-                      _buildTab("รายการจัดส่ง", 1),
-                      _buildTab("จัดส่งสำเร็จ", 2),
-                    ],
-                  ),
-                ),
+                _buildTabBar(),
                 if (_isReady && !_isLoadingStatus)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
@@ -736,7 +688,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
                       : _realOrders.isEmpty
                       ? _buildEmptyState()
                       : RefreshIndicator(
-                          onRefresh: _fetchWaitingOrders,
+                          onRefresh: _fetchOrders,
                           color: Colors.orange,
                           child: ListView.builder(
                             padding: const EdgeInsets.symmetric(
@@ -775,8 +727,14 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
   }
 
   Widget _buildEmptyState() {
+    String emptyMessage = _selectedTabIndex == 0
+        ? "ยังไม่มีออเดอร์ใหม่ในระบบขณะนี้"
+        : _selectedTabIndex == 1
+        ? "ยังไม่มีรายการที่กำลังจัดส่ง"
+        : "ยังไม่มีรายการที่จัดส่งสำเร็จ";
+
     return RefreshIndicator(
-      onRefresh: _fetchWaitingOrders,
+      onRefresh: _fetchOrders,
       color: Colors.orange,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -788,10 +746,10 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder> {
             color: Colors.orange.withOpacity(0.4),
           ),
           const SizedBox(height: 16),
-          const Center(
+          Center(
             child: Text(
-              "ยังไม่มีออเดอร์ใหม่ในระบบขณะนี้",
-              style: TextStyle(
+              emptyMessage,
+              style: const TextStyle(
                 color: Colors.grey,
                 fontSize: 16,
                 fontWeight: FontWeight.bold,

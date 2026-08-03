@@ -14,7 +14,18 @@ public interface OrderService {
 
     List<Order> getOrdersByMember(String username);
 
+    //---- Rider ----
+
     List<Order> getWaitingOrders();
 
+    List<Order> getActiveOrdersByRider(String username);
+
     boolean doConfirmOrderByRider(String studentId, int orderId);
+
+    //---- Restaurant ----
+    List<Order> getWaitingOrdersByRestaurant(String username);
+
+    boolean doConfirmOrderByRestaurant(int orderId);
+
+    List<Order> getActiveOrdersByRestaurant(String username);
 }
