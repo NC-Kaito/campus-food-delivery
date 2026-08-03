@@ -17,7 +17,7 @@ import 'package:flutter_app/features/restaurant/menu_to_addon.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/review_restaurant.dart';
 import 'package:flutter_app/features/restaurant/sales_restaurant.dart';
-import 'package:flutter_app/features/restaurant/list_order_restaurant.dart'; // 🎯 นำเข้าหน้า ListOrderRestaurant
+import 'package:flutter_app/features/restaurant/list_order_restaurant.dart'; // 🎯 นำเข้า ListOrderRestaurant
 import 'package:flutter_app/global_data.dart';
 
 class HomeRestaurant extends StatefulWidget {
@@ -36,7 +36,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   static const Color _textDark = Color(0xFF1E1E24);
   static const Color _textMuted = Color(0xFF8A8D93);
   static const Color _danger = Color(0xFFE53935);
-  static const Color _linkBlue = Color(0xFF2F80ED);
   static const Color _reviewYellow = Color(0xFFF5B301);
 
   final RestaurantService restaurantService = RestaurantService();
@@ -228,9 +227,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         categoryMenus[typeMenuId]![index].status = !newStatus;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("ไม่สามารถอัปเดตสถานะได้")),
-        );
+        _showErrorSnackBar("ไม่สามารถอัปเดตสถานะได้");
       }
     }
   }
@@ -241,6 +238,29 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       MaterialPageRoute(builder: (_) => EditMenu(menuModel: menu)),
     );
     await loadMenusByType(typeMenuId);
+  }
+
+  Future<void> _goToEditAddon(_AddonGroupAggregate agg) async {
+    final isMultipleChoice = agg.group.is_multiple_choice ?? false;
+    final items = agg.items.values.toList();
+
+    final updated = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EditAddon(
+          groupId: agg.group.addonGroupId,
+          groupName: agg.group.addonGroupName,
+          isMultipleChoice: isMultipleChoice,
+          groupStatus: agg.group.status ?? true,
+          details: items,
+        ),
+      ),
+    );
+
+    if (updated == true) {
+      _addonsLoaded = false;
+      await _loadAddonOptions();
+    }
   }
 
   Future<void> goToMenuAddon(int typeMenuId, MenuModel menu) async {
@@ -295,13 +315,13 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   String _addonCountLabel(MenuModel menu) {
     final int? menuId = menu.menuId;
     final int count = menuId != null ? (_menuAddonGroupCounts[menuId] ?? 0) : 0;
-    return count > 0 ? "มี $count กลุ่มตัวเลือกเสริม" : "ไม่มีตัวเลือกเสริม";
+    return count > 0 ? "มี $count ตัวเลือกเสริม" : "ไม่มีตัวเลือกเสริม";
   }
 
   Future<void> confirmDeleteMenu(int typeMenuId, MenuModel menu) async {
     final confirmed = await _showConfirmDialog(
       title: "ลบเมนูนี้?",
-      message: "ต้องการลบ \"${menu.menuName ?? ''}\" ใช่หรือไม่",
+      message: 'ต้องการลบ "${menu.menuName ?? ''}" ใช่หรือไม่',
     );
 
     if (confirmed != true || menu.menuId == null) return;
@@ -309,11 +329,10 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     try {
       await menuService.deleteMenu({'menuid': menu.menuId});
       await loadMenusByType(typeMenuId);
+      _showSuccessSnackBar("ลบเมนูสำเร็จ");
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("ไม่สามารถลบเมนูได้")));
+        _showErrorSnackBar("ไม่สามารถลบเมนูได้");
       }
     }
   }
@@ -322,10 +341,12 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final groupId = agg.group.addonGroupId;
     if (groupId == null) return;
 
+    int usedCount = await _addonService.getMenuCountUsingGroup(groupId);
+
     final confirmed = await _showConfirmDialog(
-      title: "ลบตัวเลือกเสริมกลุ่มนี้?",
-      message:
-          "ต้องการลบกลุ่ม \"${agg.group.addonGroupName ?? ''}\" ใช่หรือไม่",
+      title: "ยืนยันการลบตัวเลือกเสริม",
+      itemName: agg.group.addonGroupName ?? '',
+      usedCount: usedCount,
     );
 
     if (confirmed != true) return;
@@ -335,23 +356,83 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       if (success) {
         _addonsLoaded = false;
         await _loadAddonOptions();
+
+        if (mounted) {
+          setState(() {
+            _menuAddonGroupCounts.clear();
+          });
+          await loadRestaurantData();
+        }
+
+        if (mounted) {
+          _showSuccessSnackBar("ลบกลุ่มตัวเลือกเสริมสำเร็จ");
+        }
       } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("ไม่สามารถลบตัวเลือกเสริมได้")),
-        );
+        _showErrorSnackBar("ไม่สามารถลบตัวเลือกเสริมได้");
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("$e".replaceFirst('Exception: ', ''))),
-        );
+        _showErrorSnackBar("$e".replaceFirst('Exception: ', ''));
       }
     }
   }
 
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(
+              Icons.check_circle_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: _primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        duration: const Duration(seconds: 3),
+        elevation: 4,
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: _danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      ),
+    );
+  }
+
   Future<bool?> _showConfirmDialog({
     required String title,
-    required String message,
+    String? message,
+    String? itemName,
+    int usedCount = 0,
   }) {
     return showDialog<bool>(
       context: context,
@@ -387,11 +468,35 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                 ),
               ),
               const SizedBox(height: 8),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: _textMuted),
-              ),
+
+              if (usedCount > 0)
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      const TextSpan(text: "มี "),
+                      TextSpan(
+                        text: "$usedCount รายการ",
+                        style: const TextStyle(
+                          color: _accent,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const TextSpan(
+                        text:
+                            " ที่ใช้ตัวเลือกนี้อยู่\nคุณต้องการลบทิ้งใช่หรือไม่?",
+                      ),
+                    ],
+                  ),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: _textMuted),
+                )
+              else
+                Text(
+                  message ?? 'ต้องการลบ "$itemName" ใช่หรือไม่',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 14, color: _textMuted),
+                ),
+
               const SizedBox(height: 22),
               Row(
                 children: [
@@ -470,7 +575,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
           final gid = agg.group.addonGroupId;
           if (gid != null) {
             _groupEnabled.putIfAbsent(gid, () => agg.group.status ?? true);
-            _groupExpanded.putIfAbsent(gid, () => false);
+            _groupExpanded[gid] = false;
           }
           for (final item in agg.items.values) {
             final key =
@@ -485,16 +590,17 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     } catch (e) {
       if (mounted) {
         setState(() => _isLoadingAddons = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("โหลดตัวเลือกเสริมไม่สำเร็จ: $e")),
-        );
+        _showErrorSnackBar("โหลดตัวเลือกเสริมไม่สำเร็จ: $e");
       }
     }
   }
 
   Future<void> _onSelectMainTab(int index) async {
     if (_mainTabIndex == index) return;
-    setState(() => _mainTabIndex = index);
+    setState(() {
+      _mainTabIndex = index;
+      _groupExpanded.updateAll((key, value) => false);
+    });
     if (index == 1 && !_addonsLoaded) {
       while (categoryLoading.values.any((v) => v == true)) {
         await Future.delayed(const Duration(milliseconds: 200));
@@ -605,11 +711,12 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         const SizedBox(height: 16),
 
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: _buildQuickActionsRow(),
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: _buildQuickActionsRow(), // 🎯 แถบ 4 ปุ่มด้านบน
                         ),
                         const SizedBox(height: 16),
 
+                        // แสดง TabBar เฉพาะตอนอยู่หน้าเมนู
                         if (_mainTabIndex == 0)
                           Container(
                             decoration: const BoxDecoration(
@@ -645,6 +752,9 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                 horizontal: 50,
                                 vertical: 10,
                               ),
+                              onTap: (index) {
+                                setState(() {});
+                              },
                               tabs: typeMenus.isEmpty
                                   ? [const Tab(text: "ไม่มีประเภท")]
                                   : typeMenus
@@ -653,21 +763,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                               Tab(text: type.typemenuName),
                                         )
                                         .toList(),
-                            ),
-                          )
-                        else
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-                            child: Align(
-                              alignment: Alignment.centerRight,
-                              child: Text(
-                                "${_addonGroups.length} รายการ",
-                                style: const TextStyle(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  color: _textMuted,
-                                ),
-                              ),
                             ),
                           ),
                       ],
@@ -711,27 +806,26 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           );
                         }
 
+                        // ส่วนการแสดงเมนูบนพื้นหลังสีเทา
                         return RefreshIndicator(
                           color: _primary,
                           onRefresh: () => loadMenusByType(typeId),
                           child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
                             children: [
                               Padding(
                                 padding: const EdgeInsets.fromLTRB(
                                   16,
-                                  12,
                                   16,
-                                  0,
+                                  16,
+                                  4,
                                 ),
-                                child: Align(
-                                  alignment: Alignment.centerRight,
-                                  child: Text(
-                                    "${currentMenus.length} รายการ",
-                                    style: const TextStyle(
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: _textMuted,
-                                    ),
+                                child: Text(
+                                  "${currentMenus.length} รายการ",
+                                  style: const TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: _textMuted,
                                   ),
                                 ),
                               ),
@@ -743,6 +837,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                     16,
                                     90,
                                   ),
+                                  physics:
+                                      const AlwaysScrollableScrollPhysics(),
                                   itemCount: currentMenus.length,
                                   separatorBuilder: (_, __) =>
                                       const SizedBox(height: 12),
@@ -849,115 +945,113 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final bool shouldShowPrice = !isRiceCurry || (storedPrice != 0.0);
     final double displayPrice = isRiceCurry ? (storedPrice + 5.0) : storedPrice;
 
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (context) => EditMenu(menuModel: menu)),
-        );
-      },
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isAvailable ? Colors.white : const Color(0xFFEDEDED),
-          borderRadius: BorderRadius.circular(18),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isAvailable ? Colors.white : const Color(0xFFEDEDED),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              width: 84,
+              height: 84,
+              child: finalMenuImgUrl.isNotEmpty
+                  ? Image.network(
+                      Uri.encodeFull(finalMenuImgUrl),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => _placeholderImage(),
+                    )
+                  : _placeholderImage(),
             ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: SizedBox(
-                width: 84,
-                height: 84,
-                child: finalMenuImgUrl.isNotEmpty
-                    ? Image.network(
-                        Uri.encodeFull(finalMenuImgUrl),
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _placeholderImage(),
-                      )
-                    : _placeholderImage(),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          menu.menuName ?? "-",
-                          style: const TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
-                            color: _textDark,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        menu.menuName ?? "-",
+                        style: const TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w700,
+                          color: _textDark,
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildInlineStatusButton(
-                        isAvailable: isAvailable,
-                        onTap: () => toggleStatus(typeId, index),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-
-                  if (shouldShowPrice)
-                    Text(
-                      "ราคา ${displayPrice.toStringAsFixed(0)} บาท",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _primary,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    _buildInlineStatusButton(
+                      isAvailable: isAvailable,
+                      onTap: () => toggleStatus(typeId, index),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
 
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (!isRiceCurry)
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: () => goToMenuAddon(typeId, menu),
-                            child: Text(
-                              _addonCountLabel(menu),
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: Colors.blueAccent,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        )
-                      else
-                        const Spacer(),
-
-                      const SizedBox(width: 4),
-                      _buildIconAction(
-                        icon: Icons.delete_outline_rounded,
-                        color: _danger,
-                        onTap: () => confirmDeleteMenu(typeId, menu),
-                      ),
-                    ],
+                if (shouldShowPrice)
+                  Text(
+                    "ราคา ${displayPrice.toStringAsFixed(0)} บาท",
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: _primary,
+                    ),
                   ),
-                ],
-              ),
+
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    if (!isRiceCurry)
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => goToMenuAddon(typeId, menu),
+                          child: Text(
+                            _addonCountLabel(menu),
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                    else
+                      const Spacer(),
+
+                    const SizedBox(width: 4),
+                    _buildIconAction(
+                      icon: Icons.edit_rounded,
+                      color: _accent,
+                      onTap: () => goToEditMenu(typeId, menu),
+                    ),
+                    const SizedBox(width: 16),
+                    _buildIconAction(
+                      icon: Icons.delete_outline_rounded,
+                      color: _danger,
+                      onTap: () => confirmDeleteMenu(typeId, menu),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -977,52 +1071,47 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // 🎯 ปรับแต่งแถบปุ่ม Quick Actions ให้มีปุ่ม "คำสั่งซื้อ" (เปิดไปหน้า ListOrderRestaurant)
+  // 🎯 เพิ่มปุ่ม 'ออเดอร์' ให้ครบ 4 ปุ่ม
   Widget _buildQuickActionsRow() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          _buildQuickAction(
+    return Row(
+      children: [
+        Expanded(
+          child: _buildQuickAction(
             icon: Icons.receipt_long_rounded,
             label: "เมนู",
             iconColor: _mainTabIndex == 0 ? _primary : _textDark,
             active: _mainTabIndex == 0,
             onTap: () => _onSelectMainTab(0),
           ),
-          const SizedBox(width: 8),
-          _buildQuickAction(
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildQuickAction(
             icon: Icons.playlist_add_check_rounded,
-            label: "ตัวเลือกเสริม",
+            label: "ตัวเลือก",
             iconColor: _mainTabIndex == 1 ? _primary : _textDark,
             active: _mainTabIndex == 1,
             onTap: () => _onSelectMainTab(1),
           ),
-          const SizedBox(width: 8),
-          // 🎯 ปุ่มคำสั่งซื้อที่เพิ่มเข้ามาใหม่
-          _buildQuickAction(
-            icon: Icons.shopping_bag_outlined,
-            label: "คำสั่งซื้อ",
-            iconColor: _primary,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildQuickAction(
+            icon: Icons.list_alt_rounded, // ไอคอนใหม่
+            label: "ออเดอร์",
+            iconColor: _accent,
             active: false,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const ListOrderRestaurant()),
+              MaterialPageRoute(
+                builder: (_) => const ListOrderRestaurant(),
+              ), // 🎯 โยงไปหน้า ListOrder
             ),
           ),
-          const SizedBox(width: 8),
-          _buildQuickAction(
-            icon: Icons.attach_money_rounded,
-            label: "ยอดขาย",
-            iconColor: _primary,
-            active: false,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const SalesRestaurant()),
-            ),
-          ),
-          const SizedBox(width: 8),
-          _buildQuickAction(
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildQuickAction(
             icon: Icons.star_rounded,
             label: "รีวิว",
             iconColor: _reviewYellow,
@@ -1032,11 +1121,12 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               MaterialPageRoute(builder: (_) => const ReviewRestaurant()),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
+  // 🎯 ย่อขนาด Text ลงนิดนึงเพื่อให้คำไม่ตกบรรทัด
   Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -1047,8 +1137,10 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 80, // กำหนดความกว้างของปุ่มแต่ละอันให้เท่ากัน
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        padding: const EdgeInsets.symmetric(
+          vertical: 10,
+          horizontal: 2,
+        ), // ลด Padding
         decoration: BoxDecoration(
           color: active ? _primary.withOpacity(0.08) : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -1066,9 +1158,9 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               label,
               textAlign: TextAlign.center,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 10.5, // 🎯 ลดขนาดฟอนต์ให้พอดี 4 ปุ่ม
                 fontWeight: FontWeight.w700,
                 color: active ? _primary : _textDark,
               ),
@@ -1093,19 +1185,39 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       );
     }
 
+    // ส่วนการแสดงตัวเลือกเสริมบนพื้นหลังสีเทาแบบเดียวกับเมนูเป๊ะๆ ครับ
     return RefreshIndicator(
       color: _primary,
       onRefresh: () {
         _addonsLoaded = false;
         return _loadAddonOptions();
       },
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
-        itemCount: _addonGroups.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          return _buildAddonGroupCard(_addonGroups[index]);
-        },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: Text(
+              "${_addonGroups.length} รายการ",
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+                color: _textMuted,
+              ),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: _addonGroups.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                return _buildAddonGroupCard(_addonGroups[index]);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1170,29 +1282,16 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final int groupId = agg.group.addonGroupId ?? -1;
     final bool enabled = _groupEnabled[groupId] ?? true;
     final bool expanded = _groupExpanded[groupId] ?? false;
-
     final bool isMultipleChoice = agg.group.is_multiple_choice ?? false;
     final items = agg.items.values.toList();
 
     return GestureDetector(
-      onTap: () async {
-        final updated = await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => EditAddon(
-              groupId: agg.group.addonGroupId,
-              groupName: agg.group.addonGroupName,
-              isMultipleChoice: isMultipleChoice,
-              groupStatus: agg.group.status ?? true,
-              details: items,
-            ),
-          ),
-        );
-
-        if (updated == true) {
-          _addonsLoaded = false;
-          await _loadAddonOptions();
-        }
+      onTap: () {
+        setState(() {
+          bool wasExpanded = expanded;
+          _groupExpanded.updateAll((key, value) => false);
+          _groupExpanded[groupId] = !wasExpanded;
+        });
       },
       child: Container(
         decoration: BoxDecoration(
@@ -1210,57 +1309,70 @@ class _HomeRestaurantState extends State<HomeRestaurant>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
-              child: Row(
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w700,
-                            color: enabled ? _textDark : Colors.black38,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          "${items.length} ตัวเลือกย่อย",
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _textMuted,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        _buildAddonMetaBadge(
-                          icon: isMultipleChoice
-                              ? Icons.check_box_outlined
-                              : Icons.radio_button_checked_rounded,
-                          label: isMultipleChoice
-                              ? "เลือกได้หลายอย่าง"
-                              : "เลือกได้ 1 อย่าง",
-                          color: isMultipleChoice
-                              ? _linkBlue
-                              : Colors.orange[800]!,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w700,
+                                color: enabled ? _textDark : Colors.black38,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              "${items.length} ตัวเลือกย่อย",
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                color: Colors.blueAccent,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                       _buildCircleExpandButton(
                         expanded: expanded,
-                        onTap: () =>
-                            setState(() => _groupExpanded[groupId] = !expanded),
+                        onTap: () {
+                          setState(() {
+                            bool wasExpanded = expanded;
+                            _groupExpanded.updateAll((key, value) => false);
+                            _groupExpanded[groupId] = !wasExpanded;
+                          });
+                        },
                       ),
-                      const SizedBox(height: 6),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  Row(
+                    children: [
+                      _buildAddonMetaBadge(
+                        icon: isMultipleChoice
+                            ? Icons.check_box_outlined
+                            : Icons.radio_button_checked_rounded,
+                        label: isMultipleChoice
+                            ? "เลือกได้หลายอย่าง"
+                            : "เลือกได้ 1 อย่าง",
+                        color: _accent,
+                      ),
+                      const Spacer(),
+                      _buildIconAction(
+                        icon: Icons.edit_rounded,
+                        color: _accent,
+                        onTap: () => _goToEditAddon(agg),
+                      ),
+                      const SizedBox(width: 16),
                       _buildIconAction(
                         icon: Icons.delete_outline_rounded,
                         color: _danger,

@@ -223,10 +223,12 @@ class _AddAddonState extends State<AddAddon> {
         details: selectedAddons.map((addon) {
           return AddonDetailRequestModel(
             addonname: addon.nameController.text.trim(),
+            // 🎯 หากไม่ได้กรอกราคา หรือเป็นค่าว่าง จะแปลงเป็น 0.0 ทันที
             addonprice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
             status: true,
-            allowqtystatus: addon.allowqtystatus,
+            allowqtystatus: addon
+                .allowqtystatus, // คงค่า false ไว้ตามเดิมเพื่อไม่ให้กระทบ API
           );
         }).toList(),
       );
@@ -456,7 +458,7 @@ class _AddAddonState extends State<AddAddon> {
 
           // ─── ช่องชื่อตัวเลือก ───
           Expanded(
-            flex: 3,
+            flex: 4,
             child: CompositedTransformTarget(
               link: _layerLinks[addon]!,
               child: TextFormField(
@@ -513,14 +515,18 @@ class _AddAddonState extends State<AddAddon> {
 
           // ─── ช่องราคา ───
           Expanded(
-            flex: 2,
+            flex: 3,
             child: TextFormField(
               controller: addon.priceController,
               keyboardType: TextInputType.number,
               validator: (value) {
-                if (value == null || value.trim().isEmpty) return "กรอกราคา";
-                if (double.tryParse(value.trim()) == null)
-                  return "ตัวเลขเท่านั้น";
+                // 🎯 เช็กเฉพาะเวลาที่ผู้ใช้พิมพ์ข้อความลงมา ถ้าพิมพ์มาต้องเป็นตัวเลขเท่านั้น
+                // ถ้าเป็นค่าว่าง ก็ปล่อยผ่านได้เลย ไม่ต้องแจ้งเตือนใดๆ ครับ
+                if (value != null && value.trim().isNotEmpty) {
+                  if (double.tryParse(value.trim()) == null) {
+                    return "ตัวเลขเท่านั้น";
+                  }
+                }
                 return null;
               },
               style: const TextStyle(fontSize: 14),
@@ -574,52 +580,7 @@ class _AddAddonState extends State<AddAddon> {
           ),
           const SizedBox(width: 6),
 
-          // ─── ปุ่ม +จำนวน ───
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: () {
-                setState(() {
-                  addon.allowqtystatus = !addon.allowqtystatus;
-                });
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: addon.allowqtystatus
-                      ? _AddonTheme.accent.withOpacity(0.12)
-                      : _AddonTheme.surface,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: addon.allowqtystatus
-                        ? _AddonTheme.accent
-                        : Colors.transparent,
-                    width: 1.4,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      addon.allowqtystatus
-                          ? Icons.check_box_rounded
-                          : Icons.check_box_outline_blank_rounded,
-                      size: 18,
-                      color: addon.allowqtystatus
-                          ? _AddonTheme.accent
-                          : _AddonTheme.textSecondary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-
-          // ─── ปุ่มลบ ───
+          // ─── ปุ่มลบ (รูปถังขยะ) ───
           Material(
             color: Colors.transparent,
             child: InkWell(
@@ -636,8 +597,8 @@ class _AddAddonState extends State<AddAddon> {
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(
-                  Icons.close_rounded,
-                  size: 17,
+                  Icons.delete_outline_rounded,
+                  size: 20,
                   color: canDelete
                       ? _AddonTheme.danger
                       : _AddonTheme.textSecondary.withOpacity(0.35),
@@ -785,7 +746,7 @@ class _AddAddonState extends State<AddAddon> {
                         children: const [
                           SizedBox(width: 36),
                           Expanded(
-                            flex: 3,
+                            flex: 4,
                             child: Text(
                               "ชื่อตัวเลือก",
                               style: TextStyle(
@@ -795,9 +756,9 @@ class _AddAddonState extends State<AddAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 45),
+                          SizedBox(width: 8),
                           Expanded(
-                            flex: 2,
+                            flex: 3,
                             child: Text(
                               "ราคา",
                               style: TextStyle(
@@ -807,18 +768,7 @@ class _AddAddonState extends State<AddAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              "เพิ่มจำนวน",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color.fromARGB(255, 0, 0, 0),
-                              ),
-                            ),
-                          ),
+                          SizedBox(width: 40), // พื้นที่เว้นไว้ให้ปุ่มถังขยะ
                         ],
                       ),
                     ),

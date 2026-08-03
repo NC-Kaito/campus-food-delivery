@@ -4,6 +4,7 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/features/restaurant/login_restaurant.dart';
 import 'package:flutter_app/features/restaurant/update_register.dart';
+import 'package:flutter_app/features/restaurant/account_management.dart';
 
 class WaitApprove extends StatefulWidget {
   final String verificationStatus; // รับค่า 'wait' หรือ 'false'
@@ -41,6 +42,119 @@ class _WaitApproveState extends State<WaitApprove> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7F6), // พื้นหลังสีสว่างสบายตา
+      // ─── Custom Navbar แบบลดทอน (มีแค่ Home และ Profile) ───
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight + 8),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Color(0x11000000),
+                blurRadius: 16,
+                offset: Offset(0, 6),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: SizedBox(
+                height: kToolbarHeight + 8,
+                child: Row(
+                  children: [
+                    // ปุ่ม Home
+                    Material(
+                      color: const Color(0xFFFFF1DE), // orangeSoft
+                      borderRadius: BorderRadius.circular(12),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        splashColor: const Color(0xFFFF8C00).withOpacity(0.18),
+                        highlightColor: const Color(
+                          0xFFFF8C00,
+                        ).withOpacity(0.08),
+                        onTap: () => Navigator.popUntil(
+                          context,
+                          (route) => route.isFirst,
+                        ),
+                        child: Container(
+                          width: 40,
+                          height: 40,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFFFF8C00).withOpacity(0.22),
+                              width: 1,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.home_rounded,
+                            color: Color(0xFFFF8C00), // orange
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Text(
+                        '',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1F1F1F),
+                          letterSpacing: 0.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // ปุ่ม Profile (แสดงแค่ Icon)
+                    GestureDetector(
+                      onTap: () {},
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        padding: const EdgeInsets.all(2),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFFFF8C00),
+                              const Color(0xFFFF8C00).withOpacity(0.6),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFF8C00).withOpacity(0.28),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Container(
+                            color: const Color(0xFFFFF1DE),
+                            child: const Icon(
+                              Icons.person_outline_rounded,
+                              color: Color(0xFFFF8C00),
+                              size: 18,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -175,15 +289,10 @@ class _WaitApproveState extends State<WaitApprove> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            isRejected
-                                ? Icons.edit_document
-                                : Icons.remove_red_eye_rounded,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
                           Text(
-                            isRejected ? 'แก้ไขข้อมูล' : 'ดูข้อมูลที่ส่งไป',
+                            isRejected
+                                ? 'ดูข้อมูลการสมัคร'
+                                : 'ดูข้อมูลการสมัคร',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -195,7 +304,7 @@ class _WaitApproveState extends State<WaitApprove> {
                   ),
                   const SizedBox(height: 16),
 
-                  // ─── ปุ่ม ออกจากระบบ (Text Button เนียนๆ) ───
+                  // ─── ปุ่ม ออกจากระบบ ───
                   SizedBox(
                     width: double.infinity,
                     height: 54,
@@ -258,7 +367,7 @@ class _WaitApproveState extends State<WaitApprove> {
             border: Border.all(color: Colors.red.shade100),
           ),
           child: Text(
-            widget.notApproveDetail ?? 'ไม่ระบุสาเหตุ โปรดติดต่อแอดมิน',
+            widget.notApproveDetail ?? 'ไม่ระบุสาเหตุ',
             style: const TextStyle(
               fontSize: 15,
               color: Colors.black87,

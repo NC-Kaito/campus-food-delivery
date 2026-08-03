@@ -38,4 +38,14 @@ public interface MenuaddongroupRepository extends JpaRepository<Menuaddongroup, 
     @Query("DELETE FROM Menuaddongroup mg WHERE :menu MEMBER OF mg.menus")
     void deleteByMenu(@Param("menu") Menu menu);
 
+
+    // เพิ่มโค้ด 2 ส่วนนี้ต่อท้ายใน MenuaddongroupRepository.java
+    @Query("SELECT COUNT(m) FROM Menuaddongroup mg JOIN mg.menus m WHERE mg.addongroupid = :groupId")
+    int countMenusByGroupId(@Param("groupId") Integer groupId);
+
+    // 🎯 แก้ไขชื่อคอลัมน์จาก addongroupid เป็น addongroup_id ครับ
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM menu_addongroups WHERE addongroup_id = :groupId", nativeQuery = true)
+    void removeAllMenuLinks(@Param("groupId") Integer groupId);
 }

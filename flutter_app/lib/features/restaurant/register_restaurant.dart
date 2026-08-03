@@ -1,5 +1,4 @@
 // features/restaurant/register_restaurant.dart
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
@@ -7,8 +6,6 @@ import 'package:flutter_app/features/member/test_map.dart';
 import 'package:flutter_app/features/restaurant/register_owner_info.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
-
 import 'dart:io';
 
 class RegisterRestaurant extends StatefulWidget {
@@ -37,21 +34,12 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   String? _typeError;
   bool _obscureText = true;
 
-  late List<RestaurantOpeningHourModel> _openingHours;
-  String? _openingHoursError;
-
-  // ตัวแปรสำหรับการเพิ่มเวลา (Time Slot Generator)
-  List<RestaurantDayOfWeek> _tempSelectedDays = [];
-  TimeOfDay _slotOpenTime = const TimeOfDay(hour: 8, minute: 0);
-  TimeOfDay _slotCloseTime = const TimeOfDay(hour: 15, minute: 0);
-
+  final GlobalKey _typeFieldKey = GlobalKey();
   final GlobalKey _usernameKey = GlobalKey();
   final GlobalKey _passwordKey = GlobalKey();
   final GlobalKey _restaurantNameKey = GlobalKey();
-  final GlobalKey _typeFieldKey = GlobalKey();
   final GlobalKey _locationKey = GlobalKey();
   final GlobalKey _imageKey = GlobalKey();
-  final GlobalKey _openingHoursKey = GlobalKey();
 
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
@@ -65,6 +53,13 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   final ImagePicker restaurantImage = ImagePicker();
   late final TextEditingController typeRestaurantController;
 
+  List<TypeRestaurantModel> typeList = [];
+  int? _selectedTypeId;
+  String? _selectedType;
+  String? _selectedLocation;
+  File? _selectedImage;
+  File? _selectedOwnerImage;
+
   @override
   void initState() {
     super.initState();
@@ -72,17 +67,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
     passwordController = TextEditingController();
     restaurantNameController = TextEditingController();
     typeRestaurantController = TextEditingController();
-
-    // เริ่มต้นให้ทุกวันสถานะเป็น "closed = true" ไว้ก่อน
-    _openingHours = RestaurantDayOfWeek.values.map((day) {
-      return RestaurantOpeningHourModel(
-        dayOfWeek: day,
-        opentime: const TimeOfDay(hour: 8, minute: 0),
-        closetime: const TimeOfDay(hour: 18, minute: 0),
-        open: true,
-      );
-    }).toList();
-
     fetchTypes();
   }
 
@@ -95,13 +79,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
     super.dispose();
   }
 
-  List<TypeRestaurantModel> typeList = [];
-  int? _selectedTypeId;
-  String? _selectedType;
-  String? _selectedLocation;
-  File? _selectedImage;
-  File? _selectedOwnerImage;
-
   Future<void> fetchTypes() async {
     try {
       final types = await typeRestaurantService.getAllTypeRestaurant();
@@ -109,247 +86,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
         typeList = types;
       });
     } catch (e) {
-      print("เกิดข้อผิดพลาด ไม่สามารถโหลดข้อมูลประเภทร้านค้าได้");
+      debugPrint("เกิดข้อผิดพลาด ไม่สามารถโหลดข้อมูลประเภทร้านค้าได้");
     }
-  }
-
-  void _addTimeSlot() {
-    if (_tempSelectedDays.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("กรุณาเลือกวันอย่างน้อย 1 วัน"),
-          backgroundColor: _danger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    List<String> duplicateDayNames = [];
-    for (var day in _tempSelectedDays) {
-      final existingHour = _openingHours.firstWhere((h) => h.dayOfWeek == day);
-      if (!existingHour.open) {
-        duplicateDayNames.add(day.labelTh);
-      }
-    }
-
-    if (duplicateDayNames.isNotEmpty) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: _accent),
-              SizedBox(width: 8),
-              Text(
-                "วันซ้ำกัน",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-              ),
-            ],
-          ),
-          content: Text(
-            "ไม่สามารถเพิ่มได้เนื่องจาก วัน${duplicateDayNames.join(', วัน')} มีการตั้งเวลาทำการอยู่แล้ว หากต้องการเปลี่ยนเวลา กรุณาลบรายการเดิมออกก่อน",
-            style: const TextStyle(color: _textDark, fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                "รับทราบ",
-                style: TextStyle(color: _primary, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      for (var day in _tempSelectedDays) {
-        final index = _openingHours.indexWhere((h) => h.dayOfWeek == day);
-        if (index != -1) {
-          _openingHours[index] = _openingHours[index].copyWith(
-            opentime: _slotOpenTime,
-            closetime: _slotCloseTime,
-            closed: false,
-          );
-        }
-      }
-      _tempSelectedDays.clear();
-      _openingHoursError = null;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text("เพิ่มช่วงเวลาสำเร็จ"),
-        backgroundColor: _primary,
-        behavior: SnackBarBehavior.floating,
-        duration: Duration(seconds: 1),
-      ),
-    );
-  }
-
-  // 🎯 ฟังก์ชันลบช่วงเวลาแบบกลุ่มเหมือนหน้า Profile
-  void _removeGroupedTimeSlot(List<RestaurantOpeningHourModel> hoursInGroup) {
-    setState(() {
-      for (var item in hoursInGroup) {
-        final index = _openingHours.indexWhere(
-          (h) => h.dayOfWeek == item.dayOfWeek,
-        );
-        if (index != -1) {
-          _openingHours[index] = _openingHours[index].copyWith(closed: true);
-        }
-      }
-    });
-  }
-
-  void _selectTimeScrollWheel(
-    BuildContext context, {
-    required bool isOpenTime,
-  }) {
-    final initialTime = isOpenTime ? _slotOpenTime : _slotCloseTime;
-    Duration tempDuration = Duration(
-      hours: initialTime.hour,
-      minutes: initialTime.minute,
-    );
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-      ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: SizedBox(
-            height: 380,
-            child: Column(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 10),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 14,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: Text(
-                          "ยกเลิก",
-                          style: TextStyle(
-                            color: _textMuted,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        isOpenTime ? "เลือกเวลาเปิดทำการ" : "เลือกเวลาปิดทำการ",
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: _textDark,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {
-                          setState(() {
-                            final newTime = TimeOfDay(
-                              hour: tempDuration.inHours,
-                              minute: tempDuration.inMinutes % 60,
-                            );
-                            if (isOpenTime) {
-                              _slotOpenTime = newTime;
-                            } else {
-                              _slotCloseTime = newTime;
-                            }
-                          });
-                          Navigator.pop(context);
-                        },
-                        child: const Text(
-                          "ตกลง",
-                          style: TextStyle(
-                            color: _primary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1, thickness: 1),
-                Expanded(
-                  child: Center(
-                    child: Transform.scale(
-                      scale: 1.3,
-                      child: CupertinoTimerPicker(
-                        mode: CupertinoTimerPickerMode.hm,
-                        initialTimerDuration: tempDuration,
-                        onTimerDurationChanged: (Duration newDuration) {
-                          tempDuration = newDuration;
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  String _getShortThDayName(RestaurantDayOfWeek day) {
-    switch (day) {
-      case RestaurantDayOfWeek.monday:
-        return "จ.";
-      case RestaurantDayOfWeek.tuesday:
-        return "อ.";
-      case RestaurantDayOfWeek.wednesday:
-        return "พ.";
-      case RestaurantDayOfWeek.thursday:
-        return "พฤ.";
-      case RestaurantDayOfWeek.friday:
-        return "ศ.";
-      case RestaurantDayOfWeek.saturday:
-        return "ส.";
-      case RestaurantDayOfWeek.sunday:
-        return "อา.";
-    }
-  }
-
-  // 🎯 ฟังก์ชันวิเคราะห์จับกลุ่มข้อมูลเวลาที่เหมือนกันมารวมไว้แถวเดียวกัน
-  List<MapEntry<String, List<RestaurantOpeningHourModel>>>
-  _getGroupedOpeningHours() {
-    final Map<String, List<RestaurantOpeningHourModel>> groups = {};
-
-    for (var hour in _openingHours) {
-      if (hour.open) continue;
-
-      final String timeKey =
-          "${hour.opentime.hour}:${hour.opentime.minute}-${hour.closetime.hour}:${hour.closetime.minute}";
-      if (!groups.containsKey(timeKey)) {
-        groups[timeKey] = [];
-      }
-      groups[timeKey]!.add(hour);
-    }
-    return groups.entries.toList();
   }
 
   Future<void> pickImage() async {
@@ -441,8 +179,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   String? _validateImage(File? file, String fieldName) {
     if (file == null) return "กรุณาแนบ$fieldName";
     final ext = file.path.split('.').last.toLowerCase();
-    if (ext != 'jpg' && ext != 'jpeg' && ext != 'png')
+    if (ext != 'jpg' && ext != 'jpeg' && ext != 'png') {
       return "$fieldName ต้องเป็น .jpg หรือ .png";
+    }
     if (file.lengthSync() > 1024 * 1024) return "ขนาดเกิน 1MB";
     return null;
   }
@@ -450,8 +189,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   String? _validateUsername(String? value) {
     if (value == null || value.isEmpty) return "กรุณากรอกชื่อผู้ใช้";
     if (value.contains(' ')) return "ต้องไม่มีช่องว่าง";
-    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value))
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
       return "ใช้ได้เฉพาะ a-z, A-Z, 0-9 และ _";
+    }
     if (value.length < 8 || value.length > 20) return "ความยาว 8-20 ตัวอักษร";
     return null;
   }
@@ -459,22 +199,25 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
   String? _validatePasswordField(String? value) {
     if (value == null || value.isEmpty) return "กรุณากรอกรหัสผ่าน";
     if (value.contains(' ')) return "ต้องไม่มีช่องว่าง";
-    if (!RegExp(r'^[a-zA-Z0-9!#_.]+$').hasMatch(value))
+    if (!RegExp(r'^[a-zA-Z0-9!#_.]+$').hasMatch(value)) {
       return "ใช้ได้เฉพาะ a-z, A-Z, 0-9 และ ! # _ .";
+    }
     if (value.length < 8 || value.length > 16) return "ความยาว 8-16 ตัวอักษร";
     return null;
   }
 
   String? _validateRestaurantName(String? value) {
     if (value == null || value.isEmpty) return "กรุณากรอกชื่อร้านค้า";
-    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$').hasMatch(value))
+    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$').hasMatch(value)) {
       return "ต้องเป็นภาษาไทย อังกฤษ หรือตัวเลขเท่านั้น";
+    }
     if (value.length < 8 || value.length > 50) return "ความยาว 8-50 ตัวอักษร";
     return null;
   }
 
   void _scrollToFirstInvalidField() {
     final List<MapEntry<GlobalKey, bool>> checksInOrder = [
+      MapEntry(_typeFieldKey, _selectedTypeId == null),
       MapEntry(
         _usernameKey,
         _validateUsername(usernameController.text) != null,
@@ -487,10 +230,8 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
         _restaurantNameKey,
         _validateRestaurantName(restaurantNameController.text) != null,
       ),
-      MapEntry(_typeFieldKey, _selectedTypeId == null),
       MapEntry(_locationKey, _selectedLocation == null),
       MapEntry(_imageKey, _restaurantImageError != null),
-      MapEntry(_openingHoursKey, _openingHours.every((h) => h.open)),
     ];
 
     for (final check in checksInOrder) {
@@ -659,9 +400,6 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
   @override
   Widget build(BuildContext context) {
-    final groupedOpeningHours =
-        _getGroupedOpeningHours(); // 🎯 สรุปรายการกลุ่มเวลากลาง
-
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
@@ -698,10 +436,59 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
             children: [
               Container(color: Colors.white, child: _buildStepIndicator()),
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
+                padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _sectionHeader(
+                      icon: Icons.category_outlined,
+                      title: "ประเภทของร้านค้า",
+                    ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "ประเภทร้านค้า (Restaurant Type)",
+                            style: TextStyle(color: Colors.black, fontSize: 14),
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            key: _typeFieldKey,
+                            child: _buildDropdown(
+                              typeList.map((e) => e.name).toList(),
+                              _selectedType,
+                              (val) {
+                                setState(() {
+                                  _selectedType = val;
+                                  _selectedTypeId = typeList
+                                      .firstWhere((e) => e.name == val)
+                                      .id;
+                                  _typeError = null;
+                                });
+                              },
+                            ),
+                          ),
+                          _fieldError(_typeError),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: 24),
+
                     _sectionHeader(
                       icon: Icons.storefront_outlined,
                       title: "ข้อมูลร้านค้า",
@@ -723,14 +510,10 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 10),
-
-                          Text(
+                          const SizedBox(height: 5),
+                          const Text(
                             "ชื่อผู้ใช้ (Username)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.black, fontSize: 14),
                           ),
                           const SizedBox(height: 10),
                           TextFormField(
@@ -750,12 +533,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                           const SizedBox(height: 15),
 
-                          Text(
+                          const Text(
                             "รหัสผ่าน (Password)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.black, fontSize: 14),
                           ),
                           const SizedBox(height: 10),
                           TextFormField(
@@ -783,12 +563,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                           const SizedBox(height: 15),
 
-                          Text(
+                          const Text(
                             "ชื่อร้านค้า (Restaurant Name)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.black, fontSize: 14),
                           ),
                           const SizedBox(height: 10),
                           TextFormField(
@@ -808,41 +585,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
 
                           const SizedBox(height: 15),
 
-                          Text(
-                            "ประเภทร้านค้า (Restaurant Type)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-
-                          Container(
-                            key: _typeFieldKey,
-                            child: _buildDropdown(
-                              typeList.map((e) => e.name).toList(),
-                              _selectedType,
-                              (val) {
-                                setState(() {
-                                  _selectedType = val;
-                                  _selectedTypeId = typeList
-                                      .firstWhere((e) => e.name == val)
-                                      .id;
-                                  _typeError = null;
-                                });
-                              },
-                            ),
-                          ),
-                          _fieldError(_typeError),
-
-                          const SizedBox(height: 15),
-
-                          Text(
+                          const Text(
                             "ที่ตั้งร้านค้า (Location)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.black, fontSize: 14),
                           ),
                           const SizedBox(height: 5),
 
@@ -927,12 +672,9 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                           _fieldError(_locationError),
                           const SizedBox(height: 15),
 
-                          Text(
+                          const Text(
                             "รูปภาพร้านค้า (Restaurant Image)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
+                            style: TextStyle(color: Colors.black, fontSize: 14),
                           ),
                           const SizedBox(height: 10),
 
@@ -943,464 +685,119 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
                             key: _imageKey,
                           ),
                           _fieldError(_restaurantImageError),
-
-                          const SizedBox(height: 15),
-
-                          Text(
-                            "ตั้งค่าวันและเวลาเปิด-ปิดร้าน",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          Container(
-                            key: _openingHoursKey,
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade50,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: Colors.grey.shade200),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // 1. ปุ่มวงกลมอักษรย่อภาษาไทยเรียงตามวัน
-                                const Text(
-                                  "1. เลือกวันที่เปิดร้านค้า (Open Date)",
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: _textDark,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: RestaurantDayOfWeek.values.map((
-                                    day,
-                                  ) {
-                                    final isSelected = _tempSelectedDays
-                                        .contains(day);
-                                    final existingHour = _openingHours
-                                        .firstWhere((h) => h.dayOfWeek == day);
-                                    // 🎯 วันที่ตั้งเวลาทำการไปแล้ว (closed == false)
-                                    // ให้แสดงเป็นสีทึบและกดเลือกซ้ำไม่ได้อีก
-                                    final isAlreadySet = !existingHour.open;
-
-                                    return GestureDetector(
-                                      onTap: isAlreadySet
-                                          ? null
-                                          : () {
-                                              setState(() {
-                                                if (isSelected) {
-                                                  _tempSelectedDays.remove(day);
-                                                } else {
-                                                  _tempSelectedDays.add(day);
-                                                }
-                                              });
-                                            },
-                                      child: AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 200,
-                                        ),
-                                        width: 38,
-                                        height: 38,
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: isAlreadySet
-                                              ? Colors.grey.shade400
-                                              : (isSelected
-                                                    ? _accent
-                                                    : Colors.white),
-                                          shape: BoxShape.circle,
-                                          border: Border.all(
-                                            color: isAlreadySet
-                                                ? Colors.grey.shade400
-                                                : (isSelected
-                                                      ? _accent
-                                                      : Colors.grey.shade300),
-                                            width: 1.5,
-                                          ),
-                                          boxShadow: isSelected && !isAlreadySet
-                                              ? [
-                                                  BoxShadow(
-                                                    color: _accent.withOpacity(
-                                                      0.3,
-                                                    ),
-                                                    blurRadius: 4,
-                                                  ),
-                                                ]
-                                              : [],
-                                        ),
-                                        child: Text(
-                                          _getShortThDayName(day),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: isAlreadySet || isSelected
-                                                ? Colors.white
-                                                : _textDark,
-                                          ),
-                                        ),
-                                      ),
-                                    );
-                                  }).toList(),
-                                ),
-                                const SizedBox(height: 16),
-
-                                // 2. ระบุช่วงเวลาทำการดรัมสไลด์
-                                const Text(
-                                  "2. ระบุช่วงเวลาทำการ (Open time - Close time)",
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.bold,
-                                    color: _textDark,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        icon: const Icon(
-                                          Icons.access_time_rounded,
-                                          size: 16,
-                                          color: _primary,
-                                        ),
-                                        label: Text(
-                                          '${_slotOpenTime.hour.toString().padLeft(2, '0')}:${_slotOpenTime.minute.toString().padLeft(2, '0')} น.',
-                                        ),
-                                        onPressed: () => _selectTimeScrollWheel(
-                                          context,
-                                          isOpenTime: true,
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          side: BorderSide(
-                                            color: Colors.grey.shade300,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const Padding(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                      ),
-                                      child: Text("ถึง"),
-                                    ),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        icon: const Icon(
-                                          Icons.access_time_rounded,
-                                          size: 16,
-                                          color: _danger,
-                                        ),
-                                        label: Text(
-                                          '${_slotCloseTime.hour.toString().padLeft(2, '0')}:${_slotCloseTime.minute.toString().padLeft(2, '0')} น.',
-                                        ),
-                                        onPressed: () => _selectTimeScrollWheel(
-                                          context,
-                                          isOpenTime: false,
-                                        ),
-                                        style: OutlinedButton.styleFrom(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 12,
-                                          ),
-                                          side: BorderSide(
-                                            color: Colors.grey.shade300,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 16),
-
-                                // 3. ปุ่มกดบันทึกเพิ่มเข้า List
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: ElevatedButton.icon(
-                                    onPressed: _addTimeSlot,
-                                    icon: const Icon(
-                                      Icons.add_circle_outline_rounded,
-                                      size: 18,
-                                    ),
-                                    label: const Text(
-                                      "ยืนยัน",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _primary,
-                                      foregroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: 12,
-                                      ),
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-
-                                const SizedBox(height: 16),
-                                const Divider(),
-                                const SizedBox(height: 6),
-                                const Text(
-                                  "รายการเวลาเปิดทำการที่เพิ่มไว้:",
-                                  style: TextStyle(
-                                    fontSize: 12.5,
-                                    fontWeight: FontWeight.bold,
-                                    color: _textMuted,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-
-                                // 4. [GROUP DISPLAY UI] ส่วนแสดงผลกลุ่มเวลาทำการแถวเดียวกันเมื่อเวลาตรงกัน
-                                groupedOpeningHours.isNotEmpty
-                                    ? ListView.builder(
-                                        shrinkWrap: true,
-                                        physics:
-                                            const NeverScrollableScrollPhysics(),
-                                        itemCount: groupedOpeningHours.length,
-                                        itemBuilder: (context, index) {
-                                          final entry =
-                                              groupedOpeningHours[index];
-                                          final List<RestaurantOpeningHourModel>
-                                          hoursInGroup = entry.value;
-                                          final firstItem = hoursInGroup.first;
-
-                                          return Container(
-                                            margin: const EdgeInsets.only(
-                                              bottom: 6,
-                                            ),
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 8,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: Colors.white,
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                              border: Border.all(
-                                                color: Colors.grey.shade200,
-                                              ),
-                                            ),
-                                            child: Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Expanded(
-                                                  child: Row(
-                                                    children: [
-                                                      Wrap(
-                                                        spacing: 4,
-                                                        children: hoursInGroup.map((
-                                                          h,
-                                                        ) {
-                                                          return Container(
-                                                            padding:
-                                                                const EdgeInsets.symmetric(
-                                                                  horizontal: 6,
-                                                                  vertical: 3,
-                                                                ),
-                                                            decoration: BoxDecoration(
-                                                              color: _primary
-                                                                  .withOpacity(
-                                                                    0.12,
-                                                                  ),
-                                                              borderRadius:
-                                                                  BorderRadius.circular(
-                                                                    6,
-                                                                  ),
-                                                            ),
-                                                            child: Text(
-                                                              _getShortThDayName(
-                                                                h.dayOfWeek,
-                                                              ),
-                                                              style: const TextStyle(
-                                                                fontSize: 11,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                color:
-                                                                    _primaryDark,
-                                                              ),
-                                                            ),
-                                                          );
-                                                        }).toList(),
-                                                      ),
-                                                      const SizedBox(width: 10),
-                                                      Expanded(
-                                                        child: Text(
-                                                          '${firstItem.opentime.hour.toString().padLeft(2, '0')}:${firstItem.opentime.minute.toString().padLeft(2, '0')} น. - ${firstItem.closetime.hour.toString().padLeft(2, '0')}:${firstItem.closetime.minute.toString().padLeft(2, '0')} น.',
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 12.5,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w500,
-                                                                color:
-                                                                    _textDark,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                                IconButton(
-                                                  icon: const Icon(
-                                                    Icons
-                                                        .delete_outline_rounded,
-                                                    color: _danger,
-                                                    size: 20,
-                                                  ),
-                                                  onPressed: () =>
-                                                      _removeGroupedTimeSlot(
-                                                        hoursInGroup,
-                                                      ),
-                                                  padding: EdgeInsets.zero,
-                                                  constraints:
-                                                      const BoxConstraints(),
-                                                ),
-                                              ],
-                                            ),
-                                          );
-                                        },
-                                      )
-                                    : Container(
-                                        width: double.infinity,
-                                        padding: const EdgeInsets.symmetric(
-                                          vertical: 20,
-                                        ),
-                                        alignment: Alignment.center,
-                                        child: Text(
-                                          "- ยังไม่มีการตั้งเวลาทำการ -",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: Colors.grey.shade400,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                        ),
-                                      ),
-                              ],
-                            ),
-                          ),
-                          _fieldError(_openingHoursError),
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 26),
-
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(30),
-                          gradient: const LinearGradient(
-                            colors: [_primary, _primaryDark],
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: _primary.withOpacity(0.35),
-                              blurRadius: 16,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
-                        ),
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final isFormValid = formKey.currentState!
-                                .validate();
-                            setState(() {
-                              _typeError = _selectedTypeId == null
-                                  ? "กรุณาเลือกประเภทร้านค้า"
-                                  : null;
-                              _locationError = _selectedLocation == null
-                                  ? "กรุณาเลือกที่ตั้งร้านค้า"
-                                  : null;
-                              _restaurantImageError = _validateImage(
-                                _selectedImage,
-                                "รูปร้านค้า",
-                              );
-                              _openingHoursError =
-                                  _openingHours.every((h) => h.open)
-                                  ? "กรุณาเปิดร้านอย่างน้อย 1 วัน"
-                                  : null;
-                            });
-
-                            if (!isFormValid ||
-                                _typeError != null ||
-                                _locationError != null ||
-                                _restaurantImageError != null ||
-                                _openingHoursError != null) {
-                              WidgetsBinding.instance.addPostFrameCallback(
-                                (_) => _scrollToFirstInvalidField(),
-                              );
-                              return;
-                            }
-
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => RegisterOwnerInfo(
-                                  initialFirstName: _ownerFirstName,
-                                  initialLastName: _ownerLastName,
-                                  initialEmail: _ownerEmail,
-                                  initialPhone: _ownerPhone,
-                                  username: usernameController.text,
-                                  password: passwordController.text,
-                                  restaurantName: restaurantNameController.text,
-                                  typeId: _selectedTypeId!,
-                                  latitude: latilude!,
-                                  longitude: longitude!,
-                                  openingHours: _openingHours,
-                                  restaurantImage: _selectedImage,
-                                  imagecardid: _selectedOwnerImage,
-                                ),
-                              ),
-                            );
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.transparent,
-                            shadowColor: Colors.transparent,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                          ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                "ถัดไป",
-                                style: TextStyle(
-                                  fontSize: 16.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              SizedBox(width: 6),
-                              Icon(Icons.arrow_forward_rounded, size: 20),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+      // 🎯 ส่วนปุ่มล่างสุด สไตล์เดียวกับหน้า Home เป๊ะๆ เลยครับ
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: SizedBox(
+            width: double.infinity,
+            height: 54,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                gradient: const LinearGradient(
+                  colors: [_primary, _primaryDark],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _primary.withOpacity(0.35),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ElevatedButton(
+                onPressed: () async {
+                  final isFormValid = formKey.currentState!.validate();
+                  setState(() {
+                    _typeError = _selectedTypeId == null
+                        ? "กรุณาเลือกประเภทร้านค้า"
+                        : null;
+                    _locationError = _selectedLocation == null
+                        ? "กรุณาเลือกที่ตั้งร้านค้า"
+                        : null;
+                    _restaurantImageError = _validateImage(
+                      _selectedImage,
+                      "รูปร้านค้า",
+                    );
+                  });
+
+                  if (!isFormValid ||
+                      _typeError != null ||
+                      _locationError != null ||
+                      _restaurantImageError != null) {
+                    WidgetsBinding.instance.addPostFrameCallback(
+                      (_) => _scrollToFirstInvalidField(),
+                    );
+                    return;
+                  }
+
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => RegisterOwnerInfo(
+                        initialFirstName: _ownerFirstName,
+                        initialLastName: _ownerLastName,
+                        initialEmail: _ownerEmail,
+                        initialPhone: _ownerPhone,
+                        username: usernameController.text,
+                        password: passwordController.text,
+                        restaurantName: restaurantNameController.text,
+                        typeId: _selectedTypeId!,
+                        latitude: latilude!,
+                        longitude: longitude!,
+                        restaurantImage: _selectedImage,
+                        imagecardid: _selectedOwnerImage,
+                      ),
+                    ),
+                  );
+
+                  if (result != null && result is Map<String, dynamic>) {
+                    setState(() {
+                      _ownerFirstName = result['ownerFirstName'];
+                      _ownerLastName = result['ownerLastName'];
+                      _ownerEmail = result['email'];
+                      _ownerPhone = result['phone'];
+                      _selectedOwnerImage = result['ownerImage'];
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.transparent,
+                  shadowColor: Colors.transparent,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      "ถัดไป",
+                      style: TextStyle(
+                        fontSize: 16.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    SizedBox(width: 6),
+                    Icon(Icons.arrow_forward_rounded, size: 20),
+                  ],
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -1449,8 +846,7 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
       key: key,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (label.isNotEmpty)
-          _buildLabel(label), // 👈 เพิ่มเงื่อนไข if เช็คตรงนี้ครับผม
+        if (label.isNotEmpty) _buildLabel(label),
         GestureDetector(
           onTap: onTap,
           child: Container(

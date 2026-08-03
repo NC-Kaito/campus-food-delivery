@@ -208,13 +208,7 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
                   ),
                 ),
                 const SizedBox(width: gap),
-                _IconAction(
-                  icon: Icons.shopping_bag_outlined,
-                  badgeCount: widget.cartCount,
-                  tooltip: 'ตะกร้า',
-                  onTap: () {},
-                ),
-                const SizedBox(width: gap),
+
                 _IconAction(
                   icon: Icons.notifications_outlined,
                   badgeCount: widget.notificationCount,

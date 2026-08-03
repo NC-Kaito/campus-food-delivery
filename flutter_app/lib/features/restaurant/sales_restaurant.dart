@@ -1,6 +1,5 @@
 // features/restaurant/sales_restaurant.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_app/features/restaurant/restaurant_scaffold.dart';
 
 // 🎯 Placeholder — ยังไม่มีหน้านี้ในโค้ดที่ให้มา
 // ถ้ามีหน้ายอดขายจริงอยู่แล้ว ลบไฟล์นี้แล้วแก้ import ใน
@@ -10,10 +9,16 @@ class SalesRestaurant extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const RestaurantScaffold(
-      title: "ยอดขาย",
+    return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
+      appBar: AppBar(
+        title: const Text("ยอดขาย"),
+        backgroundColor: Colors.white,
+        foregroundColor: Colors
+            .black, // ทำให้ตัวหนังสือและปุ่มย้อนกลับเป็นสีดำ เพื่อให้เห็นชัดบนพื้นขาว
+        elevation: 1, // ใส่เงาบางๆ ให้แยกกับเนื้อหาด้านล่างนิดหน่อยครับ
+      ),
+      body: const Center(
         child: Text(
           "หน้ายอดขาย (รอเชื่อมข้อมูลจริง)",
           style: TextStyle(fontSize: 16, color: Colors.black54),

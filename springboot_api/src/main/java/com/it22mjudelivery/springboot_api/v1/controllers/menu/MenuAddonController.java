@@ -106,18 +106,20 @@ public class MenuAddonController {
         return ResponseEntity.ok(groups);
     }
 
-    // toggle status
-    @PatchMapping("/groups/{groupId}/status")
-    public ResponseEntity<?> toggleGroupStatus(
-            @PathVariable Integer groupId,
+    @Autowired
+    private MenuaddondetailRepository menuaddondetailRepository;
+
+    // toggle status ของรายการช้อยส์ย่อย (Menuaddondetail)
+    @PatchMapping("/details/{addonDetailId}/status")
+    public ResponseEntity<?> toggleDetailStatus(
+            @PathVariable Integer addonDetailId,
             @RequestBody Map<String, Boolean> body) {
-        return menuaddongroupRepository.findById(groupId)
-                .map(group -> {
-                    group.setStatus(body.get("status"));
-                    menuaddongroupRepository.save(group);
-                    return ResponseEntity.ok("อัปเดตสถานะสำเร็จ");
-                })
-                .orElse(ResponseEntity.notFound().build());
+        return menuaddondetailRepository.findById(addonDetailId)
+                .map(detail -> {
+                    detail.setStatus(body.get("status"));
+                    menuaddondetailRepository.save(detail);
+                    return ResponseEntity.ok("อัปเดตสถานะรายการย่อยสำเร็จ");
+                }).orElse(ResponseEntity.notFound().build());
     }
 
 
@@ -183,4 +185,20 @@ public class MenuAddonController {
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
         }
     }
+
+    //================================================================================================
+    @GetMapping("/groups/{groupId}/menuCount")
+    public ResponseEntity<?> getMenuCountUsingGroup(@PathVariable Integer groupId) {
+        try {
+            int count = menuaddongroupRepository.countMenusByGroupId(groupId);
+            Map<String, Integer> response = new HashMap<>();
+            response.put("count", count);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดในการนับจำนวนเมนู");
+        }
+    }
+
+    //================================================================================================
+
 }

@@ -173,10 +173,14 @@ public class AddonServiceImpl implements AddonService {
             Menuaddongroup group = menuaddongroupRepository.findById(groupId)
                     .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริมที่ต้องการลบ"));
 
-            // ลบ detail ลูกทั้งหมดก่อน (กัน foreign key constraint)
+            // 🎯 1. ลบความสัมพันธ์ที่ผูกกับเมนูอาหารออกก่อน (ปลดล็อก Foreign Key)
+            menuaddongroupRepository.removeAllMenuLinks(groupId);
+
+            // 2. ลบ detail ลูกทั้งหมดก่อน (กัน foreign key constraint)
             List<Menuaddondetail> details = menuaddondetailRepository.findByMenuaddongroup(group);
             menuaddondetailRepository.deleteAll(details);
 
+            // 3. ลบกลุ่มตัวเลือกหลักได้เลย
             menuaddongroupRepository.delete(group);
             return true;
         } catch (Exception e) {
