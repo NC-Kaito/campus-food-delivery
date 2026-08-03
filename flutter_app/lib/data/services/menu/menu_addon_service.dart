@@ -186,4 +186,15 @@ class MenuAddonService {
       throw Exception(e.response?.data['message'] ?? 'ไม่สามารถอัปเดตสถานะได้');
     }
   }
+
+  Future<int> getMenuCountUsingGroup(int groupId) async {
+    try {
+      final response = await DioClient.dio.get(
+        '/v1/menuAddon/groups/$groupId/menuCount',
+      );
+      return response.data['count'] ?? 0;
+    } catch (e) {
+      return 0; // ถ้ามี Error ก็คืนค่า 0 ไปก่อนเพื่อไม่ให้แอปพังครับ
+    }
+  }
 }

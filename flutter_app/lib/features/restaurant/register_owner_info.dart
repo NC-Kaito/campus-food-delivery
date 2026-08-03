@@ -2,12 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/features/restaurant/login_restaurant.dart';
-import 'package:image_picker/image_picker.dart'; // 🎯 ดึง ImagePicker มาใช้งานในหน้านี้
+import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
-import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 
 class RegisterOwnerInfo extends StatefulWidget {
   final String? initialFirstName;
@@ -23,8 +22,6 @@ class RegisterOwnerInfo extends StatefulWidget {
   final File? restaurantImage;
   final File? imagecardid;
 
-  final List<RestaurantOpeningHourModel> openingHours;
-
   const RegisterOwnerInfo({
     super.key,
     this.initialFirstName,
@@ -37,8 +34,6 @@ class RegisterOwnerInfo extends StatefulWidget {
     required this.typeId,
     required this.latitude,
     required this.longitude,
-
-    required this.openingHours,
     this.restaurantImage,
     this.imagecardid,
   });
@@ -48,10 +43,9 @@ class RegisterOwnerInfo extends StatefulWidget {
 }
 
 class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
-  // ── ธีมสีหลักของหน้า (ชุดเดียวกับ register_restaurant.dart / profile_restaurant.dart) ──
-  static const Color _primary = Color(0xFF16A34A); // เขียวหลัก
+  static const Color _primary = Color(0xFF16A34A);
   static const Color _primaryDark = Color(0xFF0F7A38);
-  static const Color _accent = Color(0xFFEA7C1E); // ส้มสำหรับหัวข้อ/แบรนด์
+  static const Color _accent = Color(0xFFEA7C1E);
   static const Color _bg = Color(0xFFF5F6F8);
   static const Color _textDark = Color(0xFF1E1E24);
   static const Color _textMuted = Color(0xFF8A8D93);
@@ -59,15 +53,12 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
 
   RestaurantService restaurantService = RestaurantService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-  final ImagePicker ownerImagePicker =
-      ImagePicker(); // 🎯 สแตนด์บายตัวเลือกรูปภาพ
+  final ImagePicker ownerImagePicker = ImagePicker();
 
   bool _isLoading = false;
-  String? _ownerImageError; // 🎯 ตัวแปรจับ Error ของรูปเจ้าของร้าน
-  File? _selectedOwnerImage; // 🎯 ถือไฟล์รูปภาพใบหน้าในหน้านี้
+  String? _ownerImageError;
+  File? _selectedOwnerImage;
 
-  // 🎯 ข้อความ error ที่ได้กลับมาจากหลังบ้าน (เช่น อีเมล/เบอร์ซ้ำในระบบ)
-  // แยกจาก validator ปกติ เพราะรูปแบบข้อมูลถูกต้องแต่ซ้ำกับข้อมูลที่มีอยู่แล้ว
   String? _emailServerError;
   String? _phoneServerError;
 
@@ -76,7 +67,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
   late final TextEditingController emailController;
   late final TextEditingController phoneController;
 
-  // ── GlobalKey ของแต่ละช่อง ใช้สำหรับเลื่อนจอไปหาช่องแรกที่ยังไม่ได้กรอก ──
   final GlobalKey _firstNameKey = GlobalKey();
   final GlobalKey _lastNameKey = GlobalKey();
   final GlobalKey _emailKey = GlobalKey();
@@ -94,7 +84,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     emailController = TextEditingController(text: widget.initialEmail);
     phoneController = TextEditingController(text: widget.initialPhone);
 
-    // ตั้งค่าเริ่มต้นรูปภาพจากหน้าแรก (ถ้ามี)
     if (widget.imagecardid != null) {
       _selectedOwnerImage = widget.imagecardid;
     }
@@ -110,7 +99,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     super.dispose();
   }
 
-  // 🎯 เพิ่มฟังก์ชันเปิดแผงเลือกรูปภาพ (กล้อง/คลังภาพ)
   Future<void> pickOwnerImage() async {
     showModalBottomSheet(
       context: context,
@@ -208,16 +196,15 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     return null;
   }
 
-  // ── ดึงตรรกะ validate ของแต่ละช่องออกมาเป็นฟังก์ชันแยก เพื่อใช้ทั้งใน
-  // TextFormField.validator และใช้ตรวจซ้ำตอนหาช่องแรกที่ error ─────────────
   String? _validateFirstName(String? value) {
     if (value == null || value.trim().isEmpty) return "กรุณากรอกชื่อจริง";
     if (value.contains(' ')) return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
     if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value)) {
       return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
     }
-    if (value.length < 3 || value.length > 30)
+    if (value.length < 3 || value.length > 30) {
       return "ความยาวต้องระว่าง 3 - 30 ตัวอักษร";
+    }
     return null;
   }
 
@@ -227,16 +214,18 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value)) {
       return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
     }
-    if (value.length < 3 || value.length > 30)
+    if (value.length < 3 || value.length > 30) {
       return "ความยาวต้องระว่าง 3 - 30 ตัวอักษร";
+    }
     return null;
   }
 
   String? _validateEmail(String? value) {
     if (value == null || value.trim().isEmpty) return "กรุณากรอกอีเมล";
     if (value.contains(' ')) return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value))
+    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
       return "รูปแบบอีเมลไม่ถูกต้อง";
+    }
     final parts = value.split('@');
     if (parts.isNotEmpty) {
       final localPart = parts[0];
@@ -253,16 +242,18 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
   String? _validatePhone(String? value) {
     if (value == null || value.trim().isEmpty) return "กรุณากรอกเบอร์โทรศัพท์";
     if (value.contains(' ')) return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
-    if (!RegExp(r'^[0-9]+$').hasMatch(value))
+    if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
       return "ต้องเป็นตัวเลข (0-9) เท่านั้น";
-    if (value.length < 10 || value.length > 15)
+    }
+    if (value.length < 10 || value.length > 15) {
       return "ความยาวต้องอยู่ระหว่าง 10 ถึง 15 หลัก";
-    if (!RegExp(r'^(06|08|09)').hasMatch(value))
+    }
+    if (!RegExp(r'^(06|08|09)').hasMatch(value)) {
       return "เบอร์โทรศัพท์ต้องขึ้นต้นด้วย 06, 08 หรือ 09";
+    }
     return null;
   }
 
-  // ── เลื่อนจอไปหาช่องแรกสุดที่ยังไม่ผ่าน/ยังไม่ได้กรอก ตามลำดับบนจอ ──────
   void _scrollToFirstInvalidField() {
     final List<MapEntry<GlobalKey, bool>> checksInOrder = [
       MapEntry(
@@ -326,7 +317,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
   }
 
   Future<void> doRegister() async {
-    // 🎯 ทำการตรวจสอบความครบถ้วนของรูปภาพใบหน้าควบคู่กับฟอร์ม
     setState(() {
       _ownerImageError = _validateImage(
         _selectedOwnerImage,
@@ -341,8 +331,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           widget.restaurantImage,
           'restaurant',
         );
-
-        // ยิงภาพประเภท 'owner' ตรงเข้าหลังบ้าน
         final imagecardIdUrl = await uploadImage(
           _selectedOwnerImage,
           'ownerImage',
@@ -354,8 +342,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           restaurantName: widget.restaurantName,
           restaurantImage: restaurantImageUrl,
           imagecardid: imagecardIdUrl,
-          openingHours: widget.openingHours,
-
+          openingHours: [],
           latitude: widget.latitude,
           longitude: widget.longitude,
           ownerFirstName: ownerFirstNameController.text,
@@ -385,10 +372,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           );
         }
       } catch (e) {
-        // 🎯 พยายามแปลข้อความ error จากหลังบ้านให้เข้าใจง่าย โดยเฉพาะกรณี
-        // ข้อมูลซ้ำในระบบ (unique constraint) เช่น อีเมล/เบอร์โทร/ชื่อผู้ใช้ซ้ำ
-        // รวมข้อความจากทุกแหล่งที่เป็นไปได้ (DioException, ข้อความ toString ทั่วไป)
-        // เผื่อ service layer ห่อ error มาในรูปแบบอื่นที่ไม่ใช่ DioException ตรงๆ
         final buffer = StringBuffer();
         if (e is DioException) {
           final data = e.response?.data;
@@ -409,7 +392,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
         final duplicateField = match?.group(1)?.toLowerCase();
 
         if (duplicateField == 'email') {
-          // แสดง error ตรงใต้ช่องอีเมลจุดเดียว (ช่องแดงเดียวกับตอน validate รูปแบบ)
           setState(() {
             _emailServerError = "อีเมลนี้ถูกใช้งานแล้ว";
           });
@@ -470,8 +452,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
         if (mounted) setState(() => _isLoading = false);
       }
     } else {
-      // รอให้ error ใต้ช่องขึ้นแสดงก่อน 1 เฟรม แล้วค่อยเลื่อนจอไปหา
-      // ช่องแรกสุดที่ยังไม่ได้กรอก/ยังไม่ถูกต้อง
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _scrollToFirstInvalidField(),
       );
@@ -571,7 +551,6 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
     );
   }
 
-  // ── ตัวบอกขั้นตอน 1/2 ด้านบนสุดของฟอร์ม (ขั้นนี้อยู่ที่ขั้นตอนที่ 2) ──
   Widget _buildStepIndicator() {
     Widget dot({
       required bool active,
@@ -646,312 +625,316 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: const BoxDecoration(color: _bg, shape: BoxShape.circle),
-            child: const Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 16,
+    Map<String, dynamic> getFormData() {
+      return {
+        'ownerFirstName': ownerFirstNameController.text,
+        'ownerLastName': ownerLastnameController.text,
+        'email': emailController.text,
+        'phone': phoneController.text,
+        'ownerImage': _selectedOwnerImage,
+      };
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (didPop) return;
+        Navigator.pop(context, getFormData());
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          leading: IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: const BoxDecoration(
+                color: _bg,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 16,
+                color: _textDark,
+              ),
+            ),
+            onPressed: () => Navigator.pop(context, getFormData()),
+          ),
+          title: const Text(
+            'สมัครร้านค้า',
+            style: TextStyle(
               color: _textDark,
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
             ),
           ),
-          onPressed: () => Navigator.pop(context),
         ),
-        title: const Text(
-          'สมัครร้านค้า',
-          style: TextStyle(
-            color: _textDark,
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
+        body: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(color: Colors.white, child: _buildStepIndicator()),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _sectionHeader(
+                        icon: Icons.person_outline_rounded,
+                        title: "ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน",
+                      ),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(22),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 16,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 10),
+                            const Text(
+                              "ชื่อจริง (First Name)",
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 0, 0, 0),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              key: _firstNameKey,
+                              controller: ownerFirstNameController,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              validator: _validateFirstName,
+                              decoration: _inputDecoration(
+                                hint: "กรอกชื่อจริง",
+                                suffixIcon: Icon(
+                                  Icons.badge_outlined,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+                            const Text(
+                              "นามสกุล (Last Name)",
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 0, 0, 0),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              key: _lastNameKey,
+                              controller: ownerLastnameController,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              validator: _validateLastName,
+                              decoration: _inputDecoration(
+                                hint: "กรอกนามสกุล",
+                                suffixIcon: Icon(
+                                  Icons.badge_outlined,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+                            const Text(
+                              "อีเมล (Email)",
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 0, 0, 0),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              key: _emailKey,
+                              controller: emailController,
+                              keyboardType: TextInputType.emailAddress,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              validator: (value) =>
+                                  _validateEmail(value) ?? _emailServerError,
+                              onChanged: (_) {
+                                if (_emailServerError != null)
+                                  setState(() => _emailServerError = null);
+                              },
+                              decoration: _inputDecoration(
+                                hint: "ตัวอย่าง xxx@gmail.com",
+                                suffixIcon: Icon(
+                                  Icons.email_outlined,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+                            const Text(
+                              "เบอร์โทรศัพท์ (Phone)",
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 0, 0, 0),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            TextFormField(
+                              key: _phoneKey,
+                              controller: phoneController,
+                              keyboardType: TextInputType.phone,
+                              autovalidateMode:
+                                  AutovalidateMode.onUserInteraction,
+                              validator: (value) =>
+                                  _validatePhone(value) ?? _phoneServerError,
+                              onChanged: (_) {
+                                if (_phoneServerError != null)
+                                  setState(() => _phoneServerError = null);
+                              },
+                              decoration: _inputDecoration(
+                                hint: "เช่น 08xxxxxxxx",
+                                suffixIcon: Icon(
+                                  Icons.phone_android_outlined,
+                                  color: Colors.grey[400],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 10),
+                            const Text(
+                              "รูปภาพบัตรประชาชน (CardID Image)",
+                              style: TextStyle(
+                                color: Color.fromARGB(255, 0, 0, 0),
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+
+                            _buildUploadBox(
+                              "",
+                              _selectedOwnerImage,
+                              pickOwnerImage,
+                              key: _ownerImageKey,
+                            ),
+                            _fieldError(_ownerImageError),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20), // เผื่อระยะก่อนสุดจอครับ
+                      Center(
+                        child: Text(
+                          "ทีมงานจะตรวจสอบและอนุมัติร้านค้าของคุณหลังสมัครสำเร็จ",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 12.5, color: _textMuted),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-      body: Form(
-        key: formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(color: Colors.white, child: _buildStepIndicator()),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _sectionHeader(
-                      icon: Icons.person_outline_rounded,
-                      title: "ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน",
+        // 🎯 ยกชุดปุ่มกดทั้งสองอันมายึดติดด้านล่างสุดเหมือนกันครับ
+        bottomNavigationBar: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 54,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context, getFormData()),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _textMuted,
+                        side: BorderSide(color: Colors.grey.shade300),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      child: const Text(
+                        "ย้อนกลับ",
+                        style: TextStyle(
+                          fontSize: 15.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: SizedBox(
+                    height: 54,
+                    child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(22),
+                        borderRadius: BorderRadius.circular(18),
+                        gradient: const LinearGradient(
+                          colors: [_primary, _primaryDark],
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
+                            color: _primary.withOpacity(0.35),
                             blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
                         ],
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 10),
-
-                          Text(
-                            "ชื่อจริง (First Name)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : doRegister,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          shadowColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
                           ),
-
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            key: _firstNameKey,
-                            controller: ownerFirstNameController,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            validator: _validateFirstName,
-                            decoration: _inputDecoration(
-                              hint: "กรอกชื่อจริง",
-                              suffixIcon: Icon(
-                                Icons.badge_outlined,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          Text(
-                            "นามสกุล (Last Name)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            key: _lastNameKey,
-                            controller: ownerLastnameController,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            validator: _validateLastName,
-                            decoration: _inputDecoration(
-                              hint: "กรอกนามสกุล",
-                              suffixIcon: Icon(
-                                Icons.badge_outlined,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          Text(
-                            "อีเมล (Email)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            key: _emailKey,
-                            controller: emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            validator: (value) =>
-                                _validateEmail(value) ?? _emailServerError,
-                            onChanged: (_) {
-                              if (_emailServerError != null) {
-                                setState(() => _emailServerError = null);
-                              }
-                            },
-                            decoration: _inputDecoration(
-                              hint: "ตัวอย่าง xxx@gmail.com",
-                              suffixIcon: Icon(
-                                Icons.email_outlined,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          Text(
-                            "เบอร์โทรศัพท์ (Phone)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-                          TextFormField(
-                            key: _phoneKey,
-                            controller: phoneController,
-                            keyboardType: TextInputType.phone,
-                            autovalidateMode:
-                                AutovalidateMode.onUserInteraction,
-                            validator: (value) =>
-                                _validatePhone(value) ?? _phoneServerError,
-                            onChanged: (_) {
-                              if (_phoneServerError != null) {
-                                setState(() => _phoneServerError = null);
-                              }
-                            },
-                            decoration: _inputDecoration(
-                              hint: "เช่น 08xxxxxxxx",
-                              suffixIcon: Icon(
-                                Icons.phone_android_outlined,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          Text(
-                            "รูปภาพบัตรประชาชน (CardID Image)",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 0, 0),
-                              fontSize: 14,
-                            ),
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          // 🎯 ย้ายกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านมาสแตนด์บายฝั่งขวาหน้าจอนี้เรียบร้อยครับ
-                          _buildUploadBox(
-                            "",
-                            _selectedOwnerImage,
-                            pickOwnerImage,
-                            key: _ownerImageKey,
-                          ),
-                          _fieldError(_ownerImageError),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 26),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: SizedBox(
-                            height: 54,
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context, {
-                                'ownerFirstName': ownerFirstNameController.text,
-                                'ownerLastName': ownerLastnameController.text,
-                                'email': emailController.text,
-                                'phone': phoneController.text,
-                                'ownerImage':
-                                    _selectedOwnerImage, // ส่งย้อนกลับไปเก็บเผื่อด้วย
-                              }),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: _textMuted,
-                                side: BorderSide(color: Colors.grey.shade300),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
                                 ),
-                              ),
-                              child: const Text(
-                                "ย้อนกลับ",
+                              )
+                            : const Text(
+                                "สมัครสมาชิก",
                                 style: TextStyle(
                                   fontSize: 15.5,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: SizedBox(
-                            height: 54,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(30),
-                                gradient: const LinearGradient(
-                                  colors: [_primary, _primaryDark],
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _primary.withOpacity(0.35),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
-                                  ),
-                                ],
-                              ),
-                              child: ElevatedButton(
-                                onPressed: _isLoading ? null : doRegister,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.transparent,
-                                  shadowColor: Colors.transparent,
-                                  foregroundColor: Colors.white,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                ),
-                                child: _isLoading
-                                    ? const SizedBox(
-                                        height: 20,
-                                        width: 20,
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : const Text(
-                                        "สมัครสมาชิก",
-                                        style: TextStyle(
-                                          fontSize: 15.5,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Center(
-                      child: Text(
-                        "ทีมงานจะตรวจสอบและอนุมัติร้านค้าของคุณหลังสมัครสำเร็จ",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12.5, color: _textMuted),
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  // วิดเจ็ตกล่องอัปโหลดรูปภาพใบหน้าเจ้าของร้านค้า
   Widget _buildUploadBox(
     String label,
     File? selectedFile,

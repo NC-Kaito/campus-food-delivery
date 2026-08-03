@@ -3,6 +3,7 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/close_account.dart';
+import 'package:flutter_app/features/restaurant/openday_rest.dart';
 import 'package:flutter_app/features/restaurant/profile_restaurant.dart';
 // TODO: แก้ path นี้ให้ตรงกับตำแหน่งไฟล์ LoginRestaurant จริงในโปรเจกต์ของคุณ
 import 'package:flutter_app/features/restaurant/login_restaurant.dart';
@@ -198,7 +199,7 @@ class _AccountManagementState extends State<AccountManagement> {
                   vertical: 14,
                 ),
                 decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 3, 220, 65),
+                  color: const Color.fromARGB(255, 246, 228, 191),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Row(
@@ -268,6 +269,18 @@ class _AccountManagementState extends State<AccountManagement> {
                   MaterialPageRoute(
                     builder: (context) => const ProfileRestaurant(),
                   ),
+                ),
+              ),
+              const _MenuDivider(),
+
+              // ──  ─────────────────────────
+              _AccountMenuItem(
+                icon: Icons.schedule_rounded,
+                iconColor: _AccountTheme.primary,
+                label: "ตั้งค่าวันเวลาเปิด-ปิดร้าน",
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const OpendayRest()),
                 ),
               ),
               const _MenuDivider(),

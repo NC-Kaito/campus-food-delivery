@@ -68,7 +68,6 @@ class _EditAddonState extends State<EditAddon> {
 
   bool _isLoading = false;
   bool _isEditMode = false;
-  bool _isTogglingGroupStatus = false;
 
   List<CustomAddonItem> selectedAddons = [];
 
@@ -97,13 +96,12 @@ class _EditAddonState extends State<EditAddon> {
       _addNewCustomAddonRow();
     } else {
       selectedAddons = widget.details.map<CustomAddonItem>((d) {
+        final priceVal = (d.addonPrice ?? 0).toInt().toString();
         return CustomAddonItem(
           nameController: TextEditingController(
             text: d.addonMenu?.addonName ?? "",
           ),
-          priceController: TextEditingController(
-            text: (d.addonPrice ?? 0).toString(),
-          ),
+          priceController: TextEditingController(text: priceVal),
           addonId: d.addonDetailId,
           allowqtystatus: d.allowqtystatus,
           status: d.status ?? true,
@@ -132,7 +130,7 @@ class _EditAddonState extends State<EditAddon> {
         priceController: TextEditingController(),
         addonId: null,
         allowqtystatus: false,
-        status: groupStatus,
+        status: true,
       );
       selectedAddons.add(newAddon);
 
@@ -220,53 +218,46 @@ class _EditAddonState extends State<EditAddon> {
     });
   }
 
-  Future<void> _toggleGroupStatus(bool value) async {
-    if (widget.groupId == null) {
-      setState(() => groupStatus = value);
-      return;
-    }
-
-    final previous = groupStatus;
-    setState(() {
-      groupStatus = value;
-      _isTogglingGroupStatus = true;
-    });
-
-    try {
-      await _addonService.toggleAddonGroupStatus(widget.groupId!, value);
-    } catch (e) {
-      if (mounted) {
-        setState(() => groupStatus = previous);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("อัปเดตสถานะกลุ่มไม่สำเร็จ: $e"),
-            backgroundColor: _AddonTheme.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isTogglingGroupStatus = false);
-    }
-  }
-
   Future<void> _toggleAddonDetailStatus(
     CustomAddonItem addon,
     bool value,
   ) async {
-    final previous = addon.status;
-    setState(() => addon.status = value);
+    final previousDetailStatus = addon.status;
+
+    setState(() {
+      addon.status = value;
+    });
+
+    // อัปเดตข้อมูลต้นทางในหน่วยความจำ
+    if (addon.addonId != null) {
+      final detailIndex = widget.details.indexWhere(
+        (detail) => detail.addonDetailId == addon.addonId,
+      );
+      if (detailIndex != -1) {
+        widget.details[detailIndex].status = value;
+      }
+    }
 
     if (addon.addonId == null) return;
 
     try {
-      await _addonService.toggleAddonGroupStatus(widget.groupId!, value);
+      await _addonService.toggleAddonDetailStatus(addon.addonId!, value);
     } catch (e) {
       if (mounted) {
-        setState(() => addon.status = previous);
+        setState(() {
+          addon.status = previousDetailStatus;
+        });
+
+        // ถ้ายิง API ไม่สำเร็จ ให้ย้อนกลับค่าในหน่วยความจำด้วย
+        if (addon.addonId != null) {
+          final detailIndex = widget.details.indexWhere(
+            (detail) => detail.addonDetailId == addon.addonId,
+          );
+          if (detailIndex != -1) {
+            widget.details[detailIndex].status = previousDetailStatus;
+          }
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("อัปเดตสถานะตัวเลือกไม่สำเร็จ: $e"),
@@ -397,8 +388,8 @@ class _EditAddonState extends State<EditAddon> {
           return AddonDetailRequestModel(
             addonDetailId: addon.addonId,
             addonname: addon.nameController.text.trim(),
-            addonprice:
-                double.tryParse(addon.priceController.text.trim()) ?? 0.0,
+            addonprice: (int.tryParse(addon.priceController.text.trim()) ?? 0)
+                .toDouble(),
             status: addon.status,
             allowqtystatus: addon.allowqtystatus,
           );
@@ -418,7 +409,23 @@ class _EditAddonState extends State<EditAddon> {
             ),
           ),
         );
-        Navigator.pop(context, true);
+
+        setState(() {
+          _isEditMode = false;
+          _originalGroupName = groupNameController.text;
+          _originalIsMultipleChoice = isMultipleChoice;
+          _originalAddons = selectedAddons
+              .map(
+                (a) => _AddonSnapshot(
+                  name: a.nameController.text,
+                  price: a.priceController.text,
+                  addonId: a.addonId,
+                  allowqtystatus: a.allowqtystatus,
+                  status: a.status,
+                ),
+              )
+              .toList();
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -452,11 +459,15 @@ class _EditAddonState extends State<EditAddon> {
       fillColor: _isEditMode ? _AddonTheme.surface : _AddonTheme.fieldBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: _isEditMode
+            ? BorderSide(color: Colors.grey.shade300, width: 1.2)
+            : BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: _isEditMode
+            ? BorderSide(color: Colors.grey.shade300, width: 1.2)
+            : BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -539,53 +550,6 @@ class _EditAddonState extends State<EditAddon> {
     );
   }
 
-  Widget _buildGroupStatusToggle() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-          decoration: BoxDecoration(
-            color: groupStatus
-                ? _AddonTheme.accent.withOpacity(0.12)
-                : _AddonTheme.danger.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            groupStatus ? "เปิดใช้งาน" : "ปิดใช้งาน",
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w700,
-              color: groupStatus ? _AddonTheme.accent : _AddonTheme.danger,
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        _isTogglingGroupStatus
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: Padding(
-                  padding: EdgeInsets.all(2.0),
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: _AddonTheme.accent,
-                  ),
-                ),
-              )
-            : Transform.scale(
-                scale: 0.8,
-                child: Switch(
-                  value: groupStatus,
-                  onChanged: _toggleGroupStatus,
-                  activeColor: _AddonTheme.accent,
-                ),
-              ),
-      ],
-    );
-  }
-
   Widget _buildMultipleChoiceSwitch() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -654,8 +618,8 @@ class _EditAddonState extends State<EditAddon> {
             borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(
-            Icons.close_rounded,
-            size: 17,
+            Icons.delete_outline_rounded,
+            size: 20,
             color: canDelete
                 ? _AddonTheme.danger
                 : _AddonTheme.textSecondary.withOpacity(0.35),
@@ -708,7 +672,7 @@ class _EditAddonState extends State<EditAddon> {
           ),
           const SizedBox(width: 10),
           Expanded(
-            flex: 3,
+            flex: 4,
             child: CompositedTransformTarget(
               link: layerLink,
               child: TextFormField(
@@ -749,15 +713,17 @@ class _EditAddonState extends State<EditAddon> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            flex: 2,
+            flex: 3,
             child: TextFormField(
               controller: addon.priceController,
               keyboardType: TextInputType.number,
               readOnly: !_isEditMode,
               validator: (value) {
-                if (value == null || value.trim().isEmpty) return "กรอกราคา";
-                if (double.tryParse(value.trim()) == null)
-                  return "ตัวเลขเท่านั้น";
+                if (value != null && value.trim().isNotEmpty) {
+                  if (int.tryParse(value.trim()) == null) {
+                    return "จำนวนเต็มเท่านั้น";
+                  }
+                }
                 return null;
               },
               style: TextStyle(
@@ -790,57 +756,6 @@ class _EditAddonState extends State<EditAddon> {
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
                   borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: _isEditMode
-                  ? () {
-                      setState(() {
-                        addon.allowqtystatus = !addon.allowqtystatus;
-                      });
-                    }
-                  : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                height: 44,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: addon.allowqtystatus
-                      ? (_isEditMode
-                            ? _AddonTheme.accent.withOpacity(0.12)
-                            : _AddonTheme.accent.withOpacity(0.05))
-                      : (_isEditMode
-                            ? _AddonTheme.surface
-                            : Colors.transparent),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: addon.allowqtystatus && _isEditMode
-                        ? _AddonTheme.accent
-                        : Colors.transparent,
-                    width: 1.4,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      addon.allowqtystatus
-                          ? Icons.check_box_rounded
-                          : Icons.check_box_outline_blank_rounded,
-                      size: 18,
-                      color: addon.allowqtystatus
-                          ? (_isEditMode
-                                ? _AddonTheme.accent
-                                : _AddonTheme.accent.withOpacity(0.6))
-                          : _AddonTheme.textSecondary.withOpacity(0.5),
-                    ),
-                  ],
                 ),
               ),
             ),
@@ -943,7 +858,6 @@ class _EditAddonState extends State<EditAddon> {
                     _sectionHeader(
                       icon: Icons.category_rounded,
                       title: "ข้อมูลกลุ่มตัวเลือก",
-                      trailing: _isEditMode ? null : _buildGroupStatusToggle(),
                     ),
                     const SizedBox(height: 16),
                     _fieldLabel("ชื่อกลุ่มตัวเลือก"),
@@ -1000,7 +914,7 @@ class _EditAddonState extends State<EditAddon> {
                         children: const [
                           SizedBox(width: 36),
                           Expanded(
-                            flex: 3,
+                            flex: 4,
                             child: Text(
                               "ชื่อตัวเลือก",
                               style: TextStyle(
@@ -1010,9 +924,9 @@ class _EditAddonState extends State<EditAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 45),
+                          SizedBox(width: 8),
                           Expanded(
-                            flex: 2,
+                            flex: 3,
                             child: Text(
                               "ราคา",
                               style: TextStyle(
@@ -1022,15 +936,16 @@ class _EditAddonState extends State<EditAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              "เพิ่มจำนวน",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: Color.fromARGB(255, 0, 0, 0),
+                          SizedBox(
+                            width: 44,
+                            child: Center(
+                              child: Text(
+                                "สถานะ",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color.fromARGB(255, 0, 0, 0),
+                                ),
                               ),
                             ),
                           ),

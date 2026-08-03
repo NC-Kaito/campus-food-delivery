@@ -1,3 +1,5 @@
+// features/restaurant/edit_menu.dart
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
@@ -7,15 +9,15 @@ import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/menu/type_menu_service.dart';
+import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/global_data.dart';
 
-// ============================================================
-// 🎨 Design tokens — เดียวกับหน้า AddMenu เพื่อความสอดคล้องทั้งแอป
-// ============================================================
+const String _riceCurryTypeName = "ข้าวราดแกง";
+
 class _MenuTheme {
-  static const Color primary = Color(0xFFFF8A00); // ส้ม — โทนหลักของแบรนด์
-  static const Color accent = Color(0xFF2FB86A); // เขียว — ปุ่มยืนยัน/สถานะ on
+  static const Color primary = Color(0xFFFF8A00);
+  static const Color accent = Color(0xFF2FB86A);
   static const Color danger = Color(0xFFE5484D);
   static const Color surface = Colors.white;
   static const Color pageBg = Color(0xFFF6F7F9);
@@ -25,9 +27,6 @@ class _MenuTheme {
   static const Color border = Color(0xFFE7E8EC);
 }
 
-// ============================================================
-// EditMenu Widget
-// ============================================================
 class EditMenu extends StatefulWidget {
   final MenuModel menuModel;
 
@@ -41,20 +40,20 @@ class _EditMenuState extends State<EditMenu> {
   final MenuService menuService = MenuService();
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final TypeMenuService typeMenuService = TypeMenuService();
+  final RestaurantService restaurantService = RestaurantService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   final TextEditingController menuNameController = TextEditingController();
   final TextEditingController descriptionController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
-  // 🎯 ราคาพิเศษ (extraprice) — เปิด/ปิดได้ด้วย toggle "พิเศษ"
-  final TextEditingController extraPriceController = TextEditingController();
   final TextEditingController _newTypeNameController = TextEditingController();
   final FocusNode _newTypeFocusNode = FocusNode();
 
   bool _isLoading = false;
   bool _isInitialLoading = true;
   bool _isAddingNewType = false;
-  bool _hasExtraPrice = false;
+  bool _isEditable = false;
+  bool _isRiceCurryRestaurant = false;
 
   List<TypeMenuModel> typeMenuList = [];
 
@@ -62,7 +61,6 @@ class _EditMenuState extends State<EditMenu> {
   String? _selectedTypeMenuName;
   String? _newTypeName;
 
-  // 🎯 รูปภาพ: ถ้าเลือกใหม่ใช้ File, ถ้าไม่ได้เลือกใช้ URL เดิม
   File? _selectedImage;
   String? _existingImageUrl;
   String? _imageError;
@@ -74,10 +72,9 @@ class _EditMenuState extends State<EditMenu> {
   void initState() {
     super.initState();
     _initializeFromMenuModel();
-    _loadAllData();
+    _initializeData();
   }
 
-  // 🎯 ใส่ข้อมูลเดิมจาก menuModel ลง controller
   void _initializeFromMenuModel() {
     menuNameController.text = widget.menuModel.menuName ?? "";
     descriptionController.text = widget.menuModel.description ?? "";
@@ -92,13 +89,31 @@ class _EditMenuState extends State<EditMenu> {
     menuNameController.dispose();
     descriptionController.dispose();
     priceController.dispose();
-    extraPriceController.dispose();
     _newTypeNameController.dispose();
     _newTypeFocusNode.dispose();
     super.dispose();
   }
 
-  // 🎯 โหลดประเภทเมนูทั้งหมด
+  Future<void> _initializeData() async {
+    await _checkRestaurantType();
+    await _loadAllData();
+  }
+
+  Future<void> _checkRestaurantType() async {
+    try {
+      final restaurant = await restaurantService.getRestaurantByUsername(
+        GlobalData.usernameRestaurant,
+      );
+      setState(() {
+        final typeName = restaurant.typerestaurantName?.toLowerCase() ?? "";
+        _isRiceCurryRestaurant =
+            typeName.contains("ข้าวแกง") || typeName.contains("ข้าวราดแกง");
+      });
+    } catch (e) {
+      debugPrint("ตรวจสอบประเภทร้านค้าผิดพลาด: $e");
+    }
+  }
+
   Future<void> _loadAllData() async {
     setState(() => _isInitialLoading = true);
     try {
@@ -108,12 +123,26 @@ class _EditMenuState extends State<EditMenu> {
 
       setState(() {
         typeMenuList = types;
-        final bool typeStillExists = typeMenuList.any(
-          (e) => e.typemenuId == _selectedTypeMenuId,
-        );
-        if (_selectedTypeMenuId != null && !typeStillExists) {
-          _selectedTypeMenuName = null;
-          _selectedTypeMenuId = null;
+
+        if (_isRiceCurryRestaurant) {
+          final match = typeMenuList
+              .where((e) => e.typemenuName == _riceCurryTypeName)
+              .firstOrNull;
+          if (match != null) {
+            _selectedTypeMenuName = match.typemenuName;
+            _selectedTypeMenuId = match.typemenuId;
+          } else {
+            _selectedTypeMenuName = _riceCurryTypeName;
+            _newTypeName = _riceCurryTypeName;
+          }
+        } else {
+          final bool typeStillExists = typeMenuList.any(
+            (e) => e.typemenuId == _selectedTypeMenuId,
+          );
+          if (_selectedTypeMenuId != null && !typeStillExists) {
+            _selectedTypeMenuName = null;
+            _selectedTypeMenuId = null;
+          }
         }
 
         _isInitialLoading = false;
@@ -126,6 +155,7 @@ class _EditMenuState extends State<EditMenu> {
   }
 
   Future<void> pickImage() async {
+    if (!_isEditable) return;
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -192,7 +222,6 @@ class _EditMenuState extends State<EditMenu> {
     );
   }
 
-  // 🎯 สร้าง final image URL: ถ้าเลือกใหม่ → upload, ถ้าไม่ → ใช้เดิม
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -203,7 +232,6 @@ class _EditMenuState extends State<EditMenu> {
   Future<void> _doSaveMenu() async {
     final isFormValid = formKey.currentState!.validate();
 
-    // รูปต้องมีอย่างน้อย 1 อย่าง: ไฟล์ใหม่ หรือ URL เดิม
     setState(() {
       _imageError =
           (_selectedImage == null &&
@@ -222,24 +250,29 @@ class _EditMenuState extends State<EditMenu> {
     setState(() => _isLoading = true);
 
     try {
-      // อัปโหลดรูปใหม่ถ้ามี ไม่งั้นใช้ URL เดิม
       String? imageUrl = _existingImageUrl;
       if (_selectedImage != null) {
         imageUrl = await menuService.uploadMenuImage(_selectedImage);
       }
 
+      final double finalPrice = _isRiceCurryRestaurant
+          ? 0.0
+          : (double.tryParse(priceController.text) ?? 0.0);
+
+      final String finalDesc = _isRiceCurryRestaurant
+          ? ""
+          : descriptionController.text.trim();
+
       final Map<String, dynamic> requestData = {
         "menuId": widget.menuModel.menuId,
         "menuname": menuNameController.text.trim(),
-        "description": descriptionController.text.trim(),
-        "price": double.parse(priceController.text),
-        // 🎯 ถ้าไม่เปิด "พิเศษ" ไว้ ให้ส่งเป็น 0 ตาม field extraprice
-        "extraprice": _hasExtraPrice
-            ? (double.tryParse(extraPriceController.text.trim()) ?? 0.0)
-            : 0.0,
+        "description": finalDesc,
+        "price": finalPrice,
+        "extraprice": 0.0,
         "status": widget.menuModel.status ?? true,
         "imageUrl": imageUrl ?? "",
         "restaurantId": GlobalData.usernameRestaurant,
+        "isRiceCurry": _isRiceCurryRestaurant,
         if (_selectedTypeMenuId != null) "typeMenuId": _selectedTypeMenuId,
         if (_newTypeName != null && _newTypeName!.isNotEmpty)
           "typeMenuName": _newTypeName,
@@ -258,7 +291,14 @@ class _EditMenuState extends State<EditMenu> {
             ),
           ),
         );
-        Navigator.pop(context);
+
+        setState(() {
+          _isEditable = false;
+          if (_selectedImage != null && imageUrl != null) {
+            _existingImageUrl = imageUrl;
+            _selectedImage = null;
+          }
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -278,13 +318,11 @@ class _EditMenuState extends State<EditMenu> {
     }
   }
 
-  // ============================================================
-  // Shared styles (เดียวกับ AddMenu)
-  // ============================================================
   InputDecoration _inputDecoration({
     String hint = "",
     Widget? suffixIcon,
     Color? fillColor,
+    bool enabled = true,
   }) {
     return InputDecoration(
       hintText: hint,
@@ -292,13 +330,19 @@ class _EditMenuState extends State<EditMenu> {
       isDense: true,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       filled: true,
-      fillColor: fillColor ?? _MenuTheme.fieldBg,
+      fillColor: enabled
+          ? (fillColor ?? _MenuTheme.fieldBg)
+          : const Color(0xFFF0F1F3),
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide.none,
+      ),
+      disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
       ),
@@ -313,10 +357,6 @@ class _EditMenuState extends State<EditMenu> {
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.6),
-      ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
       ),
     );
   }
@@ -370,30 +410,6 @@ class _EditMenuState extends State<EditMenu> {
         ),
         if (trailing != null) trailing,
       ],
-    );
-  }
-
-  Widget _fieldLabel(String text, {bool required = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: RichText(
-        text: TextSpan(
-          text: text,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: _MenuTheme.textSecondary,
-          ),
-          children: required
-              ? const [
-                  TextSpan(
-                    text: ' *',
-                    style: TextStyle(color: _MenuTheme.danger),
-                  ),
-                ]
-              : null,
-        ),
-      ),
     );
   }
 
@@ -471,6 +487,188 @@ class _EditMenuState extends State<EditMenu> {
 
                     const SizedBox(height: 22),
 
+                    // ── Section: หมวดหมู่เมนู (ประเภทเมนู) ───────────
+                    _sectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _sectionHeader(
+                            icon: Icons.category_rounded,
+                            title: "หมวดหมู่เมนู",
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                "ประเภทเมนู",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: _MenuTheme.textSecondary,
+                                ),
+                              ),
+                              if (!_isRiceCurryRestaurant && _isEditable)
+                                Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    borderRadius: BorderRadius.circular(9),
+                                    onTap: () {
+                                      setState(() {
+                                        _isAddingNewType = !_isAddingNewType;
+                                        if (!_isAddingNewType) {
+                                          _newTypeNameController.clear();
+                                          _newTypeName = null;
+                                        } else {
+                                          _selectedTypeMenuId = null;
+                                          _selectedTypeMenuName = null;
+                                        }
+                                      });
+                                      if (_isAddingNewType) {
+                                        FocusScope.of(context).unfocus();
+                                        WidgetsBinding.instance
+                                            .addPostFrameCallback((_) {
+                                              if (mounted) {
+                                                FocusScope.of(
+                                                  context,
+                                                ).requestFocus(
+                                                  _newTypeFocusNode,
+                                                );
+                                              }
+                                            });
+                                      }
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: _isAddingNewType
+                                            ? _MenuTheme.primary
+                                            : _MenuTheme.fieldBg,
+                                        borderRadius: BorderRadius.circular(9),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            _isAddingNewType
+                                                ? Icons.close_rounded
+                                                : Icons.add_rounded,
+                                            size: 14,
+                                            color: _isAddingNewType
+                                                ? Colors.white
+                                                : _MenuTheme.textSecondary,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            "เพิ่มใหม่",
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: _isAddingNewType
+                                                  ? Colors.white
+                                                  : _MenuTheme.textSecondary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+
+                          if (_isRiceCurryRestaurant)
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF0F1F3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.lock_rounded,
+                                    size: 18,
+                                    color: _MenuTheme.textSecondary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _selectedTypeMenuName ?? _riceCurryTypeName,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w700,
+                                      color: _MenuTheme.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else if (!_isAddingNewType)
+                            _buildDropdown(
+                              typeMenuList
+                                  .where(
+                                    (e) => e.typemenuName != _riceCurryTypeName,
+                                  )
+                                  .map((e) => e.typemenuName ?? "")
+                                  .toList(),
+                              _selectedTypeMenuName,
+                              _isEditable
+                                  ? (val) {
+                                      setState(() {
+                                        _selectedTypeMenuName = val;
+                                        _selectedTypeMenuId = typeMenuList
+                                            .firstWhere(
+                                              (e) => e.typemenuName == val,
+                                            )
+                                            .typemenuId;
+                                        _typeMenuError = null;
+                                        _newTypeName = null;
+                                      });
+                                    }
+                                  : null,
+                            )
+                          else
+                            TextFormField(
+                              controller: _newTypeNameController,
+                              focusNode: _newTypeFocusNode,
+                              enabled: _isEditable,
+                              onChanged: (val) {
+                                setState(() {
+                                  _newTypeName = val.trim().isEmpty
+                                      ? null
+                                      : val.trim();
+                                  _selectedTypeMenuId = null;
+                                  _selectedTypeMenuName = null;
+                                  _typeMenuError = null;
+                                });
+                              },
+                              style: const TextStyle(fontSize: 14),
+                              decoration: _inputDecoration(
+                                hint: "ชื่อประเภทอาหารใหม่...",
+                                enabled: _isEditable,
+                              ),
+                            ),
+
+                          if (_typeMenuError != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6, left: 4),
+                              child: Text(
+                                _typeMenuError!,
+                                style: const TextStyle(
+                                  color: _MenuTheme.danger,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
                     // ── Section: รูปภาพเมนู ──────────────────────────
                     _sectionCard(
                       child: Column(
@@ -483,7 +681,7 @@ class _EditMenuState extends State<EditMenu> {
                           const SizedBox(height: 14),
                           Center(
                             child: GestureDetector(
-                              onTap: pickImage,
+                              onTap: _isEditable ? pickImage : null,
                               child: Stack(
                                 children: [
                                   Container(
@@ -501,23 +699,24 @@ class _EditMenuState extends State<EditMenu> {
                                       child: _buildImagePreview(),
                                     ),
                                   ),
-                                  Positioned(
-                                    bottom: 6,
-                                    right: 6,
-                                    child: Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: const BoxDecoration(
-                                        color: _MenuTheme.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.edit_rounded,
-                                        size: 16,
-                                        color: Colors.white,
+                                  if (_isEditable)
+                                    Positioned(
+                                      bottom: 6,
+                                      right: 6,
+                                      child: Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: const BoxDecoration(
+                                          color: _MenuTheme.primary,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.edit_rounded,
+                                          size: 16,
+                                          color: Colors.white,
+                                        ),
                                       ),
                                     ),
-                                  ),
                                 ],
                               ),
                             ),
@@ -550,299 +749,145 @@ class _EditMenuState extends State<EditMenu> {
                           ),
                           const SizedBox(height: 16),
 
-                          _fieldLabel("ชื่อเมนู", required: true),
+                          const Text(
+                            "ชื่อเมนู",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _MenuTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
                           TextFormField(
                             controller: menuNameController,
+                            enabled: _isEditable,
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
                                 ? "กรุณากรอกชื่อเมนู"
                                 : null,
                             style: const TextStyle(fontSize: 14),
                             decoration: _inputDecoration(
-                              hint: "เช่น กระเพราหมูกรอบ",
+                              hint: _isRiceCurryRestaurant
+                                  ? "เช่น แกงไก่, ผัดผัก หรือ ไข่ดาว"
+                                  : "เช่น ข้าวผัด, ผัดซีอิ๊ว",
+                              enabled: _isEditable,
                             ),
                           ),
-
                           const SizedBox(height: 16),
 
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              _fieldLabel("ประเภทเมนู", required: true),
-                              Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(9),
-                                  onTap: () {
-                                    setState(() {
-                                      _isAddingNewType = !_isAddingNewType;
-                                      if (!_isAddingNewType) {
-                                        _newTypeNameController.clear();
-                                        _newTypeName = null;
-                                      } else {
-                                        _selectedTypeMenuId = null;
-                                        _selectedTypeMenuName = null;
-                                      }
-                                    });
-                                    if (_isAddingNewType) {
-                                      FocusScope.of(context).unfocus();
-                                      WidgetsBinding.instance
-                                          .addPostFrameCallback((_) {
-                                            if (mounted) {
-                                              FocusScope.of(
-                                                context,
-                                              ).requestFocus(_newTypeFocusNode);
-                                            }
-                                          });
-                                    }
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 3,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _isAddingNewType
-                                          ? _MenuTheme.primary
-                                          : _MenuTheme.fieldBg,
-                                      borderRadius: BorderRadius.circular(9),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          _isAddingNewType
-                                              ? Icons.close_rounded
-                                              : Icons.add_rounded,
-                                          size: 14,
-                                          color: _isAddingNewType
-                                              ? Colors.white
-                                              : _MenuTheme.textSecondary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          "เพิ่มใหม่",
-                                          style: TextStyle(
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w700,
-                                            color: _isAddingNewType
-                                                ? Colors.white
-                                                : _MenuTheme.textSecondary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                          if (!_isRiceCurryRestaurant) ...[
+                            const Text(
+                              "รายละเอียด",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: _MenuTheme.textSecondary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: descriptionController,
+                              maxLines: 2,
+                              enabled: _isEditable,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: _inputDecoration(
+                                hint: "รายละเอียดอาหารเพิ่มเติม...",
+                                enabled: _isEditable,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          const Text(
+                            "ราคา",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: _MenuTheme.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (_isRiceCurryRestaurant)
+                            Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: _MenuTheme.accent.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: _MenuTheme.accent.withOpacity(0.3),
                                 ),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 5),
-
-                          if (!_isAddingNewType) ...[
-                            typeMenuList.isEmpty
-                                ? Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 14,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: _MenuTheme.fieldBg,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
+                              child: const Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.info_outline_rounded,
+                                    color: _MenuTheme.accent,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        const SizedBox(
-                                          width: 16,
-                                          height: 16,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                            color: _MenuTheme.primary,
+                                        Text(
+                                          "ราคาข้าวราดแกง",
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: _MenuTheme.textPrimary,
                                           ),
                                         ),
-                                        const SizedBox(width: 10),
+                                        SizedBox(height: 6),
                                         Text(
-                                          "กำลังโหลดประเภทหมวดหมู่...",
+                                          "• 1 อย่าง 30 บาท\n• 2 อย่าง 35 บาท\n• 3 อย่าง 40 บาท",
                                           style: TextStyle(
-                                            color: _MenuTheme.textSecondary,
                                             fontSize: 13,
+                                            color: _MenuTheme.textSecondary,
+                                            height: 1.6,
                                           ),
                                         ),
                                       ],
                                     ),
-                                  )
-                                : _buildDropdown(
-                                    typeMenuList
-                                        .map((e) => e.typemenuName ?? "")
-                                        .toList(),
-                                    _selectedTypeMenuName,
-                                    (val) {
-                                      setState(() {
-                                        _selectedTypeMenuName = val;
-                                        _selectedTypeMenuId = typeMenuList
-                                            .firstWhere(
-                                              (e) => e.typemenuName == val,
-                                            )
-                                            .typemenuId;
-                                        _typeMenuError = null;
-                                        _newTypeName = null;
-                                      });
-                                    },
                                   ),
-                          ] else ...[
+                                ],
+                              ),
+                            )
+                          else
                             TextFormField(
-                              controller: _newTypeNameController,
-                              focusNode: _newTypeFocusNode,
-                              autofocus: true,
-                              onChanged: (val) {
-                                setState(() {
-                                  _newTypeName = val.trim().isEmpty
-                                      ? null
-                                      : val.trim();
-                                  _selectedTypeMenuId = null;
-                                  _selectedTypeMenuName = null;
-                                  _typeMenuError = null;
-                                });
+                              controller: priceController,
+                              enabled: _isEditable,
+                              keyboardType: TextInputType.number,
+                              validator: (value) {
+                                if (value == null || value.trim().isEmpty) {
+                                  return "กรุณากรอกราคาเมนู";
+                                }
+                                if (double.tryParse(value) == null) {
+                                  return "ต้องเป็นตัวเลขเท่านั้น";
+                                }
+                                return null;
                               },
                               style: const TextStyle(fontSize: 14),
                               decoration: _inputDecoration(
-                                hint: "ชื่อประเภทอาหาร...",
-                              ),
-                            ),
-                          ],
-
-                          if (_typeMenuError != null)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 6, left: 4),
-                              child: Text(
-                                _typeMenuError!,
-                                style: const TextStyle(
-                                  color: _MenuTheme.danger,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-
-                          const SizedBox(height: 16),
-
-                          _fieldLabel("รายละเอียด"),
-                          TextFormField(
-                            controller: descriptionController,
-                            maxLines: 2,
-                            style: const TextStyle(fontSize: 14),
-                            decoration: _inputDecoration(
-                              hint: "รายละเอียดอาหาร...",
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-
-                          // ── ราคาปกติ + ราคาพิเศษ ─────────────────
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    _fieldLabel("ราคาปกติ", required: true),
-                                    TextFormField(
-                                      controller: priceController,
-                                      keyboardType: TextInputType.number,
-                                      validator: (value) {
-                                        if (value == null ||
-                                            value.trim().isEmpty) {
-                                          return "กรุณากรอกราคาเมนู";
-                                        }
-                                        if (double.tryParse(value) == null) {
-                                          return "กรุณากรอกตัวเลขที่ถูกต้อง";
-                                        }
-                                        return null;
-                                      },
-                                      style: const TextStyle(fontSize: 14),
-                                      decoration: _inputDecoration(
-                                        hint: "0",
-                                        suffixIcon: const Padding(
-                                          padding: EdgeInsets.only(right: 12),
-                                          child: Center(
-                                            widthFactor: 1,
-                                            child: Text(
-                                              "บาท",
-                                              style: TextStyle(
-                                                color: _MenuTheme.textSecondary,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
+                                hint: "0",
+                                enabled: _isEditable,
+                                suffixIcon: const Padding(
+                                  padding: EdgeInsets.only(right: 12),
+                                  child: Center(
+                                    widthFactor: 1,
+                                    child: Text(
+                                      "บาท",
+                                      style: TextStyle(
+                                        color: _MenuTheme.textSecondary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
                                       ),
                                     ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        const Text(
-                                          "พิเศษ",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: _MenuTheme.textSecondary,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        _buildExtraPriceToggle(),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 8),
-                                    TextFormField(
-                                      controller: extraPriceController,
-                                      enabled: _hasExtraPrice,
-                                      keyboardType: TextInputType.number,
-                                      validator: (value) {
-                                        if (!_hasExtraPrice) return null;
-                                        if (value == null ||
-                                            value.trim().isEmpty) {
-                                          return "กรอกราคาพิเศษ";
-                                        }
-                                        if (double.tryParse(value) == null) {
-                                          return "ไม่ถูกต้อง";
-                                        }
-                                        return null;
-                                      },
-                                      style: const TextStyle(fontSize: 14),
-                                      decoration: _inputDecoration(
-                                        hint: "0",
-                                        fillColor: _hasExtraPrice
-                                            ? _MenuTheme.fieldBg
-                                            : _MenuTheme.border,
-                                        suffixIcon: const Padding(
-                                          padding: EdgeInsets.only(right: 12),
-                                          child: Center(
-                                            widthFactor: 1,
-                                            child: Text(
-                                              "บาท",
-                                              style: TextStyle(
-                                                color: _MenuTheme.textSecondary,
-                                                fontWeight: FontWeight.w600,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
                         ],
                       ),
                     ),
@@ -851,51 +896,139 @@ class _EditMenuState extends State<EditMenu> {
               ),
             ),
 
-      // ── ปุ่มบันทึก ปักไว้ด้านล่างเสมอ ────────────────────────────
+      // ── แผงปุ่มควบคุมด้านล่าง (ตามสไตล์หน้า Profile ร้านค้า) ─────
       bottomNavigationBar: _isInitialLoading
           ? null
-          : SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 54,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _doSaveMenu,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _MenuTheme.accent,
-                      foregroundColor: Colors.white,
-                      elevation: 6,
-                      shadowColor: _MenuTheme.accent.withOpacity(0.35),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.check_circle_rounded, size: 19),
-                              SizedBox(width: 8),
-                              Text(
-                                "บันทึกการแก้ไข",
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+          : Container(
+              color: _MenuTheme.pageBg,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              child: SafeArea(
+                child: _isEditable
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 52,
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _isEditable = false;
+                                    _selectedImage = null;
+                                  });
+                                  _initializeFromMenuModel();
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _MenuTheme.textSecondary,
+                                  side: BorderSide(color: Colors.grey.shade300),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
                                 ),
+                                child: const Text(
+                                  "ยกเลิก",
+                                  style: TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: SizedBox(
+                              height: 52,
+                              child: DecoratedBox(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(30),
+                                  gradient: const LinearGradient(
+                                    colors: [
+                                      _MenuTheme.accent,
+                                      Color(0xFF239E56),
+                                    ],
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: _MenuTheme.accent.withOpacity(
+                                        0.35,
+                                      ),
+                                      blurRadius: 14,
+                                      offset: const Offset(0, 6),
+                                    ),
+                                  ],
+                                ),
+                                child: ElevatedButton(
+                                  onPressed: _isLoading ? null : _doSaveMenu,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.transparent,
+                                    shadowColor: Colors.transparent,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(30),
+                                    ),
+                                  ),
+                                  child: _isLoading
+                                      ? const SizedBox(
+                                          height: 20,
+                                          width: 20,
+                                          child: CircularProgressIndicator(
+                                            color: Colors.white,
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Text(
+                                          "บันทึกการแก้ไข",
+                                          style: TextStyle(
+                                            fontSize: 15.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : SizedBox(
+                        width: double.infinity,
+                        height: 54,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(30),
+                            gradient: const LinearGradient(
+                              colors: [_MenuTheme.primary, Color(0xFFFFB13D)],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: _MenuTheme.primary.withOpacity(0.35),
+                                blurRadius: 16,
+                                offset: const Offset(0, 6),
                               ),
                             ],
                           ),
-                  ),
-                ),
+                          child: ElevatedButton.icon(
+                            onPressed: () => setState(() => _isEditable = true),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.transparent,
+                              shadowColor: Colors.transparent,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                            ),
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            label: const Text(
+                              "แก้ไขข้อมูล",
+                              style: TextStyle(
+                                fontSize: 16.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
               ),
             ),
     );
@@ -941,37 +1074,10 @@ class _EditMenuState extends State<EditMenu> {
     );
   }
 
-  // toggle เปิด/ปิดราคาพิเศษ (extraprice) — สวิตช์เปล่า ไม่มีข้อความ
-  Widget _buildExtraPriceToggle() {
-    return SizedBox(
-      width: 40,
-      height: 22,
-      child: FittedBox(
-        fit: BoxFit.fill,
-        child: Switch(
-          value: _hasExtraPrice,
-          activeColor: Colors.white,
-          activeTrackColor: _MenuTheme.primary,
-          inactiveThumbColor: Colors.white,
-          inactiveTrackColor: Colors.grey.shade300,
-          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-          onChanged: (value) {
-            setState(() {
-              _hasExtraPrice = value;
-              if (!_hasExtraPrice) {
-                extraPriceController.clear();
-              }
-            });
-          },
-        ),
-      ),
-    );
-  }
-
   Widget _buildDropdown(
     List<String> items,
     String? value,
-    Function(String?) onChanged,
+    Function(String?)? onChanged,
   ) {
     final String? safeValue = (value != null && items.contains(value))
         ? value
@@ -981,7 +1087,7 @@ class _EditMenuState extends State<EditMenu> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: _MenuTheme.fieldBg,
+        color: _isEditable ? _MenuTheme.fieldBg : const Color(0xFFF0F1F3),
         borderRadius: BorderRadius.circular(12),
       ),
       child: DropdownButtonHideUnderline(
@@ -1001,8 +1107,7 @@ class _EditMenuState extends State<EditMenu> {
               child: Text(e, style: const TextStyle(fontSize: 14)),
             );
           }).toList(),
-          // ไม่มีประเภทให้เลือก → ปิดการกดดรอปดาว กันเปิดเมนูเปล่า
-          onChanged: isEmpty ? null : onChanged,
+          onChanged: _isEditable && !isEmpty ? onChanged : null,
         ),
       ),
     );

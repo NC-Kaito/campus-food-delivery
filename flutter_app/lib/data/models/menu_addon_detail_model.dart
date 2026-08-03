@@ -19,11 +19,24 @@ class MenuAddonDetailModel {
   });
 
   factory MenuAddonDetailModel.fromJson(Map<String, dynamic> json) {
+    // ฟังก์ชันเล็กๆ ช่วยแปลงค่าให้เป็น boolean เสมอ
+    bool parseBool(dynamic value, {bool defaultValue = true}) {
+      if (value is bool) return value;
+      if (value is int) return value == 1;
+      if (value is String) return value.toLowerCase() == 'true' || value == '1';
+      return defaultValue;
+    }
+
     return MenuAddonDetailModel(
       addonDetailId: json['addondetailid'],
       addonPrice: (json['addonprice'] as num?)?.toDouble(),
-      status: json['status'], // ← เพิ่ม
-      allowqtystatus: json['allowqtystatus'],
+
+      // ← แปลงค่า status ตรงนี้ครับ เพื่อให้รองรับทั้งเลข 1/0 และข้อความ
+      status: json['status'] != null ? parseBool(json['status']) : true,
+
+      allowqtystatus: json['allowqtystatus'] != null
+          ? parseBool(json['allowqtystatus'], defaultValue: false)
+          : false,
       menuAddonGroup: json['menuaddongroup'] != null
           ? MenuAddonGroupModel.fromJson(json['menuaddongroup'])
           : null,
