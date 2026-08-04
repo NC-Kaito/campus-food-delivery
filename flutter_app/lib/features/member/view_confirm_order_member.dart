@@ -73,73 +73,122 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
     super.dispose();
   }
 
+  // 🎯 ไอคอนฝั่งซ้ายปรับเป็นสีส้มเข้าโทนกัน
   Widget _buildPlaceholderIcon() {
     return Container(
       width: 65,
       height: 65,
-      color: Colors.green.shade50,
-      child: Icon(Icons.fastfood_rounded, color: primaryGreen, size: 30),
+      color: Colors.orange.shade50,
+      child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
     );
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // 🎯 1. ตรวจสอบว่าเป็นเมนูข้าวแกงหรือไม่
-    final bool isCurryDish =
-        (item.orderDetailCurries != null &&
-        item.orderDetailCurries!.isNotEmpty);
+    // 🎯 1. ดึงรายการกับข้าวจากหลายๆ รูปแบบคีย์ที่เป็นไปได้ (ป้องกันคีย์ไม่ตรง)
+    List<dynamic> rawCurries = [];
+    if (item.orderDetailCurries != null &&
+        item.orderDetailCurries!.isNotEmpty) {
+      rawCurries = item.orderDetailCurries!;
+    } else if ((item as dynamic).toJson()['orderDetailCurries'] != null) {
+      rawCurries = (item as dynamic).toJson()['orderDetailCurries'];
+    } else if ((item as dynamic).toJson()['orderdetailcurries'] != null) {
+      rawCurries = (item as dynamic).toJson()['orderdetailcurries'];
+    }
 
-    // 🎯 2. จัดรูปแบบชื่อเมนูให้ตรงกับ ViewOrder
+    final bool isCurryDish = rawCurries.isNotEmpty;
     String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง (${item.orderDetailCurries!.length} อย่าง)";
+      displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
-    // 🎯 3. ดึงรายการกับข้าวที่ราด
-    String curriesText = "";
-    if (isCurryDish) {
-      curriesText = item.orderDetailCurries!
-          .map((e) {
-            if (e is Map<String, dynamic>) {
-              final menuMap = e['menu'] as Map<String, dynamic>?;
-              return (menuMap?['menuname'] ?? menuMap?['menuName'] ?? '')
-                  .toString();
-            }
-            return '';
-          })
-          .where((name) => name.isNotEmpty)
-          .join(", ");
+    // แกะรายชื่อและรูปกับข้าว
+    List<Map<String, String>> curriesList = [];
+    for (var e in rawCurries) {
+      if (e is Map<String, dynamic>) {
+        final menuMap = (e['menu'] is Map<String, dynamic>)
+            ? e['menu'] as Map<String, dynamic>
+            : e;
+
+        String name =
+            (menuMap['menuname'] ??
+                    menuMap['menuName'] ??
+                    menuMap['name'] ??
+                    '')
+                .toString();
+        String img =
+            (menuMap['menuimage'] ??
+                    menuMap['menuImage'] ??
+                    menuMap['image'] ??
+                    '')
+                .toString();
+
+        if (name.isNotEmpty) {
+          curriesList.add({'name': name, 'image': img});
+        }
+      }
     }
 
-    // 🎯 4. ดึงรายการตัวเลือกเสริม
-    String addonText = item.addons
-        .map((addon) => addon.menuAddonDetail?.addonMenu?.addonName ?? '')
-        .where((name) => name.isNotEmpty)
-        .join(", ");
+    // 🎯 2. ดึงรายการ Add-on จากทุกช่องทางที่เป็นไปได้ พร้อมนับจำนวน (เช่น ไข่ดาว x3)
+    List<dynamic> rawAddons = [];
+    if (item.addons.isNotEmpty) {
+      rawAddons = item.addons;
+    } else if ((item as dynamic).toJson()['addons'] != null) {
+      rawAddons = (item as dynamic).toJson()['addons'];
+    }
 
-    // ═══════════════════════════════════════════════
-    // 🎯 5. คำนวณราคาต่อหน่วย (ตัด extraprice ออกแล้ว)
-    //    - ข้าวราดแกง: ราคาฐานจานข้าว + ผลรวมราคากับข้าวแต่ละอย่างที่เลือก (priceAtOrder)
-    //    - เมนูทั่วไป: ราคาเมนู + ผลรวมราคาตัวเลือกเสริม
-    // ═══════════════════════════════════════════════
-    int finalPricePerUnit;
+    Map<String, int> addonCounts = {};
+    for (var addon in rawAddons) {
+      String name = '';
+      if (addon is Map) {
+        name =
+            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
+            addon['addonMenu']?['addonName'] ??
+            addon['name'] ??
+            '';
+      } else {
+        name = addon.menuAddonDetail?.addonMenu?.addonName ?? '';
+      }
+
+      if (name.isNotEmpty) {
+        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+      }
+    }
+
+    // 🎯 3. คำนวณราคาต่อหน่วย
+    int finalPricePerUnit = 0;
+    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+
     if (isCurryDish) {
       int curriesSum = 0;
-      for (var curry in item.orderDetailCurries!) {
+      for (var curry in rawCurries) {
         if (curry is Map<String, dynamic>) {
-          final num? price = curry['priceAtOrder'] as num?;
+          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
           curriesSum += (price ?? 0).toInt();
         }
       }
-      final int riceBasePrice = item.menu?.price?.toInt() ?? 0;
-      finalPricePerUnit = riceBasePrice + curriesSum;
+      int addonsSum = 0;
+      for (var addon in rawAddons) {
+        num? p = 0;
+        if (addon is Map) {
+          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
+        } else {
+          p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
+        }
+        addonsSum += (p ?? 0).toInt();
+      }
+      finalPricePerUnit =
+          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
     } else {
       int addonsSum = 0;
-      for (var addon in item.addons) {
-        addonsSum +=
-            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
-                .toInt();
+      for (var addon in rawAddons) {
+        num? p = 0;
+        if (addon is Map) {
+          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
+        } else {
+          p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
+        }
+        addonsSum += (p ?? 0).toInt();
       }
-      final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
@@ -155,6 +204,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -177,47 +227,135 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                   Text(
                     displayMenuName,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
+                      height: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     "ราคา $finalPricePerUnit บาท",
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (curriesText.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      "กับข้าวที่ราด: $curriesText",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.green.shade800,
-                        fontWeight: FontWeight.bold,
-                      ),
+
+                  // แสดงผลกับข้าวทุกอย่างแบบ Badge พร้อมรูปภาพ
+                  if (curriesList.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: curriesList.map((curry) {
+                        String rawCurryImage = curry['image'] ?? '';
+                        String finalCurryUrl = _getFinalImageUrl(rawCurryImage);
+
+                        return Container(
+                          padding: const EdgeInsets.only(
+                            left: 2,
+                            right: 8,
+                            top: 2,
+                            bottom: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.green.shade200),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  color: Colors.grey.shade200,
+                                  child: finalCurryUrl.isNotEmpty
+                                      ? Image.network(
+                                          Uri.encodeFull(finalCurryUrl),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                Icons.fastfood_rounded,
+                                                size: 12,
+                                                color: Colors.grey,
+                                              ),
+                                        )
+                                      : const Icon(
+                                          Icons.fastfood_rounded,
+                                          size: 12,
+                                          color: Colors.grey,
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                curry['name'] ?? "ไม่มีชื่อ",
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.green.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
-                  if (addonText.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      "ตัวเลือกเสริม: $addonText",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w500,
-                      ),
+
+                  // แสดงผล Add-on แบบ Badge สีส้ม พร้อมรวมจำนวน (เช่น ไข่ดาว x3)
+                  if (addonCounts.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: addonCounts.entries.map((entry) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.add_circle_rounded,
+                                size: 14,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                entry.value > 1
+                                    ? "${entry.key} x${entry.value}"
+                                    : entry.key,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.orange.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
-                  const SizedBox(height: 4),
+
+                  const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
                       "จำนวน ${item.qty}",
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),

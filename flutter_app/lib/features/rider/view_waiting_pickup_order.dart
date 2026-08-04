@@ -6,7 +6,7 @@ import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:dio/dio.dart'; // 🎯 นำเข้า Dio สำหรับยิง API ของ Google
+import 'package:dio/dio.dart';
 import 'dart:math' show min, max;
 
 class ViewWaitingPickupOrder extends StatefulWidget {
@@ -25,12 +25,10 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
   GoogleMapController? _mapController;
   final Color primaryOrange = Colors.orange;
 
-  // 🎯 ตัวแปรสำหรับวาดเส้นทางตามถนนจริง
   Set<Polyline> _polylines = {};
   String _drivingDistance = "กำลังคำนวณ...";
   String _drivingDuration = "...";
 
-  // 🚨 ข้อสำคัญ: นำ API Key ของ Google Maps ที่เปิดใช้งาน Directions API มาใส่ตรงนี้
   final String googleMapsApiKey = "ใส่_API_KEY_ของคุณที่นี่";
 
   @override
@@ -45,7 +43,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     super.dispose();
   }
 
-  // ── 🎯 ฟังก์ชันดึงเส้นทางขับรถจริงจาก Google Directions API ──
   Future<void> _calculateDrivingRoute() async {
     final order = widget.orderModel;
     final double? restaurantLat = order.restaurant?.latitude;
@@ -62,7 +59,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
         "https://maps.googleapis.com/maps/api/directions/json?origin=$origin&destination=$destination&key=$googleMapsApiKey&language=th";
 
     try {
-      // 🎯 ใช้ Dio ยิงขอข้อมูลจาก Google ตรงๆ
       Response response = await Dio().get(url);
       final data = response.data;
 
@@ -70,11 +66,9 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
         final route = data['routes'][0];
         final leg = route['legs'][0];
 
-        // ดึงข้อความระยะทาง และ เวลา
-        final distanceText = leg['distance']['text']; // e.g., "3.5 กม."
-        final durationText = leg['duration']['text']; // e.g., "12 นาที"
+        final distanceText = leg['distance']['text'];
+        final durationText = leg['duration']['text'];
 
-        // ดึงพิกัดเส้นถนน (Encoded Polyline)
         final encodedPolyline = route['overview_polyline']['points'];
         List<LatLng> polylineCoordinates = _decodePolyline(encodedPolyline);
 
@@ -104,7 +98,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     }
   }
 
-  // ── 🎯 ฟังก์ชันถอดรหัส Polyline ของ Google กลับเป็นพิกัด LatLng ──
   List<LatLng> _decodePolyline(String encoded) {
     List<LatLng> poly = [];
     int index = 0, len = encoded.length;
@@ -135,7 +128,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     return poly;
   }
 
-  // ── ปรับกล้องให้ครอบคลุมทั้งหมุดร้านค้าและลูกค้า ──
   void _setMapBounds(LatLng pos1, LatLng pos2) {
     if (_mapController == null) return;
 
@@ -150,9 +142,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     );
 
     Future.delayed(const Duration(milliseconds: 300), () {
-      _mapController?.animateCamera(
-        CameraUpdate.newLatLngBounds(bounds, 50.0), // Padding 50
-      );
+      _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 50.0));
     });
   }
 
@@ -172,37 +162,56 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     );
   }
 
+  // ── 🎯 การ์ดรายการอาหารปรับแต่งใหม่ให้เหมือนหน้า view_order_member ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
     final bool isCurryDish =
         (item.orderDetailCurries != null &&
         item.orderDetailCurries!.isNotEmpty);
 
+    int curryCount = isCurryDish ? item.orderDetailCurries!.length : 0;
     String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง (${item.orderDetailCurries!.length} อย่าง)";
+      displayMenuName = "ข้าวราดแกง ($curryCount อย่าง)";
     }
 
-    String curriesText = "";
+    // ดึงรายการกับข้าวทั้งหมดพร้อมรูปภาพ
+    List<Map<String, String>> curriesList = [];
     if (isCurryDish) {
-      curriesText = item.orderDetailCurries!
-          .map((e) {
-            if (e is Map<String, dynamic>) {
-              final menuMap = e['menu'] as Map<String, dynamic>?;
-              return (menuMap?['menuname'] ?? menuMap?['menuName'] ?? '')
-                  .toString();
-            }
-            return '';
-          })
-          .where((name) => name.isNotEmpty)
-          .join(", ");
+      for (var e in item.orderDetailCurries!) {
+        if (e is Map<String, dynamic>) {
+          final menuMap = (e['menu'] is Map<String, dynamic>)
+              ? e['menu'] as Map<String, dynamic>
+              : e;
+
+          String name = (menuMap['menuname'] ?? menuMap['menuName'] ?? '')
+              .toString();
+          String img = (menuMap['menuimage'] ?? menuMap['menuImage'] ?? '')
+              .toString();
+
+          if (name.isNotEmpty) {
+            curriesList.add({'name': name, 'image': img});
+          }
+        }
+      }
     }
 
-    String addonText = item.addons
-        .map((addon) => addon.menuAddonDetail?.addonMenu?.addonName ?? '')
-        .where((name) => name.isNotEmpty)
-        .join(", ");
+    // จัดกลุ่มและนับจำนวน Add-on ที่เลือกมาทั้งหมด (เช่น ไข่ดาว x2)
+    Map<String, int> addonCounts = {};
+    for (var addon in item.addons) {
+      String name = '';
+      if (addon.menuAddonDetail != null &&
+          addon.menuAddonDetail!.addonMenu != null) {
+        name = addon.menuAddonDetail!.addonMenu!.addonName ?? '';
+      }
+      if (name.isNotEmpty) {
+        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+      }
+    }
 
-    int finalPricePerUnit;
+    // คำนวณราคาต่อหน่วย
+    int finalPricePerUnit = 0;
+    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+
     if (isCurryDish) {
       int curriesSum = 0;
       for (var curry in item.orderDetailCurries!) {
@@ -211,8 +220,14 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
           curriesSum += (price ?? 0).toInt();
         }
       }
-      final int riceBasePrice = item.menu?.price?.toInt() ?? 0;
-      finalPricePerUnit = riceBasePrice + curriesSum;
+      int addonsSum = 0;
+      for (var addon in item.addons) {
+        addonsSum +=
+            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
+                .toInt();
+      }
+      finalPricePerUnit =
+          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
     } else {
       int addonsSum = 0;
       for (var addon in item.addons) {
@@ -220,7 +235,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
                 .toInt();
       }
-      final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
@@ -236,6 +250,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -258,42 +273,130 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                   Text(
                     displayMenuName,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
+                      height: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     "ราคา $finalPricePerUnit บาท",
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (curriesText.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      "กับข้าวที่ราด: $curriesText",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.green.shade800,
-                        fontWeight: FontWeight.bold,
-                      ),
+
+                  // แสดงผลกับข้าวทั้งหมดแบบ Badge พร้อมรูปภาพย่อย
+                  if (curriesList.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: curriesList.map((curry) {
+                        String rawCurryImage = curry['image'] ?? '';
+                        String finalCurryUrl = _getFinalImageUrl(rawCurryImage);
+
+                        return Container(
+                          padding: const EdgeInsets.only(
+                            left: 2,
+                            right: 8,
+                            top: 2,
+                            bottom: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.green.shade200),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  color: Colors.grey.shade200,
+                                  child: finalCurryUrl.isNotEmpty
+                                      ? Image.network(
+                                          Uri.encodeFull(finalCurryUrl),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                Icons.fastfood_rounded,
+                                                size: 12,
+                                                color: Colors.grey,
+                                              ),
+                                        )
+                                      : const Icon(
+                                          Icons.fastfood_rounded,
+                                          size: 12,
+                                          color: Colors.grey,
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                curry['name'] ?? "ไม่มีชื่อ",
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.green.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
-                  if (addonText.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      "ตัวเลือกเสริม: $addonText",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w500,
-                      ),
+
+                  // แสดงผล Add-on แบบ Badge สีส้ม พร้อมรวมจำนวน (เช่น ไข่ดาว x2)
+                  if (addonCounts.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: addonCounts.entries.map((entry) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.add_circle_rounded,
+                                size: 14,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                entry.value > 1
+                                    ? "${entry.key} x${entry.value}"
+                                    : entry.key,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.orange.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
+
                   if (item.note.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 6),
                     Text(
                       "หมายเหตุ: ${item.note}",
                       style: TextStyle(
@@ -303,13 +406,13 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
                       "จำนวน ${item.qty}",
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -474,7 +577,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             ),
             const SizedBox(height: 24),
 
-            // ── แผนที่เส้นทางพร้อมข้อมูลถนนจริง ────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -527,7 +629,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                     },
                     zoomControlsEnabled: false,
                     scrollGesturesEnabled: true,
-                    // 🎯 นำ Polylines เส้นถนนที่คำนวณมาแสดง
                     polylines: _polylines,
                     markers: {
                       Marker(
@@ -560,7 +661,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 20),
 
-            // ── ข้อมูลการรับส่ง ────────────────────────────────
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -658,7 +758,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
-            // ── รายการอาหาร ─────────────────────────────────
             const Text(
               "รายการอาหาร",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -674,7 +773,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             ),
             const SizedBox(height: 16),
 
-            // ── สรุปราคา ────────────────────────────────────
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -745,7 +843,6 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
         ),
       ),
 
-      // ── ปุ่มยืนยันรับออเดอร์ ────────────
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),

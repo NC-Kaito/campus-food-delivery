@@ -4,6 +4,8 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
+import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
+import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/features/member/add_order_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
@@ -20,6 +22,8 @@ class ListMenuMember extends StatefulWidget {
 class _ListMenuMemberState extends State<ListMenuMember>
     with TickerProviderStateMixin {
   final MenuService _menuService = MenuService();
+  final MenuAddonService _addonService = MenuAddonService();
+
   TabController? _tabController;
 
   bool _isLoading = true;
@@ -29,10 +33,16 @@ class _ListMenuMemberState extends State<ListMenuMember>
   String? restaurantimage;
   String? restaurantname = "กำลังโหลด...";
 
+  // ── ส่วนจัดการข้าวราดแกง ──
   final int _maxCurrySelect = 3;
   final List<MenuModel> _selectedCurries = [];
   bool _isExtraRice = false;
   int _curryQty = 1;
+
+  // 🎯 ตัวแปรเก็บ Add-on สำหรับข้าวแกง
+  List<MenuAddonDetailModel> _curryAddons = [];
+  final Map<int, int> _curryAddonQuantities = {};
+  final Map<int, MenuAddonDetailModel> _curryAddonModelsIndex = {};
 
   @override
   void initState() {
@@ -58,22 +68,27 @@ class _ListMenuMemberState extends State<ListMenuMember>
     }
   }
 
-  void _addMenuCurryToCart(double total, String note) {
+  void _addMenuCurryToCart(
+    double total,
+    String note,
+    List<MenuAddonDetailModel> addons,
+    int addonPrice,
+    int unitPrice,
+  ) {
     final MenuModel mainCurryMenu = _selectedCurries.isNotEmpty
         ? _selectedCurries.first
         : MenuModel(menuName: "ข้าวเปล่า", price: 20.0);
-    final int pricePerUnit = (total / _curryQty).toInt();
 
     CartManager().addToCart(
       CartItem(
         menu: mainCurryMenu,
-        selectedAddons: const [],
+        selectedAddons: addons,
         selectedCurries: List.from(_selectedCurries),
         quantity: _curryQty,
         note: note,
-        addonPrice: 0,
-        totalPrice: pricePerUnit,
-        unitPrice: pricePerUnit,
+        addonPrice: addonPrice,
+        totalPrice: total.toInt(),
+        unitPrice: unitPrice,
         isExtraPrice: false,
       ),
     );
@@ -100,6 +115,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
               Navigator.pop(ctx);
               setState(() {
                 _selectedCurries.clear();
+                _curryAddonQuantities.clear();
                 _isExtraRice = false;
                 _curryQty = 1;
               });
@@ -136,6 +152,38 @@ class _ListMenuMemberState extends State<ListMenuMember>
         }
       }
 
+      // 🎯 ดึงข้อมูล Add-on สำหรับหมวดหมู่ "ข้าวราดแกง" (ระดับร้านค้า)
+      for (var cat in categories) {
+        if (cat.typemenuName != null &&
+            cat.typemenuName!.contains("ข้าวราดแกง")) {
+          try {
+            final addonGroups = await _addonService.getAddonGroupsByRestaurant(
+              widget.restaurantModel.username!,
+            );
+
+            _curryAddons.clear();
+            _curryAddonModelsIndex.clear();
+
+            for (var group in addonGroups) {
+              if (group.status != false && group.details != null) {
+                for (var detail in group.details!) {
+                  if (detail.status != false) {
+                    detail.menuAddonGroup = group;
+                    _curryAddons.add(detail);
+
+                    if (detail.addonDetailId != null) {
+                      _curryAddonModelsIndex[detail.addonDetailId!] = detail;
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            debugPrint("Error fetching restaurant addons: $e");
+          }
+        }
+      }
+
       final newController = TabController(
         length: categories.isEmpty ? 1 : categories.length,
         vsync: this,
@@ -158,6 +206,20 @@ class _ListMenuMemberState extends State<ListMenuMember>
       debugPrint("Error fetching member menus data: $e");
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // 🎯 จัดกลุ่ม Add-on ของข้าวราดแกง
+  Map<String, List<MenuAddonDetailModel>> _groupCurryAddons() {
+    Map<String, List<MenuAddonDetailModel>> grouped = {};
+    for (var addon in _curryAddons) {
+      String groupName =
+          addon.menuAddonGroup?.addonGroupName ?? "ตัวเลือกเสริม";
+      if (!grouped.containsKey(groupName)) {
+        grouped[groupName] = [];
+      }
+      grouped[groupName]!.add(addon);
+    }
+    return grouped;
   }
 
   @override
@@ -254,12 +316,15 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                 ),
                               ),
                               const SizedBox(height: 20),
+                              // 🎯 ปรับแต่งแถบ TabBar ประเภทเมนูเป็นสีส้ม
                               Container(
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFFFFC8),
+                                decoration: BoxDecoration(
+                                  color: Colors
+                                      .orange
+                                      .shade50, // สีพื้นหลังส้มอ่อน
                                   border: Border(
                                     bottom: BorderSide(
-                                      color: Color(0xFFE0E0E0),
+                                      color: Colors.orange.shade200,
                                       width: 1,
                                     ),
                                   ),
@@ -270,9 +335,12 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                   tabAlignment: shouldScroll
                                       ? TabAlignment.start
                                       : TabAlignment.fill,
-                                  labelColor: Colors.black,
-                                  unselectedLabelColor: Colors.black54,
-                                  indicatorColor: Colors.black,
+                                  labelColor:
+                                      Colors.deepOrange, // สีข้อความเมื่อเลือก
+                                  unselectedLabelColor:
+                                      Colors.black54, // สีข้อความเมื่อไม่เลือก
+                                  indicatorColor:
+                                      Colors.deepOrange, // สีเส้นส้มใต้ออพชัน
                                   indicatorWeight: 3,
                                   indicatorSize: TabBarIndicatorSize.tab,
                                   dividerColor: Colors.transparent,
@@ -480,6 +548,175 @@ class _ListMenuMemberState extends State<ListMenuMember>
     );
   }
 
+  // 🎯 วิดเจ็ตสร้างตัวเลือก Addon ย่อย
+  Widget _buildCurryAddonItemOption(
+    MenuAddonDetailModel detail,
+    bool isMultipleChoice,
+  ) {
+    int id = detail.addonDetailId ?? 0;
+    int currentQty = _curryAddonQuantities[id] ?? 0;
+    bool isSelected = currentQty > 0;
+
+    String title = detail.addonMenu?.addonName ?? "ไม่มีชื่อ";
+    int price = detail.addonPrice?.toInt() ?? 0;
+    int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
+
+    void handleFrontTap() {
+      setState(() {
+        if (isSelected) {
+          _curryAddonQuantities.remove(id);
+        } else {
+          if (!isMultipleChoice) {
+            _curryAddonQuantities.removeWhere((key, value) {
+              final model = _curryAddonModelsIndex[key];
+              return model?.menuAddonGroup?.addonGroupId == currentGroupId;
+            });
+            _curryAddonQuantities[id] = 1;
+          } else {
+            _curryAddonQuantities[id] = 1;
+          }
+        }
+      });
+    }
+
+    void handlePlusTap() {
+      setState(() {
+        _curryAddonQuantities[id] = currentQty + 1;
+      });
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              InkWell(
+                onTap: handleFrontTap,
+                child: Row(
+                  children: [
+                    Container(
+                      width: 20,
+                      height: 20,
+                      decoration: BoxDecoration(
+                        shape: isMultipleChoice
+                            ? BoxShape.rectangle
+                            : BoxShape.circle,
+                        borderRadius: isMultipleChoice
+                            ? BorderRadius.circular(4)
+                            : null,
+                        border: Border.all(color: Colors.black, width: 1.5),
+                      ),
+                      child: isSelected
+                          ? Center(
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  shape: isMultipleChoice
+                                      ? BoxShape.rectangle
+                                      : BoxShape.circle,
+                                  borderRadius: isMultipleChoice
+                                      ? BorderRadius.circular(2)
+                                      : null,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                "(+$price)",
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          if (isMultipleChoice)
+            Container(
+              height: 32,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Row(
+                children: [
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    icon: Icon(
+                      Icons.remove,
+                      size: 16,
+                      color: isSelected ? Colors.black87 : Colors.grey.shade300,
+                    ),
+                    onPressed: isSelected
+                        ? () {
+                            setState(() {
+                              if (_curryAddonQuantities[id]! <= 1) {
+                                _curryAddonQuantities.remove(id);
+                              } else {
+                                _curryAddonQuantities[id] =
+                                    _curryAddonQuantities[id]! - 1;
+                              }
+                            });
+                          }
+                        : null,
+                  ),
+                  Container(
+                    alignment: Alignment.center,
+                    width: 20,
+                    child: Text(
+                      "$currentQty",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected
+                            ? Colors.black87
+                            : Colors.grey.shade400,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 32,
+                      minHeight: 32,
+                    ),
+                    icon: Icon(
+                      Icons.add,
+                      size: 16,
+                      color: isSelected ? Colors.black87 : Colors.grey.shade300,
+                    ),
+                    onPressed: isSelected ? handlePlusTap : null,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildCurrySpecialLayout(List<MenuModel> curryItems) {
     if (curryItems.isEmpty) {
       return const Center(
@@ -491,27 +728,38 @@ class _ListMenuMemberState extends State<ListMenuMember>
     }
 
     final int selectCount = _selectedCurries.length;
+    final groupedAddons = _groupCurryAddons();
 
-    // 🎯 [FIXED LOGIC] ตอนเริ่มต้นไม่มีการจิ้มกับข้าว ให้ตั้งราคารวมฐานเป็น 0 บาทก่อน หากเริ่มจิ้มจึงจะเริ่มคิดเกณฑ์ขั้นบันไดมหาลัย
+    // 🎯 [ปรับราคาใหม่] 1 อย่าง 30 บาท, 2 อย่าง 35 บาท, 3 อย่าง 40 บาท
     double basePrice = 0;
     if (selectCount == 1) {
-      basePrice = 25;
-    } else if (selectCount == 2) {
       basePrice = 30;
-    } else if (selectCount >= 3) {
+    } else if (selectCount == 2) {
       basePrice = 35;
+    } else if (selectCount >= 3) {
+      basePrice = 40;
     }
 
-    // คำนวณราคาส่วนต่างบวกเพิ่มสะสมของเมนูไข่
+    // คิดราคาส่วนต่างบวกเพิ่มของกับข้าว(เมนูพิเศษ)
     final double totalSurchargePrice = _selectedCurries.fold(
       0.0,
       (sum, curry) => sum + (curry.price ?? 0.0),
     );
 
-    // ตัวเลือกเสริมจะคิดเงินต่อเมื่อมีการเลือกกับข้าวหลักแล้วเท่านั้น ป้องกันราคาบัคกรณีจานเปล่า
+    // ราคากดเพิ่มข้าวสวย
     final double optionPrice = (selectCount > 0 && _isExtraRice) ? 5.0 : 0.0;
 
-    final double unitPrice = basePrice + totalSurchargePrice + optionPrice;
+    // คำนวณราคา Add-on รวม
+    double addonTotalPrice = 0;
+    _curryAddonQuantities.forEach((id, qty) {
+      final model = _curryAddonModelsIndex[id];
+      if (model != null) {
+        addonTotalPrice += (model.addonPrice ?? 0) * qty;
+      }
+    });
+
+    final double unitPrice =
+        basePrice + totalSurchargePrice + optionPrice + addonTotalPrice;
     final double totalPrice = unitPrice * _curryQty;
 
     return Column(
@@ -674,6 +922,72 @@ class _ListMenuMemberState extends State<ListMenuMember>
                   },
                 ),
                 const SizedBox(height: 8),
+
+                // 🎯 ── ส่วนการแสดงผล Add-on (ตัวเลือกเสริม) ──
+                if (groupedAddons.isNotEmpty) ...[
+                  const Divider(thickness: 1, height: 32),
+                  ...groupedAddons.entries.toList().asMap().entries.map((
+                    mapEntry,
+                  ) {
+                    final isFirstGroup = mapEntry.key == 0;
+                    final entry = mapEntry.value;
+
+                    String groupName = entry.key;
+                    List<MenuAddonDetailModel> items = entry.value;
+
+                    bool isMultipleChoice =
+                        items.first.menuAddonGroup?.is_multiple_choice ?? false;
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (!isFirstGroup)
+                          Divider(
+                            height: 24,
+                            thickness: 1,
+                            color: Colors.grey[300],
+                          )
+                        else
+                          const SizedBox(height: 8),
+
+                        Text(
+                          groupName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Container(
+                                width: 2,
+                                color: const Color(0xFF76FF03),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  children: items
+                                      .map(
+                                        (addonDetail) =>
+                                            _buildCurryAddonItemOption(
+                                              addonDetail,
+                                              isMultipleChoice,
+                                            ),
+                                      )
+                                      .toList(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    );
+                  }),
+                ],
               ],
             ),
           ),
@@ -835,18 +1149,36 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
-                  // 🎯 หากยังไม่ติ๊กเลือกกับข้าวเลย ปุ่มจะกดไม่ได้ (เป็นค่า null สีเทา) เพื่อบังคับกระบวนการให้ถูกต้อง
                   onPressed: _selectedCurries.isEmpty
                       ? null
                       : () {
+                          final List<MenuAddonDetailModel>
+                          finalSelectedAddonsList = [];
+                          _curryAddonQuantities.forEach((id, qty) {
+                            final model = _curryAddonModelsIndex[id];
+                            if (model != null && qty > 0) {
+                              for (int i = 0; i < qty; i++) {
+                                finalSelectedAddonsList.add(model);
+                              }
+                            }
+                          });
+
                           final curriesNames = _selectedCurries
                               .map((c) => c.menuName ?? "-")
                               .join(', ');
                           final additions = _isExtraRice ? 'เพิ่มข้าว' : '';
-                          final finalNote =
+
+                          String finalNote =
                               "ราดแกง: [$curriesNames] ${additions.isNotEmpty ? '($additions)' : ''}";
 
-                          _addMenuCurryToCart(totalPrice, finalNote);
+                          _addMenuCurryToCart(
+                            totalPrice,
+                            finalNote,
+                            finalSelectedAddonsList,
+                            addonTotalPrice.toInt(),
+                            (basePrice + totalSurchargePrice + optionPrice)
+                                .toInt(),
+                          );
                         },
                   child: const Text(
                     "เพิ่มลงตะกร้า",

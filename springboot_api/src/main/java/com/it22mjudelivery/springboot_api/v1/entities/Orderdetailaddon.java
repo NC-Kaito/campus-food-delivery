@@ -5,15 +5,17 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.Objects;
+
 @Entity
 @Table(name="orderdetailaddon")
 @IdClass(OrderdetailaddonId.class)
-@Data
+@Getter
+@Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 @ToString(exclude = {"orderDetail", "menuaddondetail"})
-@EqualsAndHashCode(exclude = {"orderDetail", "menuaddondetail"})
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Orderdetailaddon {
 
@@ -23,7 +25,6 @@ public class Orderdetailaddon {
     @JsonIgnore
     private OrderDetail orderDetail;
 
-    // 🎯 แก้ไขบรรทัดนี้: เปลี่ยน FetchType.LAZY -> FetchType.EAGER
     @Id
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "addondetailid", nullable = false)
@@ -34,4 +35,18 @@ public class Orderdetailaddon {
 
     @Column(nullable = true)
     private Integer addon_qty;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof Orderdetailaddon)) return false;
+        Orderdetailaddon that = (Orderdetailaddon) o;
+        return Objects.equals(orderDetail, that.orderDetail) &&
+                Objects.equals(menuaddondetail, that.menuaddondetail);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(orderDetail, menuaddondetail);
+    }
 }

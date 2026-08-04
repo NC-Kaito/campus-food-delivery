@@ -24,6 +24,27 @@ class OrderDetailModel {
   });
 
   factory OrderDetailModel.fromJson(Map<String, dynamic> json) {
+    // 🎯 ดึง Addons โดยเช็คทุกชื่อคีย์ที่เป็นไปได้จาก Backend
+    var rawAddons =
+        json['orderdetailaddons'] ??
+        json['orderDetailAddons'] ??
+        json['order_detail_addons'] ??
+        json['addons'];
+
+    List<OrderDetailAddonModel> parsedAddons = [];
+    if (rawAddons != null && rawAddons is List) {
+      parsedAddons = rawAddons
+          .map((addon) => OrderDetailAddonModel.fromJson(addon))
+          .toList();
+    }
+
+    // 🎯 ดึง OrderDetailCurries โดยเช็คทุกชื่อคีย์ที่เป็นไปได้
+    var rawCurries =
+        json['orderdetailcurries'] ??
+        json['orderDetailCurries'] ??
+        json['order_detail_curries'] ??
+        json['curries'];
+
     return OrderDetailModel(
       orderDetailId: json['orderdetailid'] ?? json['orderDetailId'],
       menuId: json['menu'] != null
@@ -33,27 +54,14 @@ class OrderDetailModel {
       subTotal: (json['subtotal'] ?? json['subTotal'] ?? 0).toDouble(),
       note: json['note'] ?? "",
       menu: json['menu'] != null ? MenuModel.fromJson(json['menu']) : null,
-      addons: json['orderDetailAddons'] != null
-          ? (json['orderDetailAddons'] as List)
-                .map((addon) => OrderDetailAddonModel.fromJson(addon))
-                .toList()
-          : (json['addons'] != null
-                ? (json['addons'] as List)
-                      .map((addon) => OrderDetailAddonModel.fromJson(addon))
-                      .toList()
-                : []),
-      // ← เพิ่มบรรทัดนี้: เช็คหลายชื่อ key เผื่อ backend สะกดไม่ตรงกัน
-      orderDetailCurries:
-          json['orderdetailcurries'] ??
-          json['orderDetailCurries'] ??
-          json['curries'],
+      addons: parsedAddons,
+      orderDetailCurries: rawCurries is List ? rawCurries : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'qty': qty,
-      // 🎯 แก้เป็น subTotal (ตัว T ใหญ่) เพื่อให้ตรงกับฝั่ง Java เด๊ะๆ ครับ
       'subTotal': subTotal,
       'note': note,
       'menuId': menuId,

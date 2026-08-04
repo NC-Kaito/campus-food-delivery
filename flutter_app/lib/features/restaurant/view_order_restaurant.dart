@@ -32,7 +32,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // ── 🎯 1. ฟังก์ชันใหม่สำหรับ "ยืนยันรับออเดอร์" (เชื่อม API ที่เพิ่งสร้าง) ──
+  // ── 🎯 1. ฟังก์ชันสำหรับ "ยืนยันรับออเดอร์" ──
   Future<void> _confirmOrder() async {
     if (_isUpdating) return;
     setState(() => _isUpdating = true);
@@ -46,12 +46,10 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
     try {
       final int orderId = widget.orderModel.orderId ?? 0;
-
-      // เรียกใช้งาน API รับออเดอร์
       await _orderService.confirmOrderByRestaurant(orderId);
 
       if (!mounted) return;
-      Navigator.pop(context); // ปิด Loading Dialog
+      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -61,7 +59,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
         ),
       );
 
-      Navigator.pop(context, true); // คืนค่า true กลับไปรีเฟรชหน้า List
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
@@ -76,7 +74,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     }
   }
 
-  // ── 🎯 2. ฟังก์ชันอัปเดตสถานะอื่นๆ (เช่น ตอนทำอาหารเสร็จ) ──
+  // ── 🎯 2. ฟังก์ชันอัปเดตสถานะอื่นๆ ──
   Future<void> _updateOrderStatus(
     String newStatus,
     String successMessage,
@@ -93,7 +91,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
     try {
       final int orderId = widget.orderModel.orderId ?? 0;
-      // TODO: เรียกใช้ API อัปเดตสถานะของ OrderService สำหรับ Cooking -> Delivering
+      // TODO: เรียกใช้ API อัปเดตสถานะของ OrderService
       // await _orderService.updateOrderStatus(orderId, newStatus);
 
       if (!mounted) return;
@@ -126,43 +124,62 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     return Container(
       width: 65,
       height: 65,
-      color: Colors.green.shade50,
-      child: const Icon(Icons.fastfood_rounded, color: _primary, size: 30),
+      color: Colors.orange.shade50,
+      child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
     );
   }
 
-  // ── 🎯 การ์ดรายการอาหาร ──
+  // ── 🎯 การ์ดรายการอาหารปรับแต่งใหม่ (เหมือนหน้า ViewOrderMember) ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
+    // 1. ตรวจสอบว่าเป็นข้าวราดแกงหรือไม่
     final bool isCurryDish =
         (item.orderDetailCurries != null &&
         item.orderDetailCurries!.isNotEmpty);
 
+    int curryCount = isCurryDish ? item.orderDetailCurries!.length : 0;
     String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง (${item.orderDetailCurries!.length} อย่าง)";
+      displayMenuName = "ข้าวราดแกง ($curryCount อย่าง)";
     }
 
-    String curriesText = "";
+    // 2. ดึงรายการกับข้าวทั้งหมดพร้อมรูปภาพ
+    List<Map<String, String>> curriesList = [];
     if (isCurryDish) {
-      curriesText = item.orderDetailCurries!
-          .map((e) {
-            if (e is Map<String, dynamic>) {
-              final menuMap = e['menu'] as Map<String, dynamic>?;
-              return (menuMap?['menuname'] ?? menuMap?['menuName'] ?? '')
-                  .toString();
-            }
-            return '';
-          })
-          .where((name) => name.isNotEmpty)
-          .join(", ");
+      for (var e in item.orderDetailCurries!) {
+        if (e is Map<String, dynamic>) {
+          final menuMap = (e['menu'] is Map<String, dynamic>)
+              ? e['menu'] as Map<String, dynamic>
+              : e;
+
+          String name = (menuMap['menuname'] ?? menuMap['menuName'] ?? '')
+              .toString();
+          String img = (menuMap['menuimage'] ?? menuMap['menuImage'] ?? '')
+              .toString();
+
+          if (name.isNotEmpty) {
+            curriesList.add({'name': name, 'image': img});
+          }
+        }
+      }
     }
 
-    String addonText = item.addons
-        .map((addon) => addon.menuAddonDetail?.addonMenu?.addonName ?? '')
-        .where((name) => name.isNotEmpty)
-        .join(", ");
+    // 3. จัดกลุ่มและนับจำนวน Add-on ที่เลือกมาทั้งหมด (เช่น ไข่ดาว x2)
+    Map<String, int> addonCounts = {};
+    for (var addon in item.addons) {
+      String name = '';
+      if (addon.menuAddonDetail != null &&
+          addon.menuAddonDetail!.addonMenu != null) {
+        name = addon.menuAddonDetail!.addonMenu!.addonName ?? '';
+      }
+      if (name.isNotEmpty) {
+        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+      }
+    }
 
-    int finalPricePerUnit;
+    // 4. คำนวณราคาต่อหน่วย
+    int finalPricePerUnit = 0;
+    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+
     if (isCurryDish) {
       int curriesSum = 0;
       for (var curry in item.orderDetailCurries!) {
@@ -171,8 +188,14 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           curriesSum += (price ?? 0).toInt();
         }
       }
-      final int riceBasePrice = item.menu?.price?.toInt() ?? 0;
-      finalPricePerUnit = riceBasePrice + curriesSum;
+      int addonsSum = 0;
+      for (var addon in item.addons) {
+        addonsSum +=
+            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
+                .toInt();
+      }
+      finalPricePerUnit =
+          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
     } else {
       int addonsSum = 0;
       for (var addon in item.addons) {
@@ -180,7 +203,6 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
             (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
                 .toInt();
       }
-      final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
@@ -196,6 +218,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       child: Padding(
         padding: const EdgeInsets.all(12.0),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
@@ -218,42 +241,130 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                   Text(
                     displayMenuName,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
+                      height: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     "ราคา $finalPricePerUnit บาท",
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  if (curriesText.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      "กับข้าวที่ราด: $curriesText",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.green.shade800,
-                        fontWeight: FontWeight.bold,
-                      ),
+
+                  // แสดงผลกับข้าวทุกอย่างแบบ Badge พร้อมรูปภาพย่อย
+                  if (curriesList.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: curriesList.map((curry) {
+                        String rawCurryImage = curry['image'] ?? '';
+                        String finalCurryUrl = _getFinalImageUrl(rawCurryImage);
+
+                        return Container(
+                          padding: const EdgeInsets.only(
+                            left: 2,
+                            right: 8,
+                            top: 2,
+                            bottom: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            border: Border.all(color: Colors.green.shade200),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(20),
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  color: Colors.grey.shade200,
+                                  child: finalCurryUrl.isNotEmpty
+                                      ? Image.network(
+                                          Uri.encodeFull(finalCurryUrl),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(
+                                                Icons.fastfood_rounded,
+                                                size: 12,
+                                                color: Colors.grey,
+                                              ),
+                                        )
+                                      : const Icon(
+                                          Icons.fastfood_rounded,
+                                          size: 12,
+                                          color: Colors.grey,
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                curry['name'] ?? "ไม่มีชื่อ",
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.green.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
-                  if (addonText.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      "ตัวเลือกเสริม: $addonText",
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w500,
-                      ),
+
+                  // แสดงผล Add-on แบบ Badge สีส้ม พร้อมรวมจำนวน (เช่น ไข่ดาว x2)
+                  if (addonCounts.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6.0,
+                      runSpacing: 6.0,
+                      children: addonCounts.entries.map((entry) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.shade50,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.orange.shade200),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.add_circle_rounded,
+                                size: 14,
+                                color: Colors.orange,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                entry.value > 1
+                                    ? "${entry.key} x${entry.value}"
+                                    : entry.key,
+                                style: TextStyle(
+                                  fontSize: 11.5,
+                                  color: Colors.orange.shade900,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ],
+
                   if (item.note.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 6),
                     Text(
                       "หมายเหตุ: ${item.note}",
                       style: TextStyle(
@@ -263,13 +374,13 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                       ),
                     ),
                   ],
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
                       "จำนวน ${item.qty}",
                       style: const TextStyle(
-                        fontSize: 15,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -466,7 +577,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.black12,
+                color: Colors.black,
               ),
             ),
             const SizedBox(height: 10),
@@ -584,8 +695,6 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     );
   }
 
-  // 🎯 สลับปุ่มกกดตามสถานะออเดอร์
-  // 🎯 สลับปุ่มกดตามสถานะออเดอร์
   Widget _buildActionButtonByStatus(String status) {
     if (status == "WaitingRestaurant") {
       return ElevatedButton(
@@ -607,12 +716,11 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
         ),
       );
     } else if (status == "delivery") {
-      // 🎯 เปลี่ยนเงื่อนไขจาก "Cooking" เป็น "delivery" ตามฝั่งหลังบ้าน
       return ElevatedButton(
         onPressed: _isUpdating
             ? null
             : () => _updateOrderStatus(
-                "Delivering", // 💡 (หมายเหตุ: เมื่อกดปุ่มนี้ สถานะต่อไปคืออะไร สามารถแก้ไขคำว่า "Delivering" เป็นคำที่ต้องการได้เลยครับ)
+                "Delivering",
                 "ทำอาหารเสร็จแล้ว! แจ้งไรเดอร์มารับอาหาร 🍱🛵",
               ),
         style: ElevatedButton.styleFrom(

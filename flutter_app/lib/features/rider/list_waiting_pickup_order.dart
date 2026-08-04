@@ -10,6 +10,11 @@ import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart';
 import 'package:flutter_app/features/rider/view_delivery_detail.dart'; // 🎯 1. นำเข้าหน้า ViewDeliveryDetail ที่คุณสร้างขึ้น
 
+import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart'
+    as waiting;
+import 'package:flutter_app/features/rider/view_delivery_detail.dart'
+    as delivery;
+
 class ListWaitingPickupOrder extends StatefulWidget {
   const ListWaitingPickupOrder({super.key});
 
@@ -215,11 +220,10 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     Widget targetPage;
 
     if (_selectedTabIndex == 0) {
-      targetPage = ViewWaitingPickupOrder(orderModel: orderModel);
+      targetPage = waiting.ViewWaitingPickupOrder(orderModel: orderModel);
     } else {
-      targetPage = ViewDeliveryDetail(orderModel: orderModel);
+      targetPage = delivery.ViewDeliveryDetail(orderModel: orderModel);
     }
-
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => targetPage),

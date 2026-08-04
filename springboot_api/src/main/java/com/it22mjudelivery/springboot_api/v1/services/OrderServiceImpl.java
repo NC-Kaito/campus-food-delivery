@@ -7,6 +7,7 @@ import com.it22mjudelivery.springboot_api.v1.dtos.AddOrderDto;
 import com.it22mjudelivery.springboot_api.v1.entities.*;
 import com.it22mjudelivery.springboot_api.v1.repositories.*;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -145,7 +146,19 @@ public class OrderServiceImpl implements OrderService {
     public List<Order> getOrdersByMember(String username) {
         System.out.println("📦 [SERVICE] กำลังดึงประวัติคำสั่งซื้อของกลุ่มสมาชิก: " + username);
         try {
-            return orderRepo.findOrdersByMemberUsername(username.trim());
+            List<Order> orders = orderRepo.findOrdersByMemberUsername(username.trim());
+
+            // 🎯 บังคับโหลดทีละ collection ตามลำดับ แทนที่จะปล่อยให้ Hibernate
+            // พยายามโหลด Set ทั้งสองตัวพร้อมกันแบบ EAGER ซึ่งชนกันจนเกิด
+            // ConcurrentModificationException
+            for (Order order : orders) {
+                for (OrderDetail detail : order.getOrderDetails()) {
+                    Hibernate.initialize(detail.getOrderDetailAddons());
+                    Hibernate.initialize(detail.getOrderDetailCurries());
+                }
+            }
+
+            return orders;
         } catch (Exception e) {
             System.out.println("🚨 เกิดข้อผิดพลาดในการดึงประวัติออเดอร์ที่ Service: " + e.getMessage());
             e.printStackTrace();

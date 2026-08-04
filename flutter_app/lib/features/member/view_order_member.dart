@@ -98,20 +98,18 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     return Container(
       width: 65,
       height: 65,
-      color: Colors.green.shade50,
-      child: Icon(Icons.fastfood_rounded, color: primaryGreen, size: 30),
+      color: Colors.orange.shade50,
+      child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
     );
   }
 
   Widget _buildOrderItemCard(CartItem item, int index) {
     final bool isCurryDish = item.selectedCurries.isNotEmpty;
 
-    // 🎯 สร้างตัวแปรชื่อเมนู และเช็กสถานะพิเศษ
     String displayMenuName = isCurryDish
         ? "ข้าวราดแกง (${item.selectedCurries.length} อย่าง)"
         : (item.menu.menuName ?? "ไม่มีชื่อเมนู");
 
-    // 🎯 เพิ่มคำว่า (พิเศษ) ต่อท้ายถ้าสถานะ isExtraPrice เป็น true
     if (item.isExtraPrice) {
       displayMenuName += " (พิเศษ)";
     }
@@ -119,27 +117,20 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     String? rawMenuImage = item.menu.menuImage;
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
-    int finalPricePerUnit = 0;
-    if (isCurryDish) {
-      finalPricePerUnit = item.unitPrice;
-    } else {
-      int totalAddonPricePerUnit = 0;
-      for (var addon in item.selectedAddons) {
-        totalAddonPricePerUnit += addon.addonPrice?.toInt() ?? 0;
-      }
-      int baseMenuPrice = item.unitPrice;
-      finalPricePerUnit = baseMenuPrice + totalAddonPricePerUnit;
+    // 🎯 [แก้ไขแล้ว] ไม่แยกคิดราคาระหว่างข้าวแกงกับเมนูทั่วไป ให้นำ Add-on มาบวกรวมเสมอ
+    int totalAddonPricePerUnit = 0;
+    for (var addon in item.selectedAddons) {
+      totalAddonPricePerUnit += addon.addonPrice?.toInt() ?? 0;
     }
+    int finalPricePerUnit = item.unitPrice + totalAddonPricePerUnit;
 
-    String addonText = item.selectedAddons
-        .map((e) => e.addonMenu?.addonName ?? '')
-        .where((name) => name.isNotEmpty)
-        .join(", ");
-
-    String curriesText = item.selectedCurries
-        .map((e) => e.menuName ?? '')
-        .where((name) => name.isNotEmpty)
-        .join(", ");
+    Map<String, int> addonCounts = {};
+    for (var addon in item.selectedAddons) {
+      String name = addon.addonMenu?.addonName ?? '';
+      if (name.isNotEmpty) {
+        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+      }
+    }
 
     return InkWell(
       onTap: () async {
@@ -184,6 +175,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12),
@@ -205,15 +197,15 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      crossAxisAlignment: CrossAxisAlignment
-                          .start, // ปรับให้ข้อความที่ยาวปัดตกบรรทัดสวยงาม
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: Text(
-                            displayMenuName, // 🎯 แสดงชื่อที่พ่วง (พิเศษ) แล้ว
+                            displayMenuName,
                             style: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.bold,
+                              height: 1.2,
                             ),
                           ),
                         ),
@@ -221,50 +213,136 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         Text(
                           "แก้ไข",
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             color: Colors.grey.shade700,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       "ราคา $finalPricePerUnit บาท",
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    if (curriesText.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        "กับข้าวที่ราด: $curriesText",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.green.shade800,
-                          fontWeight: FontWeight.bold,
-                        ),
+
+                    if (item.selectedCurries.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6.0,
+                        runSpacing: 6.0,
+                        children: item.selectedCurries.map((curry) {
+                          String rawCurryImage = curry.menuImage ?? '';
+                          String finalCurryUrl = _getFinalImageUrl(
+                            rawCurryImage,
+                          );
+
+                          return Container(
+                            padding: const EdgeInsets.only(
+                              left: 2,
+                              right: 8,
+                              top: 2,
+                              bottom: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              border: Border.all(color: Colors.green.shade200),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    width: 20,
+                                    height: 20,
+                                    color: Colors.grey.shade200,
+                                    child: finalCurryUrl.isNotEmpty
+                                        ? Image.network(
+                                            Uri.encodeFull(finalCurryUrl),
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(
+                                                  Icons.fastfood_rounded,
+                                                  size: 12,
+                                                  color: Colors.grey,
+                                                ),
+                                          )
+                                        : const Icon(
+                                            Icons.fastfood_rounded,
+                                            size: 12,
+                                            color: Colors.grey,
+                                          ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  curry.menuName ?? "ไม่มีชื่อ",
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Colors.green.shade900,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ],
-                    if (addonText.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        "ตัวเลือกเสริม: $addonText",
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.orange.shade800,
-                          fontWeight: FontWeight.w500,
-                        ),
+
+                    if (addonCounts.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6.0,
+                        runSpacing: 6.0,
+                        children: addonCounts.entries.map((entry) {
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.orange.shade200),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.add_circle_rounded,
+                                  size: 14,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  entry.value > 1
+                                      ? "${entry.key} x${entry.value}"
+                                      : entry.key,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Colors.orange.shade900,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
                       ),
                     ],
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
                         "จำนวน ${item.quantity}",
                         style: const TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -282,17 +360,15 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   @override
   Widget build(BuildContext context) {
     int subtotalPrice = 0;
+
+    // 🎯 [แก้ไขแล้ว] รวมราคา Add-on ไม่ว่าจะเป็นเมนูไหนก็ตาม
     for (var item in widget.storeItems) {
-      if (item.selectedCurries.isNotEmpty) {
-        subtotalPrice += (item.unitPrice * item.quantity);
-      } else {
-        int addonsSum = 0;
-        for (var addon in item.selectedAddons) {
-          addonsSum += addon.addonPrice?.toInt() ?? 0;
-        }
-        int actualMenuPrice = item.unitPrice + addonsSum;
-        subtotalPrice += (actualMenuPrice * item.quantity);
+      int addonsSum = 0;
+      for (var addon in item.selectedAddons) {
+        addonsSum += addon.addonPrice?.toInt() ?? 0;
       }
+      int actualMenuPrice = item.unitPrice + addonsSum;
+      subtotalPrice += (actualMenuPrice * item.quantity);
     }
 
     int deliveryFee = 15;
@@ -645,23 +721,17 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   );
 
                   try {
+                    // 🎯 [แก้ไขแล้ว] รวมราคา Add-on ไม่ว่าจะเป็นเมนูไหนก็ตามตอนกดยืนยันออเดอร์
                     List<OrderDetailModel> orderItems = widget.storeItems.map((
                       cartItem,
                     ) {
-                      double actualSubTotal = 0;
-
-                      if (cartItem.selectedCurries.isNotEmpty) {
-                        actualSubTotal =
-                            (cartItem.unitPrice * cartItem.quantity).toDouble();
-                      } else {
-                        int currentAddonsSum = 0;
-                        for (var addon in cartItem.selectedAddons) {
-                          currentAddonsSum += addon.addonPrice?.toInt() ?? 0;
-                        }
-                        actualSubTotal =
-                            (cartItem.unitPrice + currentAddonsSum) *
-                            cartItem.quantity.toDouble();
+                      int currentAddonsSum = 0;
+                      for (var addon in cartItem.selectedAddons) {
+                        currentAddonsSum += addon.addonPrice?.toInt() ?? 0;
                       }
+                      double actualSubTotal =
+                          (cartItem.unitPrice + currentAddonsSum) *
+                          cartItem.quantity.toDouble();
 
                       return OrderDetailModel(
                         menuId: cartItem.menu.menuId ?? 0,
@@ -679,10 +749,8 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                           curry,
                         ) {
                           return {
-                            "menuId":
-                                curry.menuId ??
-                                0, // ← เปลี่ยนเป็นแบบแบน ตรงกับ AddOrderDetailCurryDto
-                            "priceAtOrder": 5.0,
+                            "menuId": curry.menuId ?? 0,
+                            "priceAtOrder": 0.0,
                           };
                         }).toList(),
                       );
@@ -754,17 +822,11 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                 height: 50,
                 child: OutlinedButton(
                   onPressed: () {
-                    // เด้งกลับไปหน้า ListMenuMember (เพราะหน้า Add ถูก Replace ทิ้งไปแล้ว)
                     Navigator.pop(context);
                   },
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors
-                        .green
-                        .shade700, // 🎯 เปลี่ยนสีตัวอักษรและเอฟเฟกต์ตอนกดให้เข้มขึ้น
-                    side: BorderSide(
-                      color: Colors.green.shade700,
-                      width: 2,
-                    ), // 🎯 เปลี่ยนสีขอบให้เข้มขึ้นเพื่อให้ตัดกับพื้นขาว
+                    foregroundColor: Colors.green.shade700,
+                    side: BorderSide(color: Colors.green.shade700, width: 2),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(25),
                     ),

@@ -41,13 +41,13 @@ public class OrderDetail {
     @JsonIgnoreProperties({"restaurant", "hibernateLazyInitializer", "handler"})
     private Menu menu;
 
-    // 🎯 แก้ไข: กำหนด FetchType.EAGER ป้องกัน Proxy สะดุด
+    // 🎯 เปลี่ยนเป็น FetchType.EAGER
     @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonIgnoreProperties({"orderDetail", "hibernateLazyInitializer", "handler"})
     @Builder.Default
     private Set<Orderdetailaddon> orderDetailAddons = new HashSet<>();
 
-    // 🎯 แก้ไข: กำหนด FetchType.EAGER ป้องกัน Proxy สะดุด
+    // 🎯 เปลี่ยนเป็น FetchType.EAGER
     @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonIgnoreProperties({"orderDetail", "hibernateLazyInitializer", "handler"})
     @Builder.Default
