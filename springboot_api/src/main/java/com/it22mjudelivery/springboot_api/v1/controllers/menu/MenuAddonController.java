@@ -97,15 +97,17 @@ public class MenuAddonController {
         }
     }
 
-    // ดึง addon groups ของร้าน
+    // ดึง addon groups รวมของร้าน (เฉพาะคลังกลาง)
     @GetMapping("/groups")
     public ResponseEntity<?> getAddonGroupsByRestaurant(
             @RequestParam("username") String username) {
+
+        // 🎯 เปลี่ยนมาใช้เมธอดที่กรองเฉพาะ isglobal = true
         List<Menuaddongroup> groups =
-                menuaddongroupRepository.findAllByRestaurantUsername(username);
+                menuaddongroupRepository.findByUsername_UsernameAndIsglobalTrue(username);
+
         return ResponseEntity.ok(groups);
     }
-
     @Autowired
     private MenuaddondetailRepository menuaddondetailRepository;
 

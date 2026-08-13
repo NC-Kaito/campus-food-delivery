@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.services;
 
+import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.*;
 import com.it22mjudelivery.springboot_api.v1.repositories.*;
 import lombok.RequiredArgsConstructor;
@@ -142,16 +143,21 @@ public class MenuServiceImpl implements MenuService {
 
     //=============================================================================
     @Transactional
-    public boolean saveMenu(Map<String, Object> requestData) {
+    public boolean saveMenu(MenuDto requestData) {
         try {
-            String restaurantId = (String) requestData.get("restaurantId");
+            // =======================================================
+            // 1. ค้นหาร้านค้า (restaurant)
+            // =======================================================
+            String restaurantId = requestData.getUsername();
             Restaurant restaurant = restaurantRepository.findByUsername(restaurantId)
                     .orElseThrow(() -> new RuntimeException("ไม่พบข้อมูลร้านค้า"));
 
+            // =======================================================
+            // 2. จัดการหมวดหมู่เมนู (typeMenu)
+            // =======================================================
             TypeMenu typeMenu;
-            Integer typeMenuId = requestData.get("typeMenuId") != null
-                    ? (Integer) requestData.get("typeMenuId") : null;
-            String typeMenuName = (String) requestData.get("typeMenuName");
+            Integer typeMenuId = requestData.getTypeMenuId();
+            String typeMenuName = requestData.getTypeMenuName();
 
             if (typeMenuId != null) {
                 typeMenu = typeMenuRepository.findById(typeMenuId)
@@ -164,36 +170,62 @@ public class MenuServiceImpl implements MenuService {
                 throw new RuntimeException("กรุณาระบุประเภทเมนู");
             }
 
-            String finalImageUrl = "";
-            if (requestData.containsKey("imageUrl")) {
-                finalImageUrl = (String) requestData.get("imageUrl");
-            } else if (requestData.containsKey("imageurl")) {
-                finalImageUrl = (String) requestData.get("imageurl");
-            }
+            String finalImageUrl = requestData.getImageurl() != null ? requestData.getImageurl() : "";
 
-            // 1. สร้างและเซฟข้อมูลพื้นฐานลงตาราง Menu ก่อนเพื่อให้แตกไอดีหลักออกมารอ
+            // =======================================================
+            // 3. บันทึกข้อมูลเมนูหลัก
+            // =======================================================
             Menu menu = Menu.builder()
-                    .menuname((String) requestData.get("menuname"))
-                    .description((String) requestData.get("description"))
-                    .price(Double.parseDouble(requestData.get("price").toString()))
-//                    .extraprice(Double.parseDouble(requestData.get("extraprice".toString())))
+                    .menuname(requestData.getMenuname())
+                    .description(requestData.getDescription())
+                    .price(requestData.getPrice() != null ? requestData.getPrice() : 0.0)
                     .imageurl(finalImageUrl)
-                    .status((boolean) requestData.get("status"))
-                    .restaurant(restaurant)
-                    .typemenu(typeMenu)
+                    .status(requestData.isStatus())
+                    .restaurant(restaurant) // 👈 ตอนนี้ตัวแปร restaurant มีให้ใช้แล้ว
+                    .typemenu(typeMenu)     // 👈 ตอนนี้ตัวแปร typeMenu มีให้ใช้แล้ว
                     .build();
 
             menu = menuRepository.save(menu);
+
+            // =======================================================
+            // 4. จัดการผูก Add-on Groups เข้ากับเมนู (โดยไม่สร้างใหม่)
+            // =======================================================
+            Set<Menuaddongroup> groupsForThisMenu = new HashSet<>();
+
+            // ตรวจสอบว่ามีส่ง addonGroupIds (แบบ List ตัวเลข) มาหรือไม่
+            if (requestData.getAddonGroupIds() != null && !requestData.getAddonGroupIds().isEmpty()) {
+                for (Integer groupId : requestData.getAddonGroupIds()) {
+                    // ดึงกลุ่ม Add-on เดิมที่มีอยู่แล้วในคลัง
+                    Menuaddongroup existingGroup = menuaddongroupRepository.findById(groupId)
+                            .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริม ID: " + groupId));
+
+                    groupsForThisMenu.add(existingGroup);
+                }
+            }
+            // เผื่อรับมาเป็น Array Object จาก addonGroups (Fallback)
+            else if (requestData.getAddonGroups() != null && !requestData.getAddonGroups().isEmpty()) {
+                for (var groupDto : requestData.getAddonGroups()) {
+                    if (groupDto.getAddongroupid() != null) {
+                        Menuaddongroup existingGroup = menuaddongroupRepository.findById(groupDto.getAddongroupid())
+                                .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริม ID: " + groupDto.getAddongroupid()));
+
+                        groupsForThisMenu.add(existingGroup);
+                    }
+                }
+            }
+
+            // หากมีกลุ่มที่ถูกเลือก ให้จับผูกเข้ากับเมนูนี้
+            if (!groupsForThisMenu.isEmpty()) {
+                menu.setMenuAddonGroups(groupsForThisMenu);
+                menuRepository.save(menu);
+            }
+
             return true;
         } catch (Exception e) {
             System.out.println("เกิดข้อผิดพลาดในการบันทึกเมนู " + e);
             throw new RuntimeException("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + e.getMessage());
         }
     }
-
-
-    //=============================================================================
-
     @Transactional
     public boolean updateMenuByRestaurant(Map<String, Object> requestData) {
         try {
@@ -212,8 +244,6 @@ public class MenuServiceImpl implements MenuService {
                 menu.setImageurl((String) requestData.get("imageurl"));
             }
 
-            // 🎯 รองรับทั้งกรณีเลือกประเภทเดิม (typeMenuId) และเพิ่มประเภทใหม่ (typeMenuName)
-            // เหมือน logic ใน saveMenu / saveMenuWithAddons
             Integer typeMenuId = requestData.get("typeMenuId") != null
                     ? (Integer) requestData.get("typeMenuId") : null;
             String typeMenuName = (String) requestData.get("typeMenuName");
@@ -231,6 +261,26 @@ public class MenuServiceImpl implements MenuService {
             }
             menu.setTypemenu(typeMenu);
 
+            // ==========================================================
+            // 🎯 เพิ่มส่วนจัดการอัปเดต Add-on ที่ถูกผูกกับเมนู
+            // ==========================================================
+            if (requestData.containsKey("addonGroupIds")) {
+                List<?> rawIds = (List<?>) requestData.get("addonGroupIds");
+                Set<Menuaddongroup> newAddonGroups = new HashSet<>();
+
+                if (rawIds != null && !rawIds.isEmpty()) {
+                    for (Object rawId : rawIds) {
+                        Integer groupId = Integer.parseInt(rawId.toString());
+                        Menuaddongroup group = menuaddongroupRepository.findById(groupId)
+                                .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริม ID: " + groupId));
+                        newAddonGroups.add(group);
+                    }
+                }
+
+                // นำ Set ที่ได้ไปอัปเดต (ถ้า List ว่างเปล่า = ลบการผูกทั้งหมด)
+                menu.setMenuAddonGroups(newAddonGroups);
+            }
+
             menuRepository.save(menu);
             return true;
         } catch (Exception e) {
@@ -238,8 +288,6 @@ public class MenuServiceImpl implements MenuService {
             throw new RuntimeException("อัปเดตข้อมูลล้มเหลว: " + e.getMessage());
         }
     }
-
-
 
     @Transactional
     public boolean deleteMenu(int menuId) {
@@ -284,4 +332,13 @@ public class MenuServiceImpl implements MenuService {
             throw new RuntimeException("อัปเดตข้อมูลล้มเหลว: " + e.getMessage());
         }
     }
+
+//    @Override
+//    public Set<Menuaddongroup> getAddonsByTypeMenuId(int id) {
+//        TypeMenu typeMenu = typeMenuRepository.findById(id)
+//                .orElseThrow(() -> new RuntimeException("ไม่พบประเภทอาหาร ID: " + id));
+//
+//        // ดึงรายการ Add-on ที่ผูกไว้ส่งกลับไปให้ Flutter
+//        return typeMenu.getDefaultAddonGroups();
+//    }
 }

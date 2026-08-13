@@ -172,34 +172,29 @@ class MenuService {
     }
   }
 
-  // ✅ บันทึกเมนูพร้อม Add-on
-  Future<void> saveMenuWithAddons(Map<String, dynamic> requestData) async {
-    try {
-      final response = await DioClient.dio.post(
-        "/v1/menuAddon/addMenuWithAddons",
-        data: requestData,
-      );
-      if (response.statusCode != 200) {
-        throw "บันทึกเมนูไม่สำเร็จ";
-      }
-    } on DioException catch (e) {
-      final msg = e.response?.data;
-      throw (msg is String ? msg : "เกิดข้อผิดพลาดในการบันทึกเมนู");
-    }
-  }
-
+  // ยุบเหลือฟังก์ชันเดียว ส่งข้อมูลไปเส้นเดียวจบ!
   Future<void> saveMenu(Map<String, dynamic> requestData) async {
     try {
       final response = await DioClient.dio.post(
         "/v1/menu/addMenu",
         data: requestData,
       );
-      if (response.statusCode != 200) {
+
+      // ดัก statusCode 200 และ 201 (Created) เผื่อหลังบ้านส่ง 201 กลับมา
+      if (response.statusCode != 200 && response.statusCode != 201) {
         throw "บันทึกเมนูไม่สำเร็จ";
       }
     } on DioException catch (e) {
-      final msg = e.response?.data;
-      throw (msg is String ? msg : "เกิดข้อผิดพลาดในการบันทึกเมนู");
+      final data = e.response?.data;
+
+      // อัปเกรดการดัก Error เผื่อ Spring Boot ส่งกลับมาเป็น JSON Map เช่น {"message": "..."}
+      if (data is Map<String, dynamic> && data.containsKey('message')) {
+        throw data['message'];
+      } else if (data is String) {
+        throw data;
+      } else {
+        throw "เกิดข้อผิดพลาดในการเชื่อมต่อ หรือบันทึกเมนู";
+      }
     }
   }
 

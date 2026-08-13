@@ -5,11 +5,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/addon_group_request_model.dart';
 import 'package:flutter_app/data/models/addon_menu_model.dart';
-import 'package:flutter_app/features/restaurant/add_menu.dart'
-    show CustomAddonItem;
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/global_data.dart';
+
+class CustomAddonItem {
+  TextEditingController nameController;
+  TextEditingController priceController;
+  int? addonId;
+  bool allowqtystatus;
+  bool status;
+
+  CustomAddonItem({
+    required this.nameController,
+    required this.priceController,
+    this.addonId,
+    this.allowqtystatus = false,
+    this.status = true,
+  });
+}
 
 class _AddonTheme {
   static const Color primary = Color(0xFFFF8A00);
@@ -228,7 +242,6 @@ class _EditAddonState extends State<EditAddon> {
       addon.status = value;
     });
 
-    // อัปเดตข้อมูลต้นทางในหน่วยความจำ
     if (addon.addonId != null) {
       final detailIndex = widget.details.indexWhere(
         (detail) => detail.addonDetailId == addon.addonId,
@@ -248,7 +261,6 @@ class _EditAddonState extends State<EditAddon> {
           addon.status = previousDetailStatus;
         });
 
-        // ถ้ายิง API ไม่สำเร็จ ให้ย้อนกลับค่าในหน่วยความจำด้วย
         if (addon.addonId != null) {
           final detailIndex = widget.details.indexWhere(
             (detail) => detail.addonDetailId == addon.addonId,

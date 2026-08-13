@@ -58,11 +58,33 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
     setState(() {
       _allAddons = addons;
+
+      // จัดกลุ่มชั่วคราวเพื่อค้นหาตัวเลือกแรกของแต่ละกลุ่ม
+      final Map<int, List<MenuAddonDetailModel>> groupedByGroupId = {};
+
       for (var addon in addons) {
         if (addon.addonDetailId != null) {
           _addonModelsIndex[addon.addonDetailId!] = addon;
+
+          int groupId = addon.menuAddonGroup?.addonGroupId ?? 0;
+          if (!groupedByGroupId.containsKey(groupId)) {
+            groupedByGroupId[groupId] = [];
+          }
+          groupedByGroupId[groupId]!.add(addon);
         }
       }
+
+      // 🎯 ตรวจสอบและเลือก Default: ติ๊กเฉพาะตัวเลือกแรกของกลุ่มที่เป็นราคาปกติ (0 บาท)
+      groupedByGroupId.forEach((groupId, items) {
+        if (items.isNotEmpty) {
+          final firstItem = items.first;
+          if ((firstItem.addonPrice ?? 0) == 0 &&
+              firstItem.addonDetailId != null) {
+            _addonQuantities[firstItem.addonDetailId!] = 1;
+          }
+        }
+      });
+
       _isLoading = false;
     });
   }
@@ -208,7 +230,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                   ),
                                 ),
                                 Text(
-                                  "฿$basePrice",
+                                  basePrice == 0 ? "ราคาปกติ" : "฿$basePrice",
                                   style: const TextStyle(
                                     fontSize: 30,
                                     fontWeight: FontWeight.bold,
@@ -230,73 +252,76 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                             ],
                             const SizedBox(height: 24),
                             if (groupedAddons.isNotEmpty) ...[
-                              ...groupedAddons.entries.toList().asMap().entries.map((
-                                mapEntry,
-                              ) {
-                                final isFirstGroup = mapEntry.key == 0;
-                                final entry = mapEntry.value;
+                              ...groupedAddons.entries
+                                  .toList()
+                                  .asMap()
+                                  .entries
+                                  .map((mapEntry) {
+                                    final isFirstGroup = mapEntry.key == 0;
+                                    final entry = mapEntry.value;
 
-                                String groupName = entry.key;
-                                List<MenuAddonDetailModel> items = entry.value;
+                                    String groupName = entry.key;
+                                    List<MenuAddonDetailModel> items =
+                                        entry.value;
 
-                                // 🎯 ดึงค่า is_multiple_choice ตรงจาก Model ใหม่
-                                bool isMultipleChoice =
-                                    items
-                                        .first
-                                        .menuAddonGroup
-                                        ?.is_multiple_choice ??
-                                    false;
+                                    bool isMultipleChoice =
+                                        items
+                                            .first
+                                            .menuAddonGroup
+                                            ?.is_multiple_choice ??
+                                        false;
 
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (!isFirstGroup)
-                                      Divider(
-                                        height: 24,
-                                        thickness: 1,
-                                        color: Colors.grey[300],
-                                      )
-                                    else
-                                      const SizedBox(height: 8),
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (!isFirstGroup)
+                                          Divider(
+                                            height: 24,
+                                            thickness: 1,
+                                            color: Colors.grey[300],
+                                          )
+                                        else
+                                          const SizedBox(height: 8),
 
-                                    Text(
-                                      groupName,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    IntrinsicHeight(
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          Container(
-                                            width: 2,
-                                            color: const Color(0xFF76FF03),
+                                        Text(
+                                          groupName,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
                                           ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              children: items
-                                                  .map(
-                                                    (addonDetail) =>
-                                                        _buildAddonItemOption(
-                                                          addonDetail,
-                                                          isMultipleChoice,
-                                                        ),
-                                                  )
-                                                  .toList(),
-                                            ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        IntrinsicHeight(
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Container(
+                                                width: 2,
+                                                color: const Color(0xFF76FF03),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  children: items
+                                                      .map(
+                                                        (addonDetail) =>
+                                                            _buildAddonItemOption(
+                                                              addonDetail,
+                                                              isMultipleChoice,
+                                                            ),
+                                                      )
+                                                      .toList(),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                  ],
-                                );
-                              }),
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+                                    );
+                                  }),
                             ],
                             const SizedBox(height: 10),
                             const Text(
@@ -551,7 +576,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         if (isSelected) {
           _addonQuantities.remove(id);
         } else {
-          // 🎯 ถ้าเป็น Single Choice (!isMultipleChoice) ให้สลับตัวเลือกในกลุ่มเดียวกันออกอัตโนมัติ
           if (!isMultipleChoice) {
             _addonQuantities.removeWhere((key, value) {
               final model = _addonModelsIndex[key];
@@ -625,7 +649,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
               ),
               const SizedBox(width: 10),
               Text(
-                "(+$price)",
+                price == 0 ? "(ราคาปกติ)" : "(+$price)",
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.grey,
@@ -635,7 +659,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
             ],
           ),
 
-          // 🎯 ปุ่มบวก/ลบจำนวนชิ้นย่อย เปิดให้ใช้เฉพาะกลุ่มที่เป็น is_multiple_choice == true เท่านั้น
           if (isMultipleChoice)
             Container(
               height: 32,

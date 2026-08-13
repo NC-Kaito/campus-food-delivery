@@ -13,11 +13,10 @@ import 'package:flutter_app/features/restaurant/add_addon.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/edit_addon.dart';
 import 'package:flutter_app/features/restaurant/edit_menu.dart';
-import 'package:flutter_app/features/restaurant/menu_to_addon.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/review_restaurant.dart';
 import 'package:flutter_app/features/restaurant/sales_restaurant.dart';
-import 'package:flutter_app/features/restaurant/list_order_restaurant.dart'; // 🎯 นำเข้า ListOrderRestaurant
+import 'package:flutter_app/features/restaurant/list_order_restaurant.dart';
 import 'package:flutter_app/global_data.dart';
 
 class HomeRestaurant extends StatefulWidget {
@@ -61,6 +60,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   final Map<int, bool> _groupExpanded = {};
   final Map<int, bool> _itemChecked = {};
 
+  // 🎯 เก็บจำนวนกลุ่มตัวเลือกที่ผูกกับแต่ละเมนู
   final Map<int, int> _menuAddonGroupCounts = {};
 
   @override
@@ -135,6 +135,9 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     _tabController?.dispose();
 
     setState(() {
+      // 🎯 [เพิ่มจุดนี้] ล้างแคชทั้งหมดทิ้งเวลาโหลดร้านค้าใหม่ (เช่น กลับมาจากหน้า AddMenu)
+      _menuAddonGroupCounts.clear();
+
       typeMenus = validEntries.map((e) => e.key).toList();
       categoryMenus
         ..clear()
@@ -149,6 +152,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       _tabController = newController;
     });
 
+    // 🎯 โหลดจำนวนกลุ่มตัวเลือกตอนดึงเมนูเสร็จ
     _loadAddonCountsFor(validEntries.expand((e) => e.value).toList());
   }
 
@@ -197,7 +201,14 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         setState(() {
           categoryMenus[typeMenuId] = menuData;
           categoryLoading[typeMenuId] = false;
+
+          // 🎯 [เพิ่มจุดนี้] ลบแคชจำนวน Add-on เฉพาะหมวดหมู่นี้ทิ้ง เพื่อบังคับให้อัปเดตใหม่
+          for (var m in menuData) {
+            if (m.menuId != null) _menuAddonGroupCounts.remove(m.menuId);
+          }
         });
+
+        // 🎯 โหลดจำนวนกลุ่มตัวเลือกตอน Pull-to-refresh
         _loadAddonCountsFor(menuData);
       }
     } catch (e) {
@@ -205,6 +216,42 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         categoryLoading[typeMenuId] = false;
       });
     }
+  }
+
+  // 🎯 ฟังก์ชันดึงจำนวนกลุ่มตัวเลือกที่ใช้งานของแต่ละเมนู
+  Future<void> _loadAddonCountsFor(List<MenuModel> menus) async {
+    final idsToLoad = menus
+        .where(
+          (m) =>
+              m.menuId != null && !_menuAddonGroupCounts.containsKey(m.menuId),
+        )
+        .map((m) => m.menuId!)
+        .toSet()
+        .toList();
+
+    if (idsToLoad.isEmpty) return;
+
+    final results = await Future.wait(
+      idsToLoad.map((id) async {
+        try {
+          final details = await _addonService.getAddonsByMenuId(id);
+          final groupIds = details
+              .map((d) => d.menuAddonGroup?.addonGroupId)
+              .whereType<int>()
+              .toSet();
+          return MapEntry(id, groupIds.length);
+        } catch (e) {
+          return MapEntry(id, 0);
+        }
+      }),
+    );
+
+    if (!mounted) return;
+    setState(() {
+      for (final entry in results) {
+        _menuAddonGroupCounts[entry.key] = entry.value;
+      }
+    });
   }
 
   Future<void> toggleStatus(int typeMenuId, int index) async {
@@ -263,61 +310,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
-  Future<void> goToMenuAddon(int typeMenuId, MenuModel menu) async {
-    final isUpdated = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => MenuToAddon(menuModel: menu)),
-    );
-
-    if (isUpdated == true && menu.menuId != null) {
-      setState(() {
-        _menuAddonGroupCounts.remove(menu.menuId);
-      });
-      await _loadAddonCountsFor([menu]);
-    }
-  }
-
-  Future<void> _loadAddonCountsFor(List<MenuModel> menus) async {
-    final idsToLoad = menus
-        .where(
-          (m) =>
-              m.menuId != null && !_menuAddonGroupCounts.containsKey(m.menuId),
-        )
-        .map((m) => m.menuId!)
-        .toSet()
-        .toList();
-
-    if (idsToLoad.isEmpty) return;
-
-    final results = await Future.wait(
-      idsToLoad.map((id) async {
-        try {
-          final details = await _addonService.getAddonsByMenuId(id);
-          final groupIds = details
-              .map((d) => d.menuAddonGroup?.addonGroupId)
-              .whereType<int>()
-              .toSet();
-          return MapEntry(id, groupIds.length);
-        } catch (e) {
-          return MapEntry(id, 0);
-        }
-      }),
-    );
-
-    if (!mounted) return;
-    setState(() {
-      for (final entry in results) {
-        _menuAddonGroupCounts[entry.key] = entry.value;
-      }
-    });
-  }
-
-  String _addonCountLabel(MenuModel menu) {
-    final int? menuId = menu.menuId;
-    final int count = menuId != null ? (_menuAddonGroupCounts[menuId] ?? 0) : 0;
-    return count > 0 ? "มี $count ตัวเลือกเสริม" : "ไม่มีตัวเลือกเสริม";
-  }
-
   Future<void> confirmDeleteMenu(int typeMenuId, MenuModel menu) async {
     final confirmed = await _showConfirmDialog(
       title: "ลบเมนูนี้?",
@@ -358,9 +350,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         await _loadAddonOptions();
 
         if (mounted) {
-          setState(() {
-            _menuAddonGroupCounts.clear();
-          });
           await loadRestaurantData();
         }
 
@@ -712,11 +701,10 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: _buildQuickActionsRow(), // 🎯 แถบ 4 ปุ่มด้านบน
+                          child: _buildQuickActionsRow(),
                         ),
                         const SizedBox(height: 16),
 
-                        // แสดง TabBar เฉพาะตอนอยู่หน้าเมนู
                         if (_mainTabIndex == 0)
                           Container(
                             decoration: const BoxDecoration(
@@ -806,7 +794,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           );
                         }
 
-                        // ส่วนการแสดงเมนูบนพื้นหลังสีเทา
                         return RefreshIndicator(
                           color: _primary,
                           onRefresh: () => loadMenusByType(typeId),
@@ -945,6 +932,11 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final bool shouldShowPrice = !isRiceCurry || (storedPrice != 0.0);
     final double displayPrice = isRiceCurry ? (storedPrice + 5.0) : storedPrice;
 
+    final int? menuId = menu.menuId;
+    final int addonCount = menuId != null
+        ? (_menuAddonGroupCounts[menuId] ?? 0)
+        : 0;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -1014,27 +1006,44 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                   ),
 
                 const SizedBox(height: 6),
+
+                // 🎯 แสดงจำนวนกลุ่มตัวเลือก และดันปุ่มแก้ไขให้ชิดขวา
                 Row(
                   children: [
                     if (!isRiceCurry)
                       Expanded(
-                        child: GestureDetector(
-                          onTap: () => goToMenuAddon(typeId, menu),
-                          child: Text(
-                            _addonCountLabel(menu),
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.w600,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.layers_outlined,
+                              size: 14,
+                              color: addonCount > 0
+                                  ? Colors.blueAccent
+                                  : _textMuted,
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                addonCount > 0
+                                    ? "มี $addonCount กลุ่มตัวเลือก"
+                                    : "ไม่มีตัวเลือกเสริม",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: addonCount > 0
+                                      ? Colors.blueAccent
+                                      : _textMuted,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
                         ),
                       )
                     else
                       const Spacer(),
 
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 8),
                     _buildIconAction(
                       icon: Icons.edit_rounded,
                       color: _accent,
@@ -1071,7 +1080,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // 🎯 เพิ่มปุ่ม 'ออเดอร์' ให้ครบ 4 ปุ่ม
   Widget _buildQuickActionsRow() {
     return Row(
       children: [
@@ -1088,7 +1096,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         Expanded(
           child: _buildQuickAction(
             icon: Icons.playlist_add_check_rounded,
-            label: "ตัวเลือก",
+            label: "กลุ่มตัวเลือก",
             iconColor: _mainTabIndex == 1 ? _primary : _textDark,
             active: _mainTabIndex == 1,
             onTap: () => _onSelectMainTab(1),
@@ -1097,15 +1105,13 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         const SizedBox(width: 8),
         Expanded(
           child: _buildQuickAction(
-            icon: Icons.list_alt_rounded, // ไอคอนใหม่
+            icon: Icons.list_alt_rounded,
             label: "ออเดอร์",
             iconColor: _accent,
             active: false,
             onTap: () => Navigator.push(
               context,
-              MaterialPageRoute(
-                builder: (_) => const ListOrderRestaurant(),
-              ), // 🎯 โยงไปหน้า ListOrder
+              MaterialPageRoute(builder: (_) => const ListOrderRestaurant()),
             ),
           ),
         ),
@@ -1126,7 +1132,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // 🎯 ย่อขนาด Text ลงนิดนึงเพื่อให้คำไม่ตกบรรทัด
   Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -1137,10 +1142,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(
-          vertical: 10,
-          horizontal: 2,
-        ), // ลด Padding
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
         decoration: BoxDecoration(
           color: active ? _primary.withOpacity(0.08) : Colors.white,
           borderRadius: BorderRadius.circular(16),
@@ -1160,7 +1162,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               maxLines: 1,
               overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 10.5, // 🎯 ลดขนาดฟอนต์ให้พอดี 4 ปุ่ม
+                fontSize: 10.5,
                 fontWeight: FontWeight.w700,
                 color: active ? _primary : _textDark,
               ),
@@ -1185,7 +1187,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       );
     }
 
-    // ส่วนการแสดงตัวเลือกเสริมบนพื้นหลังสีเทาแบบเดียวกับเมนูเป๊ะๆ ครับ
     return RefreshIndicator(
       color: _primary,
       onRefresh: () {

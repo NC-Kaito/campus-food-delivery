@@ -4,8 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/addon_menu_model.dart';
 import 'package:flutter_app/data/models/addon_group_request_model.dart';
-
-import 'package:flutter_app/features/restaurant/add_menu.dart'
+import 'package:flutter_app/features/restaurant/edit_addon.dart'
     show CustomAddonItem;
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
@@ -190,45 +189,75 @@ class _AddAddonState extends State<AddAddon> {
     _nameFocusNodes[addon]?.unfocus();
   }
 
+  // ─── ฟังก์ชันตัวช่วยสำหรับแจ้งเตือนข้อผิดพลาด ───
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: _AddonTheme.danger,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
+  }
+
   Future<void> _doSaveAddonGroup() async {
     final isFormValid = formKey.currentState!.validate();
     if (!isFormValid) return;
 
+    final groupName = groupNameController.text.trim();
+    if (groupName.isEmpty) {
+      _showErrorSnackBar("กรุณากรอกชื่อกลุ่มตัวเลือก");
+      return;
+    }
+
+    // 1. ตรวจสอบชื่อตัวเลือกย่อยซ้ำกันเองในฟอร์ม[cite: 1]
     final names = selectedAddons
         .map((a) => a.nameController.text.trim().toLowerCase())
         .toList();
     if (names.toSet().length != names.length) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("ชื่อตัวเลือกซ้ำกัน กรุณาตรวจสอบอีกครั้ง"),
-          backgroundColor: _AddonTheme.danger,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
+      _showErrorSnackBar("ชื่อตัวเลือกย่อยซ้ำกัน กรุณาตรวจสอบอีกครั้ง");
       return;
     }
 
     setState(() => _isLoading = true);
 
     try {
-      // 🎯 ส่งค่า is_multiple_choice ไปยัง Backend
+      // 2. 🛡️ ดักป้องกัน: ดึงกลุ่มตัวเลือกทั้งหมดของร้านมาเช็คชื่อซ้ำก่อนบันทึก
+      final restaurantUsername = GlobalData.usernameRestaurant ?? "";
+      final existingGroups = await _addonService.getAddonGroupsByRestaurant(
+        restaurantUsername,
+      );
+
+      final isDuplicate = existingGroups.any(
+        (group) =>
+            (group.addonGroupName ?? "").trim().toLowerCase() ==
+            groupName.toLowerCase(),
+      );
+
+      if (isDuplicate) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          _showErrorSnackBar(
+            "มีชื่อกลุ่มตัวเลือก '$groupName' นี้อยู่แล้วในระบบ กรุณาใช้ชื่ออื่น",
+          );
+        }
+        return;
+      }
+
+      // 3. ส่งข้อมูลไปบันทึกผ่าน API[cite: 1]
       final request = AddonGroupRequestModel(
-        restaurantUsername: GlobalData.usernameRestaurant ?? "",
-        addongroupname: groupNameController.text.trim(),
+        restaurantUsername: restaurantUsername,
+        addongroupname: groupName,
         is_multiple_choice: isMultipleChoice,
         status: true,
         details: selectedAddons.map((addon) {
           return AddonDetailRequestModel(
             addonname: addon.nameController.text.trim(),
-            // 🎯 หากไม่ได้กรอกราคา หรือเป็นค่าว่าง จะแปลงเป็น 0.0 ทันที
             addonprice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
             status: true,
-            allowqtystatus: addon
-                .allowqtystatus, // คงค่า false ไว้ตามเดิมเพื่อไม่ให้กระทบ API
+            allowqtystatus: addon.allowqtystatus,
           );
         }).toList(),
       );
@@ -250,16 +279,15 @@ class _AddAddonState extends State<AddAddon> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("เกิดข้อผิดพลาด: $e"),
-            backgroundColor: _AddonTheme.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        );
+        String errorMessage = "เกิดข้อผิดพลาด: $e";
+        if (e.toString().toLowerCase().contains("duplicate") ||
+            e.toString().toLowerCase().contains("exists") ||
+            e.toString().toLowerCase().contains("unique") ||
+            e.toString().contains("409")) {
+          errorMessage =
+              "ชื่อกลุ่มตัวเลือกนี้มีอยู่แล้วในระบบ กรุณาใช้ชื่ออื่น";
+        }
+        _showErrorSnackBar(errorMessage);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -386,22 +414,14 @@ class _AddAddonState extends State<AddAddon> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                "เลือกได้หลายอย่าง",
-                style: TextStyle(
+              Text(
+                isMultipleChoice
+                    ? "ลูกค้าสามารถเลือกตัวเลือกได้ หลายอย่าง"
+                    : "ลูกค้าเลือกได้เพียง 1 อย่างเท่านั้น",
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: _AddonTheme.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                isMultipleChoice
-                    ? "ลูกค้าสามารถเลือกตัวเลือกได้มากกว่า 1 ข้อ"
-                    : "ลูกค้าเลือกได้เพียง 1 ข้อเท่านั้น",
-                style: const TextStyle(
-                  fontSize: 11.5,
-                  color: _AddonTheme.textSecondary,
                 ),
               ),
             ],
@@ -520,8 +540,6 @@ class _AddAddonState extends State<AddAddon> {
               controller: addon.priceController,
               keyboardType: TextInputType.number,
               validator: (value) {
-                // 🎯 เช็กเฉพาะเวลาที่ผู้ใช้พิมพ์ข้อความลงมา ถ้าพิมพ์มาต้องเป็นตัวเลขเท่านั้น
-                // ถ้าเป็นค่าว่าง ก็ปล่อยผ่านได้เลย ไม่ต้องแจ้งเตือนใดๆ ครับ
                 if (value != null && value.trim().isNotEmpty) {
                   if (double.tryParse(value.trim()) == null) {
                     return "ตัวเลขเท่านั้น";
@@ -768,7 +786,7 @@ class _AddAddonState extends State<AddAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 40), // พื้นที่เว้นไว้ให้ปุ่มถังขยะ
+                          SizedBox(width: 40),
                         ],
                       ),
                     ),

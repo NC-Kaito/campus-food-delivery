@@ -1,7 +1,7 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.menu;
-import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
-import com.it22mjudelivery.springboot_api.v1.dtos.menuDto;
+import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
+import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
 import com.it22mjudelivery.springboot_api.v1.services.MenuService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @RestController
@@ -36,7 +37,7 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
     }
 
     @PostMapping("/updateStatus")
-    public ResponseEntity<?> updateMenuStatus(@RequestBody menuDto dto) {
+    public ResponseEntity<?> updateMenuStatus(@RequestBody MenuDto dto) {
         try {
             boolean isResult = menuService.updateMenuStatus(dto.getMenuid(), dto.isStatus());
             if (isResult) {
@@ -52,17 +53,18 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
     }
 
     @PostMapping("/addMenu")
-    public ResponseEntity<?> addMenu(@RequestBody Map<String, Object> requestData) {
+    public ResponseEntity<?> addMenu(@RequestBody MenuDto requestData) {
         try {
-            boolean isSuccess = menuService.saveMenu(requestData);
-            if (isSuccess) {
-                return ResponseEntity.ok("บันทึกข้อมูลเมนูอาหารสำเร็จ");
-            }
-            return ResponseEntity.badRequest().body("ไม่สามารถบันทึกข้อมูลได้ ข้อมูลไม่ถูกต้อง");
+            menuService.saveMenu(requestData);
+
+            return ResponseEntity.ok(Map.of("message", "บันทึกข้อมูลเมนูอาหารสำเร็จ"));
+
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
+            e.printStackTrace();
+            return ResponseEntity.internalServerError().body(Map.of("message", "เกิดข้อผิดพลาดที่ระบบ: " + e.getMessage()));
         }
     }
 
@@ -131,4 +133,14 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
         }
     }
+
+//    @GetMapping("/{id}/addons")
+//    public ResponseEntity<?> getAddonsByTypeMenu(@PathVariable("id") int id) {
+//        try {
+//            Set<Menuaddongroup> addons = menuService.getAddonsByTypeMenuId(id);
+//            return ResponseEntity.ok(addons);
+//        } catch (Exception e) {
+//            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+//        }
+//    }
 }

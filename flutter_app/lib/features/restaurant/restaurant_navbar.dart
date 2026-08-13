@@ -191,8 +191,28 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
             child: Row(
               children: [
                 _HomeButton(
-                  onTap: () =>
-                      Navigator.popUntil(context, (route) => route.isFirst),
+                  onTap: () {
+                    // 🎯 ดักเช็กสถานะ Route ปัจจุบัน
+                    final isFirst = ModalRoute.of(context)?.isFirst ?? false;
+
+                    if (isFirst) {
+                      // ถ้าอยู่หน้า Home อยู่แล้ว ให้ดึง Controller และเลื่อนขึ้นบนสุด
+                      final scrollController = PrimaryScrollController.maybeOf(
+                        context,
+                      );
+                      if (scrollController != null &&
+                          scrollController.hasClients) {
+                        scrollController.animateTo(
+                          0.0,
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeOutCubic,
+                        );
+                      }
+                    } else {
+                      // ถ้าอยู่หน้าอื่น ให้ Pop กลับมาที่หน้าแรกตามปกติ
+                      Navigator.popUntil(context, (route) => route.isFirst);
+                    }
+                  },
                 ),
                 const SizedBox(width: gap + 4),
                 Expanded(

@@ -34,6 +34,7 @@ public class AddonServiceImpl implements AddonService {
                     .addongroupname(request.getAddongroupname())
                     .is_multiple_choice(request.is_multiple_choice())
                     .status(request.isStatus())
+                    .isglobal(true)
                     .username(restaurant)
                     .build();
 
