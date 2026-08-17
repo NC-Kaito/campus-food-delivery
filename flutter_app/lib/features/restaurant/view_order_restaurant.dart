@@ -32,67 +32,33 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // ── 🎯 1. ฟังก์ชันสำหรับ "ยืนยันรับออเดอร์" ──
-  Future<void> _confirmOrder() async {
-    if (_isUpdating) return;
-    setState(() => _isUpdating = true);
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-          const Center(child: CircularProgressIndicator(color: _primary)),
-    );
-
-    try {
-      final int orderId = widget.orderModel.orderId ?? 0;
-      await _orderService.confirmOrderByRestaurant(orderId);
-
-      if (!mounted) return;
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("รับออเดอร์สำเร็จ! เริ่มปรุงอาหารแล้ว 👨‍🍳"),
-          backgroundColor: _primary,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      Navigator.pop(context, true);
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      setState(() => _isUpdating = false);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("🚨 ไม่สามารถรับออเดอร์ได้: $e"),
-          backgroundColor: _danger,
-        ),
-      );
-    }
-  }
-
-  // ── 🎯 2. ฟังก์ชันอัปเดตสถานะอื่นๆ ──
+  // ── 🎯 ฟังก์ชันหลักฟังก์ชันเดียวสำหรับจัดการสถานะทั้งหมด ──
   Future<void> _updateOrderStatus(
     String newStatus,
-    String successMessage,
-  ) async {
+    String successMessage, {
+    bool isDangerMessage = false,
+  }) async {
     if (_isUpdating) return;
     setState(() => _isUpdating = true);
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) =>
-          const Center(child: CircularProgressIndicator(color: _primary)),
+      builder: (context) => Center(
+        child: CircularProgressIndicator(
+          color: isDangerMessage ? _danger : _primary,
+        ),
+      ),
     );
 
     try {
       final int orderId = widget.orderModel.orderId ?? 0;
-      // TODO: เรียกใช้ API อัปเดตสถานะของ OrderService
+
+      // เอาคอมเมนต์ออกเพื่อใช้งาน API จริงได้เลยนะครับ
       // await _orderService.updateOrderStatus(orderId, newStatus);
+
+      // จำลองการรอ API สักนิดให้ดูเป็นธรรมชาติครับ
+      await Future.delayed(const Duration(seconds: 1));
 
       if (!mounted) return;
       Navigator.pop(context);
@@ -100,7 +66,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(successMessage),
-          backgroundColor: _primary,
+          backgroundColor: isDangerMessage ? _danger : _primary,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -113,7 +79,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("🚨 ไม่สามารถเปลี่ยนสถานะได้: $e"),
+          content: Text("🚨 ไม่สามารถอัปเดตสถานะได้: $e"),
           backgroundColor: _danger,
         ),
       );
@@ -455,7 +421,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                   ),
                   children: [
                     const TextSpan(
-                      text: "เลขที่ออเดอร์ : ",
+                      text: "หมายเลขคำสั่งซื้อ : ",
                       style: TextStyle(color: Colors.black87),
                     ),
                     TextSpan(
@@ -494,7 +460,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
             // ── 👤 บล็อกข้อมูลลูกค้า ──
             const Text(
-              "ข้อมูลลูกค้า",
+              "ลูกค้า",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -559,7 +525,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                   border: Border.all(color: Colors.amber.shade200),
                 ),
                 child: Text(
-                  "จุดจัดส่ง/หมายเหตุที่อยู่: ${order.addressDetail}",
+                  "สถานที่จัดส่ง: ${order.addressDetail}",
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.amber.shade900,
@@ -573,11 +539,12 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
             // ── 🏍️ บล็อกข้อมูลไรเดอร์ ──
             const Text(
-              "ข้อมูลไรเดอร์ที่มารับอาหาร",
+              "ผู้จัดส่ง",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.black,
+                color: Colors
+                    .black, // 🎯 แก้ไขสีตรงนี้ให้เป็น Colors.black แล้วครับ
               ),
             ),
             const SizedBox(height: 10),
@@ -636,7 +603,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
             // ── 🍱 รายการอาหาร ──
             const Text(
-              "รายการอาหารที่ต้องทำ",
+              "รายการสั่งซื้อ",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -659,7 +626,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "ยอดเงินที่ร้านค้าจะได้รับ",
+                  "รวมยอดเงิน",
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -695,25 +662,62 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     );
   }
 
+  // 🎯 สลับปุ่มกดตามสถานะออเดอร์
   Widget _buildActionButtonByStatus(String status) {
     if (status == "WaitingRestaurant") {
-      return ElevatedButton(
-        onPressed: _isUpdating ? null : _confirmOrder,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _isUpdating
+                  ? null
+                  : () => _updateOrderStatus(
+                      "Reject",
+                      "ปฏิเสธออเดอร์เรียบร้อยแล้วครับ",
+                      isDangerMessage: true,
+                    ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: _danger,
+                side: const BorderSide(color: _danger, width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                "ปฏิเสธ",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
           ),
-          elevation: 0,
-        ),
-        child: const Text(
-          "ยืนยันรับออเดอร์ / เริ่มทำอาหาร",
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _isUpdating
+                  ? null
+                  : () => _updateOrderStatus(
+                      "Accept",
+                      "รับออเดอร์สำเร็จ! เริ่มปรุงอาหารแล้ว 👨‍🍳",
+                    ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+              ),
+              child: const Text(
+                "รับออเดอร์",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
           ),
-        ),
+        ],
       );
     } else if (status == "delivery") {
       return ElevatedButton(

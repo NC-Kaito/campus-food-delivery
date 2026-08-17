@@ -1,8 +1,10 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.member;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
+import com.it22mjudelivery.springboot_api.v1.dtos.ReviewDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Member;
 import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
+import com.it22mjudelivery.springboot_api.v1.entities.Review;
 import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddongroupRepository;
 import com.it22mjudelivery.springboot_api.v1.services.MemberService;
 import lombok.RequiredArgsConstructor;
@@ -120,4 +122,19 @@ public class MemberController {
 
         return ResponseEntity.ok(addonGroups);
     }
+
+    @PostMapping("/addReview")
+    public ResponseEntity<?> addReview(@RequestBody ReviewDto reviewDto) {
+        try {
+            Review review = memberService.addReview(reviewDto);
+            return ResponseEntity.ok(review);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+
 }
