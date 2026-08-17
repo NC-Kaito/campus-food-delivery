@@ -179,7 +179,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> getActiveOrdersByRider(String username) {
         try {
-            List<String> activeOrderStatus = Arrays.asList("WaitingRestaurant", "delivery");
+            List<String> activeOrderStatus = Arrays.asList("WaitingRestaurant","GoingToRestaurant", "delivery" );
             return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, activeOrderStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รอไรเดอร์ได้: " + e.getMessage());
@@ -238,6 +238,36 @@ public class OrderServiceImpl implements OrderService {
             return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, activeOrderStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่ต้องทำได้: " + e.getMessage());
+        }
+    }
+
+    @Override
+    @Transactional
+    public boolean updateOrderStatus(int orderId, String newStatus) {
+        try {
+            // ค้นหาออเดอร์จาก Database
+            Order order = orderRepo.findById(orderId)
+                    .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อรหัส: " + orderId));
+
+            // อัปเดตสถานะใหม่
+            order.setOrderstatus(newStatus);
+            orderRepo.save(order);
+
+            return true;
+        } catch (Exception e) {
+            System.err.println("🚨 อัปเดตสถานะไม่สำเร็จ: " + e.getMessage());
+            return false;
+        }
+    }
+
+    @Override
+    public List<Order> getSuccessOrdersByRider(String username) {
+        try {
+            // ดึงเฉพาะออเดอร์ที่สถานะเป็น Success หรือ Completed
+            List<String> successStatus = Arrays.asList("Success");
+            return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, successStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่สำเร็จแล้วได้: " + e.getMessage());
         }
     }
 

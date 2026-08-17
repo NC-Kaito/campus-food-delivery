@@ -58,16 +58,19 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     });
   }
 
-  // 🎯 ดึงข้อมูลเบื้องหลังตามแท็บที่เลือก
   Future<void> _fetchOrdersBackground() async {
     if (!_isReady) return;
     try {
       List<dynamic> orders = [];
+      String studentId = GlobalData.usernameRider; // ดึงค่ายูสเซอร์
+
       if (_selectedTabIndex == 0) {
         orders = await _orderService.getWaitingOrders();
       } else if (_selectedTabIndex == 1) {
-        String studentId = GlobalData.usernameRider;
         orders = await _orderService.getActiveOrders(studentId);
+      } else if (_selectedTabIndex == 2) {
+        // 🎯 ดึงออเดอร์ที่สำเร็จแล้ว
+        orders = await _orderService.getSuccessOrdersByRider(studentId);
       }
 
       if (mounted) {
@@ -118,7 +121,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
   }
 
-  // 🎯 ดึงข้อมูลออเดอร์แยกตามแท็บแบบแสดง Loading
   Future<void> _fetchOrders() async {
     if (!_isReady) return;
 
@@ -128,16 +130,15 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
 
     try {
       List<dynamic> orders = [];
+      String studentId = GlobalData.usernameRider;
+
       if (_selectedTabIndex == 0) {
-        // แท็บ 0: งานใหม่ที่ยังไม่มีใครรับ
         orders = await _orderService.getWaitingOrders();
       } else if (_selectedTabIndex == 1) {
-        // แท็บ 1: งานที่ไรเดอร์คนนี้รับมาแล้วกำลังดำเนินการ
-        String studentId = GlobalData.usernameRider;
         orders = await _orderService.getActiveOrders(studentId);
-      } else {
-        // แท็บ 2: จัดส่งสำเร็จ
-        orders = [];
+      } else if (_selectedTabIndex == 2) {
+        // 🎯 ดึงออเดอร์ที่สำเร็จแล้ว
+        orders = await _orderService.getSuccessOrdersByRider(studentId);
       }
 
       if (mounted) {
@@ -314,10 +315,14 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
 
     // 🎯 กำหนดคำที่ปุ่มให้ตรงกับบริบทของแท็บ
-    String buttonText = _selectedTabIndex == 0
-        ? "ดูรายละเอียดเพื่อรับงาน"
-        : "ดูเส้นทาง / สถานะจัดส่ง";
-
+    String buttonText = "ดูรายละเอียด";
+    if (_selectedTabIndex == 0) {
+      buttonText = "ดูรายละเอียดเพื่อรับงาน";
+    } else if (_selectedTabIndex == 1) {
+      buttonText = "ดูเส้นทาง / สถานะจัดส่ง";
+    } else if (_selectedTabIndex == 2) {
+      buttonText = "ดูรายละเอียดการจัดส่ง";
+    }
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () => _openOrderDetail(orderModel),

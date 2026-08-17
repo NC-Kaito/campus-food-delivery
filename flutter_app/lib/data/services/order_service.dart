@@ -113,6 +113,27 @@ class OrderService {
     }
   }
 
+  Future<List<dynamic>> getSuccessOrdersByRider(String username) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/order/rider/$username/success",
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      } else {
+        throw "เกิดข้อผิดพลาดในการดึงข้อมูลออเดอร์: ${response.statusCode}";
+      }
+    } on DioException catch (e) {
+      final errorMessage =
+          e.response?.data?["message"] ??
+          "ไม่สามารถดึงข้อมูลคำสั่งซื้อได้ หรือเซิร์ฟเวอร์ไม่ได้เปิดอยู่";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   //------ Restaurant ----
   Future<List<dynamic>> getWaitingOrdersByRestaurant(String username) async {
     try {

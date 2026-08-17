@@ -73,7 +73,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
     super.dispose();
   }
 
-  // 🎯 ไอคอนฝั่งซ้ายปรับเป็นสีส้มเข้าโทนกัน
   Widget _buildPlaceholderIcon() {
     return Container(
       width: 65,
@@ -84,15 +83,19 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // 🎯 1. ดึงรายการกับข้าวจากหลายๆ รูปแบบคีย์ที่เป็นไปได้ (ป้องกันคีย์ไม่ตรง)
+    // 🎯 1. ดึงรายการกับข้าวจากหลายๆ รูปแบบคีย์ที่เป็นไปได้
     List<dynamic> rawCurries = [];
     if (item.orderDetailCurries != null &&
         item.orderDetailCurries!.isNotEmpty) {
       rawCurries = item.orderDetailCurries!;
-    } else if ((item as dynamic).toJson()['orderDetailCurries'] != null) {
-      rawCurries = (item as dynamic).toJson()['orderDetailCurries'];
-    } else if ((item as dynamic).toJson()['orderdetailcurries'] != null) {
-      rawCurries = (item as dynamic).toJson()['orderdetailcurries'];
+    } else {
+      try {
+        final jsonItem = (item as dynamic).toJson();
+        rawCurries =
+            jsonItem['orderDetailCurries'] ??
+            jsonItem['orderdetailcurries'] ??
+            [];
+      } catch (_) {}
     }
 
     final bool isCurryDish = rawCurries.isNotEmpty;
@@ -101,39 +104,55 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
-    // แกะรายชื่อและรูปกับข้าว
+    // 🎯 2. แกะรายชื่อและรูปกับข้าว (รองรับทั้ง Map และ Model Object พร้อมเพิ่มคีย์ imageurl)
     List<Map<String, String>> curriesList = [];
     for (var e in rawCurries) {
-      if (e is Map<String, dynamic>) {
-        final menuMap = (e['menu'] is Map<String, dynamic>)
-            ? e['menu'] as Map<String, dynamic>
-            : e;
+      String name = '';
+      String img = '';
 
-        String name =
+      if (e is Map) {
+        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
+        name =
             (menuMap['menuname'] ??
                     menuMap['menuName'] ??
                     menuMap['name'] ??
                     '')
                 .toString();
-        String img =
-            (menuMap['menuimage'] ??
+        img =
+            (menuMap['imageurl'] ??
+                    menuMap['imageUrl'] ??
+                    menuMap['menuimage'] ??
                     menuMap['menuImage'] ??
                     menuMap['image'] ??
                     '')
                 .toString();
+      } else {
+        try {
+          name = (e.menu?.menuName ?? e.menu?.menuname ?? e.name ?? '')
+              .toString();
+          img =
+              (e.menu?.menuImage ??
+                      e.menu?.imageurl ??
+                      e.menu?.imageUrl ??
+                      e.image ??
+                      '')
+                  .toString();
+        } catch (_) {}
+      }
 
-        if (name.isNotEmpty) {
-          curriesList.add({'name': name, 'image': img});
-        }
+      if (name.isNotEmpty) {
+        curriesList.add({'name': name, 'image': img});
       }
     }
 
-    // 🎯 2. ดึงรายการ Add-on จากทุกช่องทางที่เป็นไปได้ พร้อมนับจำนวน (เช่น ไข่ดาว x3)
+    // 🎯 3. ดึงรายการ Add-on
     List<dynamic> rawAddons = [];
     if (item.addons.isNotEmpty) {
       rawAddons = item.addons;
-    } else if ((item as dynamic).toJson()['addons'] != null) {
-      rawAddons = (item as dynamic).toJson()['addons'];
+    } else {
+      try {
+        rawAddons = (item as dynamic).toJson()['addons'] ?? [];
+      } catch (_) {}
     }
 
     Map<String, int> addonCounts = {};
@@ -146,7 +165,9 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             addon['name'] ??
             '';
       } else {
-        name = addon.menuAddonDetail?.addonMenu?.addonName ?? '';
+        try {
+          name = addon.menuAddonDetail?.addonMenu?.addonName ?? '';
+        } catch (_) {}
       }
 
       if (name.isNotEmpty) {
@@ -154,14 +175,14 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       }
     }
 
-    // 🎯 3. คำนวณราคาต่อหน่วย
+    // 🎯 4. คำนวณราคาต่อหน่วย
     int finalPricePerUnit = 0;
     final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
 
     if (isCurryDish) {
       int curriesSum = 0;
       for (var curry in rawCurries) {
-        if (curry is Map<String, dynamic>) {
+        if (curry is Map) {
           final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
           curriesSum += (price ?? 0).toInt();
         }
@@ -172,7 +193,9 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
         if (addon is Map) {
           p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
         } else {
-          p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
+          try {
+            p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
+          } catch (_) {}
         }
         addonsSum += (p ?? 0).toInt();
       }
@@ -185,14 +208,21 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
         if (addon is Map) {
           p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
         } else {
-          p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
+          try {
+            p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
+          } catch (_) {}
         }
         addonsSum += (p ?? 0).toInt();
       }
       finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
-    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
+    // เลือกลิงก์รูปภาพ: หากเป็นข้าวแกงแต่เมนูหลักไม่มีรูป ให้ดึงรูปจากกับข้าวอย่างแรกมาแสดง
+    String rawMenuUrl = item.menu?.menuImage ?? '';
+    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
+      rawMenuUrl = curriesList.first['image'] ?? '';
+    }
+    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -208,16 +238,16 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: isCurryDish || finalMenuUrl.isEmpty
-                  ? _buildPlaceholderIcon()
-                  : Image.network(
+              child: finalMenuUrl.isNotEmpty
+                  ? Image.network(
                       Uri.encodeFull(finalMenuUrl),
                       width: 65,
                       height: 65,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildPlaceholderIcon(),
-                    ),
+                    )
+                  : _buildPlaceholderIcon(),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -241,7 +271,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ),
 
-                  // แสดงผลกับข้าวทุกอย่างแบบ Badge พร้อมรูปภาพ
+                  // แสดง Badge กับข้าวพร้อมรูปภาพ
                   if (curriesList.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -306,7 +336,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ],
 
-                  // แสดงผล Add-on แบบ Badge สีส้ม พร้อมรวมจำนวน (เช่น ไข่ดาว x3)
+                  // แสดง Badge Add-on
                   if (addonCounts.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
@@ -424,8 +454,9 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
           Text(
             label,
             textAlign: TextAlign.center,
+            // 🎯 ปรับให้ข้อความไม่ตกขอบ หรือล้นไปโดนตัวอื่น
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 10.5,
               color: isCompleted ? Colors.black87 : Colors.grey.shade500,
               fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
             ),
@@ -446,15 +477,25 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       widget.order.longitude,
     );
 
+    // 🎯 อัปเดตเงื่อนไขให้ครอบคลุมสถานะใหม่
     String status = (widget.order.orderStatus ?? "").toLowerCase();
     int currentStep = 1;
 
-    if (status.contains("waitingrestaurant") || status.contains("cooking")) {
+    if (status.contains("waitingrestaurant") ||
+        status.contains("cooking") ||
+        status.contains("preparing")) {
       currentStep = 2;
-    } else if (status.contains("delivery") || status.contains("pickedup")) {
+    } else if (status.contains("rideraccepted") ||
+        status.contains("riderarrived") ||
+        status.contains("goingtorestaurant")) {
       currentStep = 3;
-    } else if (status.contains("success") || status.contains("completed")) {
+    } else if (status.contains("delivery") ||
+        status.contains("delivering") ||
+        status.contains("ontheway") ||
+        status.contains("pickedup")) {
       currentStep = 4;
+    } else if (status.contains("success") || status.contains("completed")) {
+      currentStep = 5;
     }
 
     return Scaffold(
@@ -570,7 +611,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
             ),
             const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
               decoration: BoxDecoration(
                 color: const Color(0xFFFBFBFB),
                 borderRadius: BorderRadius.circular(16),
@@ -581,25 +622,30 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildTimelineDot(
-                    "รอผู้จัดส่ง\nรับงาน",
+                    "ค้นหาผู้จัดส่ง",
                     currentStep >= 1,
                     currentStep >= 2,
                     isFirst: true,
                   ),
                   _buildTimelineDot(
-                    "รอร้านค้า\nยืนยัน",
+                    "ร้านรับออเดอร์",
                     currentStep >= 2,
                     currentStep >= 3,
                   ),
                   _buildTimelineDot(
-                    "กำลังจัดส่ง",
+                    "ผู้จัดส่งไปรับอาหาร",
                     currentStep >= 3,
                     currentStep >= 4,
                   ),
                   _buildTimelineDot(
-                    "จัดส่ง\nสำเร็จ",
+                    "กำลังจัดส่งให้คุณ",
                     currentStep >= 4,
                     currentStep >= 5,
+                  ),
+                  _buildTimelineDot(
+                    "จัดส่งสำเร็จ",
+                    currentStep >= 5,
+                    currentStep >= 6,
                     isLast: true,
                   ),
                 ],

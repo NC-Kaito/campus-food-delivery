@@ -28,4 +28,9 @@ public interface OrderService {
     boolean doConfirmOrderByRestaurant(int orderId);
 
     List<Order> getActiveOrdersByRestaurant(String username);
+
+    // เพิ่มไว้ตรงไหนก็ได้ใน interface (เช่น ต่อจาก getActiveOrdersByRider)
+    boolean updateOrderStatus(int orderId, String newStatus);
+
+    List<Order> getSuccessOrdersByRider(String username);
 }

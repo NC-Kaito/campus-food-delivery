@@ -69,51 +69,65 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // 🎯 แปลงสถานะย่อยจาก Backend เป็นข้อความภาษาไทยภาษาพูด + กำหนดโทนสี
+  // 🎯 แปลงสถานะย่อยจาก Backend เป็นข้อความภาษาไทยแบบละเอียด
   Map<String, dynamic> _getDetailedStatusInfo(String? rawStatus) {
-    final status = (rawStatus ?? '').trim();
+    // แปลงให้เป็นตัวพิมพ์เล็กทั้งหมดเพื่อลดปัญหาตัวพิมพ์เล็ก-ใหญ่ไม่ตรงกัน
+    final status = (rawStatus ?? '').trim().toLowerCase();
 
     switch (status) {
-      case 'WaitingRider':
-        return {
-          'text': 'รอผู้จัดส่งรับงาน',
-          'color': Colors.orange[800]!,
-          'bgColor': Colors.orange[50]!,
-          'icon': Icons.directions_bike_rounded,
-        };
-      case 'WaitingRestaurant':
+      case 'waitingrestaurant':
         return {
           'text': 'รอร้านค้ายืนยัน',
           'color': Colors.blue[800]!,
           'bgColor': Colors.blue[50]!,
           'icon': Icons.storefront_rounded,
         };
-      case 'Cooking':
-      case 'Preparing':
+      case 'waitingrider':
+        return {
+          'text': 'รอผู้จัดส่งรับงาน',
+          'color': Colors.orange[800]!,
+          'bgColor': Colors.orange[50]!,
+          'icon': Icons.directions_bike_rounded,
+        };
+      case 'cooking':
+      case 'preparing':
         return {
           'text': 'ร้านกำลังปรุงอาหาร',
           'color': Colors.deepOrange[800]!,
           'bgColor': Colors.deepOrange[50]!,
           'icon': Icons.soup_kitchen_rounded,
         };
-      case 'delivery':
-      case 'OnTheWay':
+      // 🎯 เพิ่มสถานะ "กำลังไปรับอาหาร" (กรณีไรเดอร์รับงานแล้ว และกำลังขี่ไปร้าน)
+      case 'rideraccepted':
+      case 'riderarrived':
+      case 'goingtorestaurant':
         return {
-          'text': 'กำลังจัดส่ง',
+          'text': 'กำลังไปรับอาหาร',
+          'color': Colors.teal[800]!,
+          'bgColor': Colors.teal[50]!,
+          'icon': Icons.moped_rounded,
+        };
+      // 🎯 เปลี่ยนข้อความสถานะ "กำลังจัดส่ง" เป็น "กำลังไปส่งอาหารให้คุณ" (รับของจากร้านแล้ว)
+      case 'pickedup':
+      case 'delivery':
+      case 'delivering':
+      case 'ontheway':
+        return {
+          'text': 'กำลังไปส่งอาหารให้คุณ',
           'color': Colors.indigo[800]!,
           'bgColor': Colors.indigo[50]!,
           'icon': Icons.local_shipping_rounded,
         };
-      case 'Success':
-      case 'Completed':
+      case 'success':
+      case 'completed':
         return {
           'text': 'จัดส่งสำเร็จแล้ว',
           'color': Colors.green[800]!,
           'bgColor': Colors.green[50]!,
           'icon': Icons.check_circle_rounded,
         };
-      case 'Cancel':
-      case 'Cancelled':
+      case 'cancel':
+      case 'cancelled':
         return {
           'text': 'ยกเลิกคำสั่งซื้อแล้ว',
           'color': Colors.red[800]!,
@@ -122,7 +136,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
         };
       default:
         return {
-          'text': status.isEmpty ? 'ไม่ระบุสถานะ' : status,
+          'text': rawStatus?.isEmpty ?? true ? 'ไม่ระบุสถานะ' : rawStatus,
           'color': Colors.grey[800]!,
           'bgColor': Colors.grey[100]!,
           'icon': Icons.info_outline_rounded,
@@ -135,6 +149,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     return _orderHistoryList.where((order) {
       final status = (order.orderStatus ?? '').toLowerCase();
       if (type == 'pending') {
+        // ออเดอร์ที่ยังไม่เสร็จสิ้น หรือไม่ถูกยกเลิก จะมาอยู่ในแถบกำลังดำเนินการ
         return status != 'success' &&
             status != 'completed' &&
             status != 'cancel' &&
@@ -219,19 +234,14 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                   _buildNavItem(Icons.home, "หน้าหลัก", () {
                     Navigator.popUntil(context, (route) => route.isFirst);
                   }),
-                  _buildNavItem(
-                    Icons.shopping_basket,
-                    "ตะกร้าอาหาร",
-                    () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ListOrderMember(),
-                        ),
-                      );
-                    },
-                    badgeCount: cartItemCount, // 🎯 เพิ่มแจ้งเตือนตะกร้า
-                  ),
+                  _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ListOrderMember(),
+                      ),
+                    );
+                  }, badgeCount: cartItemCount),
                   _buildNavItem(
                     Icons.list_alt,
                     "คำสั่งซื้อ",
@@ -239,8 +249,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                       _fetchOrderHistory();
                     },
                     isActive: true,
-                    badgeCount:
-                        activeOrderCount, // 🎯 เพิ่มแจ้งเตือนคำสั่งซื้อที่กำลังทำ
+                    badgeCount: activeOrderCount,
                   ),
                   _buildNavItem(Icons.person, "โปรไฟล์", () {
                     Navigator.pushReplacement(
@@ -289,13 +298,12 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     );
   }
 
-  // 🎯 อัปเดตฟังก์ชันเพื่อรองรับพารามิเตอร์ badgeCount
   Widget _buildNavItem(
     IconData icon,
     String label,
     VoidCallback onTap, {
     bool isActive = false,
-    int badgeCount = 0, // 🎯 เพิ่มตัวรับค่า badge
+    int badgeCount = 0,
   }) {
     return InkWell(
       onTap: onTap,
@@ -428,7 +436,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                     ),
                     const SizedBox(height: 4),
 
-                    // 🎯 [สถานะย่อย] Badge บอกสถานะละเอียด เช่น "รอผู้จัดส่งรับงาน", "รอร้านค้ายืนยัน", "กำลังจัดส่ง"
+                    // 🎯 [สถานะย่อย] Badge บอกสถานะละเอียด
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,

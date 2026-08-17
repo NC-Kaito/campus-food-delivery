@@ -105,6 +105,16 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/rider/{username}/success")
+    public ResponseEntity<?> getSuccessOrdersForRider(@PathVariable String username) {
+        try {
+            List<Order> successOrders = orderService.getSuccessOrdersByRider(username);
+            return ResponseEntity.ok(successOrders);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
     /// //////////////// Restaurant
     @GetMapping("/restaurant/{username}/waitingOrdersByRestaurant")
     public ResponseEntity<?> getWaitingOrdersByRestaurant(@PathVariable String username) {
@@ -151,6 +161,37 @@ public class OrderController {
             return ResponseEntity.ok(activeOrders);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    @PostMapping("/updateStatus")
+    public ResponseEntity<?> updateOrderStatus(@RequestBody Map<String, Object> requestData) {
+        try {
+            // รับค่า orderId และ status ที่ส่งมาจาก Flutter
+            int orderId = Integer.parseInt(requestData.get("orderId").toString());
+            String status = requestData.get("status").toString();
+
+            // เรียกใช้ Service
+            boolean isSuccess = orderService.updateOrderStatus(orderId, status);
+
+            if (isSuccess) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "message", "อัปเดตสถานะเป็น " + status + " สำเร็จ"
+                ));
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                        "status", "error",
+                        "message", "ไม่สามารถอัปเดตสถานะได้"
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error",
+                    "message", "เกิดข้อผิดพลาดที่ระบบส่วนกลาง: " + e.getMessage()
+            ));
         }
     }
 

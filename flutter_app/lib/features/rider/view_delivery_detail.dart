@@ -1,4 +1,3 @@
-// features/rider/view_waiting_pickup_order.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/order_model.dart';
@@ -20,7 +19,7 @@ class ViewDeliveryDetail extends StatefulWidget {
 
 class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
   final OrderService _orderService = OrderService();
-  bool _isAccepting = false;
+  bool _isUpdating = false;
 
   GoogleMapController? _mapController;
   final Color primaryOrange = Colors.orange;
@@ -28,6 +27,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
   Set<Polyline> _polylines = {};
   String _drivingDistance = "กำลังคำนวณ...";
   String _drivingDuration = "...";
+
+  // 🎯 ตัวแปรเก็บค่าสถานะที่เลือกจาก Dropdown
+  String? _selectedNextStatus;
 
   final String googleMapsApiKey = "ใส่_API_KEY_ของคุณที่นี่";
 
@@ -41,6 +43,36 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
   void dispose() {
     _mapController?.dispose();
     super.dispose();
+  }
+
+  // 🎯 ฟังก์ชันดึงสถานะปัจจุบัน เพื่อบังคับว่าไรเดอร์อยู่ Step ไหน (เหลือ 2 Step)
+  int _getCurrentRiderStep() {
+    final status = (widget.orderModel.orderStatus ?? "").trim().toLowerCase();
+
+    // Step 0: ออเดอร์กำลังเตรียม หรือไรเดอร์กำลังไปรับอาหาร
+    // สถานะถัดไปที่ต้องทำ -> "รับอาหารแล้ว (เริ่มจัดส่ง)"
+    if (status.contains("waitingrestaurant") ||
+        status.contains("waitingrider") ||
+        status.contains("goingtorestaurant") ||
+        status.contains("riderarrived") ||
+        status.contains("preparing") ||
+        status.contains("cooking") ||
+        status.contains("foodready")) {
+      return 0;
+    }
+    // Step 1: ไรเดอร์รับอาหารแล้ว กำลังนำไปส่งลูกค้า
+    // สถานะถัดไปที่ต้องทำ -> "จัดส่งสำเร็จ"
+    else if (status.contains("delivery") ||
+        status.contains("delivering") ||
+        status.contains("ontheway") ||
+        status.contains("pickedup")) {
+      return 1;
+    }
+    // Step 2: จัดส่งสำเร็จแล้ว
+    else if (status.contains("success") || status.contains("completed")) {
+      return 2;
+    }
+    return -1; // อื่นๆ หรือยกเลิก
   }
 
   Future<void> _calculateDrivingRoute() async {
@@ -162,40 +194,67 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     );
   }
 
-  // ── 🎯 การ์ดรายการอาหารปรับแต่งใหม่ให้เหมือนหน้า view_order_member ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    final bool isCurryDish =
-        (item.orderDetailCurries != null &&
-        item.orderDetailCurries!.isNotEmpty);
-
-    int curryCount = isCurryDish ? item.orderDetailCurries!.length : 0;
-    String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
-    if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง ($curryCount อย่าง)";
+    List<dynamic> rawCurries = [];
+    if (item.orderDetailCurries != null &&
+        item.orderDetailCurries!.isNotEmpty) {
+      rawCurries = item.orderDetailCurries!;
+    } else {
+      try {
+        final jsonItem = (item as dynamic).toJson();
+        rawCurries =
+            jsonItem['orderDetailCurries'] ??
+            jsonItem['orderdetailcurries'] ??
+            [];
+      } catch (_) {}
     }
 
-    // ดึงรายการกับข้าวทั้งหมดพร้อมรูปภาพ
-    List<Map<String, String>> curriesList = [];
+    final bool isCurryDish = rawCurries.isNotEmpty;
+    String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
-      for (var e in item.orderDetailCurries!) {
-        if (e is Map<String, dynamic>) {
-          final menuMap = (e['menu'] is Map<String, dynamic>)
-              ? e['menu'] as Map<String, dynamic>
-              : e;
+      displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
+    }
 
-          String name = (menuMap['menuname'] ?? menuMap['menuName'] ?? '')
-              .toString();
-          String img = (menuMap['menuimage'] ?? menuMap['menuImage'] ?? '')
-              .toString();
+    List<Map<String, String>> curriesList = [];
+    for (var e in rawCurries) {
+      String name = '';
+      String img = '';
 
-          if (name.isNotEmpty) {
-            curriesList.add({'name': name, 'image': img});
-          }
-        }
+      if (e is Map) {
+        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
+        name =
+            (menuMap['menuname'] ??
+                    menuMap['menuName'] ??
+                    menuMap['name'] ??
+                    '')
+                .toString();
+        img =
+            (menuMap['imageurl'] ??
+                    menuMap['imageUrl'] ??
+                    menuMap['menuimage'] ??
+                    menuMap['menuImage'] ??
+                    menuMap['image'] ??
+                    '')
+                .toString();
+      } else {
+        try {
+          name = (e.menu?.menuName ?? e.menu?.menuname ?? e.name ?? '')
+              .toString();
+          img =
+              (e.menu?.menuImage ??
+                      e.menu?.imageurl ??
+                      e.menu?.imageUrl ??
+                      e.image ??
+                      '')
+                  .toString();
+        } catch (_) {}
+      }
+
+      if (name.isNotEmpty) {
+        curriesList.add({'name': name, 'image': img});
       }
     }
 
-    // จัดกลุ่มและนับจำนวน Add-on ที่เลือกมาทั้งหมด (เช่น ไข่ดาว x2)
     Map<String, int> addonCounts = {};
     for (var addon in item.addons) {
       String name = '';
@@ -208,15 +267,14 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       }
     }
 
-    // คำนวณราคาต่อหน่วย
     int finalPricePerUnit = 0;
     final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
 
     if (isCurryDish) {
       int curriesSum = 0;
-      for (var curry in item.orderDetailCurries!) {
-        if (curry is Map<String, dynamic>) {
-          final num? price = curry['priceAtOrder'] as num?;
+      for (var curry in rawCurries) {
+        if (curry is Map) {
+          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
           curriesSum += (price ?? 0).toInt();
         }
       }
@@ -238,7 +296,11 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
-    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
+    String rawMenuUrl = item.menu?.menuImage ?? '';
+    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
+      rawMenuUrl = curriesList.first['image'] ?? '';
+    }
+    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -254,16 +316,16 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: isCurryDish || finalMenuUrl.isEmpty
-                  ? _buildPlaceholderIcon()
-                  : Image.network(
+              child: finalMenuUrl.isNotEmpty
+                  ? Image.network(
                       Uri.encodeFull(finalMenuUrl),
                       width: 65,
                       height: 65,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildPlaceholderIcon(),
-                    ),
+                    )
+                  : _buildPlaceholderIcon(),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -286,8 +348,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-
-                  // แสดงผลกับข้าวทั้งหมดแบบ Badge พร้อมรูปภาพย่อย
                   if (curriesList.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -351,8 +411,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                       }).toList(),
                     ),
                   ],
-
-                  // แสดงผล Add-on แบบ Badge สีส้ม พร้อมรวมจำนวน (เช่น ไข่ดาว x2)
                   if (addonCounts.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
@@ -394,7 +452,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                       }).toList(),
                     ),
                   ],
-
                   if (item.note.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
@@ -426,9 +483,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     );
   }
 
-  Future<void> _confirmAcceptOrder() async {
-    if (_isAccepting) return;
-    setState(() => _isAccepting = true);
+  Future<void> _updateStatus(String nextStatus, String successMessage) async {
+    if (_isUpdating) return;
+    setState(() => _isUpdating = true);
 
     showDialog(
       context: context,
@@ -438,38 +495,162 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     );
 
     try {
-      String studentId = GlobalData.usernameRider;
-      await _orderService.confirmOrderByRider(
-        studentId,
-        widget.orderModel.orderId ?? 0,
-      );
+      int orderId = widget.orderModel.orderId ?? 0;
+      await _orderService.updateOrderStatus(orderId, nextStatus);
 
       if (!mounted) return;
-      Navigator.pop(context);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            "รับคำสั่งซื้อสำเร็จ! เปลี่ยนสถานะเป็นรอร้านค้าแล้ว 🏍️🔥",
-          ),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      Navigator.pop(context, true);
-    } catch (e) {
-      if (!mounted) return;
-      Navigator.pop(context);
-      setState(() => _isAccepting = false);
+      Navigator.pop(context); // ปิด Loading Dialog
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("🚨 ไม่สามารถรับออเดอร์ได้: $e"),
+          content: Text(successMessage),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+
+      Navigator.pop(context, true); // กลับไปหน้าก่อนหน้าและรีเฟรช
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      setState(() => _isUpdating = false);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("🚨 อัปเดตสถานะไม่สำเร็จ: $e"),
           backgroundColor: Colors.red,
         ),
       );
     }
+  }
+
+  // 🎯 สร้าง Widget แถบ Dropdown ให้เลือกสถานะ (เหลือ 2 ขั้นตอน)
+  Widget _buildBottomStatusDropdown() {
+    final int currentStep = _getCurrentRiderStep();
+
+    // ถ้าออเดอร์สำเร็จแล้วหรือถูกยกเลิก ไม่ต้องแสดงแถบจัดการสถานะ
+    if (currentStep < 0 || currentStep >= 2) {
+      return const SizedBox.shrink();
+    }
+
+    // ตัวเลือกสถานะของไรเดอร์ (เหลือแค่ 2 สถานะ)
+    final List<Map<String, dynamic>> statusOptions = [
+      {
+        'value': 'delivery',
+        'label': '1. รับอาหารแล้ว (เริ่มจัดส่ง)',
+        'step': 0,
+      },
+      {'value': 'Success', 'label': '2. จัดส่งสำเร็จ', 'step': 1},
+    ];
+
+    return SafeArea(
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Dropdown เลือกสถานะ (ตัวที่ไม่ได้คิวจะถูก Disabled)
+            DropdownButtonFormField<String>(
+              decoration: InputDecoration(
+                labelText: "อัปเดตสถานะถัดไป",
+                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                filled: true,
+                fillColor: Colors.grey.shade50,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              value: _selectedNextStatus,
+              hint: const Text("กดเพื่อเลือกสถานะ"),
+              items: statusOptions.map((option) {
+                // 🎯 ล็อกให้กดได้เฉพาะ Step ถัดไปเท่านั้น! (ข้ามและย้อนกลับไม่ได้)
+                final bool isEnabled = (option['step'] == currentStep);
+                return DropdownMenuItem<String>(
+                  value: option['value'],
+                  enabled: isEnabled,
+                  child: Text(
+                    option['label'],
+                    style: TextStyle(
+                      color: isEnabled ? Colors.black87 : Colors.grey.shade400,
+                      fontWeight: isEnabled
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() {
+                  _selectedNextStatus = val;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+
+            // ปุ่มกดยืนยันบันทึกข้อมูล
+            SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: (_isUpdating || _selectedNextStatus == null)
+                    ? null
+                    : () {
+                        String successMsg = "อัปเดตสถานะสำเร็จ";
+                        if (_selectedNextStatus == "delivery") {
+                          successMsg =
+                              "อัปเดตสถานะ: กำลังเดินทางไปส่งลูกค้า 📦";
+                        } else if (_selectedNextStatus == "Success") {
+                          successMsg = "จัดส่งสำเร็จเรียบร้อย 🎉";
+                        }
+
+                        _updateStatus(_selectedNextStatus!, successMsg);
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: primaryOrange,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  disabledBackgroundColor: Colors.grey.shade300,
+                ),
+                child: _isUpdating
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        "บันทึกการเปลี่ยนสถานะ",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -497,7 +678,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         memberFullName = "$firstName $lastName".trim();
       }
     }
-    final String memberPhone = order.member?.phone ?? "-";
 
     double deliveryFee = order.deliveryFee;
     double totalPrice = order.totalPrice;
@@ -714,10 +894,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.phone, color: Colors.green),
-                  onPressed: () {},
-                ),
               ],
             ),
 
@@ -843,42 +1019,8 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         ),
       ),
 
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton(
-              onPressed: _isAccepting ? null : _confirmAcceptOrder,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF64FF20),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(30),
-                ),
-              ),
-              child: _isAccepting
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        color: Colors.black,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Text(
-                      "รับคำสั่งซื้อ",
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-            ),
-          ),
-        ),
-      ),
+      // 🎯 แสดง Dropdown Bar อัปเดตสถานะ (2 สถานะ)
+      bottomNavigationBar: _buildBottomStatusDropdown(),
     );
   }
 }
