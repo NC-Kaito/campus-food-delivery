@@ -24,10 +24,10 @@ public class ReviewDto {
     private int restaurantrating;
     private int riderrating;
     private String commentrestaurant;
-    private String cleanliness;
-    private String taste_rating;
-    private String delivery_speed;
-    private String food_condition;
+    private Boolean cleanliness;
+    private Boolean taste_rating;
+    private Boolean delivery_speed;
+    private Boolean food_condition;
     private String commentrider;
     private int orderid;
 }

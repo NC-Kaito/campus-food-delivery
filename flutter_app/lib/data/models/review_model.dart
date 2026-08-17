@@ -3,10 +3,10 @@ class ReviewSubmitModel {
   final int restaurantrating;
   final int riderrating;
   final String? commentrestaurant;
-  final String? cleanliness;
-  final String? tasteRating;
-  final String? deliverySpeed;
-  final String? foodCondition;
+  final bool cleanliness;
+  final bool tasteRating;
+  final bool deliverySpeed;
+  final bool foodCondition;
   final String? commentrider;
 
   ReviewSubmitModel({
@@ -14,10 +14,10 @@ class ReviewSubmitModel {
     required this.restaurantrating,
     required this.riderrating,
     this.commentrestaurant,
-    this.cleanliness,
-    this.tasteRating,
-    this.deliverySpeed,
-    this.foodCondition,
+    required this.cleanliness,
+    required this.tasteRating,
+    required this.deliverySpeed,
+    required this.foodCondition,
     this.commentrider,
   });
 

@@ -3,10 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
+import 'package:flutter_app/features/member/member_review.dart';
 import 'package:flutter_app/features/member/view_confirm_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
-import 'package:flutter_app/features/member/cart_manager_member.dart'; // 🎯 นำเข้า CartManager สำหรับนับตะกร้า
+import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/global_data.dart';
 
@@ -69,7 +70,6 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // 🎯 แปลงสถานะย่อยจาก Backend เป็นข้อความภาษาไทยภาษาพูด + กำหนดโทนสี
   Map<String, dynamic> _getDetailedStatusInfo(String? rawStatus) {
     final status = (rawStatus ?? '').trim();
 
@@ -130,17 +130,21 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     }
   }
 
-  // 🎯 กรองออเดอร์เข้า 3 แถบหลัก
   List<OrderModel> _filterOrders(String type) {
     return _orderHistoryList.where((order) {
       final status = (order.orderStatus ?? '').toLowerCase();
+
+      bool isReviewed = false;
+
       if (type == 'pending') {
         return status != 'success' &&
             status != 'completed' &&
             status != 'cancel' &&
             status != 'cancelled';
       } else if (type == 'success') {
-        return status == 'success' || status == 'completed';
+        return (status == 'success' || status == 'completed') && !isReviewed;
+      } else if (type == 'history') {
+        return (status == 'success' || status == 'completed') && isReviewed;
       } else if (type == 'cancel') {
         return status == 'cancel' || status == 'cancelled';
       }
@@ -150,12 +154,11 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
   @override
   Widget build(BuildContext context) {
-    // 🎯 ดึงจำนวนตะกร้า และ ออเดอร์ที่ดำเนินการอยู่ (Pending)
     final int cartItemCount = CartManager().items.length;
     final int activeOrderCount = _filterOrders('pending').length;
 
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: Colors.grey[50],
         appBar: const NavbarMember(title: "รายการคำสั่งซื้อ"),
@@ -164,17 +167,21 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
             Container(
               color: Colors.white,
               child: TabBar(
+                // 🎯 เอา isScrollable: true ออก เพื่อให้มันแบ่งพื้นที่เท่าๆ กัน 4 ส่วน
                 indicatorColor: const Color(0xFF64F02D),
                 indicatorWeight: 3,
                 labelColor: const Color(0xFF2E7D32),
                 unselectedLabelColor: Colors.grey[600],
+                // 🎯 ลด Padding ภายในลง เพื่อให้คำยาวๆ แสดงได้ครบโดยไม่ตกบรรทัด
+                labelPadding: EdgeInsets.zero,
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
+                  fontSize: 13, // 🎯 ปรับขนาดอักษรลงนิดนึงให้ดูลงตัวและพอดีกรอบ
                 ),
                 tabs: const [
                   Tab(text: "กำลังดำเนินการ"),
                   Tab(text: "สำเร็จแล้ว"),
+                  Tab(text: "ประวัติคำสั่งซื้อ"),
                   Tab(text: "ยกเลิก"),
                 ],
               ),
@@ -192,11 +199,15 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                         ),
                         _buildOrderListView(
                           _filterOrders('success'),
-                          "ไม่มีคำสั่งซื้อที่สำเร็จแล้ว",
+                          "ไม่มีคำสั่งซื้อรอรีวิว",
+                        ),
+                        _buildOrderListView(
+                          _filterOrders('history'),
+                          "ยังไม่มีประวัติคำสั่งซื้อ",
                         ),
                         _buildOrderListView(
                           _filterOrders('cancel'),
-                          "ไม่มีคำสั่งซื้อที่ยกเลิก",
+                          "ไม่มีคำสั่งซื้อที่ถูกยกเลิก",
                         ),
                       ],
                     ),
@@ -219,19 +230,14 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                   _buildNavItem(Icons.home, "หน้าหลัก", () {
                     Navigator.popUntil(context, (route) => route.isFirst);
                   }),
-                  _buildNavItem(
-                    Icons.shopping_basket,
-                    "ตะกร้าอาหาร",
-                    () {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ListOrderMember(),
-                        ),
-                      );
-                    },
-                    badgeCount: cartItemCount, // 🎯 เพิ่มแจ้งเตือนตะกร้า
-                  ),
+                  _buildNavItem(Icons.shopping_basket, "ตะกร้าอาหาร", () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ListOrderMember(),
+                      ),
+                    );
+                  }, badgeCount: cartItemCount),
                   _buildNavItem(
                     Icons.list_alt,
                     "คำสั่งซื้อ",
@@ -239,8 +245,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                       _fetchOrderHistory();
                     },
                     isActive: true,
-                    badgeCount:
-                        activeOrderCount, // 🎯 เพิ่มแจ้งเตือนคำสั่งซื้อที่กำลังทำ
+                    badgeCount: activeOrderCount,
                   ),
                   _buildNavItem(Icons.person, "โปรไฟล์", () {
                     Navigator.pushReplacement(
@@ -289,13 +294,12 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     );
   }
 
-  // 🎯 อัปเดตฟังก์ชันเพื่อรองรับพารามิเตอร์ badgeCount
   Widget _buildNavItem(
     IconData icon,
     String label,
     VoidCallback onTap, {
     bool isActive = false,
-    int badgeCount = 0, // 🎯 เพิ่มตัวรับค่า badge
+    int badgeCount = 0,
   }) {
     return InkWell(
       onTap: onTap,
@@ -363,8 +367,13 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
         order.restaurant?.restaurantName ?? order.restaurantUsername;
     String finalImageUrl = _getFinalImageUrl(order.restaurant?.restaurantImage);
 
-    // 🎯 ดึงข้อมูลสถานะย่อยสำหรับแสดง Badge บนการ์ด
     final statusInfo = _getDetailedStatusInfo(order.orderStatus);
+
+    final bool isCompleted =
+        order.orderStatus?.toLowerCase() == 'success' ||
+        order.orderStatus?.toLowerCase() == 'completed';
+
+    bool isReviewed = false;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -389,13 +398,13 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
               builder: (context) => ViewConfirmOrderMember(order: order),
             ),
           ).then((_) {
-            // โหลดข้อมูลใหม่เมื่อกลับมาจากหน้า View
             _fetchOrderHistory();
           });
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(12.0),
@@ -414,7 +423,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                     Text(
                       storeName,
@@ -428,7 +437,6 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                     ),
                     const SizedBox(height: 4),
 
-                    // 🎯 [สถานะย่อย] Badge บอกสถานะละเอียด เช่น "รอผู้จัดส่งรับงาน", "รอร้านค้ายืนยัน", "กำลังจัดส่ง"
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -496,14 +504,76 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                         ),
                       ],
                     ),
+
+                    if (isCompleted) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            if (isReviewed) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'กำลังพัฒนาหน้าแสดงผลการรีวิว...',
+                                  ),
+                                ),
+                              );
+                            } else {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      MemberReview(order: order),
+                                ),
+                              ).then((_) {
+                                _fetchOrderHistory();
+                              });
+                            }
+                          },
+                          icon: Icon(
+                            isReviewed
+                                ? Icons.rate_review_rounded
+                                : Icons.star_rounded,
+                            size: 18,
+                            color: isReviewed ? Colors.blue : Colors.orange,
+                          ),
+                          label: Text(
+                            isReviewed ? "ดูการรีวิว" : "รีวิวคำสั่งซื้อ",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: isReviewed
+                                  ? Colors.blue[700]
+                                  : Colors.green[700],
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: isReviewed
+                                  ? Colors.blue[400]!
+                                  : Colors.green[400]!,
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            backgroundColor: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 6),
-              const Icon(
-                Icons.arrow_forward_ios,
-                size: 16,
-                color: Colors.green,
+              const Align(
+                alignment: Alignment.center,
+                child: Icon(
+                  Icons.arrow_forward_ios,
+                  size: 16,
+                  color: Colors.green,
+                ),
               ),
             ],
           ),
