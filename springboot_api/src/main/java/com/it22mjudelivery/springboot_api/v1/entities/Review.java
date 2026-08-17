@@ -31,6 +31,18 @@ public class Review {
     @Column(length = 255,nullable = true)
     private String commentrestaurant;
 
+    @Column(length = 255,nullable = true)
+    private String cleanliness;
+
+    @Column(length = 255,nullable = true)
+    private String taste_rating;
+
+    @Column(length = 255,nullable = true)
+    private String delivery_speed;
+
+    @Column(length = 255,nullable = true)
+    private String food_condition;
+
     @Column(length = 255, nullable = true)
     private String commentrider;
 

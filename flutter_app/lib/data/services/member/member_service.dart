@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
+import 'package:flutter_app/data/models/review_model.dart';
 
 class MemberService {
   Future<void> doLoginMember(MemberModel member) async {
@@ -49,6 +50,17 @@ class MemberService {
         "/v1/member/updateProfileMember",
         data: member.toJson(),
       );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> addReview(ReviewSubmitModel review) async {
+    try {
+      await DioClient.dio.post("/v1/member/addReview", data: review.toJson());
     } on DioException catch (e) {
       final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
       throw errorMessage;
