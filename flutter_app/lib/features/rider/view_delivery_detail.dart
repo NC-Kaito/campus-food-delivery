@@ -612,10 +612,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                     : () {
                         String successMsg = "อัปเดตสถานะสำเร็จ";
                         if (_selectedNextStatus == "delivery") {
-                          successMsg =
-                              "อัปเดตสถานะ: กำลังเดินทางไปส่งลูกค้า 📦";
-                        } else if (_selectedNextStatus == "Success") {
-                          successMsg = "จัดส่งสำเร็จเรียบร้อย 🎉";
+                          successMsg = "อัปเดตสถานะ: กำลังเดินทางไปส่งลูกค้า ";
+                        } else if (_selectedNextStatus == "delivered") {
+                          successMsg = "จัดส่งสำเร็จเรียบร้อย ";
                         }
 
                         _updateStatus(_selectedNextStatus!, successMsg);

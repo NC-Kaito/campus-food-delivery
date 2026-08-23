@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/features/restaurant/wait_approve.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
@@ -241,15 +242,24 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
           statusOpen: widget.restaurantData?.statusOpen ?? false,
         );
 
+        // ... โค้ดส่วนบนของ doUpdateRegisterData ...
         await restaurantService.updateProfileRestaurant(updatedModel);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('บันทึกสำเร็จ'),
+              content: Text('ส่งข้อมูลใหม่สำเร็จ รอการตรวจสอบ'),
               backgroundColor: _primary,
             ),
           );
-          Navigator.pop(context, 'success');
+
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  const WaitApprove(verificationStatus: 'wait'),
+            ),
+            (route) => route.isFirst, // หรือเคลียร์ Stack กลับไปหน้าแรก
+          );
         }
       } catch (e) {
         if (mounted) {

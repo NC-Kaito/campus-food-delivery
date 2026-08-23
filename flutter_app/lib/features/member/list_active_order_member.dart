@@ -4,13 +4,15 @@ import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/member_review.dart';
-import 'package:flutter_app/features/member/view_confirm_order_member.dart';
+import 'package:flutter_app/features/member/view_active_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/features/member/view_review.dart';
 import 'package:flutter_app/global_data.dart';
+
+import 'dart:async';
 
 class ListConfirmOrderMember extends StatefulWidget {
   const ListConfirmOrderMember({super.key});
@@ -24,6 +26,8 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
   List<OrderModel> _orderHistoryList = [];
   bool _isLoading = true;
 
+  Timer? _timer;
+
   final menuTextStyle = TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.bold,
@@ -34,6 +38,10 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
   void initState() {
     super.initState();
     _fetchOrderHistory();
+
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
+      _fetchOrderHistorySilently();
+    });
   }
 
   Future<void> _fetchOrderHistory() async {
@@ -60,6 +68,26 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  // 🎯 ฟังก์ชันดึงข้อมูลแบบไม่โชว์วงล้อหมุนกวนใจผู้ใช้
+  Future<void> _fetchOrderHistorySilently() async {
+    if (!mounted) return;
+
+    try {
+      String username = GlobalData.usernameMember.trim();
+      if (username.isEmpty) return;
+
+      final history = await _orderService.getConfirmOrdersByMember(username);
+
+      if (mounted) {
+        setState(() {
+          _orderHistoryList = history;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการดึงข้อมูลแบบ Background: $e");
     }
   }
 
@@ -105,6 +133,14 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
           'bgColor': Colors.indigo[50]!,
           'icon': Icons.local_shipping_rounded,
         };
+      // 🎯 เพิ่มสถานะ delivered ตรงนี้
+      case 'delivered':
+        return {
+          'text': 'รอยืนยันออเดอร์',
+          'color': Colors.purple[800]!,
+          'bgColor': Colors.purple[50]!,
+          'icon': Icons.assignment_turned_in_rounded,
+        };
       case 'success':
       case 'completed':
         return {
@@ -113,7 +149,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
           'bgColor': Colors.green[50]!,
           'icon': Icons.check_circle_rounded,
         };
-      case 'reviewsuccess': // 🎯 เพิ่มสถานะใหม่
+      case 'reviewsuccess':
         return {
           'text': 'รีวิวเสร็จสิ้น',
           'color': Colors.teal[800]!,
@@ -186,11 +222,21 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),
-                tabs: const [
-                  Tab(text: "กำลังดำเนินการ"),
-                  Tab(text: "สำเร็จแล้ว"),
-                  Tab(text: "ประวัติคำสั่งซื้อ"),
-                  Tab(text: "ยกเลิก"),
+                // 🎯 เปลี่ยนจากการฮาร์ดโค้ด Text เป็นฟังก์ชันสร้าง Tab พร้อม Badge ตัวเลข
+                tabs: [
+                  _buildTabWithBadge(
+                    "กำลังดำเนินการ",
+                    _filterOrders('pending').length,
+                  ),
+                  _buildTabWithBadge(
+                    "สำเร็จแล้ว",
+                    _filterOrders('success').length,
+                  ),
+                  _buildTabWithBadge(
+                    "ประวัติ",
+                    _filterOrders('history').length,
+                  ),
+                  _buildTabWithBadge("ยกเลิก", _filterOrders('cancel').length),
                 ],
               ),
             ),
@@ -387,6 +433,9 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
     final bool isReviewed = statusLower == 'reviewsuccess';
 
+    // 🎯 เพิ่มตัวแปรเช็กว่าส่งถึงแล้วหรือยัง
+    final bool isDelivered = statusLower == 'delivered';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
       decoration: BoxDecoration(
@@ -522,9 +571,9 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: OutlinedButton.icon(
+                          // ... โค้ดปุ่มรีวิวเดิมของคุณ ...
                           onPressed: () {
                             if (isReviewed) {
-                              // 🎯 กดแล้วพาไปหน้าดูรีวิว
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
@@ -540,9 +589,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                                       MemberReview(order: order),
                                 ),
                               ).then((result) {
-                                if (result == true) {
-                                  _fetchOrderHistory();
-                                }
+                                if (result == true) _fetchOrderHistory();
                               });
                             }
                           },
@@ -577,6 +624,51 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                           ),
                         ),
                       ),
+                    ]
+                    // 🎯 เพิ่มบล็อก else if ตรงนี้สำหรับสถานะ delivered
+                    else if (isDelivered) ...[
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // กดแล้วพาไปหน้า ViewConfirmOrderMember เหมือนตอนจิ้มที่การ์ด
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ViewConfirmOrderMember(order: order),
+                              ),
+                            ).then((_) {
+                              _fetchOrderHistory();
+                            });
+                          },
+                          icon: Icon(
+                            Icons.touch_app_rounded,
+                            size: 18,
+                            color: Colors.purple[600],
+                          ),
+                          label: Text(
+                            "ตรวจสอบและยืนยัน",
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.purple[700],
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: Colors.purple[400]!,
+                              width: 1.2,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            backgroundColor:
+                                Colors.purple.shade50, // สีพื้นหลังอ่อนๆ
+                          ),
+                        ),
+                      ),
                     ],
                   ],
                 ),
@@ -603,6 +695,36 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
       height: 80,
       color: Colors.orange[50],
       child: const Icon(Icons.store, color: Colors.orange, size: 40),
+    );
+  }
+
+  // 🎯 ฟังก์ชันสำหรับสร้าง Tab พร้อมตัวเลขแจ้งเตือน
+  Widget _buildTabWithBadge(String text, int count) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(text),
+          if (count > 0) ...[
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                count > 99 ? '99+' : count.toString(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

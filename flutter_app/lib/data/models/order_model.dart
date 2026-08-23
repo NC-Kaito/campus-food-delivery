@@ -14,6 +14,7 @@ class OrderModel {
   final String memberUsername;
   final String restaurantUsername;
   final DateTime? orderdate;
+  final String? cancelDetail;
 
   final RestaurantModel? restaurant;
   final RiderModel? rider; // 🎯 รับก้อนอ็อบเจ็กต์ Rider เข้ามา
@@ -37,6 +38,7 @@ class OrderModel {
     this.restaurant,
     this.rider, // 🎯
     this.orderStatus, // 🎯
+    this.cancelDetail,
     required this.items,
   });
 
@@ -49,6 +51,7 @@ class OrderModel {
       latitude: (json['latitude'] ?? 0).toDouble(),
       longitude: (json['longitude'] ?? 0).toDouble(),
       addressDetail: json['addressDetail'] ?? json['addressdetail'] ?? "",
+      cancelDetail: json['canceldetail'] ?? json['cancelDetail'],
 
       memberUsername: json['member'] != null
           ? json['member']['username'] ?? ""
@@ -94,6 +97,7 @@ class OrderModel {
       'latitude': latitude,
       'longitude': longitude,
       'addressDetail': addressDetail,
+      'canceldetail': cancelDetail,
       'memberUsername': memberUsername,
       'restaurantUsername': restaurantUsername,
       'items': items.map((item) => item.toJson()).toList(),

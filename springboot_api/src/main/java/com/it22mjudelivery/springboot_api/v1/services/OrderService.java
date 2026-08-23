@@ -39,4 +39,5 @@ public interface OrderService {
     // 🎯 ดึงออเดอร์รีวิวสำหรับ "ร้านค้า"
     List<Order> getReviewSuccessOrdersByRestaurant(String username);
 
+    void autoCancelExpiredOrders();
 }

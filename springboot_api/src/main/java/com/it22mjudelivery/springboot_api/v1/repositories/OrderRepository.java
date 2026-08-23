@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -23,4 +24,6 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
     List<Order> findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(String username, List<String> status);
 
+    @Query("SELECT o FROM Order o WHERE o.orderstatus = :status AND o.orderdate <= :cutoffTime")
+    List<Order> findExpiredOrders(@Param("status") String status, @Param("cutoffTime") LocalDateTime cutoffTime);
 }

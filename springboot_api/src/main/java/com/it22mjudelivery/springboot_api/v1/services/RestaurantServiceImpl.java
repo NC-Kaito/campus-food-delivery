@@ -98,6 +98,10 @@ public class RestaurantServiceImpl implements RestaurantService {
         restaurant.setPhone(phone);
         restaurant.setImagecardid(ownerimage);
 
+        restaurant.setVerificationstatus("wait");
+        restaurant.setNotapprovedetail(null);
+        restaurant.setRegisterdate(LocalDateTime.now());
+
         // แก้ไข opening hours: เคลียร์ของเดิมแล้วใส่ใหม่ทั้งชุด
         restaurant.getOpeningHours().clear();
         restaurant.getOpeningHours().addAll(toOpeningHourEntities(openingHourDtos, restaurant));

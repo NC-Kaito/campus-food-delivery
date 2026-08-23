@@ -1,4 +1,5 @@
 // features/member/view_confirm_order_member.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
@@ -7,6 +8,8 @@ import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart' as dio_package;
 
 class ViewConfirmOrderMember extends StatefulWidget {
   final OrderModel order;
@@ -24,7 +27,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
   String _loggedInMemberPhone = "กำลังโหลด...";
 
   final MemberService memberService = MemberService();
-
   final Color primaryGreen = const Color(0xFF64F02D);
 
   @override
@@ -71,6 +73,360 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
   void dispose() {
     _miniMapController?.dispose();
     super.dispose();
+  }
+
+  // 🎯 ยิง API กดยืนยันความถูกต้องของอาหาร
+  Future<void> _confirmSuccess() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) =>
+          const Center(child: CircularProgressIndicator(color: Colors.green)),
+    );
+
+    try {
+      var response = await DioClient.dio.post(
+        '/v1/order/confirmSuccess?orderId=${widget.order.orderId}',
+      );
+      Navigator.pop(context); // ปิด Loading
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("ยืนยันรับอาหารสำเร็จ! ขอบคุณที่ใช้บริการ"),
+            backgroundColor: Colors.green,
+          ),
+        );
+        Navigator.pop(
+          context,
+          true,
+        ); // เด้งกลับหน้า List พร้อมส่ง true ไปเพื่อบอกให้รีเฟรชหน้า
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("เกิดข้อผิดพลาด: $e"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // 🎯 เปิดหน้าต่าง (Dialog) แจ้งปัญหาอาหารผิด
+  Future<void> _showReportIssueDialog() async {
+    File? selectedImage;
+    final TextEditingController detailController = TextEditingController();
+    bool isUploading = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    color: Colors.red.shade700,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    "แจ้งปัญหา",
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "รายละเอียดปัญหา:",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: detailController,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: "เช่น ได้รับข้าวหมูทอด แทนข้าวกะเพรา...",
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: Colors.grey.shade300),
+                        ),
+                        focusedBorder: const OutlineInputBorder(
+                          borderRadius: BorderRadius.all(Radius.circular(12)),
+                          borderSide: BorderSide(color: Colors.red, width: 1.5),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      "อัปโหลดรูปภาพหลักฐาน:",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    InkWell(
+                      onTap: () async {
+                        final XFile? image = await ImagePicker().pickImage(
+                          source: ImageSource.camera,
+                          imageQuality: 80,
+                        );
+                        if (image != null) {
+                          setStateDialog(
+                            () => selectedImage = File(image.path),
+                          );
+                        }
+                      },
+                      child: Container(
+                        height: 140,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.grey.shade300,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: selectedImage != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: Image.file(
+                                  selectedImage!,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_a_photo_rounded,
+                                    color: Colors.grey.shade400,
+                                    size: 36,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    "แตะเพื่อถ่ายรูป",
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actionsPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isUploading ? null : () => Navigator.pop(context),
+                  child: Text(
+                    "ยกเลิก",
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: isUploading
+                      ? null
+                      : () async {
+                          if (detailController.text.trim().isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("กรุณาระบุรายละเอียด"),
+                              ),
+                            );
+                            return;
+                          }
+                          if (selectedImage == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("กรุณาอัปโหลดรูปภาพหลักฐาน"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          setStateDialog(() => isUploading = true);
+
+                          try {
+                            String fileName = selectedImage!.path
+                                .split('/')
+                                .last;
+                            dio_package.FormData formData =
+                                dio_package.FormData.fromMap({
+                                  'orderId': widget.order.orderId,
+                                  'issueDetail': detailController.text.trim(),
+                                  'issueImage':
+                                      await dio_package.MultipartFile.fromFile(
+                                        selectedImage!.path,
+                                        filename: fileName,
+                                      ),
+                                });
+
+                            var response = await DioClient.dio.post(
+                              '/v1/order/reportIssue',
+                              data: formData,
+                            );
+                            if (response.statusCode == 200) {
+                              Navigator.pop(context); // ปิด dialog
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    "ส่งเรื่องแจ้งปัญหาเรียบร้อยแล้ว",
+                                  ),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                              Navigator.pop(context, true); // เด้งกลับหน้า List
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text("เกิดข้อผิดพลาด: $e"),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                            setStateDialog(() => isUploading = false);
+                          }
+                        },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                  ),
+                  child: isUploading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          "ส่งหลักฐาน",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // 🎯 เปิด Popup ยืนยันก่อนเข้าสู่หน้าแจ้งปัญหา
+  Future<void> _confirmReportIssue() async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.help_outline_rounded,
+              color: Colors.orange.shade700,
+              size: 28,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "ยืนยันการแจ้งปัญหา",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+            ),
+          ],
+        ),
+        content: const Text(
+          "คุณต้องการแจ้งปัญหา 'อาหารไม่ถูกต้อง' ใช่หรือไม่?\n\n(คุณจำเป็นต้องถ่ายรูปอาหารที่ได้รับผิดเพื่อใช้เป็นหลักฐานในการตรวจสอบ)",
+          style: TextStyle(fontSize: 15, height: 1.5),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              "ยกเลิก",
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              "ใช่, ดำเนินการต่อ",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    // 🎯 ถ้าลูกค้ากด "ใช่" ค่อยเปิดฟอร์มสำหรับพิมพ์และอัปโหลดรูป
+    if (confirm == true) {
+      _showReportIssueDialog();
+    }
   }
 
   Widget _buildPlaceholderIcon() {
@@ -204,7 +560,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
     int totalItemPrice = 0;
     int baseUnitNoAddonPrice = 0;
 
-    // คำนวณราคา Add-on รวมทั้งหมด
     int addonsSum = 0;
     for (var addon in groupedAddons.values) {
       addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
@@ -220,14 +575,10 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
     } catch (_) {}
 
     if (totalItemPrice > 0) {
-      // ถ้าระบบหลังบ้านมี Subtotal ส่งมา
-      int unitTotal =
-          totalItemPrice ~/ (item.qty > 0 ? item.qty : 1); // หาราคารวมต่อ 1 จาน
-      baseUnitNoAddonPrice =
-          unitTotal - addonsSum; // หัก Add-on ออก จะได้ราคาฐานที่แท้จริง
-      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0; // กันติดลบ
+      int unitTotal = totalItemPrice ~/ (item.qty > 0 ? item.qty : 1);
+      baseUnitNoAddonPrice = unitTotal - addonsSum;
+      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0;
     } else {
-      // Fallback: ถ้าไม่มี Subtotal ให้คำนวณบวกเอง
       int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       if (baseMenuPrice == 0) {
         try {
@@ -245,7 +596,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
     }
 
-    // เลือกลิงก์รูปภาพ
     String rawMenuUrl = item.menu?.menuImage ?? '';
     if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
       rawMenuUrl = curriesList.first['image'] as String;
@@ -291,7 +641,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  // 🎯 แสดงราคาฐานสุทธิที่แท้จริง
                   Text(
                     "ราคา $baseUnitNoAddonPrice บาท",
                     style: const TextStyle(
@@ -300,7 +649,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ),
 
-                  // แสดง Badge กับข้าว
                   if (curriesList.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -366,7 +714,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ],
 
-                  // แสดง Badge Add-on แบบระบุราคาชัดเจน
                   if (groupedAddons.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
@@ -380,15 +727,11 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                         String displayText = name;
                         if (qty > 1) {
                           int totalAddonPrice = unitPrice * qty;
-                          displayText += " x$qty"; // โชว์จำนวน
-                          if (totalAddonPrice > 0) {
-                            displayText +=
-                                " (+฿$totalAddonPrice)"; // โชว์ราคารวม
-                          }
+                          displayText += " x$qty";
+                          if (totalAddonPrice > 0)
+                            displayText += " (+฿$totalAddonPrice)";
                         } else {
-                          if (unitPrice > 0) {
-                            displayText += " (+฿$unitPrice)";
-                          }
+                          if (unitPrice > 0) displayText += " (+฿$unitPrice)";
                         }
 
                         return Container(
@@ -514,7 +857,6 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
           Text(
             label,
             textAlign: TextAlign.center,
-            // 🎯 ปรับให้ข้อความไม่ตกขอบ หรือล้นไปโดนตัวอื่น
             style: TextStyle(
               fontSize: 10.5,
               color: isCompleted ? Colors.black87 : Colors.grey.shade500,
@@ -537,7 +879,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       widget.order.longitude,
     );
 
-    // 🎯 อัปเดตเงื่อนไขให้ครอบคลุมสถานะใหม่
+    // 🎯 อัปเดตเงื่อนไข Timeline ให้ครอบคลุมสถานะ
     String status = (widget.order.orderStatus ?? "").toLowerCase();
     int currentStep = 1;
 
@@ -554,9 +896,14 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
         status.contains("ontheway") ||
         status.contains("pickedup")) {
       currentStep = 4;
-    } else if (status.contains("success") || status.contains("completed")) {
-      currentStep = 5;
+    } else if (status.contains("delivered") ||
+        status.contains("success") ||
+        status.contains("completed") ||
+        status.contains("reviewsuccess")) {
+      currentStep = 5; // ถึงที่หมายแล้ว
     }
+
+    final bool isWaitingConfirm = status.contains("delivered");
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -670,47 +1017,125 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
               ),
             ),
             const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFBFBFB),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.grey.shade200),
+
+            if (status.contains("cancel"))
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.cancel_rounded,
+                          color: Colors.red.shade700,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "คำสั่งซื้อนี้ถูกยกเลิกแล้ว",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "สาเหตุ: ${widget.order.cancelDetail ?? 'ไม่มีผู้จัดส่งรับงานภายในเวลาที่กำหนด'}",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (status.contains("issue_reported"))
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.support_agent_rounded,
+                      color: Colors.orange.shade700,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        "มีการแจ้งปัญหาออเดอร์นี้\nระบบกำลังดำเนินการตรวจสอบ",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange.shade800,
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 20,
+                  horizontal: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFBFBFB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTimelineDot(
+                      "ค้นหาผู้จัดส่ง",
+                      currentStep >= 1,
+                      currentStep >= 2,
+                      isFirst: true,
+                    ),
+                    _buildTimelineDot(
+                      "ร้านรับออเดอร์",
+                      currentStep >= 2,
+                      currentStep >= 3,
+                    ),
+                    _buildTimelineDot(
+                      "ผู้จัดส่งไปรับ",
+                      currentStep >= 3,
+                      currentStep >= 4,
+                    ),
+                    _buildTimelineDot(
+                      "กำลังจัดส่ง",
+                      currentStep >= 4,
+                      currentStep >= 5,
+                    ),
+                    _buildTimelineDot(
+                      "จัดส่งสำเร็จ",
+                      currentStep >= 5,
+                      currentStep >= 6,
+                      isLast: true,
+                    ),
+                  ],
+                ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildTimelineDot(
-                    "ค้นหาผู้จัดส่ง",
-                    currentStep >= 1,
-                    currentStep >= 2,
-                    isFirst: true,
-                  ),
-                  _buildTimelineDot(
-                    "ร้านรับออเดอร์",
-                    currentStep >= 2,
-                    currentStep >= 3,
-                  ),
-                  _buildTimelineDot(
-                    "ผู้จัดส่งไปรับอาหาร",
-                    currentStep >= 3,
-                    currentStep >= 4,
-                  ),
-                  _buildTimelineDot(
-                    "กำลังจัดส่งให้คุณ",
-                    currentStep >= 4,
-                    currentStep >= 5,
-                  ),
-                  _buildTimelineDot(
-                    "จัดส่งสำเร็จ",
-                    currentStep >= 5,
-                    currentStep >= 6,
-                    isLast: true,
-                  ),
-                ],
-              ),
-            ),
             const SizedBox(height: 24),
 
             const Text(
@@ -942,6 +1367,89 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
           ],
         ),
       ),
+
+      // 🎯 แท็บเครื่องมือด้านล่าง จะแสดงเมื่อสถานะเป็น delivered เท่านั้น!
+      bottomNavigationBar: isWaitingConfirm
+          ? Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    offset: const Offset(0, -4),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      "กรุณาตรวจสอบอาหารและกดยืนยัน",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: ElevatedButton.icon(
+                        onPressed: _confirmSuccess,
+                        icon: const Icon(
+                          Icons.check_circle,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          "ได้รับอาหารถูกต้อง",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 52,
+                      child: OutlinedButton.icon(
+                        onPressed: _confirmReportIssue,
+                        icon: const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.red,
+                        ),
+                        label: const Text(
+                          "แจ้งปัญหาอาหารผิด",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red, width: 1.5),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : null,
     );
   }
 }

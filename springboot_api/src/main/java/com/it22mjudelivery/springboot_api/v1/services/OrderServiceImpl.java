@@ -9,6 +9,7 @@ import com.it22mjudelivery.springboot_api.v1.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -294,6 +295,32 @@ public class OrderServiceImpl implements OrderService {
             return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, reviewStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รีวิวแล้วของร้านค้าได้: " + e.getMessage());
+        }
+    }
+
+    // 🎯 cron = "0 * * * * *" หมายถึงให้ฟังก์ชันนี้ทำงานทุกๆ ต้นนาที (เช่น 12:00:00, 12:01:00)
+    @Scheduled(cron = "0 * * * * *")
+    @Transactional
+    public void autoCancelExpiredOrders() {
+
+        // 1. กำหนดจุดตัดเวลา (เวลาปัจจุบัน ถอยหลังไป 15 นาที)
+        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(15);
+
+        // 2. ไปดึงออเดอร์จาก DB (สมมติว่าสถานะรอไรเดอร์คือ "WAITING_RIDER")
+        List<Order> expiredOrders = orderRepo.findExpiredOrders("WaitingRider", cutoffTime);
+
+        // 3. ถ้าเจอออเดอร์ที่หมดอายุ ให้วนลูปเปลี่ยนสถานะ
+        if (!expiredOrders.isEmpty()) {
+            for (Order order : expiredOrders) {
+                order.setOrderstatus("cancel");
+                order.setCanceldetail("ไม่มีผู้จัดส่งรับงานภายใน 15 นาที");
+
+                System.out.println("-- Auto-canceled Order ID: " + order.getOrderid());
+            }
+
+            // 4. บันทึกการเปลี่ยนแปลงทั้งหมดกลับลง Database ทีเดียว
+            orderRepo.saveAll(expiredOrders);
+            System.out.println("✅ เคลียร์ออเดอร์หมดอายุอัตโนมัติจำนวน " + expiredOrders.size() + " รายการ");
         }
     }
 }
