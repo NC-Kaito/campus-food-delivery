@@ -179,7 +179,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> getActiveOrdersByRider(String username) {
         try {
-            List<String> activeOrderStatus = Arrays.asList("WaitingRestaurant","GoingToRestaurant", "delivery" );
+            List<String> activeOrderStatus = Arrays.asList("WaitingRestaurant","goingToRestaurant", "delivery" );
             return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, activeOrderStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รอไรเดอร์ได้: " + e.getMessage());
@@ -234,7 +234,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> getActiveOrdersByRestaurant(String username) {
         try {
-            List<String> activeOrderStatus = Arrays.asList("delivery");
+            List<String> activeOrderStatus = Arrays.asList("goingToRestaurant","delivery");
             return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, activeOrderStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่ต้องทำได้: " + e.getMessage());
@@ -271,4 +271,29 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    @Override
+    public List<Order> getReviewSuccessOrders(String studentId) {
+        try {
+            // 🎯 กำหนดสถานะเป็น "reviewSuccess" (เช็กให้ตรงกับตอนที่บันทึกลงฐานข้อมูลด้วยนะครับ)
+            List<String> reviewStatus = Arrays.asList("reviewSuccess");
+
+            // อาศัยฟังก์ชันเดิมที่มีอยู่แล้วใน Repository มาใช้ได้เลยครับ สะดวกมากๆ
+            return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(studentId, reviewStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รีวิวแล้วได้: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public List<Order> getReviewSuccessOrdersByRestaurant(String username) {
+        try {
+            // 🎯 กำหนดสถานะเป็น "reviewSuccess"
+            List<String> reviewStatus = Arrays.asList("reviewSuccess");
+
+            // 🎯 ใช้ฟังก์ชันค้นหาจาก Restaurant_Username ที่คุณนารีย์มีอยู่ใน Repository อยู่แล้ว
+            return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, reviewStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รีวิวแล้วของร้านค้าได้: " + e.getMessage());
+        }
+    }
 }

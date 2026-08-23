@@ -68,4 +68,13 @@ class MemberService {
       rethrow;
     }
   }
+
+  Future<ReviewSubmitModel> getReviewByOrderId(int orderId) async {
+    try {
+      final response = await DioClient.dio.get('/v1/member/getReview/$orderId');
+      return ReviewSubmitModel.fromJson(response.data);
+    } catch (e) {
+      throw Exception('ไม่สามารถโหลดข้อมูลรีวิวได้: $e');
+    }
+  }
 }

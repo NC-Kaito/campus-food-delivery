@@ -1,123 +1,14 @@
-// features/member/member_review.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/models/review_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 
 import 'package:flutter_app/features/member/cart_manager_member.dart';
-import 'package:flutter_app/features/member/list_confirm_order_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/global_data.dart';
-
-class TagProtectFormatter extends TextInputFormatter {
-  final List<String> allPossibleTags;
-
-  TagProtectFormatter(this.allPossibleTags);
-
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    for (String tag in allPossibleTags) {
-      String prefix = "$tag:";
-      if (oldValue.text.contains(prefix) && !newValue.text.contains(prefix)) {
-        return oldValue;
-      }
-    }
-    return newValue;
-  }
-}
-
-// 🎯 เพิ่มคลาสสำหรับควบคุมสีของแท็กใน TextField
-class TagHighlightController extends TextEditingController {
-  final List<String> highlightTags;
-
-  TagHighlightController({required this.highlightTags, String? text})
-    : super(text: text);
-
-  @override
-  TextSpan buildTextSpan({
-    required BuildContext context,
-    TextStyle? style,
-    required bool withComposing,
-  }) {
-    List<TextSpan> children = [];
-    String textRemaining = text;
-
-    while (textRemaining.isNotEmpty) {
-      bool foundTag = false;
-      for (String tag in highlightTags) {
-        String prefix = "$tag:";
-        if (textRemaining.startsWith(prefix)) {
-          // ถ้าเจอแท็ก ให้ใส่สีเทาอ่อน
-          children.add(
-            TextSpan(
-              text: prefix,
-              style: style?.copyWith(
-                color: Colors.grey.shade400,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          );
-          textRemaining = textRemaining.substring(prefix.length);
-          foundTag = true;
-          break;
-        }
-      }
-
-      if (!foundTag) {
-        // ถ้าไม่ใช่แท็ก ให้เป็นสีข้อความปกติ (หา index ของ \n ถัดไป หรือจบข้อความ)
-        int nextNewline = textRemaining.indexOf('\n');
-        String normalText = "";
-
-        if (nextNewline != -1) {
-          // ถ้ามีขึ้นบรรทัดใหม่ แต่เราต้องระวังเผื่อมีแท็กอยู่หลังบรรทัดใหม่
-          int nextTagIndex = -1;
-          for (String t in highlightTags) {
-            int idx = textRemaining.indexOf("$t:");
-            if (idx != -1 && (nextTagIndex == -1 || idx < nextTagIndex)) {
-              nextTagIndex = idx;
-            }
-          }
-
-          if (nextTagIndex != -1 && nextTagIndex > 0) {
-            normalText = textRemaining.substring(0, nextTagIndex);
-            textRemaining = textRemaining.substring(nextTagIndex);
-          } else {
-            normalText = textRemaining.substring(0, nextNewline + 1);
-            textRemaining = textRemaining.substring(nextNewline + 1);
-          }
-        } else {
-          // ถ้าไม่มีบรรทัดใหม่ หาแท็กถัดไป
-          int nextTagIndex = -1;
-          for (String t in highlightTags) {
-            int idx = textRemaining.indexOf("$t:");
-            if (idx != -1 && (nextTagIndex == -1 || idx < nextTagIndex)) {
-              nextTagIndex = idx;
-            }
-          }
-
-          if (nextTagIndex != -1 && nextTagIndex > 0) {
-            normalText = textRemaining.substring(0, nextTagIndex);
-            textRemaining = textRemaining.substring(nextTagIndex);
-          } else {
-            normalText = textRemaining;
-            textRemaining = "";
-          }
-        }
-
-        children.add(TextSpan(text: normalText, style: style));
-      }
-    }
-
-    return TextSpan(style: style, children: children);
-  }
-}
 
 class MemberReview extends StatefulWidget {
   final OrderModel order;
@@ -131,12 +22,13 @@ class _MemberReviewState extends State<MemberReview> {
   int _restaurantRating = 0;
   int _riderRating = 0;
 
-  // 🎯 ใช้ Controller ที่เราสร้างขึ้นใหม่ เพื่อให้สีแท็กแตกต่าง
-  final TagHighlightController _restaurantCommentController =
-      TagHighlightController(highlightTags: ['ความสะอาด', 'รสชาติ']);
-  final TagHighlightController _riderCommentController = TagHighlightController(
-    highlightTags: ['ความรวดเร็วในการจัดส่ง', 'การรักษาสภาพอาหาร'],
-  );
+  final TextEditingController _restaurantCommentController =
+      TextEditingController();
+  final TextEditingController _riderCommentController = TextEditingController();
+
+  // เซ็ตเก็บสถานะการเลือกแท็ก
+  final Set<String> _selectedRestaurantTags = {};
+  final Set<String> _selectedRiderTags = {};
 
   final Color primaryGreen = const Color(0xFF64F02D);
 
@@ -241,66 +133,36 @@ class _MemberReviewState extends State<MemberReview> {
     );
   }
 
-  Widget _buildSuggestionTags(
-    List<String> tags,
-    TextEditingController controller,
-  ) {
+  // Widget สำหรับแสดงแท็ก เลือกแล้วเป็นสีส้ม ยังไม่เลือกเป็นสีเทา
+  Widget _buildSuggestionTags(List<String> tags, Set<String> selectedTags) {
     return Wrap(
       spacing: 8.0,
       runSpacing: 8.0,
       children: tags.map((tag) {
-        String tagPrefix = "$tag:";
-        bool isSelected = controller.text.contains(tagPrefix);
-
+        bool isSelected = selectedTags.contains(tag);
         return InkWell(
           onTap: () {
-            String currentText = controller.text;
-
-            if (currentText.contains(tagPrefix)) {
-              List<String> lines = currentText.split('\n');
-              lines.removeWhere((line) => line.startsWith(tagPrefix));
-              controller.text = lines.join('\n').trim();
-            } else {
-              String newText = "$tagPrefix ";
-              if (currentText.isNotEmpty) {
-                if (currentText.endsWith('\n')) {
-                  controller.text = currentText + newText;
-                } else {
-                  controller.text = currentText + '\n' + newText;
-                }
+            setState(() {
+              if (isSelected) {
+                selectedTags.remove(tag);
               } else {
-                controller.text = newText;
+                selectedTags.add(tag);
               }
-            }
-
-            controller.selection = TextSelection.fromPosition(
-              TextPosition(offset: controller.text.length),
-            );
-
-            setState(() {});
+            });
           },
           borderRadius: BorderRadius.circular(20),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: isSelected
-                  ? Colors.orange.shade200
-                  : Colors.orange.shade50,
+              color: isSelected ? Colors.orange : Colors.grey.shade300,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: isSelected
-                    ? Colors.orange.shade700
-                    : Colors.orange.shade300,
-              ),
             ),
             child: Text(
               tag,
               style: TextStyle(
                 fontSize: 13,
-                color: isSelected
-                    ? Colors.orange.shade900
-                    : Colors.orange.shade900,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : Colors.black87,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ),
@@ -599,59 +461,30 @@ class _MemberReviewState extends State<MemberReview> {
     setState(() => _isSubmitting = true);
 
     try {
-      String? cleanlinessVal;
-      String? tasteVal;
-      List<String> otherRestaurantComments = [];
-
-      for (var line in _restaurantCommentController.text.split('\n')) {
-        if (line.startsWith('ความสะอาด:')) {
-          String val = line.substring('ความสะอาด:'.length).trim();
-          if (val.isNotEmpty) cleanlinessVal = val;
-        } else if (line.startsWith('รสชาติ:')) {
-          String val = line.substring('รสชาติ:'.length).trim();
-          if (val.isNotEmpty) tasteVal = val;
-        } else {
-          if (line.trim().isNotEmpty) {
-            otherRestaurantComments.add(line.trim());
-          }
-        }
-      }
-
-      String? deliverySpeedVal;
-      String? foodConditionVal;
-      List<String> otherRiderComments = [];
-
-      for (var line in _riderCommentController.text.split('\n')) {
-        if (line.startsWith('ความรวดเร็วในการจัดส่ง:')) {
-          String val = line.substring('ความรวดเร็วในการจัดส่ง:'.length).trim();
-          if (val.isNotEmpty) deliverySpeedVal = val;
-        } else if (line.startsWith('การรักษาสภาพอาหาร:')) {
-          String val = line.substring('การรักษาสภาพอาหาร:'.length).trim();
-          if (val.isNotEmpty) foodConditionVal = val;
-        } else {
-          if (line.trim().isNotEmpty) {
-            otherRiderComments.add(line.trim());
-          }
-        }
-      }
-
       final review = ReviewSubmitModel(
         orderid: widget.order.orderId!,
         restaurantrating: _restaurantRating,
         riderrating: _riderRating,
-        cleanliness: cleanlinessVal,
-        tasteRating: tasteVal,
-        deliverySpeed: deliverySpeedVal,
-        foodCondition: foodConditionVal,
-        commentrestaurant: otherRestaurantComments.isEmpty
+        cleanliness: _selectedRestaurantTags.contains('ถูกสุขลักษณะ'),
+        tasteRating: _selectedRestaurantTags.contains('รสชาติดี'),
+        deliverySpeed: _selectedRiderTags.contains('ส่งเร็ว'),
+        foodCondition: _selectedRiderTags.contains('รักษาสภาพอาหารดี'),
+        commentrestaurant: _restaurantCommentController.text.trim().isEmpty
             ? null
-            : otherRestaurantComments.join('\n'),
-        commentrider: otherRiderComments.isEmpty
+            : _restaurantCommentController.text.trim(),
+        commentrider: _riderCommentController.text.trim().isEmpty
             ? null
-            : otherRiderComments.join('\n'),
+            : _riderCommentController.text.trim(),
       );
 
+      // 1. ส่งข้อมูลรีวิว
       await memberService.addReview(review);
+
+      // 2. 🎯 อัปเดตสถานะออเดอร์เป็น reviewSuccess
+      await _orderService.updateOrderStatus(
+        widget.order.orderId!,
+        "reviewSuccess",
+      );
 
       if (!mounted) return;
 
@@ -661,7 +494,8 @@ class _MemberReviewState extends State<MemberReview> {
           backgroundColor: Colors.green,
         ),
       );
-      Navigator.pop(context);
+      // ส่งค่ากลับไปเพื่อให้หน้าก่อนหน้ารู้ว่ารีวิวเสร็จแล้ว จะได้รีเฟรชข้อมูล
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -810,7 +644,6 @@ class _MemberReviewState extends State<MemberReview> {
                 children: [
                   Row(
                     children: [
-                      // 🎯 ปรับไอคอนให้โดดเด่นขึ้น
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
@@ -1042,18 +875,14 @@ class _MemberReviewState extends State<MemberReview> {
                   const SizedBox(height: 8),
 
                   _buildSuggestionTags([
-                    'ความสะอาด',
-                    'รสชาติ',
-                  ], _restaurantCommentController),
+                    'ถูกสุขลักษณะ',
+                    'รสชาติดี',
+                  ], _selectedRestaurantTags),
                   const SizedBox(height: 12),
 
                   TextField(
                     controller: _restaurantCommentController,
-                    onChanged: (text) => setState(() {}),
                     maxLines: 3,
-                    inputFormatters: [
-                      TagProtectFormatter(['ความสะอาด', 'รสชาติ']),
-                    ],
                     style: const TextStyle(color: Colors.black87),
                     decoration: InputDecoration(
                       hintText: "กรอกความประทับใจ หรือข้อเสนอแนะ...",
@@ -1105,7 +934,6 @@ class _MemberReviewState extends State<MemberReview> {
                 children: [
                   Row(
                     children: [
-                      // 🎯 ปรับไอคอนให้โดดเด่นขึ้น
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
@@ -1194,21 +1022,14 @@ class _MemberReviewState extends State<MemberReview> {
                   const SizedBox(height: 8),
 
                   _buildSuggestionTags([
-                    'ความรวดเร็วในการจัดส่ง',
-                    'การรักษาสภาพอาหาร',
-                  ], _riderCommentController),
+                    'ส่งเร็ว',
+                    'รักษาสภาพอาหารดี',
+                  ], _selectedRiderTags),
                   const SizedBox(height: 12),
 
                   TextField(
                     controller: _riderCommentController,
-                    onChanged: (text) => setState(() {}),
                     maxLines: 3,
-                    inputFormatters: [
-                      TagProtectFormatter([
-                        'ความรวดเร็วในการจัดส่ง',
-                        'การรักษาสภาพอาหาร',
-                      ]),
-                    ],
                     style: const TextStyle(color: Colors.black87),
                     decoration: InputDecoration(
                       hintText:
@@ -1266,7 +1087,7 @@ class _MemberReviewState extends State<MemberReview> {
                         ),
                       )
                     : const Text(
-                        "ส่งผลการประเมิน",
+                        "รีวิว",
                         style: TextStyle(
                           color: Colors.black87,
                           fontSize: 18,

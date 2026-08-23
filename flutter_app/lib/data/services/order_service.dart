@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/order_model.dart';
+import 'package:flutter_app/data/models/review_model.dart';
 
 class OrderService {
   Future<void> memberConfirmOrder(OrderModel order) async {
@@ -188,6 +189,50 @@ class OrderService {
           "ไม่สามารถดึงข้อมูลคำสั่งซื้อได้ หรือเซิร์ฟเวอร์ไม่ได้เปิดอยู่";
       throw errorMessage;
     } catch (e) {
+      rethrow;
+    }
+  }
+
+  // 🎯 เปลี่ยนชนิดข้อมูลและแก้พาร์ทให้ตรงกับ Spring Boot เรียบร้อยแล้วครับ
+  Future<List<dynamic>> getReviewSuccessOrders(String studentId) async {
+    try {
+      // 🎯 แก้พาร์ทตรงนี้ให้เป็น /v1/order/... แล้วครับ
+      final response = await DioClient.dio.get(
+        '/v1/order/rider/$studentId/review',
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      } else {
+        throw Exception(
+          "ไม่สามารถดึงข้อมูลรีวิวได้ รหัสข้อผิดพลาด: ${response.statusCode}",
+        );
+      }
+    } catch (e) {
+      print("🚨 เกิดข้อผิดพลาดในการดึงออเดอร์ที่รีวิวแล้ว: $e");
+      rethrow;
+    }
+  }
+
+  // 🎯 ฟังก์ชันใหม่สำหรับ "ร้านค้า" ดึงรีวิวโดยเฉพาะ
+  Future<List<dynamic>> getReviewSuccessOrdersByRestaurant(
+    String username,
+  ) async {
+    try {
+      // 🎯 วิ่งไปที่เส้นทางของร้านค้าที่เราเพิ่งสร้างเมื่อกี้
+      final response = await DioClient.dio.get(
+        '/v1/order/restaurant/$username/review',
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      } else {
+        throw Exception(
+          "ไม่สามารถดึงข้อมูลรีวิวของร้านค้าได้: ${response.statusCode}",
+        );
+      }
+    } catch (e) {
+      print("🚨 เกิดข้อผิดพลาดในการดึงรีวิวของร้านค้า: $e");
       rethrow;
     }
   }

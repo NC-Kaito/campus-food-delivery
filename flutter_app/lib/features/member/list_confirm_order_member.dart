@@ -9,6 +9,7 @@ import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/features/member/view_review.dart';
 import 'package:flutter_app/global_data.dart';
 
 class ListConfirmOrderMember extends StatefulWidget {
@@ -71,25 +72,25 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
   }
 
   Map<String, dynamic> _getDetailedStatusInfo(String? rawStatus) {
-    final status = (rawStatus ?? '').trim();
+    final status = (rawStatus ?? '').trim().toLowerCase();
 
     switch (status) {
-      case 'WaitingRider':
+      case 'waitingrider':
         return {
           'text': 'รอผู้จัดส่งรับงาน',
           'color': Colors.orange[800]!,
           'bgColor': Colors.orange[50]!,
           'icon': Icons.directions_bike_rounded,
         };
-      case 'WaitingRestaurant':
+      case 'waitingrestaurant':
         return {
           'text': 'รอร้านค้ายืนยัน',
           'color': Colors.blue[800]!,
           'bgColor': Colors.blue[50]!,
           'icon': Icons.storefront_rounded,
         };
-      case 'Cooking':
-      case 'Preparing':
+      case 'cooking':
+      case 'preparing':
         return {
           'text': 'ร้านกำลังปรุงอาหาร',
           'color': Colors.deepOrange[800]!,
@@ -97,23 +98,30 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
           'icon': Icons.soup_kitchen_rounded,
         };
       case 'delivery':
-      case 'OnTheWay':
+      case 'ontheway':
         return {
           'text': 'กำลังจัดส่ง',
           'color': Colors.indigo[800]!,
           'bgColor': Colors.indigo[50]!,
           'icon': Icons.local_shipping_rounded,
         };
-      case 'Success':
-      case 'Completed':
+      case 'success':
+      case 'completed':
         return {
-          'text': 'จัดส่งสำเร็จแล้ว',
+          'text': 'จัดส่งสำเร็จ (รอรีวิว)',
           'color': Colors.green[800]!,
           'bgColor': Colors.green[50]!,
           'icon': Icons.check_circle_rounded,
         };
-      case 'Cancel':
-      case 'Cancelled':
+      case 'reviewsuccess': // 🎯 เพิ่มสถานะใหม่
+        return {
+          'text': 'รีวิวเสร็จสิ้น',
+          'color': Colors.teal[800]!,
+          'bgColor': Colors.teal[50]!,
+          'icon': Icons.stars_rounded,
+        };
+      case 'cancel':
+      case 'cancelled':
         return {
           'text': 'ยกเลิกคำสั่งซื้อแล้ว',
           'color': Colors.red[800]!,
@@ -130,21 +138,23 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     }
   }
 
+  // 🎯 ปรับปรุงการแยกแท็บ (ลบตัวแปรฮาร์ดโค้ด isReviewed ออก และใช้เงื่อนไข status แทน)
   List<OrderModel> _filterOrders(String type) {
     return _orderHistoryList.where((order) {
       final status = (order.orderStatus ?? '').toLowerCase();
 
-      bool isReviewed = false;
-
       if (type == 'pending') {
         return status != 'success' &&
             status != 'completed' &&
+            status != 'reviewsuccess' &&
             status != 'cancel' &&
             status != 'cancelled';
       } else if (type == 'success') {
-        return (status == 'success' || status == 'completed') && !isReviewed;
+        // แท็บ "สำเร็จแล้ว" โชว์ออเดอร์ที่สำเร็จแต่ยังไม่รีวิว
+        return status == 'success' || status == 'completed';
       } else if (type == 'history') {
-        return (status == 'success' || status == 'completed') && isReviewed;
+        // แท็บ "ประวัติ" โชว์ออเดอร์ที่รีวิวเสร็จแล้ว
+        return status == 'reviewsuccess';
       } else if (type == 'cancel') {
         return status == 'cancel' || status == 'cancelled';
       }
@@ -167,16 +177,14 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
             Container(
               color: Colors.white,
               child: TabBar(
-                // 🎯 เอา isScrollable: true ออก เพื่อให้มันแบ่งพื้นที่เท่าๆ กัน 4 ส่วน
                 indicatorColor: const Color(0xFF64F02D),
                 indicatorWeight: 3,
                 labelColor: const Color(0xFF2E7D32),
                 unselectedLabelColor: Colors.grey[600],
-                // 🎯 ลด Padding ภายในลง เพื่อให้คำยาวๆ แสดงได้ครบโดยไม่ตกบรรทัด
                 labelPadding: EdgeInsets.zero,
                 labelStyle: const TextStyle(
                   fontWeight: FontWeight.bold,
-                  fontSize: 13, // 🎯 ปรับขนาดอักษรลงนิดนึงให้ดูลงตัวและพอดีกรอบ
+                  fontSize: 13,
                 ),
                 tabs: const [
                   Tab(text: "กำลังดำเนินการ"),
@@ -369,11 +377,15 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
     final statusInfo = _getDetailedStatusInfo(order.orderStatus);
 
-    final bool isCompleted =
-        order.orderStatus?.toLowerCase() == 'success' ||
-        order.orderStatus?.toLowerCase() == 'completed';
+    // 🎯 ดึงสถานะปัจจุบัน
+    final String statusLower = (order.orderStatus ?? '').toLowerCase();
 
-    bool isReviewed = false;
+    final bool isCompleted =
+        statusLower == 'success' ||
+        statusLower == 'completed' ||
+        statusLower == 'reviewsuccess';
+
+    final bool isReviewed = statusLower == 'reviewsuccess';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -512,11 +524,12 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                         child: OutlinedButton.icon(
                           onPressed: () {
                             if (isReviewed) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'กำลังพัฒนาหน้าแสดงผลการรีวิว...',
-                                  ),
+                              // 🎯 กดแล้วพาไปหน้าดูรีวิว
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ViewReview(order: order),
                                 ),
                               );
                             } else {
@@ -526,8 +539,10 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                                   builder: (context) =>
                                       MemberReview(order: order),
                                 ),
-                              ).then((_) {
-                                _fetchOrderHistory();
+                              ).then((result) {
+                                if (result == true) {
+                                  _fetchOrderHistory();
+                                }
                               });
                             }
                           },

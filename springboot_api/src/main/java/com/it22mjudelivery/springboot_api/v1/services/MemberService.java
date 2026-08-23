@@ -16,4 +16,6 @@ public interface MemberService {
 
     Review addReview(ReviewDto reviewDto);
 
+    Review getReviewByOrderId(int orderId);
+
 }

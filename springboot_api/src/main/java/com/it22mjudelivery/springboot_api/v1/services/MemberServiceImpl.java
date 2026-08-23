@@ -92,4 +92,10 @@ public class MemberServiceImpl implements MemberService{
         return reviewRepository.save(review);
     }
 
+    @Override
+    public Review getReviewByOrderId(int orderId) {
+        return reviewRepository.findByOrder_Orderid(orderId)
+                .orElseThrow(() -> new RuntimeException("ไม่พบข้อมูลรีวิวของออเดอร์นี้"));
+    }
+
     }

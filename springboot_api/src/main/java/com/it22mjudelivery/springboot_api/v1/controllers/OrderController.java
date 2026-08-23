@@ -195,4 +195,23 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/rider/{studentId}/review")
+    public ResponseEntity<List<Order>> getReviewSuccessOrders(@PathVariable String studentId) {
+        List<Order> orders = orderService.getReviewSuccessOrders(studentId);
+        return ResponseEntity.ok(orders);
+    }
+
+    // 🎯 API เส้นใหม่สำหรับให้ "ร้านค้า" ดึงรีวิวของตัวเองโดยเฉพาะ
+    @GetMapping("/restaurant/{username}/review")
+    public ResponseEntity<List<Order>> getReviewSuccessOrdersByRestaurant(@PathVariable String username) {
+        try {
+            List<Order> orders = orderService.getReviewSuccessOrdersByRestaurant(username);
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+
+
 }

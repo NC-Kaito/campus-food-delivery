@@ -7,13 +7,11 @@ import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/global_data.dart';
 
-import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart';
-import 'package:flutter_app/features/rider/view_delivery_detail.dart'; // 🎯 1. นำเข้าหน้า ViewDeliveryDetail ที่คุณสร้างขึ้น
-
 import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart'
     as waiting;
 import 'package:flutter_app/features/rider/view_delivery_detail.dart'
     as delivery;
+import 'package:flutter_app/features/rider/view_review_rider.dart' as review;
 
 class ListWaitingPickupOrder extends StatefulWidget {
   const ListWaitingPickupOrder({super.key});
@@ -33,24 +31,19 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
   bool _isLoadingStatus = true;
   int _selectedTabIndex = 0;
 
-  // 🎯 ใช้ TabController จริงแทนปุ่ม chip เดิม เพื่อให้ UX/UI ของแถบแท็บ
-  // เหมือนกับฝั่ง member (list_confirm_order_member.dart) เป๊ะๆ
   late final TabController _tabController;
-
   List<dynamic> _realOrders = [];
-
   Timer? _autoRefreshTimer;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _fetchRiderStatus();
   }
 
   void _startAutoRefresh() {
     _autoRefreshTimer?.cancel();
-
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_isReady && !_isLoadingOrders && !_isUpdating) {
         _fetchOrdersBackground();
@@ -62,15 +55,16 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     if (!_isReady) return;
     try {
       List<dynamic> orders = [];
-      String studentId = GlobalData.usernameRider; // ดึงค่ายูสเซอร์
+      String studentId = GlobalData.usernameRider;
 
       if (_selectedTabIndex == 0) {
         orders = await _orderService.getWaitingOrders();
       } else if (_selectedTabIndex == 1) {
         orders = await _orderService.getActiveOrders(studentId);
       } else if (_selectedTabIndex == 2) {
-        // 🎯 ดึงออเดอร์ที่สำเร็จแล้ว
         orders = await _orderService.getSuccessOrdersByRider(studentId);
+      } else if (_selectedTabIndex == 3) {
+        orders = await _orderService.getReviewSuccessOrders(studentId);
       }
 
       if (mounted) {
@@ -137,8 +131,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       } else if (_selectedTabIndex == 1) {
         orders = await _orderService.getActiveOrders(studentId);
       } else if (_selectedTabIndex == 2) {
-        // 🎯 ดึงออเดอร์ที่สำเร็จแล้ว
         orders = await _orderService.getSuccessOrdersByRider(studentId);
+      } else if (_selectedTabIndex == 3) {
+        orders = await _orderService.getReviewSuccessOrders(studentId);
       }
 
       if (mounted) {
@@ -216,21 +211,26 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
   }
 
-  // 🎯 2. ปรับฟังก์ชันเปิดหน้ารายละเอียด ให้แยกตามแท็บ (Tab 0 ไปหน้า ViewWaitingPickupOrder, Tab 1 ไปหน้า ViewDeliveryDetail)
-  Future<void> _openOrderDetail(OrderModel orderModel) async {
+  Future<void> _openOrderDetail(
+    OrderModel orderModel,
+    dynamic rawOrder, {
+    bool isReviewTab = false,
+  }) async {
     Widget targetPage;
 
     if (_selectedTabIndex == 0) {
       targetPage = waiting.ViewWaitingPickupOrder(orderModel: orderModel);
+    } else if (isReviewTab) {
+      targetPage = review.ViewReviewRider(orderModel: orderModel);
     } else {
       targetPage = delivery.ViewDeliveryDetail(orderModel: orderModel);
     }
+
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => targetPage),
     );
 
-    // รีเฟรชลิสต์เมื่อกลับมาจากหน้ารายละเอียด
     if (result == true || _selectedTabIndex == 1) {
       _fetchOrders();
     }
@@ -241,16 +241,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-
-    if (rawPath.startsWith('/')) {
-      return "$baseUrl$rawPath";
-    } else {
-      return "$baseUrl/$rawPath";
-    }
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // 🎯 แถบแท็บสไตล์เดียวกับฝั่ง member: พื้นขาว ตัวหนังสือหนา + เส้นขีดใต้
-  // แท็บที่กำลังเลือกอยู่ (แทนปุ่ม chip สีเหลืองแบบเดิม)
   Widget _buildTabBar() {
     return Container(
       color: Colors.white,
@@ -261,15 +254,17 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         labelColor: const Color(0xFF2E7D32),
         unselectedLabelColor: Colors.grey[600],
         labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 2.0),
         onTap: (index) {
           if (_selectedTabIndex == index) return;
           setState(() => _selectedTabIndex = index);
-          _fetchOrders(); // 🎯 โหลดข้อมูลใหม่เมื่อเปลี่ยนแท็บ
+          _fetchOrders();
         },
         tabs: const [
           Tab(text: "งานใหม่"),
           Tab(text: "รายการจัดส่ง"),
           Tab(text: "จัดส่งสำเร็จ"),
+          Tab(text: "ดูรีวิว"),
         ],
       ),
     );
@@ -277,7 +272,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
 
   Widget _buildOrderCard(dynamic order) {
     final orderModel = OrderModel.fromJson(order);
-
     final int rawOrderId = orderModel.orderId ?? 0;
     final String orderId = rawOrderId.toString().padLeft(6, '0');
     final String restaurantName =
@@ -292,7 +286,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       if (firstName.isNotEmpty || lastName.isNotEmpty) {
         memberFullName = "$firstName $lastName".trim();
       }
-
       final String? rawImgPath = orderModel.member?.profileimg ?? "";
       finalImgUrl = _getFinalProfileImageUrl(rawImgPath);
     } else if (order["customerName"] != null) {
@@ -309,23 +302,30 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     String orderTimeText = "--:--";
     if (orderModel.orderdate != null) {
       final DateTime dateTime = orderModel.orderdate!;
-      final String hour = dateTime.hour.toString().padLeft(2, '0');
-      final String minute = dateTime.minute.toString().padLeft(2, '0');
-      orderTimeText = "$hour:$minute น.";
+      orderTimeText =
+          "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} น.";
     }
 
-    // 🎯 กำหนดคำที่ปุ่มให้ตรงกับบริบทของแท็บ
     String buttonText = "ดูรายละเอียด";
+    bool isReviewTab = _selectedTabIndex == 3;
+
     if (_selectedTabIndex == 0) {
       buttonText = "ดูรายละเอียดเพื่อรับงาน";
     } else if (_selectedTabIndex == 1) {
-      buttonText = "ดูเส้นทาง / สถานะจัดส่ง";
+      buttonText = "ดูเส้นทาง / Status จัดส่ง";
     } else if (_selectedTabIndex == 2) {
       buttonText = "ดูรายละเอียดการจัดส่ง";
+    } else if (isReviewTab) {
+      buttonText = "ดูรีวิวการจัดส่ง";
     }
+
+    final double cardRating =
+        double.tryParse((order['reviewRating'] ?? 5.0).toString()) ?? 5.0;
+
     return InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: () => _openOrderDetail(orderModel),
+      onTap: () =>
+          _openOrderDetail(orderModel, order, isReviewTab: isReviewTab),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
@@ -445,6 +445,30 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                 ],
               ),
             ),
+            if (isReviewTab) ...[
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.star_rounded,
+                      color: Colors.amber,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "$cardRating คะแนน",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -497,8 +521,13 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => _openOrderDetail(orderModel),
+                  onPressed: () => _openOrderDetail(
+                    orderModel,
+                    order,
+                    isReviewTab: isReviewTab,
+                  ),
                   style: ElevatedButton.styleFrom(
+                    // 🎯 ปรับแก้: ให้ใช้สีเขียว #64FF20 เป็นหลักในทุกแท็บ เพื่อความสบายตาและเข้าคู่กันครับ
                     backgroundColor: const Color(0xFF64FF20),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -509,6 +538,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                   child: Text(
                     buttonText,
                     style: const TextStyle(
+                      // 🎯 ปรับแก้: ตัวอักษรบนปุ่มเป็นสีดำ เพื่อให้ตัดกับสีพื้นหลังสีเขียวอย่างเด่นชัดและอ่านง่ายครับ
                       color: Colors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -740,7 +770,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         ? "ยังไม่มีออเดอร์ใหม่ในระบบขณะนี้"
         : _selectedTabIndex == 1
         ? "ยังไม่มีรายการที่กำลังจัดส่ง"
-        : "ยังไม่มีรายการที่จัดส่งสำเร็จ";
+        : _selectedTabIndex == 2
+        ? "ยังไม่มีรายการที่จัดส่งสำเร็จ"
+        : "ยังไม่มีรายการที่ได้รับการรีวิว";
 
     return RefreshIndicator(
       onRefresh: _fetchOrders,

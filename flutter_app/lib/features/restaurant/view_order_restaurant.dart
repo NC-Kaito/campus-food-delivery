@@ -54,10 +54,8 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     try {
       final int orderId = widget.orderModel.orderId ?? 0;
 
-      // เอาคอมเมนต์ออกเพื่อใช้งาน API จริงได้เลยนะครับ
-      // await _orderService.updateOrderStatus(orderId, newStatus);
+      await _orderService.updateOrderStatus(orderId, newStatus);
 
-      // จำลองการรอ API สักนิดให้ดูเป็นธรรมชาติครับ
       await Future.delayed(const Duration(seconds: 1));
 
       if (!mounted) return;
@@ -696,7 +694,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
               onPressed: _isUpdating
                   ? null
                   : () => _updateOrderStatus(
-                      "Accept",
+                      "goingToRestaurant",
                       "รับออเดอร์สำเร็จ! เริ่มปรุงอาหารแล้ว 👨‍🍳",
                     ),
               style: ElevatedButton.styleFrom(
@@ -724,7 +722,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
         onPressed: _isUpdating
             ? null
             : () => _updateOrderStatus(
-                "Delivering",
+                "goingToRestaurant",
                 "ทำอาหารเสร็จแล้ว! แจ้งไรเดอร์มารับอาหาร 🍱🛵",
               ),
         style: ElevatedButton.styleFrom(

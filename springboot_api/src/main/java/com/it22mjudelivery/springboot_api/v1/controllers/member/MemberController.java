@@ -136,5 +136,17 @@ public class MemberController {
         }
     }
 
+    @GetMapping("/getReview/{orderId}")
+    public ResponseEntity<?> getReviewByOrderId(@PathVariable int orderId) {
+        try {
+            Review review = memberService.getReviewByOrderId(orderId);
+            return ResponseEntity.ok(review);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
 
 }

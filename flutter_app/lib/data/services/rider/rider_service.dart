@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/data/models/review_model.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
 
 class RiderService {

@@ -83,7 +83,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // 🎯 1. ดึงรายการกับข้าวจากหลายๆ รูปแบบคีย์ที่เป็นไปได้
+    // 🎯 1. ดึงรายการกับข้าว
     List<dynamic> rawCurries = [];
     if (item.orderDetailCurries != null &&
         item.orderDetailCurries!.isNotEmpty) {
@@ -104,11 +104,12 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
-    // 🎯 2. แกะรายชื่อและรูปกับข้าว (รองรับทั้ง Map และ Model Object พร้อมเพิ่มคีย์ imageurl)
-    List<Map<String, String>> curriesList = [];
+    // 🎯 2. แกะรายชื่อ รูปกับข้าว และดึงราคา
+    List<Map<String, dynamic>> curriesList = [];
     for (var e in rawCurries) {
       String name = '';
       String img = '';
+      int price = 0;
 
       if (e is Map) {
         final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
@@ -126,22 +127,28 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     menuMap['image'] ??
                     '')
                 .toString();
+        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0).toInt();
       } else {
         try {
-          name = (e.menu?.menuName ?? e.menu?.menuname ?? e.name ?? '')
-              .toString();
-          img =
-              (e.menu?.menuImage ??
-                      e.menu?.imageurl ??
-                      e.menu?.imageUrl ??
-                      e.image ??
+          name =
+              ((e as dynamic).menu?.menuName ??
+                      (e as dynamic).menu?.menuname ??
+                      (e as dynamic).name ??
                       '')
                   .toString();
+          img =
+              ((e as dynamic).menu?.menuImage ??
+                      (e as dynamic).menu?.imageurl ??
+                      (e as dynamic).menu?.imageUrl ??
+                      (e as dynamic).image ??
+                      '')
+                  .toString();
+          price = ((e as dynamic).priceAtOrder ?? 0).toInt();
         } catch (_) {}
       }
 
       if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img});
+        curriesList.add({'name': name, 'image': img, 'price': price});
       }
     }
 
@@ -155,72 +162,93 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       } catch (_) {}
     }
 
-    Map<String, int> addonCounts = {};
+    // 🎯 4. จัดกลุ่ม Add-on (รวมจำนวนและราคา)
+    Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in rawAddons) {
       String name = '';
+      int price = 0;
+
       if (addon is Map) {
         name =
             addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
             addon['addonMenu']?['addonName'] ??
             addon['name'] ??
             '';
+        price =
+            (addon['priceAtOrder'] ??
+                    addon['menuAddonDetail']?['addonPrice'] ??
+                    0)
+                .toInt();
       } else {
         try {
-          name = addon.menuAddonDetail?.addonMenu?.addonName ?? '';
+          name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
+          price =
+              ((addon as dynamic).priceAtOrder ??
+                      (addon as dynamic).menuAddonDetail?.addonPrice ??
+                      0)
+                  .toInt();
         } catch (_) {}
       }
 
       if (name.isNotEmpty) {
-        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + 1;
+        } else {
+          groupedAddons[name] = {'qty': 1, 'unitPrice': price};
+        }
       }
     }
 
-    // 🎯 4. คำนวณราคาต่อหน่วย
-    int finalPricePerUnit = 0;
-    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+    // 🎯 5. คำนวณราคาด้วย "วิธีย้อนกลับ" เพื่อให้ตัวเลขเป๊ะทุกกรณี
+    int totalItemPrice = 0;
+    int baseUnitNoAddonPrice = 0;
 
-    if (isCurryDish) {
-      int curriesSum = 0;
-      for (var curry in rawCurries) {
-        if (curry is Map) {
-          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
-          curriesSum += (price ?? 0).toInt();
-        }
+    // คำนวณราคา Add-on รวมทั้งหมด
+    int addonsSum = 0;
+    for (var addon in groupedAddons.values) {
+      addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
+    }
+
+    try {
+      final jsonItem = (item as dynamic).toJson();
+      var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
+
+      if (rawSubtotal != null) {
+        totalItemPrice = (rawSubtotal as num).toInt();
       }
-      int addonsSum = 0;
-      for (var addon in rawAddons) {
-        num? p = 0;
-        if (addon is Map) {
-          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
-        } else {
-          try {
-            p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
-          } catch (_) {}
-        }
-        addonsSum += (p ?? 0).toInt();
-      }
-      finalPricePerUnit =
-          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
+    } catch (_) {}
+
+    if (totalItemPrice > 0) {
+      // ถ้าระบบหลังบ้านมี Subtotal ส่งมา
+      int unitTotal =
+          totalItemPrice ~/ (item.qty > 0 ? item.qty : 1); // หาราคารวมต่อ 1 จาน
+      baseUnitNoAddonPrice =
+          unitTotal - addonsSum; // หัก Add-on ออก จะได้ราคาฐานที่แท้จริง
+      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0; // กันติดลบ
     } else {
-      int addonsSum = 0;
-      for (var addon in rawAddons) {
-        num? p = 0;
-        if (addon is Map) {
-          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
-        } else {
-          try {
-            p = addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice;
-          } catch (_) {}
-        }
-        addonsSum += (p ?? 0).toInt();
+      // Fallback: ถ้าไม่มี Subtotal ให้คำนวณบวกเอง
+      int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+      if (baseMenuPrice == 0) {
+        try {
+          final jsonItem = (item as dynamic).toJson();
+          baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
+        } catch (_) {}
       }
-      finalPricePerUnit = baseMenuPrice + addonsSum;
+
+      int curriesSum = 0;
+      for (var curry in curriesList) {
+        curriesSum += curry['price'] as int;
+      }
+
+      baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
+      totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
     }
 
-    // เลือกลิงก์รูปภาพ: หากเป็นข้าวแกงแต่เมนูหลักไม่มีรูป ให้ดึงรูปจากกับข้าวอย่างแรกมาแสดง
+    // เลือกลิงก์รูปภาพ
     String rawMenuUrl = item.menu?.menuImage ?? '';
     if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] ?? '';
+      rawMenuUrl = curriesList.first['image'] as String;
     }
     final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
 
@@ -263,23 +291,25 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  // 🎯 แสดงราคาฐานสุทธิที่แท้จริง
                   Text(
-                    "ราคา $finalPricePerUnit บาท",
+                    "ราคา $baseUnitNoAddonPrice บาท",
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
 
-                  // แสดง Badge กับข้าวพร้อมรูปภาพ
+                  // แสดง Badge กับข้าว
                   if (curriesList.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6.0,
                       runSpacing: 6.0,
                       children: curriesList.map((curry) {
-                        String rawCurryImage = curry['image'] ?? '';
+                        String rawCurryImage = curry['image'] as String;
                         String finalCurryUrl = _getFinalImageUrl(rawCurryImage);
+                        String curryName = curry['name'] as String;
 
                         return Container(
                           padding: const EdgeInsets.only(
@@ -322,7 +352,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                curry['name'] ?? "ไม่มีชื่อ",
+                                curryName,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.green.shade900,
@@ -336,13 +366,31 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ],
 
-                  // แสดง Badge Add-on
-                  if (addonCounts.isNotEmpty) ...[
+                  // แสดง Badge Add-on แบบระบุราคาชัดเจน
+                  if (groupedAddons.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6.0,
                       runSpacing: 6.0,
-                      children: addonCounts.entries.map((entry) {
+                      children: groupedAddons.entries.map((entry) {
+                        String name = entry.key;
+                        int qty = entry.value['qty'] as int;
+                        int unitPrice = entry.value['unitPrice'] as int;
+
+                        String displayText = name;
+                        if (qty > 1) {
+                          int totalAddonPrice = unitPrice * qty;
+                          displayText += " x$qty"; // โชว์จำนวน
+                          if (totalAddonPrice > 0) {
+                            displayText +=
+                                " (+฿$totalAddonPrice)"; // โชว์ราคารวม
+                          }
+                        } else {
+                          if (unitPrice > 0) {
+                            displayText += " (+฿$unitPrice)";
+                          }
+                        }
+
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -363,9 +411,7 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                entry.value > 1
-                                    ? "${entry.key} x${entry.value}"
-                                    : entry.key,
+                                displayText,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.orange.shade900,
@@ -379,15 +425,29 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                     ),
                   ],
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      "จำนวน ${item.qty}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "จำนวน ${item.qty}",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          "รวม $totalItemPrice บาท",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

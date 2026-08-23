@@ -9,6 +9,7 @@ import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/edit_order_member.dart';
 import 'package:flutter_app/features/member/location_order_member.dart';
+import 'package:flutter_app/features/member/edit_curry_order_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -117,28 +118,43 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     String? rawMenuImage = item.menu.menuImage;
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
-    // 🎯 [แก้ไขแล้ว] ไม่แยกคิดราคาระหว่างข้าวแกงกับเมนูทั่วไป ให้นำ Add-on มาบวกรวมเสมอ
     int totalAddonPricePerUnit = 0;
     for (var addon in item.selectedAddons) {
       totalAddonPricePerUnit += addon.addonPrice?.toInt() ?? 0;
     }
     int finalPricePerUnit = item.unitPrice + totalAddonPricePerUnit;
 
-    Map<String, int> addonCounts = {};
+    // 🎯 ปรับลอจิก Add-on ใหม่: จัดกลุ่มเพื่อคำนวณราคารวมของแต่ละ Add-on ให้อ่านง่าย
+    Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in item.selectedAddons) {
       String name = addon.addonMenu?.addonName ?? '';
+      int price = addon.addonPrice?.toInt() ?? 0;
+
       if (name.isNotEmpty) {
-        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + 1;
+        } else {
+          groupedAddons[name] = {'qty': 1, 'unitPrice': price};
+        }
       }
     }
 
     return InkWell(
       onTap: () async {
+        Widget editPage;
+        if (isCurryDish) {
+          editPage = EditCurryOrderMember(
+            cartItem: item,
+            storeUsername: widget.storeUsername,
+          );
+        } else {
+          editPage = EditOrderMember(cartItem: item);
+        }
+
         final dynamic result = await Navigator.push(
           context,
-          MaterialPageRoute(
-            builder: (context) => EditOrderMember(cartItem: item),
-          ),
+          MaterialPageRoute(builder: (context) => editPage),
         );
 
         if (result != null) {
@@ -240,6 +256,13 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                             rawCurryImage,
                           );
 
+                          double curryPrice = curry.price ?? 0.0;
+                          String displayName = curry.menuName ?? "ไม่มีชื่อ";
+                          if (curryPrice > 0) {
+                            displayName +=
+                                " (+${curryPrice.toStringAsFixed(0)})";
+                          }
+
                           return Container(
                             padding: const EdgeInsets.only(
                               left: 2,
@@ -281,7 +304,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  curry.menuName ?? "ไม่มีชื่อ",
+                                  displayName,
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     color: Colors.green.shade900,
@@ -295,12 +318,32 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       ),
                     ],
 
-                    if (addonCounts.isNotEmpty) ...[
+                    // 🎯 แสดงผล Add-on แบบใหม่
+                    if (groupedAddons.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Wrap(
                         spacing: 6.0,
                         runSpacing: 6.0,
-                        children: addonCounts.entries.map((entry) {
+                        children: groupedAddons.entries.map((entry) {
+                          String name = entry.key;
+                          int qty = entry.value['qty'] as int;
+                          int unitPrice = entry.value['unitPrice'] as int;
+
+                          // จัดเรียงข้อความให้อ่านง่าย
+                          String displayText = name;
+                          if (qty > 1) {
+                            int totalAddonPrice = unitPrice * qty;
+                            displayText += " x$qty"; // โชว์จำนวนก่อน
+                            if (totalAddonPrice > 0) {
+                              displayText +=
+                                  " (ราคา +$totalAddonPrice บาท)"; // วงเล็บราคารวมท้ายสุด
+                            }
+                          } else {
+                            if (unitPrice > 0) {
+                              displayText += " (+฿$unitPrice)";
+                            }
+                          }
+
                           return Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -321,9 +364,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  entry.value > 1
-                                      ? "${entry.key} x${entry.value}"
-                                      : entry.key,
+                                  displayText,
                                   style: TextStyle(
                                     fontSize: 11.5,
                                     color: Colors.orange.shade900,

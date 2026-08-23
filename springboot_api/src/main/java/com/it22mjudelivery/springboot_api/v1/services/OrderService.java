@@ -33,4 +33,10 @@ public interface OrderService {
     boolean updateOrderStatus(int orderId, String newStatus);
 
     List<Order> getSuccessOrdersByRider(String username);
+
+    // 🎯 เพิ่มการประกาศฟังก์ชันสำหรับดึงออเดอร์ที่รีวิวแล้ว
+    List<Order> getReviewSuccessOrders(String studentId);
+    // 🎯 ดึงออเดอร์รีวิวสำหรับ "ร้านค้า"
+    List<Order> getReviewSuccessOrdersByRestaurant(String username);
+
 }

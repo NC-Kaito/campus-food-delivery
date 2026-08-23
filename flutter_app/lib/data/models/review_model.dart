@@ -3,10 +3,10 @@ class ReviewSubmitModel {
   final int restaurantrating;
   final int riderrating;
   final String? commentrestaurant;
-  final bool cleanliness;
-  final bool tasteRating;
-  final bool deliverySpeed;
-  final bool foodCondition;
+  final bool? cleanliness;
+  final bool? tasteRating;
+  final bool? deliverySpeed;
+  final bool? foodCondition;
   final String? commentrider;
 
   ReviewSubmitModel({
@@ -14,10 +14,10 @@ class ReviewSubmitModel {
     required this.restaurantrating,
     required this.riderrating,
     this.commentrestaurant,
-    required this.cleanliness,
-    required this.tasteRating,
-    required this.deliverySpeed,
-    required this.foodCondition,
+    this.cleanliness,
+    this.tasteRating,
+    this.deliverySpeed,
+    this.foodCondition,
     this.commentrider,
   });
 
@@ -33,5 +33,19 @@ class ReviewSubmitModel {
       'food_condition': foodCondition,
       'commentrider': commentrider,
     };
+  }
+
+  factory ReviewSubmitModel.fromJson(Map<String, dynamic> json) {
+    return ReviewSubmitModel(
+      orderid: json['orderid'] ?? 0,
+      restaurantrating: json['restaurantrating'] ?? 0,
+      riderrating: json['riderrating'] ?? 0,
+      commentrestaurant: json['commentrestaurant'],
+      cleanliness: json['cleanliness'],
+      tasteRating: json['taste_rating'],
+      deliverySpeed: json['delivery_speed'],
+      foodCondition: json['food_condition'],
+      commentrider: json['commentrider'],
+    );
   }
 }
