@@ -310,8 +310,10 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
       if (response.statusCode == 200 && response.data != null) {
         return response.data['url'];
       }
-      return response.data['url'];
+      return null;
     } catch (e) {
+      // 🎯 สั่งให้ปริ้นท์ Error ออกมา จะได้รู้ว่า Supabase บ่นอะไร
+      debugPrint("🚨 Upload Image Error ($type): $e");
       return null;
     }
   }
@@ -336,12 +338,28 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           'ownerImage',
         );
 
+        // 🎯 ดักจับ: ถ้าอัปโหลดรูปไม่ผ่าน ห้ามไปต่อเด็ดขาด!
+        if (imagecardIdUrl == null) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("🚨 อัปโหลดรูปภาพไม่สำเร็จ กรุณาลองใหม่อีกครั้ง"),
+                backgroundColor: _danger,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+          return; // หยุดการทำงานตรงนี้ ไม่ส่งไป Database
+        }
+
         RestaurantModel restaurant = RestaurantModel(
           username: widget.username,
           password: widget.password,
           restaurantName: widget.restaurantName,
-          restaurantImage: restaurantImageUrl,
-          imagecardid: imagecardIdUrl,
+          restaurantImage:
+              restaurantImageUrl, // อาจจะ null ได้ถ้าไม่ได้บังคับใส่รูปหน้าร้าน
+          imagecardid: imagecardIdUrl, // มั่นใจได้ว่าตอนนี้ไม่ null แน่นอน
           openingHours: [],
           latitude: widget.latitude,
           longitude: widget.longitude,

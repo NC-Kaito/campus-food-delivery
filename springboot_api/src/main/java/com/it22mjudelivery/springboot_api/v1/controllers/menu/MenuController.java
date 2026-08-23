@@ -1,16 +1,16 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.menu;
+
 import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
 import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
 import com.it22mjudelivery.springboot_api.v1.services.MenuService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -19,9 +19,16 @@ import java.util.UUID;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/v1/menu")
-public class MenuController { // แนะนำให้ใช้ M ตัวใหญ่ตามมาตรฐาน Java นะครับ
+public class MenuController {
 
     private final MenuService menuService;
+
+    // 🎯 ดึงค่า URL และ Key ของ Supabase จาก application.properties
+    @Value("${supabase.url}")
+    private String supabaseUrl;
+
+    @Value("${supabase.key}")
+    private String supabaseKey;
 
     @GetMapping("/restaurant/{username}")
     public ResponseEntity<List<Menu>> getMenusByRestaurant(@PathVariable String username) {
@@ -83,29 +90,47 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
         }
     }
 
-
-
+    // 🎯 เปลี่ยนแปลงฟังก์ชันให้อัปโหลดภาพเมนูอาหารไปที่ Supabase
     @PostMapping("/uploadMenuImage")
     public ResponseEntity<?> uploadMenuImage(@RequestParam("image") MultipartFile file) {
         try {
-            // 🎯 ตัดช่องว่างออกจากชื่อไฟล์ต้นฉบับ ป้องกันลิงก์ URL ขาดตอน
             String safeFilename = file.getOriginalFilename().replaceAll("\\s+", "");
             String fileName = UUID.randomUUID() + "_" + safeFilename;
 
-            // ล็อกพิกัดโฟลเดอร์เก็บไฟล์จริงที่เครื่องเซิร์ฟเวอร์
-            Path uploadDir = Paths.get("uploads", "restaurant", "menu");
-            if (!Files.exists(uploadDir)) {
-                Files.createDirectories(uploadDir);
+            // 🎯 กำหนด Path ใน Supabase (ใช้ Bucket เดิม แต่แยกเก็บเข้าโฟลเดอร์ menu)
+            String bucketName = "campus-food-delivery-images-restaurant";
+            String filePath = "menu/" + fileName;
+
+            // 🎯 เตรียม Header เพื่อยิง API ไปที่ Supabase
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(supabaseKey);
+            headers.setContentType(MediaType.parseMediaType(file.getContentType()));
+
+            // 🎯 โยนไฟล์เข้าไปใน Body และยิง Request
+            HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
+            String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucketName + "/" + filePath;
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    uploadUrl,
+                    HttpMethod.POST,
+                    requestEntity,
+                    String.class
+            );
+
+            // 🎯 ถ้ายิงผ่าน ให้ส่ง Public URL กลับไปที่ Flutter
+            if (response.getStatusCode().is2xxSuccessful()) {
+                String publicUrl = supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + filePath;
+
+                System.out.println("=========================================");
+                System.out.println("✅ Upload Menu Image Success!");
+                System.out.println("📌 URL: " + publicUrl);
+                System.out.println("=========================================");
+
+                return ResponseEntity.ok(Map.of("url", publicUrl));
+            } else {
+                return ResponseEntity.badRequest().body("อัปโหลดรูปภาพเมนูไป Supabase ไม่สำเร็จ");
             }
-
-            // บันทึกไฟล์ลงดิสก์เซิร์ฟเวอร์
-            Path savePath = uploadDir.resolve(fileName);
-            Files.copy(file.getInputStream(), savePath);
-
-            // 🎯 จุดสำคัญ: ปลดแอกการ Hardcode IP เปลี่ยนมาส่ง Relative Path คลีน ๆ สตาร์ทหัวด้วย uploads
-            String imageUrl = "uploads/restaurant/menu/" + fileName;
-
-            return ResponseEntity.ok(Map.of("url", imageUrl));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("อัปโหลดไม่สำเร็จ: " + e.getMessage());
@@ -121,7 +146,7 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
             }
             int menuId = Integer.parseInt(rawId.toString());
 
-                boolean isResult = menuService.deleteMenu(menuId);
+            boolean isResult = menuService.deleteMenu(menuId);
             if (isResult) {
                 return ResponseEntity.ok("ลบเมนูสำเร็จ");
             }
@@ -133,14 +158,4 @@ public class MenuController { // แนะนำให้ใช้ M ตัว�
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
         }
     }
-
-//    @GetMapping("/{id}/addons")
-//    public ResponseEntity<?> getAddonsByTypeMenu(@PathVariable("id") int id) {
-//        try {
-//            Set<Menuaddongroup> addons = menuService.getAddonsByTypeMenuId(id);
-//            return ResponseEntity.ok(addons);
-//        } catch (Exception e) {
-//            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-//        }
-//    }
 }

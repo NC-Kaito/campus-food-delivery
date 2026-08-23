@@ -1,22 +1,17 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.rider;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.RiderDto;
-import com.it22mjudelivery.springboot_api.v1.entities.Member;
-import com.it22mjudelivery.springboot_api.v1.entities.Order;
 import com.it22mjudelivery.springboot_api.v1.entities.Rider;
 import com.it22mjudelivery.springboot_api.v1.services.RiderService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -25,6 +20,13 @@ import java.util.UUID;
 @RequestMapping("/v1/rider")
 public class RiderController {
     private final RiderService riderService;
+
+    // 🎯 ดึงค่า URL และ Key ของ Supabase จาก application.properties
+    @Value("${supabase.url}")
+    private String supabaseUrl;
+
+    @Value("${supabase.key}")
+    private String supabaseKey;
 
     @PostMapping("/loginRider")
     public ResponseEntity<?> doLoginRider(@RequestBody RiderDto riderDto){
@@ -47,10 +49,8 @@ public class RiderController {
             }
             return ResponseEntity.badRequest().body("สมัครผู้จัดส่งไม่สำเร็จ");
         } catch (RuntimeException e) {
-            // จับข้อความที่เรา throw เช่น "ชื่อผู้ใช้งานนี้ถูกใช้ไปแล้ว"
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            // กรณีเกิด Error อื่นๆ ที่ไม่ได้คาดคิด
             System.out.println(e);
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
         }
@@ -61,12 +61,20 @@ public class RiderController {
             @RequestPart("studentCardImage") MultipartFile studentCardFile,
             @RequestPart("vehicleImage") MultipartFile vehicleFile,
             @RequestPart("drivingLicenseImg") MultipartFile drivingLicenseFile,
-            @RequestPart("riderData") String riderJson // หรือรับเป็น @ModelAttribute DTO ก็ได้
+            @RequestPart("riderData") String riderJson
     ) {
         try {
-            // ✅ เรียกใช้ฟังก์ชันเดียว แต่แยกโฟลเดอร์ปลายทาง
+            // ✅ อัปโหลดรูปที่ 1
             String studentCardPath = saveFile(studentCardFile, "studentCard");
+
+            Thread.sleep(500); // ⏱️ พัก 0.5 วินาทีให้ Supabase หายใจ
+
+            // ✅ อัปโหลดรูปที่ 2
             String vehicleImagePath = saveFile(vehicleFile, "vehicleImage");
+
+            Thread.sleep(500); // ⏱️ พัก 0.5 วินาที
+
+            // ✅ อัปโหลดรูปที่ 3
             String drivingLicensePath = saveFile(drivingLicenseFile, "drivingLicenseImg");
 
             Map<String, String> response = new HashMap<>();
@@ -81,8 +89,9 @@ public class RiderController {
         }
     }
 
+    // 🎯 เปลี่ยนไส้ในฟังก์ชันนี้ให้ยิงไฟล์ขึ้น Supabase Storage
     private String saveFile(MultipartFile file, String subFolder) throws IOException {
-        if (file.isEmpty()) return null;
+        if (file == null || file.isEmpty()) return null;
 
         String originalFilename = file.getOriginalFilename() != null
                 ? file.getOriginalFilename()
@@ -90,16 +99,40 @@ public class RiderController {
         String safeFilename = originalFilename.replaceAll("\\s+", "");
         String fileName = UUID.randomUUID() + "_" + safeFilename;
 
-        Path uploadDir = Paths.get("uploads", "rider", subFolder);
+        // 🎯 กำหนด Bucket Name (ตั้งชื่อให้สอดคล้องกับของร้านค้า)
+        String bucketName = "campus-food-delivery-images-rider";
+        String filePath = "rider/" + subFolder + "/" + fileName;
 
-        if (!Files.exists(uploadDir)) {
-            Files.createDirectories(uploadDir);
+        // 🎯 ยิง API ไปที่ Supabase
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(supabaseKey);
+
+        // กันเหนียวกรณีที่ contentType เป็น null ให้ตั้งค่าเป็นภาพ jpeg พื้นฐาน
+        String contentType = file.getContentType();
+        if (contentType == null) contentType = "image/jpeg";
+        headers.setContentType(MediaType.parseMediaType(contentType));
+
+        HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
+        String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucketName + "/" + filePath;
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                uploadUrl,
+                HttpMethod.POST,
+                requestEntity,
+                String.class
+        );
+
+        if (response.getStatusCode().is2xxSuccessful()) {
+            String publicUrl = supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + filePath;
+
+            System.out.println("✅ Upload Rider Image Success: [" + subFolder + "]");
+            System.out.println("📌 URL: " + publicUrl);
+
+            return publicUrl;
+        } else {
+            throw new IOException("อัปโหลดรูปภาพประเภท " + subFolder + " ไป Supabase ไม่สำเร็จ");
         }
-
-        Path savePath = uploadDir.resolve(fileName);
-        Files.copy(file.getInputStream(), savePath);
-
-        return "uploads/rider/" + subFolder + "/" + fileName;
     }
 
     @GetMapping("/getRider")
@@ -116,14 +149,11 @@ public class RiderController {
     }
 
     @PostMapping("/updateIsActive")
-// 🎯 แก้หัวเมธอดตรงนี้: เปลี่ยนจาก @RequestParam ทั้งหมด ให้เป็น @RequestBody Map แบบนี้ครับ
     public ResponseEntity<?> updateRiderStatus(@RequestBody Map<String, Object> payload) {
         try {
-            // 📦 แกะข้อมูลจาก JSON Body ที่ Flutter ส่งมาให้อย่างถูกต้อง
             String studentId = payload.get("studentId").toString();
             boolean isActive = (boolean) payload.get("isActive");
 
-            // ยิงเข้าสู่ชั้น Service ของคุณ Kaito
             boolean isResult = riderService.updateRiderStatus(studentId, isActive);
 
             if (isResult) {
@@ -145,6 +175,4 @@ public class RiderController {
             ));
         }
     }
-
-
 }

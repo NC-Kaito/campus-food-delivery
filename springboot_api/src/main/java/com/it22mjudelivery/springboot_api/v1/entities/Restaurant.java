@@ -31,7 +31,7 @@ public class Restaurant {
     @Column(length = 50, nullable = false)
     private String restaurantname;
 
-    @Column(length = 200, nullable = false)
+    @Column(length = 255, nullable = false)
     private String restaurantimage;
 
     @Column(nullable = false)
@@ -46,7 +46,7 @@ public class Restaurant {
     @Column(length = 50, nullable = false)
     private String ownerlastname;
 
-    @Column(length = 200, nullable = false)
+    @Column(length = 255, nullable = false)
     private String imagecardid;
 
     @Column(length = 100, nullable = false, unique = true)
