@@ -154,7 +154,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ListConfirmOrderMember(),
+                        builder: (context) => const ListActiveOrderMember(),
                       ),
                     );
                   },

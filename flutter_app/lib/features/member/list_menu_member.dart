@@ -10,6 +10,7 @@ import 'package:flutter_app/features/member/add_order_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 
 class ListMenuMember extends StatefulWidget {
   final RestaurantModel restaurantModel;
@@ -39,7 +40,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
   bool _isExtraRice = false;
   int _curryQty = 1;
 
-  // 🎯 ตัวแปรเก็บ Add-on สำหรับข้าวแกง
   List<MenuAddonDetailModel> _curryAddons = [];
   final Map<int, int> _curryAddonQuantities = {};
   final Map<int, MenuAddonDetailModel> _curryAddonModelsIndex = {};
@@ -66,6 +66,157 @@ class _ListMenuMemberState extends State<ListMenuMember>
     } else {
       return "$baseUrl/$rawPath";
     }
+  }
+
+  // 🎯 ฟังก์ชันจัดรูปเวลา
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  // 🎯 ฟังก์ชันจัดกลุ่มวันและเวลาเปิด-ปิดให้อ่านง่าย
+  String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
+    if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
+      return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
+    }
+
+    const shortDayNames = {
+      RestaurantDayOfWeek.monday: "จ.",
+      RestaurantDayOfWeek.tuesday: "อ.",
+      RestaurantDayOfWeek.wednesday: "พ.",
+      RestaurantDayOfWeek.thursday: "พฤ.",
+      RestaurantDayOfWeek.friday: "ศ.",
+      RestaurantDayOfWeek.saturday: "ส.",
+      RestaurantDayOfWeek.sunday: "อา.",
+    };
+
+    final Map<String, List<String>> timeGroups = {};
+
+    for (var d in RestaurantDayOfWeek.values) {
+      final hour = hours.firstWhere(
+        (h) => h.dayOfWeek == d,
+        orElse: () => RestaurantOpeningHourModel(
+          dayOfWeek: d,
+          opentime: const TimeOfDay(hour: 0, minute: 0),
+          closetime: const TimeOfDay(hour: 0, minute: 0),
+          open: false,
+        ),
+      );
+
+      if (hour.open) {
+        final String timeString =
+            "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
+        if (!timeGroups.containsKey(timeString)) {
+          timeGroups[timeString] = [];
+        }
+        timeGroups[timeString]!.add(shortDayNames[d]!);
+      }
+    }
+
+    if (timeGroups.isEmpty) return "ปิดทำการทุกวัน";
+
+    final List<String> resultLines = [];
+    timeGroups.forEach((time, daysList) {
+      resultLines.add("${daysList.join(', ')} ($time)");
+    });
+
+    return resultLines.join(" | ");
+  }
+
+  // 🎯 ฟังก์ชันเช็กว่าปัจจุบันร้านเปิดอยู่หรือไม่
+  bool _isCurrentlyOpen() {
+    final item = widget.restaurantModel;
+    if (item.statusOpen == false) return false;
+
+    final hours = item.openingHours;
+    if (hours == null || hours.isEmpty) return false;
+
+    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
+    final today = hours.firstWhere(
+      (h) => h.dayOfWeek == todayEnum,
+      orElse: () => RestaurantOpeningHourModel(
+        dayOfWeek: todayEnum,
+        opentime: const TimeOfDay(hour: 0, minute: 0),
+        closetime: const TimeOfDay(hour: 0, minute: 0),
+        open: false,
+      ),
+    );
+
+    if (!today.open) return false;
+
+    final now = TimeOfDay.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
+    final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
+
+    if (openMinutes <= closeMinutes) {
+      return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+    }
+    return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+  }
+
+  // 🎯 ฟังก์ชันเด้ง Alert เมื่อร้านปิดทำการ
+  void _showClosedWarningDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: const Row(
+            children: [
+              Icon(Icons.lock_clock_outlined, color: Colors.orange, size: 28),
+              SizedBox(width: 10),
+              Text(
+                "ร้านค้าปิดให้บริการ",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+            ],
+          ),
+          content: const Text(
+            "ขออภัย ร้านค้าอยู่นอกเวลาทำการ หรือกำลังปิดให้บริการชั่วคราว จึงไม่สามารถสั่งอาหารได้ในขณะนี้",
+            style: TextStyle(fontSize: 15, color: Colors.black87, height: 1.4),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                "ดูเมนูต่อ",
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 8,
+                ),
+              ),
+              child: const Text(
+                "กลับหน้าหลัก",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _addMenuCurryToCart(
@@ -152,7 +303,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
         }
       }
 
-      // 🎯 ดึงข้อมูล Add-on สำหรับหมวดหมู่ "ข้าวราดแกง" (ระดับร้านค้า)
       for (var cat in categories) {
         if (cat.typemenuName != null &&
             cat.typemenuName!.contains("ข้าวราดแกง")) {
@@ -208,7 +358,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
     }
   }
 
-  // 🎯 จัดกลุ่ม Add-on ของข้าวราดแกง
   Map<String, List<MenuAddonDetailModel>> _groupCurryAddons() {
     Map<String, List<MenuAddonDetailModel>> grouped = {};
     for (var addon in _curryAddons) {
@@ -224,6 +373,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
 
   @override
   Widget build(BuildContext context) {
+    final bool isRestaurantOpen = _isCurrentlyOpen();
     final bool shouldScroll = _typeMenus.length > 3;
 
     if (_isLoading || _tabController == null) {
@@ -315,13 +465,71 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 20),
-                              // 🎯 ปรับแต่งแถบ TabBar ประเภทเมนูเป็นสีส้ม
+                              const SizedBox(height: 8),
+
+                              // 🎯 แสดงวันเวลาเปิดปิดร้านใต้ชื่อร้าน
+                              Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.calendar_today_rounded,
+                                      size: 16,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _getGroupedOpeningHoursText(
+                                          widget.restaurantModel.openingHours,
+                                        ),
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.grey.shade700,
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                              if (!isRestaurantOpen)
+                                Container(
+                                  margin: const EdgeInsets.only(top: 14),
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  color: Colors.red.shade50,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.lock_clock_outlined,
+                                        color: Colors.red.shade700,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        "ขณะนี้ร้านปิดให้บริการชั่วคราว",
+                                        style: TextStyle(
+                                          color: Colors.red.shade700,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              const SizedBox(height: 14),
                               Container(
                                 decoration: BoxDecoration(
-                                  color: Colors
-                                      .orange
-                                      .shade50, // สีพื้นหลังส้มอ่อน
+                                  color: Colors.orange.shade50,
                                   border: Border(
                                     bottom: BorderSide(
                                       color: Colors.orange.shade200,
@@ -335,12 +543,9 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                   tabAlignment: shouldScroll
                                       ? TabAlignment.start
                                       : TabAlignment.fill,
-                                  labelColor:
-                                      Colors.deepOrange, // สีข้อความเมื่อเลือก
-                                  unselectedLabelColor:
-                                      Colors.black54, // สีข้อความเมื่อไม่เลือก
-                                  indicatorColor:
-                                      Colors.deepOrange, // สีเส้นส้มใต้ออพชัน
+                                  labelColor: Colors.deepOrange,
+                                  unselectedLabelColor: Colors.black54,
+                                  indicatorColor: Colors.deepOrange,
                                   indicatorWeight: 3,
                                   indicatorSize: TabBarIndicatorSize.tab,
                                   dividerColor: Colors.transparent,
@@ -385,7 +590,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
 
                         if (type.typemenuName != null &&
                             type.typemenuName!.contains("ข้าวราดแกง")) {
-                          return _buildCurrySpecialLayout(currentMenus);
+                          return _buildCurrySpecialLayout(
+                            currentMenus,
+                            isRestaurantOpen,
+                          );
                         }
 
                         if (currentMenus.isEmpty) {
@@ -423,117 +631,143 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                     : Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(16),
                               ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: SizedBox(
-                                        width: 110,
-                                        height: 110,
-                                        child: Stack(
-                                          fit: StackFit.expand,
-                                          children: [
-                                            finalMenuUrl.isNotEmpty
-                                                ? Image.network(
-                                                    Uri.encodeFull(
-                                                      finalMenuUrl,
-                                                    ),
-                                                    fit: BoxFit.cover,
-                                                    errorBuilder: (_, __, ___) =>
-                                                        _buildPlaceholderIcon(),
-                                                  )
-                                                : _buildPlaceholderIcon(),
-                                            if (!isAvailable)
-                                              Container(
-                                                color: Colors.black.withOpacity(
-                                                  0.5,
-                                                ),
-                                                child: Center(
-                                                  child: Container(
-                                                    padding:
-                                                        const EdgeInsets.symmetric(
-                                                          horizontal: 12,
-                                                          vertical: 4,
-                                                        ),
-                                                    decoration: BoxDecoration(
-                                                      color: Colors.red
-                                                          .withOpacity(0.9),
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            8,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  if (!isRestaurantOpen) {
+                                    _showClosedWarningDialog();
+                                    return;
+                                  }
+
+                                  if (!isAvailable) {
+                                    return;
+                                  }
+
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          AddOrderMember(menuModel: menu),
+                                    ),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Row(
+                                    children: [
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: SizedBox(
+                                          width: 110,
+                                          height: 110,
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              finalMenuUrl.isNotEmpty
+                                                  ? Image.network(
+                                                      Uri.encodeFull(
+                                                        finalMenuUrl,
+                                                      ),
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder: (_, __, ___) =>
+                                                          _buildPlaceholderIcon(),
+                                                    )
+                                                  : _buildPlaceholderIcon(),
+                                              if (!isAvailable)
+                                                Container(
+                                                  color: Colors.black
+                                                      .withOpacity(0.5),
+                                                  child: Center(
+                                                    child: Container(
+                                                      padding:
+                                                          const EdgeInsets.symmetric(
+                                                            horizontal: 12,
+                                                            vertical: 4,
                                                           ),
-                                                    ),
-                                                    child: const Text(
-                                                      "หมด",
-                                                      style: TextStyle(
-                                                        color: Colors.white,
-                                                        fontSize: 16,
-                                                        fontWeight:
-                                                            FontWeight.bold,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.red
+                                                            .withOpacity(0.9),
+                                                        borderRadius:
+                                                            BorderRadius.circular(
+                                                              8,
+                                                            ),
+                                                      ),
+                                                      child: const Text(
+                                                        "หมด",
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 16,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
                                                       ),
                                                     ),
                                                   ),
                                                 ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 15),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              menu.menuName ?? "ไม่มีชื่อเมนู",
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                                color: isAvailable
+                                                    ? Colors.black
+                                                    : Colors.grey.shade700,
                                               ),
+                                            ),
+                                            const SizedBox(height: 8),
+                                            Text(
+                                              "ราคา ${menu.price?.toStringAsFixed(0) ?? '0'} บาท",
+                                              style: TextStyle(
+                                                color: isAvailable
+                                                    ? Colors.green
+                                                    : Colors.grey.shade600,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 14,
+                                              ),
+                                            ),
                                           ],
                                         ),
                                       ),
-                                    ),
-                                    const SizedBox(width: 15),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            menu.menuName ?? "ไม่มีชื่อเมนู",
-                                            style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                              color: isAvailable
-                                                  ? Colors.black
-                                                  : Colors.grey.shade700,
+                                      IconButton(
+                                        onPressed: () {
+                                          if (!isRestaurantOpen) {
+                                            _showClosedWarningDialog();
+                                            return;
+                                          }
+                                          if (!isAvailable) {
+                                            return;
+                                          }
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) =>
+                                                  AddOrderMember(
+                                                    menuModel: menu,
+                                                  ),
                                             ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            "ราคา ${menu.price?.toStringAsFixed(0) ?? '0'} บาท",
-                                            style: TextStyle(
-                                              color: isAvailable
-                                                  ? Colors.green
-                                                  : Colors.grey.shade600,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 14,
-                                            ),
-                                          ),
-                                        ],
+                                          );
+                                        },
+                                        icon: Icon(
+                                          Icons.add_circle,
+                                          color:
+                                              (isAvailable && isRestaurantOpen)
+                                              ? const Color(0xFF4CAF50)
+                                              : Colors.grey.shade400,
+                                          size: 36,
+                                        ),
                                       ),
-                                    ),
-                                    IconButton(
-                                      onPressed: isAvailable
-                                          ? () {
-                                              Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) =>
-                                                      AddOrderMember(
-                                                        menuModel: menu,
-                                                      ),
-                                                ),
-                                              );
-                                            }
-                                          : null,
-                                      icon: Icon(
-                                        Icons.add_circle,
-                                        color: isAvailable
-                                            ? const Color(0xFF4CAF50)
-                                            : Colors.grey.shade400,
-                                        size: 36,
-                                      ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ),
                             );
@@ -548,10 +782,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
     );
   }
 
-  // 🎯 วิดเจ็ตสร้างตัวเลือก Addon ย่อย
   Widget _buildCurryAddonItemOption(
     MenuAddonDetailModel detail,
     bool isMultipleChoice,
+    bool isRestaurantOpen,
   ) {
     int id = detail.addonDetailId ?? 0;
     int currentQty = _curryAddonQuantities[id] ?? 0;
@@ -562,6 +796,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
     int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
 
     void handleFrontTap() {
+      if (!isRestaurantOpen) {
+        _showClosedWarningDialog();
+        return;
+      }
       setState(() {
         if (isSelected) {
           _curryAddonQuantities.remove(id);
@@ -580,6 +818,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
     }
 
     void handlePlusTap() {
+      if (!isRestaurantOpen) {
+        _showClosedWarningDialog();
+        return;
+      }
       setState(() {
         _curryAddonQuantities[id] = currentQty + 1;
       });
@@ -606,7 +848,12 @@ class _ListMenuMemberState extends State<ListMenuMember>
                         borderRadius: isMultipleChoice
                             ? BorderRadius.circular(4)
                             : null,
-                        border: Border.all(color: Colors.black, width: 1.5),
+                        border: Border.all(
+                          color: isRestaurantOpen
+                              ? Colors.black
+                              : Colors.grey.shade400,
+                          width: 1.5,
+                        ),
                       ),
                       child: isSelected
                           ? Center(
@@ -620,7 +867,9 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                   borderRadius: isMultipleChoice
                                       ? BorderRadius.circular(2)
                                       : null,
-                                  color: Colors.orange,
+                                  color: isRestaurantOpen
+                                      ? Colors.orange
+                                      : Colors.grey,
                                 ),
                               ),
                             )
@@ -629,9 +878,11 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     const SizedBox(width: 12),
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
-                        color: Colors.black87,
+                        color: isRestaurantOpen
+                            ? Colors.black87
+                            : Colors.grey.shade500,
                       ),
                     ),
                   ],
@@ -667,20 +918,26 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     icon: Icon(
                       Icons.remove,
                       size: 16,
-                      color: isSelected ? Colors.black87 : Colors.grey.shade300,
+                      color: (isSelected && isRestaurantOpen)
+                          ? Colors.black87
+                          : Colors.grey.shade300,
                     ),
-                    onPressed: isSelected
-                        ? () {
-                            setState(() {
-                              if (_curryAddonQuantities[id]! <= 1) {
-                                _curryAddonQuantities.remove(id);
-                              } else {
-                                _curryAddonQuantities[id] =
-                                    _curryAddonQuantities[id]! - 1;
-                              }
-                            });
+                    onPressed: () {
+                      if (!isRestaurantOpen) {
+                        _showClosedWarningDialog();
+                        return;
+                      }
+                      if (isSelected) {
+                        setState(() {
+                          if (_curryAddonQuantities[id]! <= 1) {
+                            _curryAddonQuantities.remove(id);
+                          } else {
+                            _curryAddonQuantities[id] =
+                                _curryAddonQuantities[id]! - 1;
                           }
-                        : null,
+                        });
+                      }
+                    },
                   ),
                   Container(
                     alignment: Alignment.center,
@@ -690,7 +947,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: isSelected
+                        color: (isSelected && isRestaurantOpen)
                             ? Colors.black87
                             : Colors.grey.shade400,
                       ),
@@ -705,9 +962,19 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     icon: Icon(
                       Icons.add,
                       size: 16,
-                      color: isSelected ? Colors.black87 : Colors.grey.shade300,
+                      color: (isSelected && isRestaurantOpen)
+                          ? Colors.black87
+                          : Colors.grey.shade300,
                     ),
-                    onPressed: isSelected ? handlePlusTap : null,
+                    onPressed: () {
+                      if (!isRestaurantOpen) {
+                        _showClosedWarningDialog();
+                        return;
+                      }
+                      if (isSelected) {
+                        handlePlusTap();
+                      }
+                    },
                   ),
                 ],
               ),
@@ -717,7 +984,10 @@ class _ListMenuMemberState extends State<ListMenuMember>
     );
   }
 
-  Widget _buildCurrySpecialLayout(List<MenuModel> curryItems) {
+  Widget _buildCurrySpecialLayout(
+    List<MenuModel> curryItems,
+    bool isRestaurantOpen,
+  ) {
     if (curryItems.isEmpty) {
       return const Center(
         child: Text(
@@ -730,7 +1000,6 @@ class _ListMenuMemberState extends State<ListMenuMember>
     final int selectCount = _selectedCurries.length;
     final groupedAddons = _groupCurryAddons();
 
-    // 🎯 [ปรับราคาใหม่] 1 อย่าง 30 บาท, 2 อย่าง 35 บาท, 3 อย่าง 40 บาท
     double basePrice = 0;
     if (selectCount == 1) {
       basePrice = 30;
@@ -740,16 +1009,13 @@ class _ListMenuMemberState extends State<ListMenuMember>
       basePrice = 40;
     }
 
-    // คิดราคาส่วนต่างบวกเพิ่มของกับข้าว(เมนูพิเศษ)
     final double totalSurchargePrice = _selectedCurries.fold(
       0.0,
       (sum, curry) => sum + (curry.price ?? 0.0),
     );
 
-    // ราคากดเพิ่มข้าวสวย
     final double optionPrice = (selectCount > 0 && _isExtraRice) ? 5.0 : 0.0;
 
-    // คำนวณราคา Add-on รวม
     double addonTotalPrice = 0;
     _curryAddonQuantities.forEach((id, qty) {
       final model = _curryAddonModelsIndex[id];
@@ -900,30 +1166,33 @@ class _ListMenuMemberState extends State<ListMenuMember>
                           ),
                         ),
                         value: isSelected,
-                        onChanged:
-                            (!isAvailable ||
-                                (!isSelected &&
-                                    _selectedCurries.length >= _maxCurrySelect))
-                            ? null
-                            : (bool? value) {
-                                setState(() {
-                                  if (isSelected) {
-                                    _selectedCurries.removeWhere(
-                                      (element) =>
-                                          element.menuId == curry.menuId,
-                                    );
-                                  } else {
-                                    _selectedCurries.add(curry);
-                                  }
-                                });
-                              },
+                        onChanged: (bool? value) {
+                          if (!isRestaurantOpen) {
+                            _showClosedWarningDialog();
+                            return;
+                          }
+                          if (!isAvailable ||
+                              (!isSelected &&
+                                  _selectedCurries.length >= _maxCurrySelect)) {
+                            return;
+                          }
+
+                          setState(() {
+                            if (isSelected) {
+                              _selectedCurries.removeWhere(
+                                (element) => element.menuId == curry.menuId,
+                              );
+                            } else {
+                              _selectedCurries.add(curry);
+                            }
+                          });
+                        },
                       ),
                     );
                   },
                 ),
                 const SizedBox(height: 8),
 
-                // 🎯 ── ส่วนการแสดงผล Add-on (ตัวเลือกเสริม) ──
                 if (groupedAddons.isNotEmpty) ...[
                   const Divider(thickness: 1, height: 32),
                   ...groupedAddons.entries.toList().asMap().entries.map((
@@ -975,6 +1244,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                             _buildCurryAddonItemOption(
                                               addonDetail,
                                               isMultipleChoice,
+                                              isRestaurantOpen,
                                             ),
                                       )
                                       .toList(),
@@ -1031,8 +1301,13 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     style: TextStyle(fontSize: 12),
                   ),
                   value: _isExtraRice,
-                  onChanged: (val) =>
-                      setState(() => _isExtraRice = val ?? false),
+                  onChanged: (val) {
+                    if (!isRestaurantOpen) {
+                      _showClosedWarningDialog();
+                      return;
+                    }
+                    setState(() => _isExtraRice = val ?? false);
+                  },
                 ),
               ),
               const SizedBox(height: 16),
@@ -1063,13 +1338,19 @@ class _ListMenuMemberState extends State<ListMenuMember>
                               icon: Icon(
                                 Icons.remove_circle_outline,
                                 size: 24,
-                                color: _curryQty > 1
+                                color: (_curryQty > 1 && isRestaurantOpen)
                                     ? Colors.black87
                                     : Colors.grey.shade400,
                               ),
-                              onPressed: _curryQty > 1
-                                  ? () => setState(() => _curryQty--)
-                                  : null,
+                              onPressed: () {
+                                if (!isRestaurantOpen) {
+                                  _showClosedWarningDialog();
+                                  return;
+                                }
+                                if (_curryQty > 1) {
+                                  setState(() => _curryQty--);
+                                }
+                              },
                             ),
                             SizedBox(
                               width: 28,
@@ -1084,12 +1365,20 @@ class _ListMenuMemberState extends State<ListMenuMember>
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(
+                              icon: Icon(
                                 Icons.add_circle_outline,
                                 size: 24,
-                                color: Colors.black87,
+                                color: isRestaurantOpen
+                                    ? Colors.black87
+                                    : Colors.grey.shade400,
                               ),
-                              onPressed: () => setState(() => _curryQty++),
+                              onPressed: () {
+                                if (!isRestaurantOpen) {
+                                  _showClosedWarningDialog();
+                                  return;
+                                }
+                                setState(() => _curryQty++);
+                              },
                             ),
                           ],
                         ),
@@ -1141,7 +1430,9 @@ class _ListMenuMemberState extends State<ListMenuMember>
                 height: 50,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4CAF50),
+                    backgroundColor: isRestaurantOpen
+                        ? const Color(0xFF4CAF50)
+                        : Colors.grey.shade400,
                     foregroundColor: Colors.white,
                     disabledBackgroundColor: Colors.grey.shade300,
                     elevation: 0,
@@ -1149,37 +1440,43 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       borderRadius: BorderRadius.circular(25),
                     ),
                   ),
-                  onPressed: _selectedCurries.isEmpty
-                      ? null
-                      : () {
-                          final List<MenuAddonDetailModel>
-                          finalSelectedAddonsList = [];
-                          _curryAddonQuantities.forEach((id, qty) {
-                            final model = _curryAddonModelsIndex[id];
-                            if (model != null && qty > 0) {
-                              for (int i = 0; i < qty; i++) {
-                                finalSelectedAddonsList.add(model);
-                              }
-                            }
-                          });
+                  onPressed: () {
+                    if (!isRestaurantOpen) {
+                      _showClosedWarningDialog();
+                      return;
+                    }
 
-                          final curriesNames = _selectedCurries
-                              .map((c) => c.menuName ?? "-")
-                              .join(', ');
-                          final additions = _isExtraRice ? 'เพิ่มข้าว' : '';
+                    if (_selectedCurries.isEmpty) {
+                      return;
+                    }
 
-                          String finalNote =
-                              "ราดแกง: [$curriesNames] ${additions.isNotEmpty ? '($additions)' : ''}";
+                    final List<MenuAddonDetailModel> finalSelectedAddonsList =
+                        [];
+                    _curryAddonQuantities.forEach((id, qty) {
+                      final model = _curryAddonModelsIndex[id];
+                      if (model != null && qty > 0) {
+                        for (int i = 0; i < qty; i++) {
+                          finalSelectedAddonsList.add(model);
+                        }
+                      }
+                    });
 
-                          _addMenuCurryToCart(
-                            totalPrice,
-                            finalNote,
-                            finalSelectedAddonsList,
-                            addonTotalPrice.toInt(),
-                            (basePrice + totalSurchargePrice + optionPrice)
-                                .toInt(),
-                          );
-                        },
+                    final curriesNames = _selectedCurries
+                        .map((c) => c.menuName ?? "-")
+                        .join(', ');
+                    final additions = _isExtraRice ? 'เพิ่มข้าว' : '';
+
+                    String finalNote =
+                        "ราดแกง: [$curriesNames] ${additions.isNotEmpty ? '($additions)' : ''}";
+
+                    _addMenuCurryToCart(
+                      totalPrice,
+                      finalNote,
+                      finalSelectedAddonsList,
+                      addonTotalPrice.toInt(),
+                      (basePrice + totalSurchargePrice + optionPrice).toInt(),
+                    );
+                  },
                   child: const Text(
                     "เพิ่มลงตะกร้า",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),

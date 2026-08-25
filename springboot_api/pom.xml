@@ -93,6 +93,19 @@
             <scope>runtime</scope>
         </dependency>
         <!--===================================================================-->
+        <!-- Source: https://mvnrepository.com/artifact/com.cloudinary/cloudinary-http44 -->
+        <dependency>
+            <groupId>com.cloudinary</groupId>
+            <artifactId>cloudinary-http44</artifactId>
+            <version>1.38.0</version>
+            <scope>compile</scope>
+        </dependency>
+        <!-- เพิ่มสำหรับใช้งานระบบส่งอีเมล -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+        <!--===================================================================-->
     </dependencies>
 
     <build>

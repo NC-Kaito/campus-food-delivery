@@ -7,25 +7,27 @@ import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
 import com.it22mjudelivery.springboot_api.v1.entities.Review;
 import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddongroupRepository;
 import com.it22mjudelivery.springboot_api.v1.services.MemberService;
+// 🎯 Import CloudinaryService เข้ามา
+import com.it22mjudelivery.springboot_api.v1.services.CloudinaryService;
+
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/v1/member")
 public class MemberController {
     private final MemberService memberService;
+
+    // 🎯 ฉีด CloudinaryService เข้ามาใช้งาน
+    private final CloudinaryService cloudinaryService;
 
     private MenuaddongroupRepository menuaddongroupRepo;
 
@@ -86,25 +88,24 @@ public class MemberController {
         }
     }
 
+    // 🎯 เปลี่ยนมาใช้ Cloudinary อัปโหลดรูปลูกค้า
     @PostMapping("/uploadProfileImage")
     public ResponseEntity<?> uploadProfileImage(@RequestParam("image") MultipartFile file) {
         try {
-            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            // 1. ระบุชื่อโฟลเดอร์สำหรับเก็บรูปโปรไฟล์ลูกค้า
+            String folderName = "maejo_delivery/members/profile";
 
-            // 🎯 จุดที่ 1: ตรวจเช็คให้มั่นใจว่าพิกัดโฟลเดอร์เก็บไฟล์จริงเอาไว้ที่ไหน
-            // แนะนำให้ยิงตรงเข้าโฟลเดอร์ member/ เพื่อความง่ายและสั้นในการจัดพาร์ทครับ
-            Path uploadDir = Paths.get("uploads", "member", "profile");
-            if (!Files.exists(uploadDir)) {
-                Files.createDirectories(uploadDir);
-            }
+            // 2. เรียกใช้ CloudinaryService เพื่ออัปโหลดและรับ URL กลับมา
+            String publicUrl = cloudinaryService.uploadImage(file, folderName);
 
-            // บันทึกไฟล์ลงเซิร์ฟเวอร์จริง
-            Path savePath = uploadDir.resolve(fileName);
-            Files.copy(file.getInputStream(), savePath);
+            // 3. พิมพ์ Log เช็กความเรียบร้อย
+            System.out.println("=========================================");
+            System.out.println("✅ Upload Member Profile Image Success!");
+            System.out.println("📌 URL: " + publicUrl);
+            System.out.println("=========================================");
 
-            String imageUrl = "uploads/member/profile/" + fileName;
-
-            return ResponseEntity.ok(Map.of("url", imageUrl));
+            // 4. ส่ง URL กลับไปให้ Flutter
+            return ResponseEntity.ok(Map.of("url", publicUrl));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("อัปโหลดไม่สำเร็จ: " + e.getMessage());
@@ -147,6 +148,4 @@ public class MemberController {
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
         }
     }
-
-
 }

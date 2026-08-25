@@ -9,7 +9,7 @@ import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
-import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
+import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
@@ -32,8 +32,7 @@ class _HomeMemberState extends State<HomeMember> {
   final RestaurantService _restaurantService = RestaurantService();
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final MenuService _menuService = MenuService();
-  final OrderService _orderService =
-      OrderService(); // 🎯 เพิ่ม Service สำหรับคำสั่งซื้อ
+  final OrderService _orderService = OrderService();
 
   List<RestaurantModel> _results = [];
   List<TypeRestaurantModel> typeList = [];
@@ -41,7 +40,7 @@ class _HomeMemberState extends State<HomeMember> {
 
   bool _isLoading = true;
   Set<int> _selectedTypeIds = {};
-  int _activeOrderCount = 0; // 🎯 ตัวแปรเก็บจำนวนออเดอร์ที่กำลังดำเนินการ
+  int _activeOrderCount = 0;
 
   final menuTextStyle = const TextStyle(
     fontSize: 12,
@@ -63,11 +62,10 @@ class _HomeMemberState extends State<HomeMember> {
 
   Future<void> _initData() async {
     await fetchTypes();
-    await _fetchActiveOrderCount(); // 🎯 โหลดจำนวนออเดอร์เมื่อเปิดหน้า
+    await _fetchActiveOrderCount();
     await _loadResults("");
   }
 
-  // 🎯 ฟังก์ชันดึงจำนวน "คำสั่งซื้อที่กำลังดำเนินการ"
   Future<void> _fetchActiveOrderCount() async {
     try {
       String username = GlobalData.usernameMember.trim();
@@ -78,7 +76,6 @@ class _HomeMemberState extends State<HomeMember> {
       int count = 0;
       for (var order in history) {
         final status = (order.orderStatus ?? '').toLowerCase();
-        // คัดกรองเฉพาะออเดอร์ที่ยังไม่เสร็จสิ้น หรือ ยังไม่ถูกยกเลิก
         if (status != 'success' &&
             status != 'completed' &&
             status != 'cancel' &&
@@ -216,46 +213,76 @@ class _HomeMemberState extends State<HomeMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  bool _isCurrentlyOpen(RestaurantModel item) {
-    if (item.statusOpen == false) return false;
-
+  // 🎯 ฟังก์ชันตรวจสอบสถานะร้านแบบละเอียด (ครอบคลุม 3 เงื่อนไข)
+  Map<String, dynamic> _getRestaurantStatusInfo(RestaurantModel item) {
+    bool isScheduledOpen = false;
     final hours = item.openingHours;
-    if (hours == null || hours.isEmpty) return false;
 
-    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
-    final today = hours.firstWhere(
-      (h) => h.dayOfWeek == todayEnum,
-      orElse: () => RestaurantOpeningHourModel(
-        dayOfWeek: todayEnum,
-        opentime: const TimeOfDay(hour: 0, minute: 0),
-        closetime: const TimeOfDay(hour: 0, minute: 0),
-        open: false,
-      ),
-    );
+    if (hours != null && hours.isNotEmpty) {
+      final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
+      final today = hours.firstWhere(
+        (h) => h.dayOfWeek == todayEnum,
+        orElse: () => RestaurantOpeningHourModel(
+          dayOfWeek: todayEnum,
+          opentime: const TimeOfDay(hour: 0, minute: 0),
+          closetime: const TimeOfDay(hour: 0, minute: 0),
+          open: false,
+        ),
+      );
 
-    if (!today.open) return false;
+      if (today.open) {
+        final now = TimeOfDay.now();
+        final nowMinutes = now.hour * 60 + now.minute;
+        final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
+        final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
 
-    final now = TimeOfDay.now();
-    final nowMinutes = now.hour * 60 + now.minute;
-    final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
-    final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
-
-    if (openMinutes <= closeMinutes) {
-      return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+        if (openMinutes <= closeMinutes) {
+          isScheduledOpen =
+              nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+        } else {
+          isScheduledOpen =
+              nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+        }
+      }
     }
-    return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+
+    bool isMasterOpen = item.statusOpen ?? true;
+
+    // 🎯 3 เงื่อนไขเป๊ะๆ
+    if (isMasterOpen == true && isScheduledOpen == true) {
+      return {
+        'text': 'เปิดอยู่',
+        'color': const Color(0xFF2E7D32),
+        'bgColor': const Color(0xFF64F02D).withOpacity(0.15),
+        'isOpen': true,
+      };
+    } else if (isMasterOpen == false && isScheduledOpen == true) {
+      return {
+        'text': 'ปิดชั่วคราว',
+        'color': Colors.orange.shade800,
+        'bgColor': Colors.orange.shade50,
+        'isOpen': false,
+      };
+    } else {
+      return {
+        'text': 'ปิดทำการ',
+        'color': Colors.grey.shade600,
+        'bgColor': Colors.grey.shade200,
+        'isOpen': false,
+      };
+    }
   }
 
-  // 🎯 ปรับปรุงให้โหลดทั้งจำนวนตะกร้าและคำสั่งซื้อใหม่พร้อมกันเมื่อกลับมาหน้าหลัก
   void _refreshBadges() {
     _fetchActiveOrderCount();
     if (mounted) setState(() {});
   }
 
+  // 🎯 อัปเดตข้อความใน Alert ให้ครอบคลุมทุกการปิด
   void _showClosedRestaurantDialog(RestaurantModel item) {
     final bool manuallyClosedByOwner = item.statusOpen == false;
     final String message = manuallyClosedByOwner
-        ? "ร้าน \"${item.restaurantName ?? 'นี้'}\" ปิดทำการในวันนี้"
+        ? "ร้าน \"${item.restaurantName ?? 'นี้'}\" ปิดชั่วคราวในขณะนี้"
         : "ร้าน \"${item.restaurantName ?? 'นี้'}\" อยู่นอกเวลาทำการในขณะนี้ (${_getTodayHoursText(item.openingHours)})";
 
     showDialog(
@@ -317,6 +344,16 @@ class _HomeMemberState extends State<HomeMember> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            width: double.infinity,
+            height: 150,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage('assets/images/member_home.png'),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
           Container(
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
             color: Colors.transparent,
@@ -561,12 +598,11 @@ class _HomeMemberState extends State<HomeMember> {
                     ),
                   ).then((_) => _refreshBadges());
                 }, badgeCount: cartItemCount),
-                // 🎯 เพิ่ม badge แจ้งเตือนออเดอร์ที่ดำเนินการอยู่
                 _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ListConfirmOrderMember(),
+                      builder: (context) => const ListActiveOrderMember(),
                     ),
                   ).then((_) => _refreshBadges());
                 }, badgeCount: _activeOrderCount),
@@ -686,10 +722,16 @@ class _HomeMemberState extends State<HomeMember> {
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () {
-          if (!_isCurrentlyOpen(item)) {
+          // 🎯 ดึงก้อนข้อมูลสถานะ 3 แบบ
+          final statusInfo = _getRestaurantStatusInfo(item);
+
+          // 🎯 เช็กค่า isOpen ว่าร้านเปิดขายหรือไม่
+          if (statusInfo['isOpen'] == false) {
             _showClosedRestaurantDialog(item);
             return;
           }
+
+          // ถ้าร้านเปิดปกติ ให้พาไปหน้าเมนู
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -804,13 +846,11 @@ class _HomeMemberState extends State<HomeMember> {
                       const SizedBox(width: 8),
                       Builder(
                         builder: (context) {
-                          final bool isOpen = _isCurrentlyOpen(item);
-                          final Color statusColor = isOpen
-                              ? const Color(0xFF2E7D32)
-                              : Colors.grey.shade600;
-                          final Color statusBg = isOpen
-                              ? primaryGreen.withOpacity(0.15)
-                              : Colors.grey.shade200;
+                          // 🎯 สร้างกล่องแสดงสถานะที่รองรับสี 3 แบบ
+                          final statusInfo = _getRestaurantStatusInfo(item);
+                          final Color statusColor = statusInfo['color'];
+                          final Color statusBg = statusInfo['bgColor'];
+                          final String statusText = statusInfo['text'];
 
                           return Container(
                             padding: const EdgeInsets.symmetric(
@@ -834,7 +874,7 @@ class _HomeMemberState extends State<HomeMember> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  isOpen ? "เปิดอยู่" : "ปิดอยู่",
+                                  statusText,
                                   style: TextStyle(
                                     color: statusColor,
                                     fontSize: 11,

@@ -11,16 +11,19 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart' as dio_package;
 
-class ViewConfirmOrderMember extends StatefulWidget {
+import 'package:flutter_app/features/member/member_review.dart';
+import 'package:flutter_app/features/member/view_review.dart';
+
+class ViewActiveOrderMember extends StatefulWidget {
   final OrderModel order;
 
-  const ViewConfirmOrderMember({super.key, required this.order});
+  const ViewActiveOrderMember({super.key, required this.order});
 
   @override
-  State<ViewConfirmOrderMember> createState() => _ViewConfirmOrderMemberState();
+  State<ViewActiveOrderMember> createState() => _ViewConfirmOrderMemberState();
 }
 
-class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
+class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
   GoogleMapController? _miniMapController;
 
   String _loggedInMemberName = "กำลังโหลด...";
@@ -903,7 +906,91 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
       currentStep = 5; // ถึงที่หมายแล้ว
     }
 
-    final bool isWaitingConfirm = status.contains("delivered");
+    // 🎯 ดึงสถานะที่แท้จริงแบบเดียวกับการ์ดด้านนอก
+    final bool isCompleted =
+        status == 'success' ||
+        status == 'completed' ||
+        status == 'reviewsuccess';
+    final bool isReviewed = status == 'reviewsuccess';
+
+    // ⏱️ เช็กเวลา 1 ชั่วโมง สำหรับการแจ้งปัญหา (นำระบบแกะเวลาจากหน้า List มาใช้)
+    bool isWithinOneHour = true;
+    try {
+      dynamic rawSuccessTime;
+      // พยายามหาชื่อตัวแปรที่ตรงกับใน OrderModel (ป้องกัน NoSuchMethodError)
+      try {
+        rawSuccessTime = (widget.order as dynamic).successtime;
+      } catch (_) {
+        try {
+          rawSuccessTime = (widget.order as dynamic).successTime;
+        } catch (_) {}
+      }
+
+      final dynamic rawOrderDate = widget.order.orderdate;
+
+      if (rawSuccessTime != null && rawOrderDate != null) {
+        DateTime orderDate;
+        if (rawOrderDate is DateTime) {
+          orderDate = rawOrderDate.toLocal();
+        } else {
+          orderDate = DateTime.parse(rawOrderDate.toString()).toLocal();
+        }
+
+        int hour = 0;
+        int minute = 0;
+
+        if (rawSuccessTime is List) {
+          hour = int.tryParse(rawSuccessTime[0].toString()) ?? 0;
+          if (rawSuccessTime.length > 1) {
+            minute = int.tryParse(rawSuccessTime[1].toString()) ?? 0;
+          }
+        } else {
+          String timeStr = rawSuccessTime
+              .toString()
+              .replaceAll(RegExp(r'[\[\]]'), '')
+              .trim();
+          List<String> timeParts = timeStr.contains(':')
+              ? timeStr.split(':')
+              : timeStr.split(',');
+          if (timeParts.isNotEmpty) {
+            hour = int.tryParse(timeParts[0].trim()) ?? 0;
+          }
+          if (timeParts.length > 1) {
+            minute = int.tryParse(timeParts[1].trim()) ?? 0;
+          }
+        }
+
+        DateTime successDateTime = DateTime(
+          orderDate.year,
+          orderDate.month,
+          orderDate.day,
+          hour,
+          minute,
+        );
+
+        // 🎯 ตัดวินาทีทิ้ง ป้องกันบั๊กเวลาสั่ง 10:00:55 เทียบกับเวลาส่ง 10:00:00
+        DateTime strippedOrderDate = DateTime(
+          orderDate.year,
+          orderDate.month,
+          orderDate.day,
+          orderDate.hour,
+          orderDate.minute,
+        );
+
+        if (successDateTime.isBefore(strippedOrderDate)) {
+          successDateTime = successDateTime.add(const Duration(days: 1));
+        }
+
+        if (DateTime.now().difference(successDateTime).inMinutes >= 60) {
+          isWithinOneHour = false;
+        }
+      } else if (isCompleted) {
+        isWithinOneHour = false;
+      }
+    } catch (e) {
+      debugPrint("Error parsing success time in view: $e");
+      isWithinOneHour = false;
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -1368,8 +1455,8 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
         ),
       ),
 
-      // 🎯 แท็บเครื่องมือด้านล่าง จะแสดงเมื่อสถานะเป็น delivered เท่านั้น!
-      bottomNavigationBar: isWaitingConfirm
+      // 🎯 แท็บเครื่องมือด้านล่าง อัปเดตใหม่ให้โชว์ปุ่มรีวิวและแจ้งปัญหาแบบแยกเงื่อนไข
+      bottomNavigationBar: isCompleted
           ? Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -1386,70 +1473,119 @@ class _ViewConfirmOrderMemberState extends State<ViewConfirmOrderMember> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      "กรุณาตรวจสอบอาหารและกดยืนยัน",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: ElevatedButton.icon(
-                        onPressed: _confirmSuccess,
-                        icon: const Icon(
-                          Icons.check_circle,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          "ได้รับอาหารถูกต้อง",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                    // ⭐ 1. แสดงปุ่ม รีวิวคำสั่งซื้อ หรือ ดูรีวิว (เช็กแค่สถานะรีวิว)
+                    if (!isReviewed)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    MemberReview(order: widget.order),
+                              ),
+                            ).then((result) {
+                              if (result == true) Navigator.pop(context, true);
+                            });
+                          },
+                          icon: const Icon(
+                            Icons.star_rounded,
                             color: Colors.white,
                           ),
+                          label: const Text(
+                            "รีวิวคำสั่งซื้อ",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orange,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                      )
+                    else
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    ViewReview(order: widget.order),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.rate_review_rounded,
+                            color: Colors.blue,
+                          ),
+                          label: const Text(
+                            "ดูการรีวิวของคุณ",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: Colors.blue,
+                              width: 1.5,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            backgroundColor: Colors.blue.shade50,
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 52,
-                      child: OutlinedButton.icon(
-                        onPressed: _confirmReportIssue,
-                        icon: const Icon(
-                          Icons.warning_amber_rounded,
-                          color: Colors.red,
-                        ),
-                        label: const Text(
-                          "แจ้งปัญหาอาหารผิด",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+
+                    // 🚨 2. ปุ่มแจ้งปัญหา (เช็กแค่ว่าอยู่ในเวลา 1 ชั่วโมงหรือไม่ โดยไม่สนว่ารีวิวไปหรือยัง)
+                    if (isWithinOneHour) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: OutlinedButton.icon(
+                          onPressed: _confirmReportIssue,
+                          icon: const Icon(
+                            Icons.warning_amber_rounded,
                             color: Colors.red,
                           ),
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.red, width: 1.5),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                          label: const Text(
+                            "แจ้งปัญหาอาหารผิด",
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: Colors.red,
+                              width: 1.5,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
             )
-          : null,
+          : null, // ถ้าออเดอร์ยังไม่เสร็จ ก็ไม่ต้องโชว์แท็บด้านล่าง
     );
   }
 }

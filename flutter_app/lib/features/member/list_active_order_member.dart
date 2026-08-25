@@ -14,14 +14,14 @@ import 'package:flutter_app/global_data.dart';
 
 import 'dart:async';
 
-class ListConfirmOrderMember extends StatefulWidget {
-  const ListConfirmOrderMember({super.key});
+class ListActiveOrderMember extends StatefulWidget {
+  const ListActiveOrderMember({super.key});
 
   @override
-  State<ListConfirmOrderMember> createState() => _ListConfirmOrderMemberState();
+  State<ListActiveOrderMember> createState() => _ListConfirmOrderMemberState();
 }
 
-class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
+class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
   final OrderService _orderService = OrderService();
   List<OrderModel> _orderHistoryList = [];
   bool _isLoading = true;
@@ -42,6 +42,12 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
       _fetchOrderHistorySilently();
     });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchOrderHistory() async {
@@ -71,7 +77,6 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     }
   }
 
-  // 🎯 ฟังก์ชันดึงข้อมูลแบบไม่โชว์วงล้อหมุนกวนใจผู้ใช้
   Future<void> _fetchOrderHistorySilently() async {
     if (!mounted) return;
 
@@ -97,6 +102,26 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
     final String baseUrl = DioClient.dio.options.baseUrl;
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+  }
+
+  String _formatDateTime(dynamic rawDate) {
+    if (rawDate == null || rawDate.toString().isEmpty) return "ไม่ระบุเวลา";
+    try {
+      DateTime dt;
+      if (rawDate is DateTime) {
+        dt = rawDate.toLocal();
+      } else {
+        dt = DateTime.parse(rawDate.toString()).toLocal();
+      }
+      final d = dt.day.toString().padLeft(2, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final y = dt.year + 543;
+      final hr = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return "$d/$m/$y $hr:$min น.";
+    } catch (e) {
+      return rawDate.toString();
+    }
   }
 
   Map<String, dynamic> _getDetailedStatusInfo(String? rawStatus) {
@@ -133,7 +158,6 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
           'bgColor': Colors.indigo[50]!,
           'icon': Icons.local_shipping_rounded,
         };
-      // 🎯 เพิ่มสถานะ delivered ตรงนี้
       case 'delivered':
         return {
           'text': 'รอยืนยันออเดอร์',
@@ -174,22 +198,22 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     }
   }
 
-  // 🎯 ปรับปรุงการแยกแท็บ (ลบตัวแปรฮาร์ดโค้ด isReviewed ออก และใช้เงื่อนไข status แทน)
   List<OrderModel> _filterOrders(String type) {
     return _orderHistoryList.where((order) {
       final status = (order.orderStatus ?? '').toLowerCase();
 
       if (type == 'pending') {
-        return status != 'success' &&
+        return status != 'delivered' &&
+            status != 'success' &&
             status != 'completed' &&
             status != 'reviewsuccess' &&
             status != 'cancel' &&
             status != 'cancelled';
       } else if (type == 'success') {
-        // แท็บ "สำเร็จแล้ว" โชว์ออเดอร์ที่สำเร็จแต่ยังไม่รีวิว
-        return status == 'success' || status == 'completed';
+        return status == 'delivered' ||
+            status == 'success' ||
+            status == 'completed';
       } else if (type == 'history') {
-        // แท็บ "ประวัติ" โชว์ออเดอร์ที่รีวิวเสร็จแล้ว
         return status == 'reviewsuccess';
       } else if (type == 'cancel') {
         return status == 'cancel' || status == 'cancelled';
@@ -222,18 +246,17 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                   fontWeight: FontWeight.bold,
                   fontSize: 13,
                 ),
-                // 🎯 เปลี่ยนจากการฮาร์ดโค้ด Text เป็นฟังก์ชันสร้าง Tab พร้อม Badge ตัวเลข
                 tabs: [
                   _buildTabWithBadge(
                     "กำลังดำเนินการ",
                     _filterOrders('pending').length,
                   ),
                   _buildTabWithBadge(
-                    "สำเร็จแล้ว",
+                    "สำเร็จ/รอรีวิว",
                     _filterOrders('success').length,
                   ),
                   _buildTabWithBadge(
-                    "ประวัติ",
+                    "ประวัติคำสั่งซื้อ",
                     _filterOrders('history').length,
                   ),
                   _buildTabWithBadge("ยกเลิก", _filterOrders('cancel').length),
@@ -423,7 +446,6 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
     final statusInfo = _getDetailedStatusInfo(order.orderStatus);
 
-    // 🎯 ดึงสถานะปัจจุบัน
     final String statusLower = (order.orderStatus ?? '').toLowerCase();
 
     final bool isCompleted =
@@ -433,8 +455,68 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
     final bool isReviewed = statusLower == 'reviewsuccess';
 
-    // 🎯 เพิ่มตัวแปรเช็กว่าส่งถึงแล้วหรือยัง
-    final bool isDelivered = statusLower == 'delivered';
+    String formattedDate = _formatDateTime(order.orderdate);
+
+    bool isWithinOneHour = true;
+    try {
+      final dynamic rawSuccessTime =
+          (order as dynamic).successtime ?? (order as dynamic).successTime;
+
+      final dynamic rawOrderDate = order.orderdate;
+
+      if (rawSuccessTime != null && rawOrderDate != null) {
+        DateTime orderDate;
+        if (rawOrderDate is DateTime) {
+          orderDate = rawOrderDate.toLocal();
+        } else {
+          orderDate = DateTime.parse(rawOrderDate.toString()).toLocal();
+        }
+
+        int hour = 0;
+        int minute = 0;
+
+        // 🎯 ตัวถอดรหัสเวลาแบบครอบจักรวาล (รองรับแบบ Array [14, 30] และ String "14:30")
+        if (rawSuccessTime is List) {
+          hour = int.tryParse(rawSuccessTime[0].toString()) ?? 0;
+          if (rawSuccessTime.length > 1) {
+            minute = int.tryParse(rawSuccessTime[1].toString()) ?? 0;
+          }
+        } else {
+          String timeStr = rawSuccessTime
+              .toString()
+              .replaceAll(RegExp(r'[\[\]]'), '')
+              .trim();
+          List<String> timeParts = timeStr.contains(':')
+              ? timeStr.split(':')
+              : timeStr.split(',');
+          if (timeParts.isNotEmpty)
+            hour = int.tryParse(timeParts[0].trim()) ?? 0;
+          if (timeParts.length > 1)
+            minute = int.tryParse(timeParts[1].trim()) ?? 0;
+        }
+
+        DateTime successDateTime = DateTime(
+          orderDate.year,
+          orderDate.month,
+          orderDate.day,
+          hour,
+          minute,
+        );
+
+        if (successDateTime.isBefore(orderDate)) {
+          successDateTime = successDateTime.add(const Duration(days: 1));
+        }
+
+        if (DateTime.now().difference(successDateTime).inMinutes >= 60) {
+          isWithinOneHour = false;
+        }
+      } else if (isCompleted) {
+        isWithinOneHour = false;
+      }
+    } catch (e) {
+      debugPrint("Error parsing success time: $e");
+      isWithinOneHour = false;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -456,7 +538,7 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => ViewConfirmOrderMember(order: order),
+              builder: (context) => ViewActiveOrderMember(order: order),
             ),
           ).then((_) {
             _fetchOrderHistory();
@@ -535,14 +617,38 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
                     ),
 
                     const SizedBox(height: 6),
-                    Text(
-                      "รหัสบิล: #${order.orderId ?? '-'}",
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "รหัสบิล: #${order.orderId ?? '-'}",
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 12,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              formattedDate,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
+
                     const SizedBox(height: 4),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -568,106 +674,172 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
 
                     if (isCompleted) ...[
                       const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          // ... โค้ดปุ่มรีวิวเดิมของคุณ ...
-                          onPressed: () {
-                            if (isReviewed) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      ViewReview(order: order),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (isWithinOneHour) ...[
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          ViewActiveOrderMember(order: order),
+                                    ),
+                                  ).then((_) {
+                                    _fetchOrderHistory();
+                                  });
+                                },
+                                icon: Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 16,
+                                  color: Colors.red[600],
                                 ),
-                              );
-                            } else {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                      MemberReview(order: order),
+                                label: Text(
+                                  "แจ้งปัญหา",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.red[700],
+                                  ),
                                 ),
-                              ).then((result) {
-                                if (result == true) _fetchOrderHistory();
-                              });
-                            }
-                          },
-                          icon: Icon(
-                            isReviewed
-                                ? Icons.rate_review_rounded
-                                : Icons.star_rounded,
-                            size: 18,
-                            color: isReviewed ? Colors.blue : Colors.orange,
-                          ),
-                          label: Text(
-                            isReviewed ? "ดูการรีวิว" : "รีวิวคำสั่งซื้อ",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: isReviewed
-                                  ? Colors.blue[700]
-                                  : Colors.green[700],
-                            ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: isReviewed
-                                  ? Colors.blue[400]!
-                                  : Colors.green[400]!,
-                              width: 1.2,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            backgroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ]
-                    // 🎯 เพิ่มบล็อก else if ตรงนี้สำหรับสถานะ delivered
-                    else if (isDelivered) ...[
-                      const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            // กดแล้วพาไปหน้า ViewConfirmOrderMember เหมือนตอนจิ้มที่การ์ด
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ViewConfirmOrderMember(order: order),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: Colors.red[400]!,
+                                    width: 1.2,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  backgroundColor: Colors.red.shade50,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                ),
                               ),
-                            ).then((_) {
-                              _fetchOrderHistory();
-                            });
-                          },
-                          icon: Icon(
-                            Icons.touch_app_rounded,
-                            size: 18,
-                            color: Colors.purple[600],
-                          ),
-                          label: Text(
-                            "ตรวจสอบและยืนยัน",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.purple[700],
                             ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(
-                              color: Colors.purple[400]!,
-                              width: 1.2,
+                            const SizedBox(width: 8),
+
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () {
+                                  if (isReviewed) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            ViewReview(order: order),
+                                      ),
+                                    );
+                                  } else {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) =>
+                                            MemberReview(order: order),
+                                      ),
+                                    ).then((result) {
+                                      if (result == true) _fetchOrderHistory();
+                                    });
+                                  }
+                                },
+                                icon: Icon(
+                                  isReviewed
+                                      ? Icons.rate_review_rounded
+                                      : Icons.star_rounded,
+                                  size: 16,
+                                  color: isReviewed
+                                      ? Colors.blue
+                                      : Colors.orange,
+                                ),
+                                label: Text(
+                                  isReviewed ? "ดูรีวิว" : "รีวิวออเดอร์",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: isReviewed
+                                        ? Colors.blue[700]
+                                        : Colors.green[700],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: isReviewed
+                                        ? Colors.blue[400]!
+                                        : Colors.green[400]!,
+                                    width: 1.2,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  backgroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                ),
+                              ),
                             ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
+                          ] else ...[
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                if (isReviewed) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          ViewReview(order: order),
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          MemberReview(order: order),
+                                    ),
+                                  ).then((result) {
+                                    if (result == true) _fetchOrderHistory();
+                                  });
+                                }
+                              },
+                              icon: Icon(
+                                isReviewed
+                                    ? Icons.rate_review_rounded
+                                    : Icons.star_rounded,
+                                size: 16,
+                                color: isReviewed ? Colors.blue : Colors.orange,
+                              ),
+                              label: Text(
+                                isReviewed ? "ดูรีวิว" : "รีวิวออเดอร์",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isReviewed
+                                      ? Colors.blue[700]
+                                      : Colors.green[700],
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: isReviewed
+                                      ? Colors.blue[400]!
+                                      : Colors.green[400]!,
+                                  width: 1.2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                backgroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                              ),
                             ),
-                            backgroundColor:
-                                Colors.purple.shade50, // สีพื้นหลังอ่อนๆ
-                          ),
-                        ),
+                          ],
+                        ],
                       ),
                     ],
                   ],
@@ -698,7 +870,6 @@ class _ListConfirmOrderMemberState extends State<ListConfirmOrderMember> {
     );
   }
 
-  // 🎯 ฟังก์ชันสำหรับสร้าง Tab พร้อมตัวเลขแจ้งเตือน
   Widget _buildTabWithBadge(String text, int count) {
     return Tab(
       child: Row(

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/restaurant_model.dart';
-import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
 
@@ -14,11 +12,10 @@ class HomeAdmin extends StatefulWidget {
 class _HomeAdminState extends State<HomeAdmin> {
   bool isLoading = true;
 
-  // ── เพิ่มตัวแปรเก็บค่าที่นับได้ ─────────────────────────────────────────
-  int _totalRestaurants = 0; // verificationStatus == "true"
-  int _totalRiders = 0; // verificationStatus == "true"
-  int _newRestaurants = 0; // verificationStatus == "wait"
-  int _newRiders = 0; // verificationStatus == "wait"
+  int _totalRestaurants = 0;
+  int _totalRiders = 0;
+  int _newRestaurants = 0;
+  int _newRiders = 0;
 
   final AdminService _adminService = AdminService();
 
@@ -28,19 +25,20 @@ class _HomeAdminState extends State<HomeAdmin> {
     _fetchDashboardData();
   }
 
-  // home_admin.dart
   Future<void> _fetchDashboardData() async {
     try {
       setState(() => isLoading = true);
       final counts = await _adminService.getDashboardCount();
+      if (!mounted) return;
       setState(() {
-        _totalRestaurants = counts['totalRestaurant']!;
-        _newRestaurants = counts['newRestaurant']!;
-        _totalRiders = counts['totalRider']!;
-        _newRiders = counts['newRider']!;
+        _totalRestaurants = counts['totalRestaurant'] ?? 0;
+        _newRestaurants = counts['newRestaurant'] ?? 0;
+        _totalRiders = counts['totalRider'] ?? 0;
+        _newRiders = counts['newRider'] ?? 0;
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() => isLoading = false);
     }
   }
@@ -48,64 +46,72 @@ class _HomeAdminState extends State<HomeAdmin> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF8FAFC), // Slate 50 นุ่มนวลสบายตา
       appBar: const AdminNavbar(),
       body: isLoading
           ? const Center(
               child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF7A00)),
+                strokeWidth: 3,
               ),
             )
           : RefreshIndicator(
               onRefresh: _fetchDashboardData,
-              color: Colors.orange,
+              color: const Color(0xFFFF7A00),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 20,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildTitle(),
-                      const SizedBox(height: 10),
-
-                      _buildSectionTitle(
-                        title: 'Overview of Platform Activity',
-                        icon: Icons.bar_chart_rounded,
-                        iconColor: Colors.orange,
-                        iconSize: 24,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 1200),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 36,
                       ),
-                      const SizedBox(height: 16),
-                      _buildOverviewRow(), // ← ใช้ค่าจาก state
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // ── Hero / Header Banner ──
+                          _buildHeroHeader(),
+                          const SizedBox(height: 36),
 
-                      const SizedBox(height: 32),
+                          // ── Active Stats Section ──
+                          _buildSectionHeader(
+                            title: 'ภาพรวมระบบและร้านค้าที่เปิดให้บริการ',
+                            subtitle:
+                                'สถิติจำนวนร้านค้าและผู้จัดส่งที่ผ่านการตรวจสอบเรียบร้อยแล้ว',
+                            badgeText: 'Active Data',
+                            badgeColor: const Color(0xFF10B981),
+                          ),
+                          const SizedBox(height: 18),
+                          _buildStatsGrid(
+                            cards: [
+                              _MetricCard(
+                                title: 'ร้านค้าที่เปิดให้บริการ',
+                                count: _totalRestaurants,
+                                icon: Icons.storefront_rounded,
+                                themeColor: const Color(0xFF059669),
+                                lightBgColor: const Color(0xFFECFDF5),
+                                trendLabel: 'พร้อมให้บริการ',
+                              ),
+                              _MetricCard(
+                                title: 'ผู้จัดส่งที่พร้อมทำงาน',
+                                count: _totalRiders,
+                                icon: Icons.two_wheeler_rounded,
+                                themeColor: const Color(0xFF2563EB),
+                                lightBgColor: const Color(0xFFEFF6FF),
+                                trendLabel: 'ผ่านการอนุมัติ',
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 20),
 
-                      _buildSectionTitle(
-                        title: 'รายการใหม่ที่รอการตรวจสอบ',
-                        icon: Icons.fiber_new_rounded,
-                        iconColor: const Color(0xFFD32F2F),
-                        iconSize: 32,
+                          // ── System Feature / Guideline Section ──
+                          _buildSystemOverviewSection(),
+                          const SizedBox(height: 20),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      _buildNewRow(), // ← ใช้ค่าจาก state
-
-                      const SizedBox(height: 32),
-
-                      _buildSectionTitle(
-                        title:
-                            'เกี่ยวกับระบบบริหารจัดการหลังบ้าน (System Overview)',
-                        icon: Icons.info_outline_rounded,
-                        iconColor: Colors.blue,
-                        iconSize: 24,
-                      ),
-                      const SizedBox(height: 16),
-                      _buildSystemDescriptionBox(),
-
-                      const SizedBox(height: 20),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -113,335 +119,487 @@ class _HomeAdminState extends State<HomeAdmin> {
     );
   }
 
-  // ── Title ──────────────────────────────────────────────────────────────────
-  Widget _buildTitle() {
-    return Row(
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            Icon(Icons.person, size: 28, color: Colors.grey[800]),
-            Positioned(
-              right: -4,
-              bottom: -2,
-              child: Icon(Icons.settings, size: 14, color: Colors.grey[800]),
-            ),
+  // ── Hero / Header ──────────────────────────────────────────────────────────
+  Widget _buildHeroHeader() {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.fromARGB(255, 128, 255, 0),
+            Color.fromARGB(255, 175, 231, 145),
           ],
         ),
-        const SizedBox(width: 10),
-        Text(
-          'Dashboard',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.grey[850],
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromARGB(255, 66, 112, 220).withOpacity(0.12),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
-        ),
-      ],
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFF7A00).withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        'ADMIN PORTAL',
+                        style: TextStyle(
+                          color: Color(0xFFFF9800),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      width: 7,
+                      height: 7,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF10B981),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'Live System',
+                      style: TextStyle(
+                        color: Color(0xFF94A3B8),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Dashboard ภาพรวมระบบ',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'ยินดีต้อนรับสู่ศูนย์กลางการจัดการและตรวจสอบข้อมูลร้านค้าและผู้จัดส่ง',
+                  style: TextStyle(
+                    color: Color(0xFF94A3B8),
+                    fontSize: 13.5,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          ElevatedButton.icon(
+            onPressed: _fetchDashboardData,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text(
+              'รีเฟรชข้อมูล',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white.withOpacity(0.08),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: Colors.white.withOpacity(0.15)),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  // ── Section Title ──────────────────────────────────────────────────────────
-  Widget _buildSectionTitle({
+  // ── Section Title Component ────────────────────────────────────────────────
+  Widget _buildSectionHeader({
     required String title,
-    required IconData icon,
-    required Color iconColor,
-    double iconSize = 22,
+    required String subtitle,
+    required String badgeText,
+    required Color badgeColor,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(icon, size: iconSize, color: iconColor),
-            const SizedBox(width: 8),
             Text(
               title,
-              style: TextStyle(
-                color: Colors.grey[700],
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.3,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: badgeColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                badgeText,
+                style: TextStyle(
+                  color: badgeColor,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 4),
-        const Divider(color: Color(0xFFD9D9D9), thickness: 1),
-      ],
-    );
-  }
-
-  // ── Overview Row ── ใช้ค่า _totalRestaurants / _totalRiders ───────────────
-  Widget _buildOverviewRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _OverviewCard(
-            icon: Icons.store_rounded,
-            iconColor: const Color(0xFF4CAF50),
-            iconBg: const Color(0xFFE8F5E9),
-            label: 'จำนวนร้านค้าทั้งหมด',
-            count: _totalRestaurants, // ← ค่าจริงจาก API
-          ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: _OverviewCard(
-            icon: Icons.delivery_dining_rounded,
-            iconColor: const Color(0xFFFF9800),
-            iconBg: const Color(0xFFFFF3E0),
-            label: 'จำนวนผู้จัดส่งทั้งหมด',
-            count: _totalRiders, // ← ค่าจริงจาก API
-          ),
+        Text(
+          subtitle,
+          style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
         ),
       ],
     );
   }
 
-  // ── New Registration Row ── ใช้ค่า _newRestaurants / _newRiders ───────────
-  Widget _buildNewRow() {
-    return Row(
-      children: [
-        Expanded(
-          child: _NewRegCard(
-            icon: Icons.tablet_android_rounded,
-            iconColor: const Color(0xFFFF9800),
-            iconBg: const Color(0xFFFFFDE7),
-            label: 'การสมัครร้านค้าใหม่',
-            count: _newRestaurants, // ← ค่าจริงจาก API
-            countColor: const Color(0xFFFF9800),
-          ),
-        ),
-        const SizedBox(width: 20),
-        Expanded(
-          child: _NewRegCard(
-            icon: Icons.assignment_ind_rounded,
-            iconColor: const Color(0xFF2196F3),
-            iconBg: const Color(0xFFFFFDE7),
-            label: 'การสมัครผู้จัดส่งใหม่',
-            count: _newRiders, // ← ค่าจริงจาก API
-            countColor: const Color(0xFF2196F3),
-          ),
-        ),
-      ],
+  // ── Responsive Grid ────────────────────────────────────────────────────────
+  Widget _buildStatsGrid({required List<Widget> cards}) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 680) {
+          return Column(
+            children: cards
+                .map(
+                  (card) => Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: card,
+                  ),
+                )
+                .toList(),
+          );
+        }
+        return Row(
+          children: cards
+              .map(
+                (card) => Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: card,
+                  ),
+                ),
+              )
+              .toList(),
+        );
+      },
     );
   }
 
-  // ── System Description Box ─────────────────────────────────────────────────
-  Widget _buildSystemDescriptionBox() {
+  // ── System Feature / Description Card ──────────────────────────────────────
+  Widget _buildSystemOverviewSection() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(30),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.02),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDescriptionLine(
-            '1. ระบบตรวจสอบและอนุมัติร้านค้า (Merchant Verification): ',
-            'ช่องทางคัดกรอง ตรวจสอบเอกสาร และอนุมัติสิทธิ์การเปิดร้านค้าออนไลน์ของพาร์ทเนอร์ภายในมหาวิทยาลัย',
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.shield_outlined,
+                  size: 22,
+                  color: Color(0xFF2563EB),
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'คู่มือการปฏิบัติงานและมาตรฐานระบบ (System Capabilities)',
+                    style: TextStyle(
+                      fontSize: 16.5,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF0F172A),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'แนวทางการตรวจสอบและขั้นตอนการดำเนินงานของฝ่ายบริหารจัดการระบบ',
+                    style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            ],
           ),
-          _buildDescriptionLine(
-            '2. ระบบบริหารจัดการผู้จัดส่งอาหาร (Rider Onboarding Hub): ',
-            'ตรวจสอบข้อมูลส่วนตัว บัตรนักศึกษา และเอกสารยานพาหนะของไรเดอร์เพื่อความปลอดภัยในการให้บริการ',
-          ),
-          _buildDescriptionLine(
-            '3. การแสดงผลสถิติแบบเรียลไทม์ (Real-time Overview): ',
-            'สรุปยอดรวมจำนวนร้านค้าทั้งหมด ไรเดอร์ที่สแตนด์บาย และคำขอสมัครใหม่ที่รอการดำเนินการ',
-          ),
-          _buildDescriptionLine(
-            '4. ระบบคัดกรองและแจ้งเตือนอัจฉริยะ (Pending Alerts): ',
-            'แยกแยะรายการคำสมัครใหม่ที่เพิ่งเข้าสู่ระบบ ช่วยให้แอดมินไม่พลาดทุกการอัปเดตข้อมูล',
-          ),
-          _buildDescriptionLine(
-            '5. ระบบจัดการเหตุผลการปฏิเสธ (Disapproval & Feedback Logging): ',
-            'บันทึกหมายเหตุและระบุเหตุผลอย่างชัดเจนในกรณีที่เอกสารไม่ผ่านเกณฑ์มาตรฐานของระบบ',
+          const SizedBox(height: 24),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 20,
+            runSpacing: 20,
+            children: [
+              _buildFeatureTile(
+                step: '01',
+                title: 'การอนุมัติร้านค้า (Merchant Verification)',
+                desc:
+                    'ตรวจสอบใบอนุญาต สุขอนามัย และข้อมูลเมนูอาหารก่อนเปิดรับออเดอร์',
+                icon: Icons.store_mall_directory_rounded,
+                color: const Color(0xFF059669),
+              ),
+              _buildFeatureTile(
+                step: '02',
+                title: 'การตรวจสอบไรเดอร์ (Rider Onboarding)',
+                desc:
+                    'ตรวจประวัติ เอกสารยานพาหนะ และใบอนุญาตขับขี่เพื่อความปลอดภัยของผู้ใช้บริการ',
+                icon: Icons.badge_rounded,
+                color: const Color(0xFF2563EB),
+              ),
+              _buildFeatureTile(
+                step: '03',
+                title: 'มอนิเตอร์สถานะเรียลไทม์ (Live Monitoring)',
+                desc:
+                    'ระบบดึงข้อมูลอัปเดตแบบทันท่วงที ให้คุณตัดสินใจได้ทันทีเมื่อมีรายการรอคิว',
+                icon: Icons.insights_rounded,
+                color: const Color(0xFFFF7A00),
+              ),
+              _buildFeatureTile(
+                step: '04',
+                title: 'บันทึกเหตุผลการปฏิเสธ (Feedback Log)',
+                desc:
+                    'ส่งหมายเหตุและข้อแก้ไขให้พาร์ทเนอร์ปรับปรุงเอกสารได้อย่างตรงจุดและโปร่งใส',
+                icon: Icons.edit_note_rounded,
+                color: const Color(0xFFE11D48),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDescriptionLine(String title, String desc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(
-            fontSize: 14,
-            height: 1.4,
-            color: Colors.black87,
+  Widget _buildFeatureTile({
+    required String step,
+    required String title,
+    required String desc,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      width: 500,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEEF2F6)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 22, color: color),
           ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      step,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1E293B),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  desc,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: Color(0xFF64748B),
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Reusable Modern Metric Card
+// ══════════════════════════════════════════════════════════════════════════════
+class _MetricCard extends StatefulWidget {
+  final String title;
+  final int count;
+  final IconData icon;
+  final Color themeColor;
+  final Color lightBgColor;
+  final String trendLabel;
+  final bool isHighlight;
+
+  const _MetricCard({
+    required this.title,
+    required this.count,
+    required this.icon,
+    required this.themeColor,
+    required this.lightBgColor,
+    required this.trendLabel,
+    this.isHighlight = false,
+  });
+
+  @override
+  State<_MetricCard> createState() => _MetricCardState();
+}
+
+class _MetricCardState extends State<_MetricCard> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        transform: Matrix4.translationValues(0, _isHovered ? -4 : 0, 0),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _isHovered
+                ? widget.themeColor.withOpacity(0.35)
+                : const Color(0xFFE2E8F0),
+            width: _isHovered ? 1.5 : 1,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _isHovered
+                  ? widget.themeColor.withOpacity(0.08)
+                  : const Color(0xFF0F172A).withOpacity(0.02),
+              blurRadius: _isHovered ? 20 : 8,
+              offset: Offset(0, _isHovered ? 10 : 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextSpan(
-              text: title,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: widget.lightBgColor,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(widget.icon, size: 26, color: widget.themeColor),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: widget.isHighlight
+                        ? widget.themeColor.withOpacity(0.12)
+                        : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    widget.trendLabel,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w700,
+                      color: widget.isHighlight
+                          ? widget.themeColor
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              '${widget.count}',
+              style: TextStyle(
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: const Color(0xFF0F172A),
+                height: 1.0,
+                letterSpacing: -1,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              widget.title,
               style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2C3E50),
-              ),
-            ),
-            TextSpan(
-              text: desc,
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ══════════════════════════════════════════════════════════════════════════════
-// Overview Card / New Registration Card (ไม่เปลี่ยนแปลง)
-// ══════════════════════════════════════════════════════════════════════════════
-class _OverviewCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String label;
-  final int count;
-
-  const _OverviewCard({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.label,
-    required this.count,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Row(
-          children: [
-            Container(
-              width: 150,
-              height: 95,
-              color: iconBg,
-              child: Icon(icon, size: 40, color: iconColor),
-            ),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$count',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: iconColor,
-                        height: 1.1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _NewRegCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String label;
-  final int count;
-  final Color countColor;
-
-  const _NewRegCard({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.label,
-    required this.count,
-    required this.countColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Row(
-          children: [
-            Container(
-              width: 150,
-              height: 95,
-              color: iconBg,
-              child: Icon(icon, size: 38, color: iconColor),
-            ),
-            Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey[800],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$count',
-                      style: TextStyle(
-                        fontSize: 30,
-                        fontWeight: FontWeight.bold,
-                        color: countColor,
-                        height: 1.1,
-                      ),
-                    ),
-                  ],
-                ),
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF64748B),
               ),
             ),
           ],

@@ -83,6 +83,21 @@ class RestaurantService {
     }
   }
 
+  // For Register Again (Not Approve)
+  Future<void> updateRegisterRestaurant(RestaurantModel restaurant) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/restaurant/updateRegisterRestaurant",
+        data: restaurant.toJson(),
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> updateStatusOpen(RestaurantModel restaurant) async {
     try {
       await DioClient.dio.post(

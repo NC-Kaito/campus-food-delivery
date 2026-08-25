@@ -4,17 +4,16 @@ import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
 import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
 import com.it22mjudelivery.springboot_api.v1.services.MenuService;
+// 🎯 Import CloudinaryService เข้ามา (เช็ก Package ให้ตรงกับของคุณด้วยนะครับ)
+import com.it22mjudelivery.springboot_api.v1.services.CloudinaryService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -22,13 +21,8 @@ import java.util.UUID;
 public class MenuController {
 
     private final MenuService menuService;
-
-    // 🎯 ดึงค่า URL และ Key ของ Supabase จาก application.properties
-    @Value("${supabase.url}")
-    private String supabaseUrl;
-
-    @Value("${supabase.key}")
-    private String supabaseKey;
+    // 🎯 ฉีด CloudinaryService เข้ามาใช้งาน
+    private final CloudinaryService cloudinaryService;
 
     @GetMapping("/restaurant/{username}")
     public ResponseEntity<List<Menu>> getMenusByRestaurant(@PathVariable String username) {
@@ -90,47 +84,24 @@ public class MenuController {
         }
     }
 
-    // 🎯 เปลี่ยนแปลงฟังก์ชันให้อัปโหลดภาพเมนูอาหารไปที่ Supabase
+    // 🎯 เปลี่ยนแปลงฟังก์ชันให้อัปโหลดภาพเมนูอาหารไปที่ Cloudinary แทน
     @PostMapping("/uploadMenuImage")
     public ResponseEntity<?> uploadMenuImage(@RequestParam("image") MultipartFile file) {
         try {
-            String safeFilename = file.getOriginalFilename().replaceAll("\\s+", "");
-            String fileName = UUID.randomUUID() + "_" + safeFilename;
+            // 1. กำหนดชื่อโฟลเดอร์สำหรับเมนูอาหาร
+            String folderName = "maejo_delivery/menus";
 
-            // 🎯 กำหนด Path ใน Supabase (ใช้ Bucket เดิม แต่แยกเก็บเข้าโฟลเดอร์ menu)
-            String bucketName = "campus-food-delivery-images-restaurant";
-            String filePath = "menu/" + fileName;
+            // 2. เรียกใช้ CloudinaryService เพื่ออัปโหลดและรับ URL กลับมา
+            String publicUrl = cloudinaryService.uploadImage(file, folderName);
 
-            // 🎯 เตรียม Header เพื่อยิง API ไปที่ Supabase
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(supabaseKey);
-            headers.setContentType(MediaType.parseMediaType(file.getContentType()));
+            // 3. พิมพ์ Log เช็กความเรียบร้อย
+            System.out.println("=========================================");
+            System.out.println("✅ Upload Menu Image Success (Cloudinary)!");
+            System.out.println("📌 URL: " + publicUrl);
+            System.out.println("=========================================");
 
-            // 🎯 โยนไฟล์เข้าไปใน Body และยิง Request
-            HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
-            String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucketName + "/" + filePath;
-
-            ResponseEntity<String> response = restTemplate.exchange(
-                    uploadUrl,
-                    HttpMethod.POST,
-                    requestEntity,
-                    String.class
-            );
-
-            // 🎯 ถ้ายิงผ่าน ให้ส่ง Public URL กลับไปที่ Flutter
-            if (response.getStatusCode().is2xxSuccessful()) {
-                String publicUrl = supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + filePath;
-
-                System.out.println("=========================================");
-                System.out.println("✅ Upload Menu Image Success!");
-                System.out.println("📌 URL: " + publicUrl);
-                System.out.println("=========================================");
-
-                return ResponseEntity.ok(Map.of("url", publicUrl));
-            } else {
-                return ResponseEntity.badRequest().body("อัปโหลดรูปภาพเมนูไป Supabase ไม่สำเร็จ");
-            }
+            // 4. ส่ง URL กลับไปให้ Flutter
+            return ResponseEntity.ok(Map.of("url", publicUrl));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("อัปโหลดไม่สำเร็จ: " + e.getMessage());

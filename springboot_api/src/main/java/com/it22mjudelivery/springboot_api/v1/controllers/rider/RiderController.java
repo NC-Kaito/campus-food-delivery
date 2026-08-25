@@ -3,30 +3,25 @@ package com.it22mjudelivery.springboot_api.v1.controllers.rider;
 import com.it22mjudelivery.springboot_api.v1.dtos.RiderDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Rider;
 import com.it22mjudelivery.springboot_api.v1.services.RiderService;
+// 🎯 Import CloudinaryService เข้ามา
+import com.it22mjudelivery.springboot_api.v1.services.CloudinaryService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/v1/rider")
 public class RiderController {
+
     private final RiderService riderService;
-
-    // 🎯 ดึงค่า URL และ Key ของ Supabase จาก application.properties
-    @Value("${supabase.url}")
-    private String supabaseUrl;
-
-    @Value("${supabase.key}")
-    private String supabaseKey;
+    // 🎯 ฉีด CloudinaryService เข้ามาใช้งาน
+    private final CloudinaryService cloudinaryService;
 
     @PostMapping("/loginRider")
     public ResponseEntity<?> doLoginRider(@RequestBody RiderDto riderDto){
@@ -56,6 +51,7 @@ public class RiderController {
         }
     }
 
+    // 🎯 รับไฟล์แล้วเรียก saveFile() ซึ่งทำงานเร็วกว่าเดิม ไม่ต้องใช้ Thread.sleep แล้ว
     @PostMapping("/registerRiderWithImages")
     public ResponseEntity<?> registerRider(
             @RequestPart("studentCardImage") MultipartFile studentCardFile,
@@ -67,12 +63,8 @@ public class RiderController {
             // ✅ อัปโหลดรูปที่ 1
             String studentCardPath = saveFile(studentCardFile, "studentCard");
 
-            Thread.sleep(500); // ⏱️ พัก 0.5 วินาทีให้ Supabase หายใจ
-
             // ✅ อัปโหลดรูปที่ 2
             String vehicleImagePath = saveFile(vehicleFile, "vehicleImage");
-
-            Thread.sleep(500); // ⏱️ พัก 0.5 วินาที
 
             // ✅ อัปโหลดรูปที่ 3
             String drivingLicensePath = saveFile(drivingLicenseFile, "drivingLicenseImg");
@@ -89,50 +81,20 @@ public class RiderController {
         }
     }
 
-    // 🎯 เปลี่ยนไส้ในฟังก์ชันนี้ให้ยิงไฟล์ขึ้น Supabase Storage
-    private String saveFile(MultipartFile file, String subFolder) throws IOException {
+    // 🎯 เปลี่ยนไส้ในฟังก์ชันนี้ให้ยิงไฟล์ขึ้น Cloudinary แทน
+    private String saveFile(MultipartFile file, String subFolder) {
         if (file == null || file.isEmpty()) return null;
 
-        String originalFilename = file.getOriginalFilename() != null
-                ? file.getOriginalFilename()
-                : "file";
-        String safeFilename = originalFilename.replaceAll("\\s+", "");
-        String fileName = UUID.randomUUID() + "_" + safeFilename;
+        // 🎯 กำหนด Folder Name สำหรับ Rider โดยเฉพาะ
+        String folderName = "maejo_delivery/riders/" + subFolder;
 
-        // 🎯 กำหนด Bucket Name (ตั้งชื่อให้สอดคล้องกับของร้านค้า)
-        String bucketName = "campus-food-delivery-images-rider";
-        String filePath = "rider/" + subFolder + "/" + fileName;
+        // 🎯 เรียกใช้ CloudinaryService
+        String publicUrl = cloudinaryService.uploadImage(file, folderName);
 
-        // 🎯 ยิง API ไปที่ Supabase
-        RestTemplate restTemplate = new RestTemplate();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(supabaseKey);
+        System.out.println("✅ Upload Rider Image Success: [" + subFolder + "]");
+        System.out.println("📌 URL: " + publicUrl);
 
-        // กันเหนียวกรณีที่ contentType เป็น null ให้ตั้งค่าเป็นภาพ jpeg พื้นฐาน
-        String contentType = file.getContentType();
-        if (contentType == null) contentType = "image/jpeg";
-        headers.setContentType(MediaType.parseMediaType(contentType));
-
-        HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
-        String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucketName + "/" + filePath;
-
-        ResponseEntity<String> response = restTemplate.exchange(
-                uploadUrl,
-                HttpMethod.POST,
-                requestEntity,
-                String.class
-        );
-
-        if (response.getStatusCode().is2xxSuccessful()) {
-            String publicUrl = supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + filePath;
-
-            System.out.println("✅ Upload Rider Image Success: [" + subFolder + "]");
-            System.out.println("📌 URL: " + publicUrl);
-
-            return publicUrl;
-        } else {
-            throw new IOException("อัปโหลดรูปภาพประเภท " + subFolder + " ไป Supabase ไม่สำเร็จ");
-        }
+        return publicUrl;
     }
 
     @GetMapping("/getRider")

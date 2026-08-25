@@ -251,6 +251,9 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อรหัส: " + orderId));
 
             // อัปเดตสถานะใหม่
+            if(newStatus.equals("Success")){
+                order.setSuccesstime(LocalTime.now());
+            }
             order.setOrderstatus(newStatus);
             orderRepo.save(order);
 

@@ -19,5 +19,13 @@ public interface RestaurantService {
             String ownerlastname, String email, String phone, String ownerimage
     );
 
+    boolean updateRegisterRestaurant(
+            String username, String restaurantname, String restaurantimage, int typeid,
+            double latitude, double longitude,
+            List<OpeningHourDto> openingHourDtos, String ownerfirstname,
+            String ownerlastname, String email, String phone, String ownerimage
+    );
+
     void doCloseAccount(String username);
+
 }

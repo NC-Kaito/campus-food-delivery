@@ -1,21 +1,19 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.restaurant;
 
-import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
-import com.it22mjudelivery.springboot_api.v1.entities.Member;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.RestaurantRepository;
 import com.it22mjudelivery.springboot_api.v1.services.RestaurantService;
+// 🎯 Import CloudinaryService เข้ามา (เช็ก Package ให้ตรงกับโปรเจกต์คุณด้วยนะครับ)
+import com.it22mjudelivery.springboot_api.v1.services.CloudinaryService;
+
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -24,12 +22,8 @@ public class RestaurantController {
     private final RestaurantService restaurantService;
     private final RestaurantRepository restaurantRepository;
 
-    // 🎯 ดึงค่า URL และ Key จาก application.properties
-    @Value("${supabase.url}")
-    private String supabaseUrl;
-
-    @Value("${supabase.key}")
-    private String supabaseKey;
+    // 🎯 ฉีด CloudinaryService เข้ามาใช้งาน
+    private final CloudinaryService cloudinaryService;
 
     @PostMapping("/loginRestaurant")
     public ResponseEntity<?> doLoginRestaurant(@RequestBody Map<String, String> loginData) {
@@ -64,58 +58,32 @@ public class RestaurantController {
         }
     }
 
+    // 🎯 แก้ไขฟังก์ชันอัปโหลดรูปให้ส่งไปที่ Cloudinary
     @PostMapping("/uploadImage")
     public ResponseEntity<?> uploadImageRegister(
             @RequestParam("image") MultipartFile file,
             @RequestParam("type") String type) {
         try {
-            String safeFilename = file.getOriginalFilename().replaceAll("\\s+", "");
-            String fileName = UUID.randomUUID() + "_" + safeFilename;
-
-            // ตรวจสอบเงื่อนไขแยกประเภทโฟลเดอร์
+            // 1. ตรวจสอบเงื่อนไขแยกประเภทโฟลเดอร์
             String targetSubFolder = "imageRestaurant";
             if ("ownerImage".equalsIgnoreCase(type)) {
                 targetSubFolder = "ownerImage";
             }
 
-            // 🎯 กำหนด Path ใน Supabase
-            String bucketName = "campus-food-delivery-images-restaurant"; //  Bucket name
-            String filePath = "restaurant/" + targetSubFolder + "/" + fileName;
+            // 2. กำหนดชื่อโฟลเดอร์หลักใน Cloudinary
+            String folderName = "maejo_delivery/restaurants/" + targetSubFolder;
 
-            // 🎯 เตรียม Header เพื่อยิง API ไปที่ Supabase
-            RestTemplate restTemplate = new RestTemplate();
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(supabaseKey);
-            headers.setContentType(MediaType.parseMediaType(file.getContentType()));
+            // 3. เรียกใช้ CloudinaryService เพื่ออัปโหลดและรับ URL กลับมา
+            String publicUrl = cloudinaryService.uploadImage(file, folderName);
 
-            // 🎯 โยนไฟล์เข้าไปใน Body และยิง Request
-            HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
-            String uploadUrl = supabaseUrl + "/storage/v1/object/" + bucketName + "/" + filePath;
+            // 4. พิมพ์ Log เพื่อเช็กความเรียบร้อย
+            System.out.println("=========================================");
+            System.out.println("✅ Upload to Cloudinary Success!");
+            System.out.println("📌 URL: " + publicUrl);
+            System.out.println("=========================================");
 
-            ResponseEntity<String> response = restTemplate.exchange(
-                    uploadUrl,
-                    HttpMethod.POST,
-                    requestEntity,
-                    String.class
-            );
-
-            // 🎯 ถ้ายิงผ่าน ให้ส่ง Public URL กลับไปที่ Flutter
-            if (response.getStatusCode().is2xxSuccessful()) {
-                String publicUrl = supabaseUrl + "/storage/v1/object/public/" + bucketName + "/" + filePath;
-
-                // ---------------------------------------------------------
-                // 🔎 เพิ่มคำสั่งตรวจสอบความยาว URL ตรงนี้ครับ
-                System.out.println("=========================================");
-                System.out.println("✅ Upload Success!");
-                System.out.println("📌 URL: " + publicUrl);
-                System.out.println("📏 URL Length: " + publicUrl.length() + " characters");
-                System.out.println("=========================================");
-                // ---------------------------------------------------------
-
-                return ResponseEntity.ok(Map.of("url", publicUrl));
-            } else {
-                return ResponseEntity.badRequest().body("อัปโหลดรูปภาพไป Supabase ไม่สำเร็จ");
-            }
+            // 5. ส่ง URL กลับไปให้ Flutter (Format เดิม Flutter จะได้ไม่ต้องแก้โค้ด)
+            return ResponseEntity.ok(Map.of("url", publicUrl));
 
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("อัปโหลดไม่สำเร็จ: " + e.getMessage());
@@ -159,6 +127,27 @@ public class RestaurantController {
     public ResponseEntity<?> updateProfileRestaurant(@RequestBody RestaurantDto restaurantDto){
         try {
             boolean isResult = restaurantService.updateProfileRestaurant(
+                    restaurantDto.getUsername(), restaurantDto.getRestaurantname(), restaurantDto.getRestaurantimage(), restaurantDto.getTypeid(),
+                    restaurantDto.getLatitude(), restaurantDto.getLongitude(),
+                    restaurantDto.getOpeningHours(),
+                    restaurantDto.getOwnerfirstname(),
+                    restaurantDto.getOwnerlastname(), restaurantDto.getEmail(), restaurantDto.getPhone(), restaurantDto.getImagecardid());
+            if (isResult) {
+                return ResponseEntity.ok("updateProfileRestaurant สำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("updateProfileRestaurant ไม่สำเร็จ ข้อมูลไม่ถูกต้อง");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    @PostMapping("/updateRegisterRestaurant")
+    public ResponseEntity<?> updateRegisterRestaurant(@RequestBody RestaurantDto restaurantDto){
+        try {
+            boolean isResult = restaurantService.updateRegisterRestaurant(
                     restaurantDto.getUsername(), restaurantDto.getRestaurantname(), restaurantDto.getRestaurantimage(), restaurantDto.getTypeid(),
                     restaurantDto.getLatitude(), restaurantDto.getLongitude(),
                     restaurantDto.getOpeningHours(),

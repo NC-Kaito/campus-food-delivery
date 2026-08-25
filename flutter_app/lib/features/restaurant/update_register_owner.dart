@@ -243,7 +243,7 @@ class _UpdateRegisterOwnerState extends State<UpdateRegisterOwner> {
         );
 
         // ... โค้ดส่วนบนของ doUpdateRegisterData ...
-        await restaurantService.updateProfileRestaurant(updatedModel);
+        await restaurantService.updateRegisterRestaurant(updatedModel);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(

@@ -16,12 +16,14 @@ class OrderModel {
   final DateTime? orderdate;
   final String? cancelDetail;
 
+  // 🎯 เพิ่มตัวแปรสำหรับเก็บเวลาที่จัดส่งสำเร็จ
+  final String? successtime;
+
   final RestaurantModel? restaurant;
-  final RiderModel? rider; // 🎯 รับก้อนอ็อบเจ็กต์ Rider เข้ามา
+  final RiderModel? rider;
   final MemberModel? member;
 
-  final String?
-  orderStatus; // 🎯 พี่เติมตัวนี้กลับมาให้ เพื่อใช้วาด Timeline ครับ
+  final String? orderStatus;
   final List<OrderDetailModel> items;
 
   OrderModel({
@@ -36,9 +38,10 @@ class OrderModel {
     required this.restaurantUsername,
     this.member,
     this.restaurant,
-    this.rider, // 🎯
-    this.orderStatus, // 🎯
+    this.rider,
+    this.orderStatus,
     this.cancelDetail,
+    this.successtime, // 🎯 นำเข้า Constructor
     required this.items,
   });
 
@@ -52,6 +55,10 @@ class OrderModel {
       longitude: (json['longitude'] ?? 0).toDouble(),
       addressDetail: json['addressDetail'] ?? json['addressdetail'] ?? "",
       cancelDetail: json['canceldetail'] ?? json['cancelDetail'],
+
+      // 🎯 ดักจับ JSON ก้อนเวลาจัดส่งสำเร็จ และครอบ .toString() ป้องกัน Error จาก Array ของ Spring Boot
+      successtime:
+          json['successtime']?.toString() ?? json['successTime']?.toString(),
 
       memberUsername: json['member'] != null
           ? json['member']['username'] ?? ""
@@ -67,10 +74,7 @@ class OrderModel {
           ? RestaurantModel.fromJson(json['restaurant'])
           : null,
 
-      // 🎯 ดักจับ JSON ก้อนไรเดอร์ และแปลงเข้าโมเดล
       rider: json['rider'] != null ? RiderModel.fromJson(json['rider']) : null,
-
-      // 🎯 ดักจับสถานะออเดอร์จากฐานข้อมูล
       orderStatus: json['orderstatus'] ?? json['orderStatus'],
 
       items: (json['orderDetails'] != null)
@@ -88,8 +92,6 @@ class OrderModel {
     );
   }
 
-  // data/models/order_model.dart ลำดับเดิมทุกประการ แก้เฉพาะ toJson
-  // data/models/order_model.dart
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = {
       'deliveryFee': deliveryFee,
@@ -106,6 +108,9 @@ class OrderModel {
     if (orderId != null) data['orderId'] = orderId;
     if (orderStatus != null) data['orderstatus'] = orderStatus;
     if (orderdate != null) data['orderdate'] = orderdate!.toIso8601String();
+
+    // 🎯 แปลงกลับเป็น JSON
+    if (successtime != null) data['successtime'] = successtime;
 
     return data;
   }

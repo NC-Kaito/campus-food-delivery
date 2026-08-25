@@ -1,12 +1,30 @@
-// features/admin/view_register_rider.dart
+//  features/admin/view_register_rider.dart
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
 import 'package:flutter_app/features/admin/list_rider.dart';
-
 import 'package:flutter_app/core/network/dio_client.dart';
+
+// ============ THEME TOKENS (โทนสีสอดคล้องกับหน้า View_RegisterRestaurant) ============
+class _Palette {
+  static const primary = Color(0xFF2FBA6E); // เขียวหลัก
+  static const primaryDark = Color(0xFF1E9E5B);
+  static const primarySoft = Color(0xFFE8F9EF);
+  static const bg = Color(0xFFF5F7FA);
+  static const cardBg = Colors.white;
+  static const border = Color(0xFFE7EAF0);
+  static const fieldBg = Color(0xFFF7F8FA);
+  static const textPrimary = Color(0xFF1F2937);
+  static const textSecondary = Color(0xFF6B7280);
+  static const success = Color(0xFF22C55E);
+  static const danger = Color(0xFFEF4444);
+  static const dangerSoft = Color(0xFFFEECEC);
+  static const warning = Color(0xFFF59E0B);
+  static const warningSoft = Color(0xFFFFF4E5);
+  static const info = Color(0xFF3B82F6);
+}
 
 class View_RegisterRider extends StatefulWidget {
   final RiderModel rider;
@@ -34,11 +52,11 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
 
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
-    if (rawPath.startsWith('http://') || rawPath.startsWith('https://'))
+    if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
       return rawPath;
+    }
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-    print("BASE URL: ${DioClient.dio.options.baseUrl}");
     if (rawPath.startsWith('/')) {
       return "$baseUrl$rawPath";
     } else {
@@ -50,51 +68,22 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
   void _showApproveDialog(RiderModel r) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.all(22),
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'คุณแน่ใจหรือไม่\nว่าต้องการอนุมัติข้อมูลนี้',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4CAF50),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(
-                    child: _dialogButton(
-                      'ยกเลิก',
-                      const Color(0xFFD0D0D0),
-                      Colors.black87,
-                      () => Navigator.pop(context),
-                      isOutlined: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _dialogButton(
-                      'อนุมัติ',
-                      const Color(0xFF67E22B),
-                      Colors.white,
-                      () async {
-                        Navigator.pop(context);
-                        await _approveRider(r);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+      barrierColor: Colors.black.withOpacity(0.45),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: _confirmDialogShell(
+          icon: Icons.check_circle_rounded,
+          iconColor: _Palette.success,
+          iconBg: _Palette.primarySoft,
+          title: 'ยืนยันการอนุมัติ',
+          subtitle: 'คุณแน่ใจหรือไม่ว่าต้องการอนุมัติผู้จัดส่งคนนี้',
+          child: null,
+          confirmLabel: 'อนุมัติ',
+          confirmColor: _Palette.success,
+          onConfirm: () async {
+            Navigator.pop(context);
+            await _approveRider(r);
+          },
         ),
       ),
     );
@@ -104,101 +93,158 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
     final TextEditingController reasonController = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: Colors.red, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.all(22),
-        content: SizedBox(
-          width: 380,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'คุณแน่ใจหรือไม่\nว่าต้องการปฏิเสธข้อมูลนี้',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
+      barrierColor: Colors.black.withOpacity(0.45),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: _confirmDialogShell(
+          icon: Icons.cancel_rounded,
+          iconColor: _Palette.danger,
+          iconBg: _Palette.dangerSoft,
+          title: 'ยืนยันการปฏิเสธ',
+          subtitle: 'คุณแน่ใจหรือไม่ว่าต้องการปฏิเสธผู้จัดส่งคนนี้',
+          child: Padding(
+            padding: const EdgeInsets.only(top: 18),
+            child: TextField(
+              controller: reasonController,
+              maxLines: 4,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'ระบุเหตุผลในการปฏิเสธ...',
+                hintStyle: TextStyle(color: Colors.grey.shade400),
+                filled: true,
+                fillColor: const Color(0xFFF7F8FA),
+                contentPadding: const EdgeInsets.all(14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _Palette.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _Palette.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: _Palette.danger,
+                    width: 1.4,
+                  ),
                 ),
               ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: reasonController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'หมายเหตุ....',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _dialogButton(
-                      'ยกเลิก',
-                      const Color(0xFFD0D0D0),
-                      Colors.black87,
-                      () => Navigator.pop(context),
-                      isOutlined: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _dialogButton(
-                      'ตกลง',
-                      const Color(0xFFFF3B30),
-                      Colors.white,
-                      () async {
-                        Navigator.pop(context);
-                        await _rejectRider(r, reasonController.text.trim());
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
+          confirmLabel: 'ยืนยันปฏิเสธ',
+          confirmColor: _Palette.danger,
+          onConfirm: () async {
+            Navigator.pop(context);
+            await _rejectRider(r, reasonController.text.trim());
+          },
         ),
       ),
     );
   }
 
-  Widget _dialogButton(
-    String label,
-    Color color,
-    Color textColor,
-    VoidCallback onPressed, {
-    bool isOutlined = false,
+  Widget _confirmDialogShell({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    required Widget? child,
+    required String confirmLabel,
+    required Color confirmColor,
+    required VoidCallback onConfirm,
   }) {
-    return SizedBox(
-      height: 44,
-      child: isOutlined
-          ? OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: color),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              child: Text(label, style: TextStyle(color: textColor)),
-            )
-          : ElevatedButton(
-              onPressed: onPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              child: Text(label, style: TextStyle(color: textColor)),
+    return Container(
+      width: 400,
+      padding: const EdgeInsets.fromLTRB(28, 30, 28, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Icon(icon, color: iconColor, size: 34),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _Palette.textPrimary,
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: _Palette.textSecondary,
+            ),
+          ),
+          if (child != null) child,
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: _Palette.border,
+                        width: 1.4,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'ยกเลิก',
+                      style: TextStyle(
+                        color: _Palette.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: confirmColor,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      confirmLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -206,19 +252,13 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
     try {
       await adminService.approveRider(r.studentid!);
       setState(() => rider.verificationStatus = "Confirm");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('อนุมัติผู้จัดส่งสำเร็จ'),
-          backgroundColor: Colors.green,
-        ),
+      _showSnack(
+        'อนุมัติผู้จัดส่งสำเร็จ',
+        _Palette.success,
+        Icons.check_circle,
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เกิดข้อผิดพลาด'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('เกิดข้อผิดพลาด', _Palette.danger, Icons.error);
     }
   }
 
@@ -229,20 +269,28 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
         rider.verificationStatus = "Reject";
         rider.notApproveDetail = reason;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('ปฏิเสธผู้จัดส่งสำเร็จ'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('ปฏิเสธผู้จัดส่งสำเร็จ', _Palette.danger, Icons.info);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เกิดข้อผิดพลาด'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('เกิดข้อผิดพลาด', _Palette.danger, Icons.error);
     }
+  }
+
+  void _showSnack(String text, Color color, IconData icon) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: color,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
   }
 
   // ================= BUILD =================
@@ -251,323 +299,263 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
   Widget build(BuildContext context) {
     final r = rider;
 
-    Color statusColor = r.verificationStatus == "Confirm"
-        ? const Color(0xFF67E22B)
-        : (r.verificationStatus == "Reject" || r.notApproveDetail != null
-              ? const Color(0xFFFF3B30)
-              : const Color(0xFFFF9800));
+    Color statusColor;
+    Color statusBg;
+    String statusText;
+    IconData statusIcon;
 
-    String statusText = r.verificationStatus == "Confirm"
-        ? 'อนุมัติแล้ว'
-        : (r.verificationStatus == "Reject" || r.notApproveDetail != null
-              ? 'ปฏิเสธแล้ว'
-              : 'รอดำเนินการ');
-
-    if (r.verificationStatus != "Confirm" && r.notApproveDetail == null) {
-      statusColor = const Color(0xFFFF9800);
+    if (r.verificationStatus == 'Confirm') {
+      statusColor = _Palette.success;
+      statusBg = _Palette.primarySoft;
+      statusText = 'อนุมัติแล้ว';
+      statusIcon = Icons.check_circle_rounded;
+    } else if (r.verificationStatus == 'Reject' ||
+        (r.notApproveDetail != null &&
+            r.notApproveDetail != 'NULL' &&
+            r.notApproveDetail!.isNotEmpty)) {
+      statusColor = _Palette.danger;
+      statusBg = _Palette.dangerSoft;
+      statusText = 'ปฏิเสธแล้ว';
+      statusIcon = Icons.cancel_rounded;
+    } else {
+      statusColor = _Palette.warning;
+      statusBg = _Palette.warningSoft;
       statusText = 'รอดำเนินการ';
+      statusIcon = Icons.hourglass_top_rounded;
     }
 
+    final bool isApproved = r.verificationStatus == 'Confirm';
+    final bool isRejected =
+        r.verificationStatus == 'Reject' ||
+        (r.notApproveDetail != null &&
+            r.notApproveDetail != 'NULL' &&
+            r.notApproveDetail!.isNotEmpty);
+    final bool isDecided = isApproved || isRejected;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _Palette.bg,
       appBar: const AdminNavbar(),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: const [
-                  Icon(Icons.delivery_dining, size: 26, color: Colors.black87),
-                  SizedBox(width: 8),
-                  Text(
-                    'รายละเอียดการสมัครของผู้จัดส่ง',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Column(
-                  children: [
-                    // Header Bar
-                    Container(
-                      height: 46,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF2F2F2),
-                        border: Border(
-                          bottom: BorderSide(color: Color(0xFFD9D9D9)),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1350),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ----- Page Header -----
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ListRider(),
+                          ),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _Palette.border),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_rounded,
+                            size: 20,
+                            color: _Palette.textPrimary,
+                          ),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 34),
-                          Expanded(
-                            child: Text(
-                              'รายละเอียดผู้จัดส่ง ลำดับที่ : ${widget.index}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: 172,
-                            height: 46,
-                            alignment: Alignment.center,
-                            color: statusColor,
-                            child: Text(
-                              statusText,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(width: 14),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _Palette.primarySoft,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.delivery_dining_rounded,
+                          color: _Palette.primaryDark,
+                          size: 22,
+                        ),
                       ),
-                    ),
-                    // Content Area
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(34, 24, 34, 34),
-                      child: IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // LEFT SIDE: ข้อมูลส่วนตัว
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _sectionTitle('ข้อมูลส่วนตัว'),
-                                  const SizedBox(height: 14),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _labelValue(
-                                          'รหัสนักศึกษา (Student)',
-                                          r.studentid ?? '-',
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _labelValue(
-                                          'เบอร์โทรศัพท์ (Phone)',
-                                          r.phone ?? '-',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _labelValue(
-                                          'ชื่อ - นามสกุล',
-                                          '${r.firstName ?? ''} ${r.lastName ?? ''}',
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _labelValue(
-                                          'อีเมล (Email)',
-                                          r.email ?? '-',
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 24),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'รายละเอียดการสมัครของผู้จัดส่ง',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: _Palette.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
 
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // ฝั่งซ้าย: ข้อมูลคณะ สาขา และวันเกิด
-                                      Expanded(
-                                        flex: 1,
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            _labelValue(
-                                              'คณะ (Faculty)',
-                                              r.facultyName ?? '-',
-                                            ),
-                                            const SizedBox(height: 24),
-                                            _labelValue(
-                                              'สาขาวิชา (Major)',
-                                              r.majorName ?? '-',
-                                            ),
-                                            const SizedBox(height: 24),
-                                            _labelValue(
-                                              'วันเกิด (Birthday)',
-                                              r.birthday ?? '-',
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      // ฝั่งขวา: แสดงหัวข้อ และรูปภาพบัตรนักศึกษา
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'บัตรนักศึกษา (Student Card)',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            _imageBox(
-                                              r.studentCardImage,
-                                              "studentCard",
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                  // ----- Main Card -----
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: _Palette.cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _Palette.border),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        // Header Bar
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 18,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            border: Border(
+                              bottom: BorderSide(color: _Palette.border),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'รายละเอียดผู้จัดส่ง • ลำดับที่ ${widget.index}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15.5,
+                                    color: _Palette.textPrimary,
                                   ),
-                                  if (r.notApproveDetail != null) ...[
-                                    const SizedBox(height: 20),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFEEEE),
-                                        border: Border.all(color: Colors.red),
-                                      ),
-                                      child: Text(
-                                        'เหตุผลที่ปฏิเสธ : ${r.notApproveDetail}',
-                                        style: const TextStyle(
-                                          color: Colors.red,
-                                        ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 9,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusBg,
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: statusColor.withOpacity(0.35),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      statusIcon,
+                                      size: 16,
+                                      color: statusColor,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      statusText,
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
+                          ),
+                        ),
 
-                            // MIDDLE DIVIDER
-                            const VerticalDivider(
-                              width: 60,
-                              thickness: 1,
-                              color: Color(0xFFD9D9D9),
-                            ),
+                        // Content Area
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(32, 26, 32, 32),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final isWide = constraints.maxWidth > 900;
+                              final left = _buildPersonalInfoSection(r);
+                              final right = _buildVehicleSection(r);
 
-                            // RIGHT SIDE: ข้อมูลยานพาหนะ
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _sectionTitle('ข้อมูลยานพาหนะ'),
-                                  const SizedBox(height: 14),
-                                  _labelValue(
-                                    'ทะเบียนรถ (Vehicle Plate)',
-                                    r.vehiclePlate ?? '-',
-                                  ),
-                                  const SizedBox(height: 20),
-
-                                  Row(
+                              if (isWide) {
+                                return IntrinsicHeight(
+                                  child: Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // ฝั่งรูปยานพาหนะ
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'รูปยานพาหนะ (Vehicle image)',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            _imageBox(
-                                              r.vehicleImage,
-                                              "vehicle",
-                                            ),
-                                          ],
-                                        ),
+                                      Expanded(child: left),
+                                      const SizedBox(width: 36),
+                                      const VerticalDivider(
+                                        width: 1,
+                                        thickness: 1,
+                                        color: _Palette.border,
                                       ),
-                                      const SizedBox(width: 16),
-
-                                      // ฝั่งรูปใบขับขี่
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'รูปใบขับขี่ ( driving license image)',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            _imageBox(
-                                              r.drivingLicenseImg,
-                                              "license",
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                      const SizedBox(width: 36),
+                                      Expanded(child: right),
                                     ],
                                   ),
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  left,
+                                  const SizedBox(height: 28),
+                                  const Divider(color: _Palette.border),
+                                  const SizedBox(height: 28),
+                                  right,
                                 ],
-                              ),
-                            ),
-                          ],
+                              );
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Buttons Bottom
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _actionButton(
-                    label: 'ย้อนกลับ',
-                    color: const Color(0xFFD9D9D9),
-                    textColor: Colors.black87,
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ListRider(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  _actionButton(
-                    label: 'ปฏิเสธการสมัคร',
-                    color: const Color(0xFFFF3B30),
-                    onPressed: () => _showRejectDialog(r),
-                  ),
-                  const SizedBox(width: 10),
-                  _actionButton(
-                    label: 'อนุมัติการสมัคร',
-                    color: const Color(0xFF67E22B),
-                    onPressed: () => _showApproveDialog(r),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 16,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _actionButton(
+                label: 'ย้อนกลับ',
+                icon: Icons.arrow_back_rounded,
+                color: Colors.white,
+                textColor: _Palette.textPrimary,
+                borderColor: _Palette.border,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ListRider()),
+                ),
+              ),
+              const SizedBox(width: 30),
+              _actionButton(
+                label: 'ปฏิเสธการสมัคร',
+                icon: Icons.close_rounded,
+                color: _Palette.danger,
+                onPressed: isDecided ? null : () => _showRejectDialog(r),
+              ),
+              const SizedBox(width: 30),
+              _actionButton(
+                label: 'อนุมัติการสมัคร',
+                icon: Icons.check_rounded,
+                color: _Palette.success,
+                onPressed: isDecided ? null : () => _showApproveDialog(r),
               ),
             ],
           ),
@@ -576,22 +564,148 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
     );
   }
 
-  Widget _sectionTitle(String title) {
+  // ----- LEFT: ข้อมูลส่วนตัว -----
+  Widget _buildPersonalInfoSection(RiderModel r) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF6AD12B),
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
+        _sectionTitle('ข้อมูลส่วนตัว', Icons.person_outline_rounded),
+        const SizedBox(height: 18),
+
+        // 1. รหัสนักศึกษา
+        _labelValue('รหัสนักศึกษา (Student ID)', r.studentid ?? '-'),
+        const SizedBox(height: 22),
+
+        // 2. บัตรนักศึกษา (ปรับขนาดให้เล็กลง)
+        _imageLabel('บัตรนักศึกษา (Student Card)'),
+        const SizedBox(height: 10),
+        _imageBox(r.studentCardImage, width: 280, height: 160),
+        const SizedBox(height: 22),
+
+        // 3. ชื่อ - นามสกุล
+        _labelValue(
+          'ชื่อ - นามสกุล',
+          '${r.firstName ?? ''} ${r.lastName ?? ''}',
         ),
-        const Divider(color: Color(0xFFD9D9D9), thickness: 1),
+        const SizedBox(height: 18),
+
+        // 4. คณะ
+        _labelValue('คณะ (Faculty)', r.facultyName ?? '-'),
+        const SizedBox(height: 18),
+
+        // 5. สาขาวิชา
+        _labelValue('สาขาวิชา (Major)', r.majorName ?? '-'),
+        const SizedBox(height: 18),
+
+        // 6. วันเกิด
+        _labelValue('วันเกิด (Birthday)', r.birthday ?? '-'),
+        const SizedBox(height: 18),
+
+        // 7. อีเมล และ เบอร์โทรศัพท์
+        Row(
+          children: [
+            Expanded(child: _labelValue('อีเมล (Email)', r.email ?? '-')),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _labelValue('เบอร์โทรศัพท์ (Phone)', r.phone ?? '-'),
+            ),
+          ],
+        ),
+
+        if (r.notApproveDetail != null &&
+            r.notApproveDetail != 'NULL' &&
+            r.notApproveDetail!.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _Palette.dangerSoft,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _Palette.danger.withOpacity(0.3)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: _Palette.danger,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        color: _Palette.danger,
+                        fontSize: 13.5,
+                        height: 1.4,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: 'เหตุผลที่ปฏิเสธ: ',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(text: r.notApproveDetail),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
+
+  // ----- RIGHT: ข้อมูลยานพาหนะ -----
+  Widget _buildVehicleSection(RiderModel r) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('ข้อมูลยานพาหนะ', Icons.two_wheeler_rounded),
+        const SizedBox(height: 18),
+        _labelValue('ทะเบียนรถ (Vehicle Plate)', r.vehiclePlate ?? '-'),
+        const SizedBox(height: 22),
+        // รูปยานพาหนะ (ปรับขนาดให้เล็กลง)
+        _imageLabel('รูปยานพาหนะ (Vehicle Image)'),
+        const SizedBox(height: 10),
+        _imageBox(r.vehicleImage, width: 280, height: 160),
+        const SizedBox(height: 22),
+        // รูปใบขับขี่ (ปรับขนาดให้เล็กลง)
+        _imageLabel('รูปใบขับขี่ (Driving License Image)'),
+        const SizedBox(height: 10),
+        _imageBox(r.drivingLicenseImg, width: 280, height: 160),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color.fromARGB(255, 69, 159, 255)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color.fromARGB(255, 69, 159, 255),
+            fontSize: 15.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _imageLabel(String text) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      color: _Palette.textSecondary,
+    ),
+  );
 
   Widget _labelValue(String label, String value) {
     return Column(
@@ -599,37 +713,49 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 13, color: Colors.black87),
-        ),
-        const SizedBox(height: 4),
-        if (value.isNotEmpty)
-          Text(
-            value,
-            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: _Palette.textSecondary,
           ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _Palette.fieldBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _Palette.border),
+          ),
+          child: Text(
+            value.trim().isEmpty ? '-' : value,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: _Palette.textPrimary,
+              height: 1.4,
+            ),
+          ),
+        ),
       ],
     );
   }
 
-  // 🎯 ปรับปรุงเสถียรภาพกล่องโหลดรูปภาพ: ใช้ระบบ Encode สากลแก้ปัญหารูปเก่าและอักขระพิเศษพังหน้าจอ
-  Widget _imageBox(String? imageUrl, String type) {
+  // 🎯 ปรับให้รับทั้ง width และ height เพื่อให้สามารถคุมขนาดกว้างและยาวของแต่ละรูปได้ตามต้องการ
+  Widget _imageBox(String? imageUrl, {double? width, double height = 160}) {
     final String finalUrl = _getFinalImageUrl(imageUrl);
-
-    // ครอบด้วย Uri.encodeFull เพียงชั้นเดียวเพื่อความแม่นยำและเสถียรในการถอดสัญกรณ์อักขระ
     final String encodedUrl = finalUrl.isNotEmpty
         ? Uri.encodeFull(finalUrl)
         : "";
 
-    final double boxWidth = 240;
-    final double boxHeight = (type == "studentCard") ? 145 : 260;
-
     return Container(
-      width: boxWidth,
-      height: boxHeight,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.black26),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFF7F8FA),
+        border: Border.all(color: _Palette.border),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: encodedUrl.isNotEmpty
           ? GestureDetector(
@@ -639,44 +765,44 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                 child: Tooltip(
                   message: 'คลิกเพื่อขยายรูป',
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(14),
                     child: Stack(
+                      fit: StackFit.expand,
                       children: [
                         Image.network(
-                          encodedUrl, // ✅ เรียกใช้งานผ่าน URL ที่แปลงพาร์ทสแตนด์บายเรียบร้อย
-                          width: boxWidth,
-                          height: boxHeight,
+                          encodedUrl,
                           fit: BoxFit.cover,
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
                             return const Center(
                               child: CircularProgressIndicator(
-                                color: Colors.green,
+                                color: _Palette.primary,
+                                strokeWidth: 2.5,
                               ),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {
                             return const Center(
                               child: Icon(
-                                Icons.image_not_supported,
+                                Icons.image_not_supported_rounded,
                                 color: Colors.grey,
                               ),
                             );
                           },
                         ),
                         Positioned(
-                          bottom: 6,
-                          right: 6,
+                          right: 8,
+                          bottom: 8,
                           child: Container(
-                            decoration: const BoxDecoration(
-                              color: Colors.black45,
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.45),
                               shape: BoxShape.circle,
                             ),
-                            padding: const EdgeInsets.all(4),
                             child: const Icon(
-                              Icons.zoom_in,
+                              Icons.zoom_in_rounded,
+                              size: 16,
                               color: Colors.white,
-                              size: 18,
                             ),
                           ),
                         ),
@@ -687,7 +813,7 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
               ),
             )
           : const Center(
-              child: Icon(Icons.image_outlined, size: 45, color: Colors.grey),
+              child: Icon(Icons.image_outlined, size: 36, color: Colors.grey),
             ),
     );
   }
@@ -695,6 +821,7 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
   void _showMaximizedImage(BuildContext context, String url) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.75),
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(16),
@@ -707,7 +834,13 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
                 maxHeight: MediaQuery.of(context).size.height * 0.85,
               ),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 40,
+                  ),
+                ],
               ),
               clipBehavior: Clip.antiAlias,
               child: InteractiveViewer(
@@ -748,23 +881,41 @@ class _View_RegisterRiderState extends State<View_RegisterRider> {
 
   Widget _actionButton({
     required String label,
+    required IconData icon,
     required Color color,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     Color textColor = Colors.white,
+    Color? borderColor,
   }) {
+    final bool disabled = onPressed == null;
+    final Color effectiveBg = disabled ? const Color(0xFFE5E7EB) : color;
+    final Color effectiveText = disabled ? const Color(0xFF9CA3AF) : textColor;
+
     return SizedBox(
-      width: 160,
-      height: 45,
-      child: ElevatedButton(
+      height: 48,
+      child: ElevatedButton.icon(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        child: Text(
+        icon: Icon(icon, size: 18, color: effectiveText),
+        label: Text(
           label,
-          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: effectiveText,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: effectiveBg,
+          disabledBackgroundColor: const Color(0xFFE5E7EB),
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: (!disabled && borderColor != null)
+                ? BorderSide(color: borderColor)
+                : BorderSide.none,
+          ),
         ),
       ),
     );

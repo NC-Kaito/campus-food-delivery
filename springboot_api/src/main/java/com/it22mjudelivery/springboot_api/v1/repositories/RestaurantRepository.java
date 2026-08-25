@@ -23,10 +23,9 @@ public interface RestaurantRepository  extends JpaRepository<Restaurant, String>
 
     List<Restaurant> findByRestaurantnameContainingIgnoreCaseAndVerificationstatusTrue(String restaurantname);
 
-    @Query("SELECT DISTINCT r FROM Menu m " +
-            "JOIN m.restaurant r " +
+    @Query("SELECT r FROM Restaurant r " +
             "WHERE (LOWER(r.restaurantname) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
-            "OR LOWER(m.menuname) LIKE LOWER(CONCAT('%', :keyword, '%'))) " +
+            "OR EXISTS (SELECT m FROM Menu m WHERE m.restaurant = r AND LOWER(m.menuname) LIKE LOWER(CONCAT('%', :keyword, '%')))) " +
             "AND r.verificationstatus = :status")
     List<Restaurant> searchByStoreOrMenu(@Param("keyword") String keyword, @Param("status") String status);
 }

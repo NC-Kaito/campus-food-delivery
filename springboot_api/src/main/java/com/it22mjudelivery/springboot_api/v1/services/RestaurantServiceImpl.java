@@ -51,7 +51,7 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .email(restaurantDto.getEmail())
                 .phone(restaurantDto.getPhone())
                 .registerdate(LocalDateTime.now())
-                .statusopen(false)
+                .statusopen(true)
                 .verificationstatus("wait")
                 .build();
 
@@ -76,6 +76,39 @@ public class RestaurantServiceImpl implements RestaurantService {
     }
 
     public boolean updateProfileRestaurant(String username, String restaurantname, String restaurantimage,
+                                           int typeid,
+                                           double latitude, double longitude,
+                                           List<OpeningHourDto> openingHourDtos,
+                                           String ownerfirstname,
+                                           String ownerlastname, String email, String phone, String ownerimage) {
+
+        Restaurant restaurant = restaurantRepository.findByUsername(username)
+                .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+        TypeRestaurant typeRestaurant = typeRestaurantRepository.findById(typeid)
+                .orElseThrow(() -> new RuntimeException("ไม่พบประเภทร้านค้าที่ระบุ"));
+
+        restaurant.setRestaurantname(restaurantname);
+        restaurant.setTyperestaurant(typeRestaurant);
+        restaurant.setRestaurantimage(restaurantimage);
+        restaurant.setLatitude(latitude);
+        restaurant.setLongitude(longitude);
+        restaurant.setOwnerfirstname(ownerfirstname);
+        restaurant.setOwnerlastname(ownerlastname);
+        restaurant.setEmail(email);
+        restaurant.setPhone(phone);
+        restaurant.setImagecardid(ownerimage);
+
+        restaurant.setNotapprovedetail(null);
+        restaurant.setRegisterdate(LocalDateTime.now());
+
+        restaurant.getOpeningHours().clear();
+        restaurant.getOpeningHours().addAll(toOpeningHourEntities(openingHourDtos, restaurant));
+
+        restaurantRepository.save(restaurant);
+        return true;
+    }
+
+    public boolean updateRegisterRestaurant(String username, String restaurantname, String restaurantimage,
                                            int typeid,
                                            double latitude, double longitude,
                                            List<OpeningHourDto> openingHourDtos,

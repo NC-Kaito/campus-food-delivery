@@ -1,16 +1,36 @@
-// features/admin/view_register_restaurant.dart
+// ​ features/admin/view_register_restaurant.dart
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/services/Admin/admin_service.dart';
+import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/features/admin/admin_navbar.dart';
 import 'package:flutter_app/features/admin/list_restaurant.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
-import 'package:flutter_app/core/network/dio_client.dart'; // 🎯 อิมพอร์ตดึงตัวแปรไอพีกลางเข้ามาร้อยสายรูปภาพสากล
+import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/features/admin/map_view_restaurant.dart'
     if (dart.library.html) 'package:flutter_app/utils/map_view_web.dart';
+
+// ============ THEME TOKENS (ปรับสีตรงนี้ที่เดียวได้ทั้งหน้า) ============
+class _Palette {
+  static const primary = Color(0xFF2FBA6E);
+  static const primaryDark = Color(0xFF1E9E5B);
+  static const primarySoft = Color(0xFFE8F9EF);
+  static const bg = Color(0xFFF5F7FA);
+  static const cardBg = Colors.white;
+  static const border = Color(0xFFE7EAF0);
+  static const fieldBg = Color(0xFFF7F8FA);
+  static const textPrimary = Color(0xFF1F2937);
+  static const textSecondary = Color(0xFF6B7280);
+  static const success = Color(0xFF22C55E);
+  static const danger = Color(0xFFEF4444);
+  static const dangerSoft = Color(0xFFFEECEC);
+  static const warning = Color(0xFFF59E0B);
+  static const warningSoft = Color(0xFFFFF4E5);
+  static const info = Color(0xFF3B82F6);
+}
 
 class View_RegisterRestaurant extends StatefulWidget {
   final RestaurantModel restaurant;
@@ -29,12 +49,17 @@ class View_RegisterRestaurant extends StatefulWidget {
 
 class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
   final AdminService adminService = AdminService();
+  final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   late RestaurantModel restaurant;
+
+  List<TypeRestaurantModel> _typeList = [];
+  String? _restaurantTypeName;
 
   @override
   void initState() {
     super.initState();
     restaurant = widget.restaurant;
+    _restaurantTypeName = restaurant.typerestaurantName ?? '-';
 
     if (restaurant.latitude != null && restaurant.longitude != null) {
       registerMapView(
@@ -43,91 +68,42 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
         restaurant.longitude!,
       );
     }
+
+    _fetchRestaurantType();
   }
 
-  String _formatTime(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-  // สรุปเวลาเปิด-ปิดทั้งสัปดาห์ จัดกลุ่มวันที่เวลาเหมือนกันติดกันไว้ด้วยกัน
-  String getOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาเปิด-ปิด";
-
-    const dayFullName = {
-      RestaurantDayOfWeek.monday: "จันทร์",
-      RestaurantDayOfWeek.tuesday: "อังคาร",
-      RestaurantDayOfWeek.wednesday: "พุธ",
-      RestaurantDayOfWeek.thursday: "พฤหัส",
-      RestaurantDayOfWeek.friday: "ศุกร์",
-      RestaurantDayOfWeek.saturday: "เสาร์",
-      RestaurantDayOfWeek.sunday: "อาทิตย์",
-    };
-
-    // เรียงให้ครบ จ-อา เสมอ ถ้าวันไหนไม่มีข้อมูลให้ถือว่าปิด
-    final ordered = RestaurantDayOfWeek.values.map((d) {
-      return hours.firstWhere(
-        (h) => h.dayOfWeek == d,
-        orElse: () => RestaurantOpeningHourModel(
-          dayOfWeek: d,
-          opentime: const TimeOfDay(hour: 0, minute: 0),
-          closetime: const TimeOfDay(hour: 0, minute: 0),
-          open: true,
-        ),
-      );
-    }).toList();
-
-    final List<String> groups = [];
-    int i = 0;
-    while (i < ordered.length) {
-      final start = ordered[i];
-      int j = i;
-      while (j + 1 < ordered.length &&
-          ordered[j + 1].open == start.open &&
-          ordered[j + 1].opentime.hour == start.opentime.hour &&
-          ordered[j + 1].opentime.minute == start.opentime.minute &&
-          ordered[j + 1].closetime.hour == start.closetime.hour &&
-          ordered[j + 1].closetime.minute == start.closetime.minute) {
-        j++;
+  Future<void> _fetchRestaurantType() async {
+    const String typePath = "/v1/typerestaurant";
+    List<TypeRestaurantModel> fetched = [];
+    try {
+      final response = await DioClient.dio.get(typePath);
+      if (response.statusCode == 200) {
+        final List data = response.data;
+        fetched = data.map((e) => TypeRestaurantModel.fromJson(e)).toList();
       }
-      final label = (i == j)
-          ? dayFullName[ordered[i].dayOfWeek]!
-          : "${dayFullName[ordered[i].dayOfWeek]} - ${dayFullName[ordered[j].dayOfWeek]}";
-
-      groups.add(
-        start.open
-            ? "$label: ปิด"
-            : "$label: ${_formatTime(start.opentime)} - ${_formatTime(start.closetime)} น.",
-      );
-
-      i = j + 1;
+    } catch (e) {
+      try {
+        fetched = await typeRestaurantService.getAllTypeRestaurant();
+      } catch (err) {
+        debugPrint("Error fetching restaurant types: $err");
+      }
     }
-    return groups.join(
-      '\n',
-    ); // ขึ้นบรรทัดใหม่ทีละกลุ่ม เหมาะกับหน้ารายละเอียด admin
+
+    if (!mounted || fetched.isEmpty) return;
+
+    final matched = fetched
+        .where((t) => t.id == restaurant.typerestaurantId)
+        .firstOrNull;
+    setState(() {
+      _typeList = fetched;
+      _restaurantTypeName =
+          matched?.name ?? restaurant.typerestaurantName ?? '-';
+    });
   }
 
-  String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลา";
-
-    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
-    final today = hours.firstWhere(
-      (h) => h.dayOfWeek == todayEnum,
-      orElse: () => RestaurantOpeningHourModel(
-        dayOfWeek: todayEnum,
-        opentime: const TimeOfDay(hour: 0, minute: 0),
-        closetime: const TimeOfDay(hour: 0, minute: 0),
-        open: true,
-      ),
-    );
-
-    if (today.open) return "วันนี้ปิด";
-    return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
-  }
-
-  // 🎯 ฟังก์ชันช่วยต่อสายเชื่อมพาร์ทรูปภาพสั้นเข้ากับไอพีฐานข้อมูลศูนย์กลางให้ถูกต้องสมบูรณ์
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
-    if (rawPath.startsWith('http'))
-      return rawPath; // รองรับประวัติลิงก์ตัวเก่าแช่แข็ง
+    if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
     if (rawPath.startsWith('/')) {
@@ -141,51 +117,22 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
   void _showApproveDialog(RestaurantModel r) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.all(22),
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'คุณแน่ใจหรือไม่\nว่าต้องการอนุมัติข้อมูลนี้',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4CAF50),
-                ),
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(
-                    child: _dialogButton(
-                      'ยกเลิก',
-                      const Color(0xFFD0D0D0),
-                      Colors.black87,
-                      () => Navigator.pop(context),
-                      isOutlined: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _dialogButton(
-                      'อนุมัติ',
-                      const Color(0xFF67E22B),
-                      Colors.white,
-                      () async {
-                        Navigator.pop(context);
-                        await _approveRestaurant(r);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+      barrierColor: Colors.black.withOpacity(0.45),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: _confirmDialogShell(
+          icon: Icons.check_circle_rounded,
+          iconColor: _Palette.success,
+          iconBg: _Palette.primarySoft,
+          title: 'ยืนยันการอนุมัติ',
+          subtitle: 'คุณแน่ใจหรือไม่ว่าต้องการอนุมัติร้านค้านี้',
+          child: null,
+          confirmLabel: 'อนุมัติ',
+          confirmColor: _Palette.success,
+          onConfirm: () async {
+            Navigator.pop(context);
+            await _approveRestaurant(r);
+          },
         ),
       ),
     );
@@ -195,104 +142,158 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     final TextEditingController reasonController = TextEditingController();
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
-          side: const BorderSide(color: Colors.red, width: 1.5),
-        ),
-        contentPadding: const EdgeInsets.all(22),
-        content: SizedBox(
-          width: 380,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'คุณแน่ใจหรือไม่\nว่าต้องการปฏิเสธข้อมูลนี้',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red,
+      barrierColor: Colors.black.withOpacity(0.45),
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: _confirmDialogShell(
+          icon: Icons.cancel_rounded,
+          iconColor: _Palette.danger,
+          iconBg: _Palette.dangerSoft,
+          title: 'ยืนยันการปฏิเสธ',
+          subtitle: 'คุณแน่ใจหรือไม่ว่าต้องการปฏิเสธร้านค้านี้',
+          child: Padding(
+            padding: const EdgeInsets.only(top: 18),
+            child: TextField(
+              controller: reasonController,
+              maxLines: 4,
+              style: const TextStyle(fontSize: 14),
+              decoration: InputDecoration(
+                hintText: 'ระบุเหตุผลในการปฏิเสธ...',
+                hintStyle: TextStyle(color: Colors.grey.shade400),
+                filled: true,
+                fillColor: const Color(0xFFF7F8FA),
+                contentPadding: const EdgeInsets.all(14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _Palette.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: _Palette.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(
+                    color: _Palette.danger,
+                    width: 1.4,
+                  ),
                 ),
               ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: reasonController,
-                maxLines: 4,
-                decoration: InputDecoration(
-                  hintText: 'หมายเหตุ....',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  Expanded(
-                    child: _dialogButton(
-                      'ยกเลิก',
-                      const Color(0xFFD0D0D0),
-                      Colors.black87,
-                      () => Navigator.pop(context),
-                      isOutlined: true,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _dialogButton(
-                      'ตกลง',
-                      const Color(0xFFFF3B30),
-                      Colors.white,
-                      () async {
-                        Navigator.pop(context);
-                        await _rejectRestaurant(
-                          r,
-                          reasonController.text.trim(),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
+          confirmLabel: 'ยืนยันปฏิเสธ',
+          confirmColor: _Palette.danger,
+          onConfirm: () async {
+            Navigator.pop(context);
+            await _rejectRestaurant(r, reasonController.text.trim());
+          },
         ),
       ),
     );
   }
 
-  Widget _dialogButton(
-    String label,
-    Color color,
-    Color textColor,
-    VoidCallback onPressed, {
-    bool isOutlined = false,
+  Widget _confirmDialogShell({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    required Widget? child,
+    required String confirmLabel,
+    required Color confirmColor,
+    required VoidCallback onConfirm,
   }) {
-    return SizedBox(
-      height: 44,
-      child: isOutlined
-          ? OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: color),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              child: Text(label, style: TextStyle(color: textColor)),
-            )
-          : ElevatedButton(
-              onPressed: onPressed,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              child: Text(label, style: TextStyle(color: textColor)),
+    return Container(
+      width: 400,
+      padding: const EdgeInsets.fromLTRB(28, 30, 28, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            child: Icon(icon, color: iconColor, size: 34),
+          ),
+          const SizedBox(height: 18),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: _Palette.textPrimary,
             ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13.5,
+              color: _Palette.textSecondary,
+            ),
+          ),
+          if (child != null) child,
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(
+                        color: _Palette.border,
+                        width: 1.4,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'ยกเลิก',
+                      style: TextStyle(
+                        color: _Palette.textPrimary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: 46,
+                  child: ElevatedButton(
+                    onPressed: onConfirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: confirmColor,
+                      elevation: 0,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      confirmLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -300,19 +301,9 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     try {
       await adminService.approveRestaurant(r.username!);
       setState(() => restaurant.verificationStatus = "Confirm");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('อนุมัติร้านค้าสำเร็จ'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      _showSnack('อนุมัติร้านค้าสำเร็จ', _Palette.success, Icons.check_circle);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เกิดข้อผิดพลาด'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('เกิดข้อผิดพลาด', _Palette.danger, Icons.error);
     }
   }
 
@@ -320,20 +311,28 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     try {
       await adminService.rejectRestaurant(r.username!, reason);
       setState(() => restaurant.notApproveDetail = reason);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('ปฏิเสธร้านค้าสำเร็จ'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('ปฏิเสธร้านค้าสำเร็จ', _Palette.danger, Icons.info);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('เกิดข้อผิดพลาด'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showSnack('เกิดข้อผิดพลาด', _Palette.danger, Icons.error);
     }
+  }
+
+  void _showSnack(String text, Color color, IconData icon) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: color,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.all(16),
+        content: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 10),
+            Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
   }
 
   // ================= BUILD =================
@@ -341,393 +340,266 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
   @override
   Widget build(BuildContext context) {
     final r = restaurant;
-    Color statusColor = r.verificationStatus == true
-        ? const Color(0xFF67E22B)
-        : (r.notApproveDetail != null
-              ? const Color(0xFFFF3B30)
-              : const Color(0xFFFF9800));
-    String statusText = r.verificationStatus == true
-        ? 'อนุมัติแล้ว'
-        : (r.notApproveDetail != null ? 'ปฏิเสธแล้ว' : 'รอดำเนินการ');
+
+    Color statusColor;
+    Color statusBg;
+    String statusText;
+    IconData statusIcon;
+
+    if (r.verificationStatus == 'Confirm') {
+      statusColor = _Palette.success;
+      statusBg = _Palette.primarySoft;
+      statusText = 'อนุมัติแล้ว';
+      statusIcon = Icons.check_circle_rounded;
+    } else if (r.verificationStatus == 'Reject' ||
+        (r.notApproveDetail != null &&
+            r.notApproveDetail != 'NULL' &&
+            r.notApproveDetail!.isNotEmpty)) {
+      statusColor = _Palette.danger;
+      statusBg = _Palette.dangerSoft;
+      statusText = 'ปฏิเสธแล้ว';
+      statusIcon = Icons.cancel_rounded;
+    } else {
+      statusColor = _Palette.warning;
+      statusBg = _Palette.warningSoft;
+      statusText = 'รอดำเนินการ';
+      statusIcon = Icons.hourglass_top_rounded;
+    }
+
+    final bool isApproved = r.verificationStatus == 'Confirm';
+    final bool isRejected =
+        r.verificationStatus == 'Reject' ||
+        (r.notApproveDetail != null &&
+            r.notApproveDetail != 'NULL' &&
+            r.notApproveDetail!.isNotEmpty);
+    final bool isDecided = isApproved || isRejected;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _Palette.bg,
       appBar: const AdminNavbar(),
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: const [
-                  Icon(Icons.store, size: 26, color: Colors.black87),
-                  SizedBox(width: 8),
-                  Text(
-                    'รายละเอียดการสมัครของร้านค้า',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Column(
-                  children: [
-                    // Header Bar
-                    Container(
-                      height: 46,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFFF2F2F2),
-                        border: Border(
-                          bottom: BorderSide(color: Color(0xFFD9D9D9)),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1350),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 28, 24, 100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ----- Page Header -----
+                  Row(
+                    children: [
+                      InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ListRestaurant(),
+                          ),
+                        ),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _Palette.border),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_rounded,
+                            size: 20,
+                            color: _Palette.textPrimary,
+                          ),
                         ),
                       ),
-                      child: Row(
-                        children: [
-                          const SizedBox(width: 34),
-                          Expanded(
-                            child: Text(
-                              'รายละเอียดร้านค้า ลำดับที่ : ${widget.index}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: 172,
-                            height: 46,
-                            alignment: Alignment.center,
-                            color: statusColor,
-                            child: Text(
-                              statusText,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
+                      const SizedBox(width: 14),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: _Palette.primarySoft,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.storefront_rounded,
+                          color: _Palette.primaryDark,
+                          size: 22,
+                        ),
                       ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'รายละเอียดการสมัครของร้านค้า',
+                        style: TextStyle(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: _Palette.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 22),
+
+                  // ----- Main Card -----
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: _Palette.cardBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _Palette.border),
                     ),
-                    // Content Area
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(34, 24, 34, 34),
-                      child: IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // LEFT SIDE (ข้อมูลร้านค้า & ข้อมูลการติดต่อ)
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _sectionTitle('ข้อมูลร้านค้า'),
-                                  const SizedBox(height: 14),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _labelValue(
-                                          'ID ร้านค้า',
-                                          r.username ?? '-',
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _labelValue(
-                                          'ชื่อร้าน (Restaurant Name)',
-                                          r.restaurantName ?? '-',
-                                        ),
-                                      ),
-                                    ],
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        // Header Bar
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 28,
+                            vertical: 18,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            border: Border(
+                              bottom: BorderSide(color: _Palette.border),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'รายละเอียดร้านค้า • ลำดับที่ ${widget.index}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 15.5,
+                                    color: _Palette.textPrimary,
                                   ),
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: _labelValue(
-                                          'วันที่เปิดทำการ',
-                                          getOpeningHoursText(r.openingHours),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: _labelValue(
-                                          'เวลาเปิด - ปิด',
-                                          _getTodayHoursText(r.openingHours),
-                                        ),
-                                      ),
-                                    ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 9,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: statusBg,
+                                  borderRadius: BorderRadius.circular(30),
+                                  border: Border.all(
+                                    color: statusColor.withOpacity(0.35),
                                   ),
-                                  const SizedBox(height: 24),
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'รูปร้านค้า (Restaurant Image)',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 10),
-                                            _imageBox(r.restaurantImage),
-                                          ],
-                                        ),
-                                      ),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            const Text(
-                                              'ที่ตั้งร้านค้า (latitude-longitude)',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Container(
-                                              width: 300,
-                                              height: 200,
-                                              decoration: BoxDecoration(
-                                                border: Border.all(
-                                                  color: const Color(
-                                                    0xFFD9D9D9,
-                                                  ),
-                                                ),
-                                                borderRadius:
-                                                    BorderRadius.circular(6),
-                                              ),
-                                              child:
-                                                  (r.latitude != null &&
-                                                      r.longitude != null)
-                                                  ? ClipRRect(
-                                                      borderRadius:
-                                                          BorderRadius.circular(
-                                                            6,
-                                                          ),
-                                                      child: kIsWeb
-                                                          ? buildMapView(
-                                                              'map-${r.username}',
-                                                            ) // 🎯 ตัดค่าพารามิเตอร์ส่วนเกินออกตามแนวทางสากลเพื่อให้ระบบคอมไพล์ผ่านฉลุย
-                                                          : GoogleMap(
-                                                              initialCameraPosition:
-                                                                  CameraPosition(
-                                                                    target: LatLng(
-                                                                      r.latitude!,
-                                                                      r.longitude!,
-                                                                    ),
-                                                                    zoom: 17,
-                                                                  ),
-                                                              markers: {
-                                                                Marker(
-                                                                  markerId:
-                                                                      const MarkerId(
-                                                                        'shop',
-                                                                      ),
-                                                                  position: LatLng(
-                                                                    r.latitude!,
-                                                                    r.longitude!,
-                                                                  ),
-                                                                  infoWindow: InfoWindow(
-                                                                    title:
-                                                                        r.restaurantName ??
-                                                                        'ร้านค้า',
-                                                                  ),
-                                                                ),
-                                                              },
-                                                              zoomControlsEnabled:
-                                                                  false,
-                                                              scrollGesturesEnabled:
-                                                                  false,
-                                                              zoomGesturesEnabled:
-                                                                  false,
-                                                              rotateGesturesEnabled:
-                                                                  false,
-                                                              tiltGesturesEnabled:
-                                                                  false,
-                                                              myLocationButtonEnabled:
-                                                                  false,
-                                                              liteModeEnabled:
-                                                                  true,
-                                                            ),
-                                                    )
-                                                  : const Center(
-                                                      child: Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .center,
-                                                        children: [
-                                                          Icon(
-                                                            Icons.location_off,
-                                                            size: 36,
-                                                            color: Colors.grey,
-                                                          ),
-                                                          SizedBox(height: 4),
-                                                          Text(
-                                                            'ไม่มีข้อมูลพิกัด',
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                              color:
-                                                                  Colors.grey,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  if (r.notApproveDetail != null) ...[
-                                    const SizedBox(height: 20),
-                                    Container(
-                                      padding: const EdgeInsets.all(12),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFFEEEE),
-                                        border: Border.all(color: Colors.red),
-                                      ),
-                                      child: Text(
-                                        'เหตุผลที่ปฏิเสธ : ${r.notApproveDetail}',
-                                        style: const TextStyle(
-                                          color: Colors.red,
-                                        ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      statusIcon,
+                                      size: 16,
+                                      color: statusColor,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      statusText,
+                                      style: TextStyle(
+                                        color: statusColor,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ],
-                                ],
+                                ),
                               ),
-                            ),
+                            ],
+                          ),
+                        ),
 
-                            // MIDDLE DIVIDER
-                            const VerticalDivider(
-                              width: 60,
-                              thickness: 1,
-                              color: Color(0xFFD9D9D9),
-                            ),
+                        // Content Area
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(32, 26, 32, 32),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              final isWide = constraints.maxWidth > 900;
+                              final left = _buildRestaurantSection(r);
+                              final right = _buildOwnerSection(r);
 
-                            // RIGHT SIDE (ข้อมูลเอกสาร)
-                            Expanded(
-                              flex: 1,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _sectionTitle(
-                                    'ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน',
-                                  ),
-                                  const SizedBox(height: 14),
-
-                                  // ใช้ Row จัดระเบียบให้รูปร้านค้า และ รูปหน้าเจ้าของร้านค้า แสดงผลเคียงคู่กัน
-                                  Row(
+                              if (isWide) {
+                                return IntrinsicHeight(
+                                  child: Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // ฝั่งรูปร้านค้า
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-
-                                          children: [
-                                            _labelValue(
-                                              'ชื่อ-นามสกุล',
-                                              '${r.ownerFirstName ?? ''} ${r.ownerLastName ?? ''}',
-                                            ),
-                                            const SizedBox(height: 24),
-                                            _labelValue(
-                                              'อีเมล (Email)',
-                                              r.email ?? '-',
-                                            ),
-                                            const SizedBox(height: 24),
-                                            _labelValue(
-                                              'เบอร์โทรศัพท์ (Phone)',
-                                              r.phone ?? '-',
-                                            ),
-                                          ],
-                                        ),
+                                      Expanded(child: left),
+                                      const SizedBox(width: 36),
+                                      const VerticalDivider(
+                                        width: 1,
+                                        thickness: 1,
+                                        color: _Palette.border,
                                       ),
-                                      const SizedBox(
-                                        width: 10,
-                                      ), // ระยะเว้นวรรคช่องว่างระหว่างรูป
-                                      // ฝั่งรูปหน้าเจ้าของร้านค้า
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            // 🎯 ปรับปรุงข้อความหัวข้อตามความต้องการของอาจารย์
-                                            const Text(
-                                              'บัตรประชาชน (National ID)',
-                                              style: TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 10),
-                                            // 🎯 ดึงประวัติรูปภาพใบหน้าจากฟิลด์ใหม่ r.ownerImage มาเรนเดอร์ขึ้นจอแอดมินโดยอัตโนมัติ
-                                            _imageBox(r.imagecardid),
-                                          ],
-                                        ),
-                                      ),
+                                      const SizedBox(width: 36),
+                                      Expanded(child: right),
                                     ],
                                   ),
+                                );
+                              }
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  left,
+                                  const SizedBox(height: 28),
+                                  const Divider(color: _Palette.border),
+                                  const SizedBox(height: 28),
+                                  right,
                                 ],
-                              ),
-                            ),
-                          ],
+                              );
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Buttons Bottom
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  _actionButton(
-                    label: 'ย้อนกลับ',
-                    color: const Color(0xFFD9D9D9),
-                    textColor: Colors.black87,
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ListRestaurant(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  _actionButton(
-                    label: 'ปฏิเสธการสมัคร',
-                    color: const Color(0xFFFF3B30),
-                    onPressed: () => _showRejectDialog(r),
-                  ),
-                  const SizedBox(width: 10),
-                  _actionButton(
-                    label: 'อนุมัติการสมัคร',
-                    color: const Color(0xFF67E22B),
-                    onPressed: () => _showApproveDialog(r),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 100, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 16,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _actionButton(
+                label: 'ย้อนกลับ',
+                icon: Icons.arrow_back_rounded,
+                color: Colors.white,
+                textColor: _Palette.textPrimary,
+                borderColor: _Palette.border,
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const ListRestaurant(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 30),
+              _actionButton(
+                label: 'ปฏิเสธการสมัคร',
+                icon: Icons.close_rounded,
+                color: _Palette.danger,
+                onPressed: isDecided ? null : () => _showRejectDialog(r),
+              ),
+              const SizedBox(width: 30),
+              _actionButton(
+                label: 'อนุมัติการสมัคร',
+                icon: Icons.check_rounded,
+                color: _Palette.success,
+                onPressed: isDecided ? null : () => _showApproveDialog(r),
               ),
             ],
           ),
@@ -736,22 +608,210 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
     );
   }
 
-  Widget _sectionTitle(String title) {
+  // ----- LEFT: ประเภทร้านค้า + ข้อมูลร้านค้า -----
+  Widget _buildRestaurantSection(RestaurantModel r) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF6AD12B),
-            fontSize: 15,
-            fontWeight: FontWeight.bold,
-          ),
+        _sectionTitle('ประเภทร้านค้า', Icons.category_outlined),
+        const SizedBox(height: 18),
+        _labelValue(
+          'ประเภทร้านค้า (Restaurant Type)',
+          _restaurantTypeName ?? '-',
         ),
-        const Divider(color: Color(0xFFD9D9D9), thickness: 1),
+        const Divider(height: 36, thickness: 1, color: Color(0xFFE2E2E2)),
+
+        _sectionTitle('ข้อมูลร้านค้า', Icons.storefront_outlined),
+        const SizedBox(height: 18),
+
+        _labelValue('ID ร้านค้า', r.username ?? '-'),
+        const SizedBox(height: 18),
+        _labelValue('ชื่อร้าน (Restaurant Name)', r.restaurantName ?? '-'),
+
+        const SizedBox(height: 22),
+
+        // 🎯 วางที่ตั้งร้านค้าและรูปร้านค้าไว้ข้างกัน กำหนดขนาด 280 x 160
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _imageLabel('ที่ตั้งร้านค้า (latitude-longitude)'),
+                const SizedBox(height: 10),
+                Container(
+                  width: 280,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: _Palette.border),
+                    borderRadius: BorderRadius.circular(14),
+                    color: const Color(0xFFF7F8FA),
+                  ),
+                  child: (r.latitude != null && r.longitude != null)
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: kIsWeb
+                              ? buildMapView('map-${r.username}')
+                              : GoogleMap(
+                                  initialCameraPosition: CameraPosition(
+                                    target: LatLng(r.latitude!, r.longitude!),
+                                    zoom: 17,
+                                  ),
+                                  markers: {
+                                    Marker(
+                                      markerId: const MarkerId('shop'),
+                                      position: LatLng(
+                                        r.latitude!,
+                                        r.longitude!,
+                                      ),
+                                      infoWindow: InfoWindow(
+                                        title: r.restaurantName ?? 'ร้านค้า',
+                                      ),
+                                    ),
+                                  },
+                                  zoomControlsEnabled: false,
+                                  scrollGesturesEnabled: false,
+                                  zoomGesturesEnabled: false,
+                                  rotateGesturesEnabled: false,
+                                  tiltGesturesEnabled: false,
+                                  myLocationButtonEnabled: false,
+                                  liteModeEnabled: true,
+                                ),
+                        )
+                      : const Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.location_off_rounded,
+                                size: 32,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                'ไม่มีข้อมูลพิกัด',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _imageLabel('รูปร้านค้า (Restaurant Image)'),
+                const SizedBox(height: 10),
+                _imageBox(r.restaurantImage, width: 280, height: 160),
+              ],
+            ),
+          ],
+        ),
+
+        if (r.notApproveDetail != null &&
+            r.notApproveDetail != 'NULL' &&
+            r.notApproveDetail!.isNotEmpty) ...[
+          const SizedBox(height: 22),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _Palette.dangerSoft,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _Palette.danger.withOpacity(0.3)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: _Palette.danger,
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: const TextStyle(
+                        color: _Palette.danger,
+                        fontSize: 13.5,
+                        height: 1.4,
+                      ),
+                      children: [
+                        const TextSpan(
+                          text: 'เหตุผลที่ปฏิเสธ: ',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        TextSpan(text: r.notApproveDetail),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
+
+  // ----- RIGHT: ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน -----
+  Widget _buildOwnerSection(RestaurantModel r) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _sectionTitle(
+          'ข้อมูลเจ้าของร้านค้า หรือผู้ดูแลร้าน',
+          Icons.person_outline_rounded,
+        ),
+        const SizedBox(height: 18),
+        _labelValue(
+          'ชื่อ-นามสกุล',
+          '${r.ownerFirstName ?? ''} ${r.ownerLastName ?? ''}',
+        ),
+        const SizedBox(height: 18),
+        _labelValue('อีเมล (Email)', r.email ?? '-'),
+        const SizedBox(height: 18),
+        _labelValue('เบอร์โทรศัพท์ (Phone)', r.phone ?? '-'),
+        const SizedBox(height: 22),
+
+        _imageLabel('บัตรประชาชน (National ID)'),
+        const SizedBox(height: 10),
+        _imageBox(r.imagecardid, width: 280, height: 160),
+      ],
+    );
+  }
+
+  Widget _sectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color.fromARGB(255, 69, 159, 255)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            color: Color.fromARGB(255, 69, 159, 255),
+            fontSize: 15.5,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _imageLabel(String text) => Text(
+    text,
+    style: const TextStyle(
+      fontSize: 12.5,
+      fontWeight: FontWeight.w600,
+      color: _Palette.textSecondary,
+    ),
+  );
 
   Widget _labelValue(String label, String value) {
     return Column(
@@ -759,31 +819,48 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 13, color: Colors.black87),
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: _Palette.textSecondary,
+          ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _Palette.fieldBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: _Palette.border),
+          ),
+          child: Text(
+            value.trim().isEmpty ? '-' : value,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w700,
+              color: _Palette.textPrimary,
+              height: 1.4,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _imageBox(String? imageUrl) {
+  Widget _imageBox(String? imageUrl, {double? width, double height = 160}) {
     final String finalUrl = _getFinalImageUrl(imageUrl);
     final String encodedUrl = finalUrl.isNotEmpty
         ? Uri.encodeFull(finalUrl)
         : "";
 
     return Container(
-      // 1. ตั้งค่า Container ให้มีขนาดที่คุณต้องการ
-      width: 300,
-      height: 200,
+      width: width ?? double.infinity,
+      height: height,
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.black26),
-        borderRadius: BorderRadius.circular(8),
+        color: const Color(0xFFF7F8FA),
+        border: Border.all(color: _Palette.border),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: encodedUrl.isNotEmpty
           ? GestureDetector(
@@ -793,35 +870,47 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                 child: Tooltip(
                   message: 'คลิกเพื่อขยายรูป',
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(14),
                     child: Stack(
+                      fit: StackFit.expand,
                       children: [
-                        // 2. ตั้งค่า Image.network ให้มีขนาดเท่ากับ Container
                         Image.network(
                           encodedUrl,
-                          width: 300,
-                          height: 200,
-                          // 3. ใช้ BoxFit.cover เพื่อให้รูปขยายเต็มพื้นที่
-                          // หรือถ้าอยากให้เห็นรูปทั้งหมดโดยไม่โดนตัดให้ใช้ BoxFit.contain
                           fit: BoxFit.cover,
                           loadingBuilder: (context, child, loadingProgress) {
                             if (loadingProgress == null) return child;
                             return const Center(
                               child: CircularProgressIndicator(
-                                color: Colors.green,
+                                color: _Palette.primary,
+                                strokeWidth: 2.5,
                               ),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {
                             return const Center(
                               child: Icon(
-                                Icons.image_not_supported,
+                                Icons.image_not_supported_rounded,
                                 color: Colors.grey,
                               ),
                             );
                           },
                         ),
-                        // ... (ส่วนของปุ่มซูม)
+                        Positioned(
+                          right: 8,
+                          bottom: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.45),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.zoom_in_rounded,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -829,7 +918,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
               ),
             )
           : const Center(
-              child: Icon(Icons.image_outlined, size: 50, color: Colors.grey),
+              child: Icon(Icons.image_outlined, size: 36, color: Colors.grey),
             ),
     );
   }
@@ -837,6 +926,7 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
   void _showMaximizedImage(BuildContext context, String url) {
     showDialog(
       context: context,
+      barrierColor: Colors.black.withOpacity(0.75),
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(16),
@@ -849,7 +939,13 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
                 maxHeight: MediaQuery.of(context).size.height * 0.85,
               ),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.4),
+                    blurRadius: 40,
+                  ),
+                ],
               ),
               clipBehavior: Clip.antiAlias,
               child: InteractiveViewer(
@@ -890,23 +986,41 @@ class _View_RegisterRestaurantState extends State<View_RegisterRestaurant> {
 
   Widget _actionButton({
     required String label,
+    required IconData icon,
     required Color color,
-    required VoidCallback onPressed,
+    required VoidCallback? onPressed,
     Color textColor = Colors.white,
+    Color? borderColor,
   }) {
+    final bool disabled = onPressed == null;
+    final Color effectiveBg = disabled ? const Color(0xFFE5E7EB) : color;
+    final Color effectiveText = disabled ? const Color(0xFF9CA3AF) : textColor;
+
     return SizedBox(
-      width: 160,
-      height: 45,
-      child: ElevatedButton(
+      height: 48,
+      child: ElevatedButton.icon(
         onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
-        ),
-        child: Text(
+        icon: Icon(icon, size: 18, color: effectiveText),
+        label: Text(
           label,
-          style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: effectiveText,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: effectiveBg,
+          disabledBackgroundColor: const Color(0xFFE5E7EB),
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+            side: (!disabled && borderColor != null)
+                ? BorderSide(color: borderColor)
+                : BorderSide.none,
+          ),
         ),
       ),
     );
