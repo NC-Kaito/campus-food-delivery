@@ -26,10 +26,6 @@ class _MemberReviewState extends State<MemberReview> {
       TextEditingController();
   final TextEditingController _riderCommentController = TextEditingController();
 
-  // เซ็ตเก็บสถานะการเลือกแท็ก
-  final Set<String> _selectedRestaurantTags = {};
-  final Set<String> _selectedRiderTags = {};
-
   final Color primaryGreen = const Color(0xFF64F02D);
 
   final MemberService memberService = MemberService();
@@ -130,44 +126,6 @@ class _MemberReviewState extends State<MemberReview> {
           ),
         );
       }),
-    );
-  }
-
-  // Widget สำหรับแสดงแท็ก เลือกแล้วเป็นสีส้ม ยังไม่เลือกเป็นสีเทา
-  Widget _buildSuggestionTags(List<String> tags, Set<String> selectedTags) {
-    return Wrap(
-      spacing: 8.0,
-      runSpacing: 8.0,
-      children: tags.map((tag) {
-        bool isSelected = selectedTags.contains(tag);
-        return InkWell(
-          onTap: () {
-            setState(() {
-              if (isSelected) {
-                selectedTags.remove(tag);
-              } else {
-                selectedTags.add(tag);
-              }
-            });
-          },
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: BoxDecoration(
-              color: isSelected ? Colors.orange : Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              tag,
-              style: TextStyle(
-                fontSize: 13,
-                color: isSelected ? Colors.white : Colors.black87,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 
@@ -465,10 +423,10 @@ class _MemberReviewState extends State<MemberReview> {
         orderid: widget.order.orderId!,
         restaurantrating: _restaurantRating,
         riderrating: _riderRating,
-        cleanliness: _selectedRestaurantTags.contains('ถูกสุขลักษณะ'),
-        tasteRating: _selectedRestaurantTags.contains('รสชาติดี'),
-        deliverySpeed: _selectedRiderTags.contains('ส่งเร็ว'),
-        foodCondition: _selectedRiderTags.contains('รักษาสภาพอาหารดี'),
+        cleanliness: false, // ตั้งเป็น false เนื่องจากลบ Tag ออกแล้ว
+        tasteRating: false, // ตั้งเป็น false เนื่องจากลบ Tag ออกแล้ว
+        deliverySpeed: false, // ตั้งเป็น false เนื่องจากลบ Tag ออกแล้ว
+        foodCondition: false, // ตั้งเป็น false เนื่องจากลบ Tag ออกแล้ว
         commentrestaurant: _restaurantCommentController.text.trim().isEmpty
             ? null
             : _restaurantCommentController.text.trim(),
@@ -477,10 +435,8 @@ class _MemberReviewState extends State<MemberReview> {
             : _riderCommentController.text.trim(),
       );
 
-      // 1. ส่งข้อมูลรีวิว
       await memberService.addReview(review);
 
-      // 2. 🎯 อัปเดตสถานะออเดอร์เป็น reviewSuccess
       await _orderService.updateOrderStatus(
         widget.order.orderId!,
         "reviewSuccess",
@@ -494,7 +450,6 @@ class _MemberReviewState extends State<MemberReview> {
           backgroundColor: Colors.green,
         ),
       );
-      // ส่งค่ากลับไปเพื่อให้หน้าก่อนหน้ารู้ว่ารีวิวเสร็จแล้ว จะได้รีเฟรชข้อมูล
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -626,6 +581,32 @@ class _MemberReviewState extends State<MemberReview> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 200, 230, 201),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.storefront_rounded,
+                    color: const Color.fromARGB(255, 53, 151, 58),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  "ให้คะแนนร้านค้า",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -642,33 +623,6 @@ class _MemberReviewState extends State<MemberReview> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.storefront_rounded,
-                          color: Colors.orange.shade800,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        "ให้คะแนนร้านค้า",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
                   Row(
                     children: [
                       ClipRRect(
@@ -872,12 +826,6 @@ class _MemberReviewState extends State<MemberReview> {
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 8),
-
-                  _buildSuggestionTags([
-                    'ถูกสุขลักษณะ',
-                    'รสชาติดี',
-                  ], _selectedRestaurantTags),
                   const SizedBox(height: 12),
 
                   TextField(
@@ -885,7 +833,7 @@ class _MemberReviewState extends State<MemberReview> {
                     maxLines: 3,
                     style: const TextStyle(color: Colors.black87),
                     decoration: InputDecoration(
-                      hintText: "กรอกความประทับใจ หรือข้อเสนอแนะ...",
+                      hintText: "แสดงความคิดเห็น...",
                       hintStyle: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 14,
@@ -915,6 +863,32 @@ class _MemberReviewState extends State<MemberReview> {
             ),
 
             const SizedBox(height: 24),
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 200, 230, 201),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.moped_rounded,
+                    color: const Color.fromARGB(255, 53, 151, 58),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                const Text(
+                  "ให้คะแนนผู้จัดส่ง",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
 
             Container(
               padding: const EdgeInsets.all(20),
@@ -932,33 +906,6 @@ class _MemberReviewState extends State<MemberReview> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.moped_rounded,
-                          color: Colors.green.shade800,
-                          size: 24,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const Text(
-                        "ให้คะแนนผู้จัดส่ง",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
                   Row(
                     children: [
                       ClipRRect(
@@ -996,7 +943,7 @@ class _MemberReviewState extends State<MemberReview> {
                   const SizedBox(height: 20),
 
                   const Text(
-                    "การจัดส่งและบริการเป็นอย่างไรบ้าง?",
+                    "ให้คะแนนการบริการของผู้จัดส่ง",
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
@@ -1019,12 +966,6 @@ class _MemberReviewState extends State<MemberReview> {
                       color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 8),
-
-                  _buildSuggestionTags([
-                    'ส่งเร็ว',
-                    'รักษาสภาพอาหารดี',
-                  ], _selectedRiderTags),
                   const SizedBox(height: 12),
 
                   TextField(
@@ -1032,8 +973,7 @@ class _MemberReviewState extends State<MemberReview> {
                     maxLines: 3,
                     style: const TextStyle(color: Colors.black87),
                     decoration: InputDecoration(
-                      hintText:
-                          "คำชมเล็กๆ น้อยๆ ช่วยเป็นกำลังใจให้ไรเดอร์ได้นะ...",
+                      hintText: "แสดงความคิดเห็น...",
                       hintStyle: TextStyle(
                         color: Colors.grey[400],
                         fontSize: 14,

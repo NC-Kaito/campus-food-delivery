@@ -67,7 +67,9 @@ class _AddMenuState extends State<AddMenu> {
 
   List<_AddonGroupAggregate> _allAddonGroups = [];
   List<_AddonGroupAggregate> _addonSearchResults = [];
-  final Map<int, bool> _groupLinked = {};
+
+  // 🎯 เปลี่ยนมาใช้ List เพื่อเก็บลำดับการจัดเรียงได้เหมือนหน้า EditMenu
+  List<int> _linkedGroupIds = [];
   final Map<int, bool> _groupExpanded = {};
 
   bool _isLoading = false;
@@ -144,7 +146,6 @@ class _AddMenuState extends State<AddMenu> {
         for (final agg in _allAddonGroups) {
           final gid = agg.group.addonGroupId;
           if (gid != null) {
-            _groupLinked.putIfAbsent(gid, () => false);
             _groupExpanded.putIfAbsent(gid, () => false);
           }
         }
@@ -228,7 +229,7 @@ class _AddMenuState extends State<AddMenu> {
   void _updateAddonSearchResults(String value) {
     final query = value.trim().toLowerCase();
     final results = _allAddonGroups.where((agg) {
-      final isLinked = _groupLinked[agg.group.addonGroupId] ?? false;
+      final isLinked = _linkedGroupIds.contains(agg.group.addonGroupId);
       if (isLinked) return false;
       if (query.isEmpty) return true;
       final name = agg.group.addonGroupName?.toLowerCase() ?? "";
@@ -357,7 +358,9 @@ class _AddMenuState extends State<AddMenu> {
 
   void _selectAddonGroupToUse(int groupId) {
     setState(() {
-      _groupLinked[groupId] = true;
+      if (!_linkedGroupIds.contains(groupId)) {
+        _linkedGroupIds.add(groupId);
+      }
       _groupExpanded[groupId] = false;
     });
     _addonSearchController.clear();
@@ -484,10 +487,7 @@ class _AddMenuState extends State<AddMenu> {
 
       final String finalDesc = descriptionController.text.trim();
 
-      final selectedGroupIds = _groupLinked.entries
-          .where((entry) => entry.value == true)
-          .map((entry) => entry.key)
-          .toList();
+      final selectedGroupIds = _linkedGroupIds;
 
       final Map<String, dynamic> requestData = {
         "menuname": enteredMenuName,
@@ -507,8 +507,8 @@ class _AddMenuState extends State<AddMenu> {
               .map(
                 (id) => {
                   "addongroupid": id,
-                  "is_multiple_choice": false, // 🎯 เพิ่มค่า default กัน Error
-                  "status": true, // 🎯 เพิ่มค่า default กัน Error
+                  "is_multiple_choice": false,
+                  "status": true,
                 },
               )
               .toList(),
@@ -651,9 +651,14 @@ class _AddMenuState extends State<AddMenu> {
       );
     }
 
-    final linkedCount = _groupLinked.values.where((v) => v).length;
-    final linkedGroups = _allAddonGroups
-        .where((agg) => _groupLinked[agg.group.addonGroupId] == true)
+    final linkedCount = _linkedGroupIds.length;
+    final linkedGroups = _linkedGroupIds
+        .map(
+          (id) => _allAddonGroups
+              .where((agg) => agg.group.addonGroupId == id)
+              .firstOrNull,
+        )
+        .whereType<_AddonGroupAggregate>()
         .toList();
 
     return Scaffold(
@@ -1254,11 +1259,35 @@ class _AddMenuState extends State<AddMenu> {
                       if (linkedGroups.isEmpty)
                         _buildEmptyAddonState()
                       else
-                        ...linkedGroups.map(
-                          (agg) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _buildActiveAddonGroupCard(agg),
-                          ),
+                        ReorderableListView.builder(
+                          shrinkWrap: true,
+                          primary: false,
+                          physics: const NeverScrollableScrollPhysics(),
+                          padding: EdgeInsets.zero,
+                          buildDefaultDragHandles: false,
+                          itemCount: linkedGroups.length,
+                          onReorder: (oldIndex, newIndex) {
+                            setState(() {
+                              if (newIndex > oldIndex) {
+                                newIndex -= 1;
+                              }
+                              final item = _linkedGroupIds.removeAt(oldIndex);
+                              _linkedGroupIds.insert(newIndex, item);
+                            });
+                          },
+                          itemBuilder: (context, index) =>
+                              ReorderableDelayedDragStartListener(
+                                key: ValueKey(
+                                  linkedGroups[index].group.addonGroupId,
+                                ),
+                                index: index,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildActiveAddonGroupCard(
+                                    linkedGroups[index],
+                                  ),
+                                ),
+                              ),
                         ),
                     ],
                   ),
@@ -1485,33 +1514,39 @@ class _AddMenuState extends State<AddMenu> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
+                  const SizedBox(width: 8),
+                  // 🎯 จัดเลย์เอาต์ปุ่มขยายและปุ่มลบในแนวตั้ง ตามด้วยจุดลากด้านขวาสุด
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      _buildCircleExpandButton(
-                        expanded: isExpanded,
-                        onTap: () => setState(
-                          () => _groupExpanded[groupId] = !isExpanded,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () =>
-                            setState(() => _groupLinked[groupId] = false),
-                        child: Container(
-                          padding: const EdgeInsets.all(7),
-                          decoration: BoxDecoration(
-                            color: _MenuTheme.danger.withOpacity(0.08),
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildCircleExpandButton(
+                            expanded: isExpanded,
+                            onTap: () => setState(
+                              () => _groupExpanded[groupId] = !isExpanded,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
                             borderRadius: BorderRadius.circular(10),
+                            onTap: () =>
+                                setState(() => _linkedGroupIds.remove(groupId)),
+                            child: Container(
+                              padding: const EdgeInsets.all(7),
+                              decoration: BoxDecoration(
+                                color: _MenuTheme.danger.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.delete_outline_rounded,
+                                color: _MenuTheme.danger,
+                                size: 20,
+                              ),
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.delete_outline_rounded,
-                            color: _MenuTheme.danger,
-                            size: 20,
-                          ),
-                        ),
+                        ],
                       ),
                     ],
                   ),

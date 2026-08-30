@@ -69,9 +69,10 @@ class _EditMenuState extends State<EditMenu> {
 
   List<_AddonGroupAggregate> _allAddonGroups = [];
   List<_AddonGroupAggregate> _addonSearchResults = [];
-  final Map<int, bool> _groupLinked = {};
+
+  List<int> _linkedGroupIds = [];
+  List<int> _originalLinkedGroupIds = [];
   final Map<int, bool> _groupExpanded = {};
-  final Map<int, bool> _originalGroupLinked = {};
 
   bool _isLoading = false;
   bool _isInitialLoading = true;
@@ -205,12 +206,12 @@ class _EditMenuState extends State<EditMenu> {
           return agg;
         }).toList();
 
+        _linkedGroupIds = linkedGroupIds.toList();
+        _originalLinkedGroupIds = List.from(_linkedGroupIds);
+
         for (final agg in _allAddonGroups) {
           final gid = agg.group.addonGroupId;
           if (gid != null) {
-            final isLinked = linkedGroupIds.contains(gid);
-            _groupLinked[gid] = isLinked;
-            _originalGroupLinked[gid] = isLinked;
             _groupExpanded[gid] = false;
           }
         }
@@ -235,7 +236,7 @@ class _EditMenuState extends State<EditMenu> {
   void _updateAddonSearchResults(String value) {
     final query = value.trim().toLowerCase();
     final results = _allAddonGroups.where((agg) {
-      final isLinked = _groupLinked[agg.group.addonGroupId] ?? false;
+      final isLinked = _linkedGroupIds.contains(agg.group.addonGroupId);
       if (isLinked) return false;
       if (query.isEmpty) return true;
       final name = agg.group.addonGroupName?.toLowerCase() ?? "";
@@ -364,7 +365,9 @@ class _EditMenuState extends State<EditMenu> {
 
   void _selectAddonGroupToUse(int groupId) {
     setState(() {
-      _groupLinked[groupId] = true;
+      if (!_linkedGroupIds.contains(groupId)) {
+        _linkedGroupIds.add(groupId);
+      }
       _groupExpanded[groupId] = false;
     });
     _addonSearchController.clear();
@@ -481,10 +484,7 @@ class _EditMenuState extends State<EditMenu> {
           ? ""
           : descriptionController.text.trim();
 
-      final selectedGroupIds = _groupLinked.entries
-          .where((entry) => entry.value == true)
-          .map((entry) => entry.key)
-          .toList();
+      final selectedGroupIds = _linkedGroupIds;
 
       final Map<String, dynamic> requestData = {
         "menuId": widget.menuModel.menuId,
@@ -499,8 +499,6 @@ class _EditMenuState extends State<EditMenu> {
         if (_selectedTypeMenuId != null) "typeMenuId": _selectedTypeMenuId,
         if (_newTypeName != null && _newTypeName!.isNotEmpty)
           "typeMenuName": _newTypeName,
-
-        // 🎯 ส่งค่า Array เสมอ หากว่างเปล่า Backend จะนำไปอัปเดตเพื่อลบการผูกได้ถูกต้อง
         "addonGroupIds": selectedGroupIds,
       };
 
@@ -524,9 +522,8 @@ class _EditMenuState extends State<EditMenu> {
             _existingImageUrl = imageUrl;
             _selectedImage = null;
           }
-          // บันทึกสถานะการผูกกลับเข้า Original Snapshot
-          _originalGroupLinked.clear();
-          _originalGroupLinked.addAll(_groupLinked);
+          _originalLinkedGroupIds.clear();
+          _originalLinkedGroupIds.addAll(_linkedGroupIds);
         });
       }
     } catch (e) {
@@ -644,9 +641,14 @@ class _EditMenuState extends State<EditMenu> {
 
   @override
   Widget build(BuildContext context) {
-    final linkedCount = _groupLinked.values.where((v) => v).length;
-    final linkedGroups = _allAddonGroups
-        .where((agg) => _groupLinked[agg.group.addonGroupId] == true)
+    final linkedCount = _linkedGroupIds.length;
+    final linkedGroups = _linkedGroupIds
+        .map(
+          (id) => _allAddonGroups
+              .where((agg) => agg.group.addonGroupId == id)
+              .firstOrNull,
+        )
+        .whereType<_AddonGroupAggregate>()
         .toList();
 
     return Scaffold(
@@ -1232,6 +1234,41 @@ class _EditMenuState extends State<EditMenu> {
 
                             if (linkedGroups.isEmpty)
                               _buildEmptyAddonState()
+                            else if (_isEditable)
+                              ReorderableListView.builder(
+                                shrinkWrap: true,
+                                primary: false,
+                                physics: const NeverScrollableScrollPhysics(),
+                                padding: EdgeInsets.zero,
+                                buildDefaultDragHandles: false,
+                                itemCount: linkedGroups.length,
+                                onReorder: (oldIndex, newIndex) {
+                                  setState(() {
+                                    if (newIndex > oldIndex) {
+                                      newIndex -= 1;
+                                    }
+                                    final item = _linkedGroupIds.removeAt(
+                                      oldIndex,
+                                    );
+                                    _linkedGroupIds.insert(newIndex, item);
+                                  });
+                                },
+                                itemBuilder: (context, index) =>
+                                    ReorderableDelayedDragStartListener(
+                                      key: ValueKey(
+                                        linkedGroups[index].group.addonGroupId,
+                                      ),
+                                      index: index,
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: _buildActiveAddonGroupCard(
+                                          linkedGroups[index],
+                                        ),
+                                      ),
+                                    ),
+                              )
                             else
                               ...linkedGroups.map(
                                 (agg) => Padding(
@@ -1265,9 +1302,10 @@ class _EditMenuState extends State<EditMenu> {
                                   setState(() {
                                     _isEditable = false;
                                     _selectedImage = null;
-                                    // คืนค่า Addon Group ให้กลับเป็นค่าดั้งเดิมก่อนกดแก้ไข
-                                    _groupLinked.clear();
-                                    _groupLinked.addAll(_originalGroupLinked);
+                                    _linkedGroupIds.clear();
+                                    _linkedGroupIds.addAll(
+                                      _originalLinkedGroupIds,
+                                    );
                                   });
                                   _initializeFromMenuModel();
                                   _addonSearchController.clear();
@@ -1630,7 +1668,8 @@ class _EditMenuState extends State<EditMenu> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 8),
+                  // 🎯 จัดปุ่มลบ ปุ่มขยาย ไว้ในคอลัมน์ (คุณสามารถกดค้างที่การ์ดเพื่อลากเปลี่ยนตำแหน่งได้เลยครับ)
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1640,13 +1679,12 @@ class _EditMenuState extends State<EditMenu> {
                           () => _groupExpanded[groupId] = !isExpanded,
                         ),
                       ),
-
                       if (_isEditable) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         InkWell(
                           borderRadius: BorderRadius.circular(10),
                           onTap: () =>
-                              setState(() => _groupLinked[groupId] = false),
+                              setState(() => _linkedGroupIds.remove(groupId)),
                           child: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(

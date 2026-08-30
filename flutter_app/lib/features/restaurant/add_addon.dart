@@ -211,7 +211,7 @@ class _AddAddonState extends State<AddAddon> {
       return;
     }
 
-    // 1. ตรวจสอบชื่อตัวเลือกย่อยซ้ำกันเองในฟอร์ม[cite: 1]
+    // 1. ตรวจสอบชื่อตัวเลือกย่อยซ้ำกันเองในฟอร์ม
     final names = selectedAddons
         .map((a) => a.nameController.text.trim().toLowerCase())
         .toList();
@@ -245,7 +245,7 @@ class _AddAddonState extends State<AddAddon> {
         return;
       }
 
-      // 3. ส่งข้อมูลไปบันทึกผ่าน API[cite: 1]
+      // 3. ส่งข้อมูลไปบันทึกผ่าน API
       final request = AddonGroupRequestModel(
         restaurantUsername: restaurantUsername,
         addongroupname: groupName,
@@ -448,6 +448,9 @@ class _AddAddonState extends State<AddAddon> {
     final bool canDelete = selectedAddons.length > 1;
 
     return Container(
+      key: ValueKey(
+        addon,
+      ), // เพิ่ม Key เพื่อให้ ReorderableListView ทำงานได้สมบูรณ์
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -598,31 +601,49 @@ class _AddAddonState extends State<AddAddon> {
           ),
           const SizedBox(width: 6),
 
-          // ─── ปุ่มลบ (รูปถังขยะ) ───
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(9),
-              onTap: canDelete ? () => _removeAddonItemRow(index) : null,
-              child: Container(
-                width: 34,
-                height: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: canDelete
-                      ? _AddonTheme.danger.withOpacity(0.1)
-                      : Colors.transparent,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // ─── ปุ่มลบ (รูปถังขยะ) ───
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
                   borderRadius: BorderRadius.circular(9),
-                ),
-                child: Icon(
-                  Icons.delete_outline_rounded,
-                  size: 20,
-                  color: canDelete
-                      ? _AddonTheme.danger
-                      : _AddonTheme.textSecondary.withOpacity(0.35),
+                  onTap: canDelete ? () => _removeAddonItemRow(index) : null,
+                  child: Container(
+                    width: 34,
+                    height: 44,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: canDelete
+                          ? _AddonTheme.danger.withOpacity(0.1)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Icon(
+                      Icons.delete_outline_rounded,
+                      size: 20,
+                      color: canDelete
+                          ? _AddonTheme.danger
+                          : _AddonTheme.textSecondary.withOpacity(0.35),
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(width: 2),
+              // ─── ไอคอนจุด 6 จุดสำหรับลาก ───
+              ReorderableDragStartListener(
+                index: index,
+                child: Padding(
+                  padding: const EdgeInsets.all(4.0),
+                  child: Icon(
+                    Icons.drag_indicator_rounded,
+                    size: 24,
+                    color: Colors.grey.shade400,
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -758,10 +779,10 @@ class _AddAddonState extends State<AddAddon> {
                     ),
                     const SizedBox(height: 14),
 
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
-                        children: const [
+                        children: [
                           SizedBox(width: 36),
                           Expanded(
                             flex: 4,
@@ -786,18 +807,30 @@ class _AddAddonState extends State<AddAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 40),
+                          SizedBox(
+                            width: 68,
+                          ), // ปรับระยะให้ตรงกับไอคอนลบ + จุดลาก
                         ],
                       ),
                     ),
                     const SizedBox(height: 8),
 
-                    ListView.builder(
+                    ReorderableListView.builder(
                       shrinkWrap: true,
                       primary: false,
                       padding: EdgeInsets.zero,
                       physics: const NeverScrollableScrollPhysics(),
+                      buildDefaultDragHandles: false,
                       itemCount: selectedAddons.length,
+                      onReorder: (oldIndex, newIndex) {
+                        setState(() {
+                          if (newIndex > oldIndex) {
+                            newIndex -= 1;
+                          }
+                          final item = selectedAddons.removeAt(oldIndex);
+                          selectedAddons.insert(newIndex, item);
+                        });
+                      },
                       itemBuilder: (context, index) => _buildAddonRow(index),
                     ),
 
@@ -817,9 +850,9 @@ class _AddAddonState extends State<AddAddon> {
                             ),
                             color: _AddonTheme.accent.withOpacity(0.06),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
+                            children: [
                               Icon(
                                 Icons.add_rounded,
                                 size: 18,
