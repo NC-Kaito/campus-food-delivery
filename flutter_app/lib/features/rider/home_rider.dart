@@ -1,10 +1,11 @@
-// ​// features/rider/home_rider.dart
+// features/rider/home_rider.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_app/features/rider/profile_rider.dart';
+import 'package:flutter_app/features/rider/account_menagement_rider.dart';
 import 'package:flutter_app/features/rider/list_waiting_pickup_order.dart';
 
-// 🚀 นำเข้าไฟล์ที่จำเป็นสำหรับการดึงรูปโปรไฟล์
 import 'package:flutter_app/data/services/rider/rider_service.dart';
+import 'package:flutter_app/data/services/order_service.dart';
+import 'package:flutter_app/features/rider/navbar_rider.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 
@@ -17,17 +18,23 @@ class HomeRider extends StatefulWidget {
 
 class _HomeRiderState extends State<HomeRider>
     with SingleTickerProviderStateMixin {
-  // สถานะเปิด-ปิดรับงาน
   bool _isOnline = true;
 
-  // 0 = รายวัน, 1 = รายเดือน
-  int _selectedIncomeTab = 0;
+  // 🎯 ตัวแปรเก็บ Filter ที่เลือก (ค่าเริ่มต้นคือ "7 วันย้อนหลัง")
+  String _selectedFilter = '7days';
+  String _previousFilter = '7days';
+  DateTimeRange? _selectedDateRange;
 
-  // 🚀 ตัวแปรสำหรับเก็บ URL รูปโปรไฟล์
+  List<Map<String, dynamic>> _incomeData = [];
+  bool _isLoadingIncome = true;
+
+  // 🎯 ตัวแปรเก็บจำนวนออเดอร์แจ้งเตือนที่ปุ่ม "รับงาน"
+  int _activeOrderCount = 0;
+
   String? _profileImageUrl;
   final RiderService _riderService = RiderService();
+  final OrderService _orderService = OrderService();
 
-  // กำหนดชุดสีที่ดูสบายตาและพรีเมียมขึ้น
   final Color _primaryOrange = const Color(0xFFF97316);
   final Color _accentBlue = const Color(0xFF3B82F6);
   final Color _bgCoolGray = const Color(0xFFF8FAFC);
@@ -37,11 +44,11 @@ class _HomeRiderState extends State<HomeRider>
   @override
   void initState() {
     super.initState();
-    // 🚀 เรียกใช้ฟังก์ชันดึงข้อมูลโปรไฟล์ตอนเปิดหน้า
     _loadRiderProfile();
+    _loadIncomeData(); // โหลดข้อมูลทันที
+    _fetchActiveOrderCount(); // 🎯 โหลดจำนวนออเดอร์แจ้งเตือน
   }
 
-  // 🚀 ฟังก์ชันดึงข้อมูล Rider
   Future<void> _loadRiderProfile() async {
     try {
       final rider = await _riderService.getRiderByStudentId(
@@ -49,7 +56,6 @@ class _HomeRiderState extends State<HomeRider>
       );
       if (mounted) {
         setState(() {
-          // หาก backend ของน้องนารีใช้ฟิลด์อื่นเก็บรูปโปรไฟล์ สามารถเปลี่ยนตรงนี้ได้เลยนะครับ
           _profileImageUrl = rider.studentCardImage;
         });
       }
@@ -58,7 +64,165 @@ class _HomeRiderState extends State<HomeRider>
     }
   }
 
-  // 🚀 ฟังก์ชันแปลง URL รูปภาพให้สมบูรณ์
+  // 🎯 ฟังก์ชันโหลดจำนวนออเดอร์ใหม่และออเดอร์ที่กำลังจัดส่ง เพื่อโชว์ Badge แดง
+  Future<void> _fetchActiveOrderCount() async {
+    try {
+      String studentId = GlobalData.usernameRider;
+
+      // 1. ดึงงานใหม่ที่ยังไม่มีใครรับ
+      final waitingOrders = await _orderService.getWaitingOrders();
+      // 2. ดึงงานที่ไรเดอร์คนนี้รับแล้ว แต่ยังส่งไม่เสร็จ
+      final activeOrders = await _orderService.getActiveOrders(studentId);
+
+      if (mounted) {
+        setState(() {
+          _activeOrderCount = waitingOrders.length + activeOrders.length;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการนับออเดอร์แจ้งเตือน: $e");
+    }
+  }
+
+  // 🎯 สร้าง List ตัวเลือกใน Dropdown แบบเรียบง่าย ใช้งานสะดวก
+  List<DropdownMenuItem<String>> _buildFilterOptions() {
+    return const [
+      DropdownMenuItem(value: 'today', child: Text('วันนี้')),
+      DropdownMenuItem(value: '3days', child: Text('3 วันย้อนหลัง')),
+      DropdownMenuItem(value: '7days', child: Text('7 วันย้อนหลัง')),
+      DropdownMenuItem(value: '1month', child: Text('1 เดือนย้อนหลัง')),
+      DropdownMenuItem(value: '3months', child: Text('3 เดือนย้อนหลัง')),
+      DropdownMenuItem(value: '6months', child: Text('6 เดือนย้อนหลัง')),
+      DropdownMenuItem(value: 'custom', child: Text('เลือกช่วงเวลาเอง...')),
+    ];
+  }
+
+  // 🎯 ฟังก์ชันเรียกปฏิทินให้ไรเดอร์เลือกช่วงเวลาแบบ Custom
+  Future<void> _pickDateRange() async {
+    final pickedRange = await showDateRangePicker(
+      context: context,
+      initialDateRange:
+          _selectedDateRange ??
+          DateTimeRange(
+            start: DateTime.now().subtract(const Duration(days: 7)),
+            end: DateTime.now(),
+          ),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: ColorScheme.light(
+              primary: _primaryOrange,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedRange != null) {
+      setState(() {
+        _selectedFilter = 'custom';
+        _selectedDateRange = pickedRange;
+      });
+      _loadIncomeData();
+    } else {
+      // ถ้ายกเลิก ให้กลับไปใช้ Filter ก่อนหน้า
+      setState(() {
+        _selectedFilter = _previousFilter;
+      });
+    }
+  }
+
+  // 🎯 ฟังก์ชันโหลดข้อมูลรายได้ โดยแปลง Filter เป็นวันที่ Start/End
+  Future<void> _loadIncomeData() async {
+    setState(() => _isLoadingIncome = true);
+
+    DateTime start;
+    DateTime end;
+    DateTime now = DateTime.now();
+    DateTime todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    DateTime todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    if (_selectedFilter == 'today') {
+      start = todayStart;
+      end = todayEnd;
+    } else if (_selectedFilter == '3days') {
+      start = todayStart.subtract(const Duration(days: 3));
+      end = todayEnd;
+    } else if (_selectedFilter == '7days') {
+      start = todayStart.subtract(const Duration(days: 7));
+      end = todayEnd;
+    } else if (_selectedFilter == '1month') {
+      start = DateTime(now.year, now.month - 1, now.day);
+      end = todayEnd;
+    } else if (_selectedFilter == '3months') {
+      start = DateTime(now.year, now.month - 3, now.day);
+      end = todayEnd;
+    } else if (_selectedFilter == '6months') {
+      start = DateTime(now.year, now.month - 6, now.day);
+      end = todayEnd;
+    } else if (_selectedFilter == 'custom' && _selectedDateRange != null) {
+      start = _selectedDateRange!.start;
+      end = DateTime(
+        _selectedDateRange!.end.year,
+        _selectedDateRange!.end.month,
+        _selectedDateRange!.end.day,
+        23,
+        59,
+        59,
+      );
+    } else {
+      start = todayStart.subtract(const Duration(days: 7));
+      end = todayEnd;
+    }
+
+    try {
+      final data = await _orderService.getRiderIncomeByDateRange(
+        GlobalData.usernameRider,
+        start,
+        end,
+      );
+
+      if (mounted) {
+        setState(() {
+          _incomeData = data;
+          _isLoadingIncome = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingIncome = false);
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.day}/${date.month}/${date.year + 543}";
+  }
+
+  // 🎯 แปลงเลขเดือนเป็นชื่อภาษาไทย
+  String _getMonthNameThai(String monthStr) {
+    const months = [
+      "ม.ค.",
+      "ก.พ.",
+      "มี.ค.",
+      "เม.ย.",
+      "พ.ค.",
+      "มิ.ย.",
+      "ก.ค.",
+      "ส.ค.",
+      "ก.ย.",
+      "ต.ค.",
+      "พ.ย.",
+      "ธ.ค.",
+    ];
+    int m = int.tryParse(monthStr) ?? 1;
+    return months[m - 1];
+  }
+
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -68,87 +232,25 @@ class _HomeRiderState extends State<HomeRider>
 
   @override
   Widget build(BuildContext context) {
-    // เตรียม URL รูปภาพที่สมบูรณ์ไว้ใช้งาน
     final String finalAvatarUrl = _getFinalImageUrl(_profileImageUrl);
 
     return Scaffold(
       backgroundColor: _bgCoolGray,
-      appBar: AppBar(
-        backgroundColor: _primaryOrange,
-        elevation: 0,
-        title: const Text(
-          "หน้าหลักไรเดอร์",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 22,
-            letterSpacing: 0.5,
-          ),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_active_outlined,
-              color: Colors.white,
-              size: 26,
-            ),
-            onPressed: () {
-              // TODO: เปิดหน้าดูการแจ้งเตือน
-            },
-          ),
-        ],
-      ),
+      appBar: const NavbarRider(title: "หน้าหลักไรเดอร์"),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(vertical: 20.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ====== 🎯 ส่วนที่ 1: สถานะการทำงาน ======
             _buildStatusHeader(finalAvatarUrl),
             const SizedBox(height: 24),
-
-            // ====== 🎯 ส่วนที่ 2: แดชบอร์ดรายได้ ======
             _buildIncomeDashboard(context),
             const SizedBox(height: 24),
-
-            // ====== 🎯 ส่วนที่ 3: สถิติการทำงาน (สามารถกดไปดูรีวิวได้) ======
             _buildPerformanceSection(context),
-            const SizedBox(height: 24),
-
-            // ====== 🎯 ส่วนที่ 4: รายการจัดส่งล่าสุด ======
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "รายการจัดส่งล่าสุด",
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: _textDark,
-                    ),
-                  ),
-                  Text(
-                    "ดูทั้งหมด",
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: _accentBlue,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildRecentDeliveriesList(),
             const SizedBox(height: 20),
           ],
         ),
       ),
-
-      // ====== 🎯 Navbar ด้านล่าง ======
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -173,26 +275,67 @@ class _HomeRiderState extends State<HomeRider>
                 MaterialPageRoute(
                   builder: (context) => const ListWaitingPickupOrder(),
                 ),
-              );
+              ).then((_) {
+                // 🎯 รีเฟรชแจ้งเตือนเมื่อกลับมา
+                _fetchActiveOrderCount();
+              });
             } else if (index == 2) {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfileRider()),
+                MaterialPageRoute(
+                  builder: (context) => const AccountManagementRider(),
+                ),
               );
             }
           },
-          items: const [
-            BottomNavigationBarItem(
+          items: [
+            const BottomNavigationBarItem(
               icon: Icon(Icons.home_rounded),
               label: "หน้าหลัก",
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.list_alt_rounded),
+              // 🎯 ซ้อน Stack ใส่ Badge แดงตรงปุ่มรับงาน
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.list_alt_rounded),
+                  if (_activeOrderCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Text(
+                          _activeOrderCount > 99 ? '99+' : '$_activeOrderCount',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               label: "รับงาน",
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_rounded),
-              label: "บัญชี",
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.settings),
+              label: "ตั้งค่าบัญชี",
             ),
           ],
         ),
@@ -200,7 +343,6 @@ class _HomeRiderState extends State<HomeRider>
     );
   }
 
-  // 🧩 ฟังก์ชันวาดส่วนหัวสลับสถานะรับงาน พร้อมรูปโปรไฟล์ (อัปเดตให้รับ URL รูป)
   Widget _buildStatusHeader(String finalAvatarUrl) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -237,11 +379,9 @@ class _HomeRiderState extends State<HomeRider>
                     child: CircleAvatar(
                       radius: 32,
                       backgroundColor: Colors.orange.shade50,
-                      // 🚀 นำ URL รูปมาใส่ตรงนี้ครับ
                       backgroundImage: finalAvatarUrl.isNotEmpty
                           ? NetworkImage(finalAvatarUrl)
                           : null,
-                      // 🚀 หากไม่มีรูป จะแสดงไอคอนคนแทน
                       child: finalAvatarUrl.isEmpty
                           ? Icon(
                               Icons.person_rounded,
@@ -289,10 +429,13 @@ class _HomeRiderState extends State<HomeRider>
               ),
             ],
           ),
+          // 🎯 เปลี่ยนสี Switch ตรงนี้เป็นสีเขียว
           Switch(
             value: _isOnline,
-            activeColor: _primaryOrange,
-            activeTrackColor: Colors.orange.shade200,
+            activeColor: Colors.green.shade600,
+            activeTrackColor: Colors.green.shade200,
+            inactiveThumbColor: Colors.grey.shade400,
+            inactiveTrackColor: Colors.grey.shade200,
             onChanged: (value) {
               setState(() {
                 _isOnline = value;
@@ -305,6 +448,67 @@ class _HomeRiderState extends State<HomeRider>
   }
 
   Widget _buildIncomeDashboard(BuildContext context) {
+    bool isGroupByMonth = false;
+    if (_selectedFilter == '3months' || _selectedFilter == '6months') {
+      isGroupByMonth = true;
+    } else if ((_selectedFilter == 'custom' ||
+            _selectedFilter == 'custom_month') &&
+        _selectedDateRange != null) {
+      if (_selectedDateRange!.end.difference(_selectedDateRange!.start).inDays >
+          31) {
+        isGroupByMonth = true;
+      }
+    }
+
+    List<Map<String, dynamic>> displayTableData = [];
+    if (isGroupByMonth) {
+      Map<String, Map<String, dynamic>> monthlyMap = {};
+      for (var item in _incomeData) {
+        try {
+          List<String> parts = item['date'].toString().split('/');
+          if (parts.length == 3) {
+            String monthName = _getMonthNameThai(parts[1]);
+            int yearTH = int.parse(parts[2]);
+            String monthYear = "$monthName $yearTH";
+
+            if (!monthlyMap.containsKey(monthYear)) {
+              monthlyMap[monthYear] = {
+                "date": monthYear,
+                "rounds": 0,
+                "amount": 0.0,
+              };
+            }
+            monthlyMap[monthYear]!["rounds"] += (item['rounds'] as num).toInt();
+            monthlyMap[monthYear]!["amount"] += (item['amount'] as num)
+                .toDouble();
+          }
+        } catch (_) {}
+      }
+      displayTableData = monthlyMap.values.toList();
+    } else {
+      displayTableData = List.from(_incomeData);
+    }
+
+    final double totalAmount = _incomeData.fold<double>(
+      0.0,
+      (sum, item) => sum + (item['amount'] as num).toDouble(),
+    );
+    final int totalRounds = _incomeData.fold<int>(
+      0,
+      (sum, item) => sum + (item['rounds'] as num).toInt(),
+    );
+
+    String dateRangeText = "";
+    if ((_selectedFilter == 'custom' || _selectedFilter == 'custom_month') &&
+        _selectedDateRange != null) {
+      if (_selectedDateRange!.start.isAtSameMomentAs(_selectedDateRange!.end)) {
+        dateRangeText = _formatDate(_selectedDateRange!.start);
+      } else {
+        dateRangeText =
+            "${_formatDate(_selectedDateRange!.start)} - ${_formatDate(_selectedDateRange!.end)}";
+      }
+    }
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -320,129 +524,224 @@ class _HomeRiderState extends State<HomeRider>
         ],
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F9FF),
-              borderRadius: BorderRadius.circular(16),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Expanded(
-                  child: _buildTabButton(
-                    title: "รายวัน",
-                    isSelected: _selectedIncomeTab == 0,
-                    onTap: () => setState(() => _selectedIncomeTab = 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "สรุปรายรับ",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (dateRangeText.isNotEmpty &&
+                          (_selectedFilter == 'custom' ||
+                              _selectedFilter == 'custom_month'))
+                        Text(
+                          dateRangeText,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
-                Expanded(
-                  child: _buildTabButton(
-                    title: "รายเดือน",
-                    isSelected: _selectedIncomeTab == 1,
-                    onTap: () => setState(() => _selectedIncomeTab = 1),
+                Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.blue.shade100),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _selectedFilter == 'custom_month'
+                          ? 'custom'
+                          : _selectedFilter,
+                      icon: const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        size: 20,
+                        color: Colors.blue,
+                      ),
+                      dropdownColor: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                      items: _buildFilterOptions(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          if (val == 'custom') {
+                            _previousFilter = _selectedFilter == 'custom_month'
+                                ? 'custom'
+                                : _selectedFilter;
+                            _pickDateRange();
+                          } else {
+                            setState(() {
+                              _selectedFilter = val;
+                            });
+                            _loadIncomeData();
+                          }
+                        }
+                      },
+                    ),
                   ),
                 ),
               ],
             ),
           ),
 
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: _selectedIncomeTab == 0
-                ? _buildIncomeSideBySideContent(
-                    title: "ยอดที่ได้วันนี้",
-                    amount: "฿ 450.00",
-                    rounds: "12",
-                  )
-                : _buildIncomeSideBySideContent(
-                    title: "ยอดที่ได้เดือนนี้",
-                    amount: "฿ 12,450.00",
-                    rounds: "245",
-                  ),
+          _buildIncomeSideBySideContent(
+            title: "ยอดรวมทั้งหมด",
+            amount: "฿ ${totalAmount.toStringAsFixed(0)}",
+            rounds: totalRounds.toString(),
           ),
 
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RiderIncomeHistoryPage(),
-                ),
-              );
-            },
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(24),
-                  bottomRight: Radius.circular(24),
-                ),
-                border: Border(
-                  top: BorderSide(color: Colors.blue.shade50, width: 1.5),
-                ),
+          // ── ส่วนตารางข้อมูล (ยืดเต็มความกว้าง 100%) ──
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: Colors.grey.shade100)),
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    "ดูประวัติรายได้ย้อนหลัง",
-                    style: TextStyle(
-                      color: _accentBlue,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+              child: _isLoadingIncome
+                  ? const Padding(
+                      padding: EdgeInsets.all(30.0),
+                      child: Center(
+                        child: CircularProgressIndicator(color: Colors.blue),
+                      ),
+                    )
+                  : displayTableData.isEmpty
+                  ? Padding(
+                      padding: const EdgeInsets.all(30.0),
+                      child: Center(
+                        child: Text(
+                          "ไม่มีประวัติการส่งสำเร็จในช่วงเวลานี้",
+                          style: TextStyle(
+                            color: Colors.grey.shade500,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    )
+                  : Column(
+                      children: [
+                        // หัวตาราง
+                        Container(
+                          color: Colors.grey.shade50,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 3,
+                                child: Text(
+                                  isGroupByMonth ? 'เดือน' : 'วันที่',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(
+                                flex: 2,
+                                child: Text(
+                                  'รอบจัดส่ง',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const Expanded(
+                                flex: 2,
+                                child: Text(
+                                  'รายได้ (฿)',
+                                  textAlign: TextAlign.right,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // ข้อมูลแต่ละแถว
+                        ...displayTableData.map((data) {
+                          final double amount = (data['amount'] as num)
+                              .toDouble();
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border(
+                                top: BorderSide(color: Colors.grey.shade100),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  flex: 3,
+                                  child: Text(
+                                    data['date'].toString(),
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    data['rounds'].toString(),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ),
+                                Expanded(
+                                  flex: 2,
+                                  child: Text(
+                                    amount.toStringAsFixed(0),
+                                    textAlign: TextAlign.right,
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF10B981),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 16,
-                    color: _accentBlue,
-                  ),
-                ],
-              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTabButton({
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.1),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : [],
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          title,
-          style: TextStyle(
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: isSelected ? _accentBlue : _textMuted,
-            fontSize: 14,
-          ),
-        ),
       ),
     );
   }
@@ -454,7 +753,7 @@ class _HomeRiderState extends State<HomeRider>
   }) {
     return Padding(
       key: ValueKey(title),
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -484,7 +783,7 @@ class _HomeRiderState extends State<HomeRider>
                 Text(
                   amount,
                   style: TextStyle(
-                    fontSize: 28,
+                    fontSize: 26,
                     fontWeight: FontWeight.bold,
                     color: _textDark,
                     letterSpacing: -0.5,
@@ -493,10 +792,8 @@ class _HomeRiderState extends State<HomeRider>
               ],
             ),
           ),
-
           Container(height: 50, width: 1.5, color: Colors.blue.shade50),
           const SizedBox(width: 24),
-
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,7 +824,7 @@ class _HomeRiderState extends State<HomeRider>
                     Text(
                       rounds,
                       style: TextStyle(
-                        fontSize: 28,
+                        fontSize: 26,
                         fontWeight: FontWeight.bold,
                         color: _textDark,
                       ),
@@ -556,16 +853,13 @@ class _HomeRiderState extends State<HomeRider>
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const RiderReviewPage()),
-          );
+          // TODO: ไปหน้าดูรีวิว
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [const Color(0xFFFFF7ED), Colors.white],
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFFF7ED), Colors.white],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -652,449 +946,6 @@ class _HomeRiderState extends State<HomeRider>
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildRecentDeliveriesList() {
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: 3,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      itemBuilder: (context, index) {
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.blueGrey.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-            border: Border.all(color: Colors.grey.shade100),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  Icons.restaurant_rounded,
-                  color: _accentBlue,
-                  size: 22,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "ร้านข้าวมันไก่ป้าณี",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: _textDark,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time_rounded,
-                          size: 14,
-                          color: _textMuted,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "จัดส่งเมื่อ 14:30 น.",
-                          style: TextStyle(color: _textMuted, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    "+ ฿ 45.00",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 15,
-                      color: Color(0xFF10B981),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      "สำเร็จ",
-                      style: TextStyle(
-                        color: Colors.green.shade700,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// =========================================================================
-// 🚀 หน้าสำหรับดูประวัติรายได้ย้อนหลัง
-// =========================================================================
-class RiderIncomeHistoryPage extends StatefulWidget {
-  const RiderIncomeHistoryPage({super.key});
-
-  @override
-  State<RiderIncomeHistoryPage> createState() => _RiderIncomeHistoryPageState();
-}
-
-class _RiderIncomeHistoryPageState extends State<RiderIncomeHistoryPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  final Color _themeBlue = const Color(0xFF3B82F6);
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: _themeBlue,
-        elevation: 0,
-        title: const Text(
-          "ประวัติรายได้ย้อนหลัง",
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          indicatorWeight: 4,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.blue.shade100,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-          ),
-          tabs: const [
-            Tab(text: "รายวัน (ย้อนหลัง)"),
-            Tab(text: "รายเดือน"),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [_buildDailyHistoryList(), _buildMonthlyHistoryList()],
-      ),
-    );
-  }
-
-  Widget _buildDailyHistoryList() {
-    final List<Map<String, String>> dailyData = [
-      {"date": "26 ส.ค. 2569", "rounds": "12", "amount": "฿ 450.00"},
-      {"date": "25 ส.ค. 2569", "rounds": "15", "amount": "฿ 580.00"},
-      {"date": "24 ส.ค. 2569", "rounds": "10", "amount": "฿ 380.00"},
-      {"date": "23 ส.ค. 2569", "rounds": "14", "amount": "฿ 520.00"},
-    ];
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: dailyData.length,
-      itemBuilder: (context, index) {
-        final item = dailyData[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: _themeBlue.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(color: Colors.blue.shade50),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.calendar_month_rounded,
-                      color: _themeBlue,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item["date"]!,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "จัดส่งสำเร็จ ${item["rounds"]} รอบ",
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Text(
-                item["amount"]!,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Color(0xFF10B981),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMonthlyHistoryList() {
-    final List<Map<String, String>> monthlyData = [
-      {"month": "สิงหาคม 2569", "rounds": "245", "amount": "฿ 12,450.00"},
-      {"month": "กรกฎาคม 2569", "rounds": "310", "amount": "฿ 15,800.00"},
-      {"month": "มิถุนายน 2569", "rounds": "290", "amount": "฿ 14,200.00"},
-    ];
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: monthlyData.length,
-      itemBuilder: (context, index) {
-        final item = monthlyData[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: _themeBlue.withOpacity(0.06),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-            border: Border.all(color: Colors.blue.shade50),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      Icons.account_balance_wallet_rounded,
-                      color: Color(0xFF10B981),
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        item["month"]!,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        "รวมจัดส่ง ${item["rounds"]} รอบ",
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              Text(
-                item["amount"]!,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 18,
-                  color: Color(0xFF10B981),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// =========================================================================
-// 🚀 หน้าสำหรับดูรีวิวของไรเดอร์
-// =========================================================================
-class RiderReviewPage extends StatelessWidget {
-  const RiderReviewPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF97316),
-        title: const Text(
-          "รีวิวจากลูกค้า",
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(20),
-        itemCount: 4,
-        itemBuilder: (context, index) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.orange.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: List.generate(
-                        5,
-                        (i) => const Icon(
-                          Icons.star_rounded,
-                          color: Colors.amber,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      "เมื่อวานนี้",
-                      style: TextStyle(
-                        color: Colors.grey.shade500,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  "บริการดีมากครับ พูดจาสุภาพ ส่งอาหารรวดเร็วและกล่องอาหารยังอยู่ในสภาพสมบูรณ์ ประทับใจมากครับ!",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF1E293B),
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 12,
-                      backgroundColor: Colors.grey.shade200,
-                      child: const Icon(
-                        Icons.person,
-                        size: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      "คุณลูกค้า (ไม่ระบุชื่อ)",
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
       ),
     );
   }

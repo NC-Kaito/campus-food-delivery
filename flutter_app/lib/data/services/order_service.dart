@@ -272,4 +272,77 @@ class OrderService {
       rethrow;
     }
   }
+
+  // 🎯 ฟังก์ชันขอล็อกออเดอร์ (กันไรเดอร์คนอื่นแย่ง)
+  Future<void> lockOrder(int orderId, String riderId) async {
+    try {
+      await DioClient.dio.post(
+        '/v1/order/lockOrder',
+        queryParameters: {'orderId': orderId, 'riderId': riderId},
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 409) {
+        throw "LOCKED"; // ส่ง Flag ออกไปบอก UI ว่าโดนล็อกอยู่
+      }
+      throw "เกิดข้อผิดพลาด ไม่สามารถเข้าถึงออเดอร์ได้";
+    } catch (e) {
+      throw "เกิดข้อผิดพลาด ไม่สามารถเข้าถึงออเดอร์ได้";
+    }
+  }
+
+  // 🎯 ฟังก์ชันปลดล็อกออเดอร์
+  Future<void> unlockOrder(int orderId, String riderId) async {
+    try {
+      await DioClient.dio.post(
+        '/v1/order/unlockOrder',
+        queryParameters: {'orderId': orderId, 'riderId': riderId},
+      );
+    } catch (e) {
+      // 🚀 ไม่ต้อง throw error เพราะฝั่ง Backend มีระบบ Auto-unlock 1 นาทีคอยซัพพอร์ตอยู่แล้ว
+      print("Unlock Failed (Ignored): $e");
+    }
+  }
+
+  // 🎯 ฟังก์ชันดึงรายงานรายได้ย้อนหลังตามช่วงเวลา
+  Future<List<Map<String, dynamic>>> getRiderIncomeByDateRange(
+    String studentId,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    try {
+      // ปรับเวลาให้ครอบคลุมทั้งวัน (ตั้งแต่ 00:00:00 ของวันเริ่ม จนถึง 23:59:59 ของวันสิ้นสุด)
+      final start = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+        0,
+        0,
+        0,
+      );
+      final end = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day,
+        23,
+        59,
+        59,
+      );
+
+      final response = await DioClient.dio.get(
+        '/v1/order/rider/$studentId/income',
+        queryParameters: {
+          'startDate': start.toIso8601String(),
+          'endDate': end.toIso8601String(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(response.data);
+      }
+      return [];
+    } catch (e) {
+      print("🚨 เกิดข้อผิดพลาดในการดึงข้อมูลรายได้: $e");
+      return [];
+    }
+  }
 }

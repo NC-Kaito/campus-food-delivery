@@ -1,11 +1,16 @@
 // features/rider/list_waiting_pickup_order.dart
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/services/rider/rider_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/data/models/order_model.dart';
+import 'package:flutter_app/features/rider/navbar_rider.dart';
 import 'package:flutter_app/global_data.dart';
+
+// 🎯 Import หน้าบัญชี (ตรวจสอบชื่อไฟล์ของคุณให้ตรง)
+import 'package:flutter_app/features/rider/account_menagement_rider.dart';
 
 import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart'
     as waiting;
@@ -31,15 +36,41 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
   bool _isLoadingStatus = true;
   int _selectedTabIndex = 0;
 
+  // 🎯 ตัวแปรเก็บจำนวนออเดอร์แจ้งเตือน (Badge)
+  int _activeOrderCount = 0;
+
   late final TabController _tabController;
   List<dynamic> _realOrders = [];
   Timer? _autoRefreshTimer;
+
+  final Color _primaryOrange = const Color(
+    0xFFF97316,
+  ); // 🎯 โทนสีส้มเดียวกับระบบ Rider
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _fetchRiderStatus();
+    _fetchActiveOrderBadgeCount(); // 🎯 ดึงจำนวนออเดอร์แจ้งเตือนเมื่อเปิดหน้า
+  }
+
+  // 🎯 ฟังก์ชันโหลดจำนวนแจ้งเตือน (แบบเดียวกับหน้า Home)
+  Future<void> _fetchActiveOrderBadgeCount() async {
+    try {
+      String studentId = GlobalData.usernameRider;
+
+      final waitingOrders = await _orderService.getWaitingOrders();
+      final activeOrders = await _orderService.getActiveOrders(studentId);
+
+      if (mounted) {
+        setState(() {
+          _activeOrderCount = waitingOrders.length + activeOrders.length;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการนับออเดอร์แจ้งเตือน: $e");
+    }
   }
 
   void _startAutoRefresh() {
@@ -47,6 +78,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_isReady && !_isLoadingOrders && !_isUpdating) {
         _fetchOrdersBackground();
+        _fetchActiveOrderBadgeCount(); // 🎯 ให้อัปเดตตัวเลขแจ้งเตือนอัตโนมัติด้วย
       }
     });
   }
@@ -142,6 +174,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
           _isLoadingOrders = false;
         });
       }
+
+      // 🎯 ดึงตัวเลขแจ้งเตือนใหม่ทุกครั้งที่มีการเปลี่ยนแท็บหรือโหลดข้อมูลใหม่
+      _fetchActiveOrderBadgeCount();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -216,8 +251,47 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     dynamic rawOrder, {
     bool isReviewTab = false,
   }) async {
-    Widget targetPage;
+    if (_selectedTabIndex == 0) {
+      try {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(color: Colors.orange),
+          ),
+        );
 
+        await _orderService.lockOrder(
+          orderModel.orderId ?? 0,
+          GlobalData.usernameRider,
+        );
+
+        if (mounted) Navigator.pop(context);
+      } catch (e) {
+        if (mounted) Navigator.pop(context);
+
+        if (e.toString() == "LOCKED") {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                "🚨 มีไรเดอร์ท่านอื่นกำลังพิจารณาออเดอร์นี้อยู่ครับ",
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          );
+          return;
+        }
+      }
+    }
+
+    Widget targetPage;
     if (_selectedTabIndex == 0) {
       targetPage = waiting.ViewWaitingPickupOrder(orderModel: orderModel);
     } else if (isReviewTab) {
@@ -230,6 +304,13 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       context,
       MaterialPageRoute(builder: (context) => targetPage),
     );
+
+    if (_selectedTabIndex == 0) {
+      await _orderService.unlockOrder(
+        orderModel.orderId ?? 0,
+        GlobalData.usernameRider,
+      );
+    }
 
     if (result == true || _selectedTabIndex == 1) {
       _fetchOrders();
@@ -527,7 +608,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                     isReviewTab: isReviewTab,
                   ),
                   style: ElevatedButton.styleFrom(
-                    // 🎯 ปรับแก้: ให้ใช้สีเขียว #64FF20 เป็นหลักในทุกแท็บ เพื่อความสบายตาและเข้าคู่กันครับ
                     backgroundColor: const Color(0xFF64FF20),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -538,7 +618,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                   child: Text(
                     buttonText,
                     style: const TextStyle(
-                      // 🎯 ปรับแก้: ตัวอักษรบนปุ่มเป็นสีดำ เพื่อให้ตัดกับสีพื้นหลังสีเขียวอย่างเด่นชัดและอ่านง่ายครับ
                       color: Colors.black,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -557,42 +636,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        shadowColor: Colors.grey.shade200,
-        leading: IconButton(
-          icon: const Icon(Icons.home_outlined, color: Colors.orange, size: 30),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.delivery_dining,
-              color: Colors.orange,
-              size: 30,
-            ),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none,
-              color: Colors.orange,
-              size: 30,
-            ),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.account_circle_outlined,
-              color: Colors.orange,
-              size: 30,
-            ),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: const NavbarRider(title: "รับงาน"),
       body: _isLoadingStatus
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
           : Column(
@@ -742,6 +786,91 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                 ),
               ],
             ),
+
+      // 🎯 แถบ Navbar ด้านล่าง
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blueGrey.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, -2),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          selectedItemColor: _primaryOrange,
+          unselectedItemColor: Colors.blueGrey.shade300,
+          backgroundColor: Colors.white,
+          currentIndex: 1, // 🎯 ชี้สถานะไปที่แท็บที่ 2 (รับงาน)
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+          onTap: (index) {
+            if (index == 0) {
+              // กลับไปหน้าหลัก (HomeRider)
+              Navigator.popUntil(context, (route) => route.isFirst);
+            } else if (index == 2) {
+              // ไปหน้าตั้งค่าบัญชี
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const AccountManagementRider(),
+                ),
+              );
+            }
+          },
+          items: [
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: "หน้าหลัก",
+            ),
+            BottomNavigationBarItem(
+              // 🎯 ซ้อน Stack ใส่ Badge แดงตรงปุ่มรับงาน
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.list_alt_rounded),
+                  if (_activeOrderCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 5,
+                          vertical: 1,
+                        ),
+                        constraints: const BoxConstraints(
+                          minWidth: 18,
+                          minHeight: 18,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                        child: Text(
+                          _activeOrderCount > 99 ? '99+' : '$_activeOrderCount',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              label: "รับงาน",
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.settings),
+              label: "บัญชี",
+            ),
+          ],
+        ),
+      ),
     );
   }
 

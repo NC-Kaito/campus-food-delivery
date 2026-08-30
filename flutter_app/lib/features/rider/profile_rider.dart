@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/rider/rider_service.dart';
+import 'package:flutter_app/features/rider/navbar_rider.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:image_picker/image_picker.dart';
@@ -363,51 +364,7 @@ class _ProfileRiderState extends State<ProfileRider> {
 
     return Scaffold(
       backgroundColor: _bg,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 1,
-        shadowColor: Colors.grey.shade200,
-        title: const Text(
-          "โปรไฟล์ไรเดอร์",
-          style: TextStyle(
-            color: _textDark,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.home_outlined, color: Colors.orange, size: 28),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.delivery_dining,
-              color: Colors.orange,
-              size: 28,
-            ),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_none,
-              color: Colors.orange,
-              size: 28,
-            ),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(
-              Icons.account_circle,
-              color: Colors.orange,
-              size: 28,
-            ),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+      appBar: const NavbarRider(title: "โปรไฟล์"),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _primary))
           : SafeArea(
