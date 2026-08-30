@@ -22,6 +22,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
+
+
     @Autowired
     private final OrderRepository orderRepo;
 
@@ -168,6 +170,47 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional
+    public boolean reportIssue(int orderId, String issueDetail, org.springframework.web.multipart.MultipartFile issueImage) {
+        try {
+            // 1. ค้นหาออเดอร์ในระบบ
+            Order order = orderRepo.findById(orderId)
+                    .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อรหัส: " + orderId));
+
+            // 2. อัปโหลดรูปลง Cloudinary (ถ้ามีการแนบรูปมาด้วย)
+            String imageUrl = "";
+            if (issueImage != null && !issueImage.isEmpty()) {
+                // ⚠️ คำเตือน: ตรงนี้ให้เรียกใช้ Service อัปโหลดรูปภาพของคุณ
+                // สมมติว่ามี CloudinaryService อยู่แล้ว และโยนเข้าโฟลเดอร์ maejo_delivery/issues
+                // imageUrl = cloudinaryService.uploadImage(issueImage, "maejo_delivery/issues");
+
+                // *ตัวอย่างโค้ดถ้าคุณใช้ Cloudinary แบบเดิม:
+                // Map uploadResult = cloudinary.uploader().upload(issueImage.getBytes(), ObjectUtils.asMap("folder", "maejo_delivery/issues"));
+                // imageUrl = uploadResult.get("url").toString();
+            }
+
+            // 3. บันทึกข้อมูลการแจ้งปัญหาลง Entity
+            order.setCanceldetail(issueDetail); // เก็บรายละเอียดปัญหา
+
+            if (!imageUrl.isEmpty()) {
+                order.setCancelimage(imageUrl); // เก็บ URL รูปหลักฐาน
+            }
+
+            // 4. เปลี่ยนสถานะให้ตรงกับที่แอป Flutter ดักไว้
+            order.setOrderstatus("issue_reported");
+
+            orderRepo.save(order);
+            System.out.println("✅ บันทึกข้อมูลการแจ้งปัญหาสำหรับออเดอร์รหัส " + orderId + " สำเร็จ!");
+
+            return true;
+        } catch (Exception e) {
+            System.err.println("🚨 เกิดข้อผิดพลาดในการแจ้งปัญหา: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+    }
+
+    @Override
     public List<Order> getWaitingOrders() {
         try {
             // 🔍 ค้นหาออเดอร์ที่มีสถานะ "WaitingRider" จาก Repository
@@ -180,7 +223,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> getActiveOrdersByRider(String username) {
         try {
-            List<String> activeOrderStatus = Arrays.asList("WaitingRestaurant","goingToRestaurant", "delivery" );
+            List<String> activeOrderStatus = Arrays.asList("WaitingRestaurant","goingToRestaurant", "delivery", "arrived" );
             return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, activeOrderStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รอไรเดอร์ได้: " + e.getMessage());
@@ -251,7 +294,7 @@ public class OrderServiceImpl implements OrderService {
                     .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อรหัส: " + orderId));
 
             // อัปเดตสถานะใหม่
-            if(newStatus.equals("Success")){
+            if(newStatus.equalsIgnoreCase("Success")){
                 order.setSuccesstime(LocalTime.now());
             }
             order.setOrderstatus(newStatus);

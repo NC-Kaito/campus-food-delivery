@@ -1,5 +1,6 @@
 // features/member/list_order_member.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/features/member/account_management_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/list_active_order_member.dart';
 import 'package:flutter_app/features/member/view_order_member.dart';
@@ -161,12 +162,12 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                   badgeCount:
                       _activeOrderCount, // 🎯 เพิ่ม Badge ออเดอร์ที่กำลังดำเนินการ
                 ),
-                _buildNavItem(Icons.person, "โปรไฟล์", () {
+                _buildNavItem(Icons.settings, "ตั้งค่า", () {
                   // กดเปิดหน้า Profile สมาชิก
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ProfileMember(),
+                      builder: (context) => const AccountManagementMember(),
                     ),
                   );
                 }),

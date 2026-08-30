@@ -1,6 +1,7 @@
 // features/member/home_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
+import 'package:flutter_app/features/member/account_management_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/list_active_order_member.dart';
 import 'package:flutter_app/features/member/list_menu_member.dart';
@@ -10,6 +11,8 @@ import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
+// 🎯 Import Member Service เพื่อดึงข้อมูลชื่อผู้ใช้งาน
+import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
@@ -33,6 +36,8 @@ class _HomeMemberState extends State<HomeMember> {
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final MenuService _menuService = MenuService();
   final OrderService _orderService = OrderService();
+  final MemberService _memberService =
+      MemberService(); // 🎯 เรียกใช้งาน MemberService
 
   List<RestaurantModel> _results = [];
   List<TypeRestaurantModel> typeList = [];
@@ -41,6 +46,7 @@ class _HomeMemberState extends State<HomeMember> {
   bool _isLoading = true;
   Set<int> _selectedTypeIds = {};
   int _activeOrderCount = 0;
+  String _memberName = ""; // 🎯 ตัวแปรเก็บชื่อลูกค้า
 
   final menuTextStyle = const TextStyle(
     fontSize: 12,
@@ -61,9 +67,26 @@ class _HomeMemberState extends State<HomeMember> {
   }
 
   Future<void> _initData() async {
+    await _fetchMemberProfile(); // 🎯 โหลดชื่อลูกค้าก่อนเลย
     await fetchTypes();
     await _fetchActiveOrderCount();
     await _loadResults("");
+  }
+
+  // 🎯 ดึงชื่อลูกค้ามาเก็บไว้
+  Future<void> _fetchMemberProfile() async {
+    try {
+      final mem = await _memberService.getMemberByUsername(
+        GlobalData.usernameMember,
+      );
+      if (mounted && mem != null) {
+        setState(() {
+          _memberName = mem.firstname ?? GlobalData.usernameMember;
+        });
+      }
+    } catch (e) {
+      debugPrint("Error fetching member profile: $e");
+    }
   }
 
   Future<void> _fetchActiveOrderCount() async {
@@ -213,7 +236,6 @@ class _HomeMemberState extends State<HomeMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // 🎯 ฟังก์ชันตรวจสอบสถานะร้านแบบละเอียด (ครอบคลุม 3 เงื่อนไข)
   Map<String, dynamic> _getRestaurantStatusInfo(RestaurantModel item) {
     bool isScheduledOpen = false;
     final hours = item.openingHours;
@@ -248,7 +270,6 @@ class _HomeMemberState extends State<HomeMember> {
 
     bool isMasterOpen = item.statusOpen ?? true;
 
-    // 🎯 3 เงื่อนไขเป๊ะๆ
     if (isMasterOpen == true && isScheduledOpen == true) {
       return {
         'text': 'เปิดอยู่',
@@ -278,7 +299,6 @@ class _HomeMemberState extends State<HomeMember> {
     if (mounted) setState(() {});
   }
 
-  // 🎯 อัปเดตข้อความใน Alert ให้ครอบคลุมทุกการปิด
   void _showClosedRestaurantDialog(RestaurantModel item) {
     final bool manuallyClosedByOwner = item.statusOpen == false;
     final String message = manuallyClosedByOwner
@@ -358,7 +378,33 @@ class _HomeMemberState extends State<HomeMember> {
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 12),
             color: Colors.transparent,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 🎯 เพิ่มข้อความต้อนรับส่วนนี้
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.waving_hand_rounded,
+                      color: Colors.orange,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        "ยินดีต้อนรับกลับมาคุณ ${_memberName.isNotEmpty ? _memberName : GlobalData.usernameMember}",
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.green.shade800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
                 Row(
                   children: [
                     Expanded(
@@ -606,13 +652,16 @@ class _HomeMemberState extends State<HomeMember> {
                     ),
                   ).then((_) => _refreshBadges());
                 }, badgeCount: _activeOrderCount),
-                _buildNavItem(Icons.person, "โปรไฟล์", () {
+                _buildNavItem(Icons.settings, "ตั้งค่า", () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ProfileMember(),
+                      builder: (context) => const AccountManagementMember(),
                     ),
-                  );
+                  ).then((_) {
+                    // กลับมาจากหน้าตั้งค่า เผื่อเปลี่ยนชื่อ ให้รีโหลดข้อมูลใหม่
+                    _fetchMemberProfile();
+                  });
                 }),
               ],
             ),
@@ -722,16 +771,13 @@ class _HomeMemberState extends State<HomeMember> {
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () {
-          // 🎯 ดึงก้อนข้อมูลสถานะ 3 แบบ
           final statusInfo = _getRestaurantStatusInfo(item);
 
-          // 🎯 เช็กค่า isOpen ว่าร้านเปิดขายหรือไม่
           if (statusInfo['isOpen'] == false) {
             _showClosedRestaurantDialog(item);
             return;
           }
 
-          // ถ้าร้านเปิดปกติ ให้พาไปหน้าเมนู
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -846,7 +892,6 @@ class _HomeMemberState extends State<HomeMember> {
                       const SizedBox(width: 8),
                       Builder(
                         builder: (context) {
-                          // 🎯 สร้างกล่องแสดงสถานะที่รองรับสี 3 แบบ
                           final statusInfo = _getRestaurantStatusInfo(item);
                           final Color statusColor = statusInfo['color'];
                           final Color statusBg = statusInfo['bgColor'];

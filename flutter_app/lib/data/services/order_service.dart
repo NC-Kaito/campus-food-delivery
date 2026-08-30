@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -39,6 +40,41 @@ class OrderService {
     } catch (e) {
       print("🚨 เกิดข้อผิดพลาดในการรับข้อมูลคำสั่งซื้อ: $e");
       return [];
+    }
+  }
+
+  // 🎯 ฟังก์ชันสำหรับแจ้งปัญหาคำสั่งซื้อพร้อมอัปโหลดรูปภาพ
+  Future<bool> reportIssue(
+    int orderId,
+    String issueDetail,
+    File issueImage,
+  ) async {
+    try {
+      // ดึงชื่อไฟล์จาก Path
+      String fileName = issueImage.path.split('/').last;
+
+      // จัดเตรียมข้อมูลเป็น FormData (เหมือนฝั่ง Postman)
+      FormData formData = FormData.fromMap({
+        'orderId': orderId,
+        'issueDetail': issueDetail,
+        'issueImage': await MultipartFile.fromFile(
+          issueImage.path,
+          filename: fileName,
+        ),
+      });
+
+      // ยิง Request ไปยัง Spring Boot
+      Response response = await DioClient.dio.post(
+        '/v1/order/reportIssue',
+        data: formData,
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      throw Exception("เกิดข้อผิดพลาดในการแจ้งปัญหา: $e");
     }
   }
 

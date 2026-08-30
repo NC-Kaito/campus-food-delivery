@@ -53,6 +53,25 @@ public class OrderController {
         }
     }
 
+    @PostMapping("/reportIssue")
+    public ResponseEntity<?> reportIssue(
+            @RequestParam("orderId") int orderId,
+            @RequestParam("issueDetail") String issueDetail,
+            @RequestParam(value = "issueImage", required = false) org.springframework.web.multipart.MultipartFile issueImage) {
+
+        try {
+            boolean isSuccess = orderService.reportIssue(orderId, issueDetail, issueImage);
+
+            if (isSuccess) {
+                return ResponseEntity.ok("ส่งเรื่องแจ้งปัญหาเรียบร้อยแล้ว");
+            } else {
+                return ResponseEntity.badRequest().body("ไม่สามารถส่งเรื่องแจ้งปัญหาได้");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดจากเซิร์ฟเวอร์: " + e.getMessage());
+        }
+    }
+
     /// /////////////////////////////// Rider --
     @GetMapping("/waitingOrders")
     public ResponseEntity<?> getWaitingOrders() {

@@ -27,10 +27,11 @@ class _LoginMemberState extends State<LoginMember> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  // 🎯 เปลี่ยนสีตรงนี้ให้ตรงกับหน้าอื่น
   final menuTextStyle = const TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.bold,
-    color: Color(0xFF0A6B29),
+    color: Color(0xFF64F02D),
   );
 
   @override
@@ -108,8 +109,7 @@ class _LoginMemberState extends State<LoginMember> {
               // 🎯 เพิ่ม padding เพื่อไม่ให้ชิดขอบจอบน/ล่างเกินไปตอนเลื่อน
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Column(
-                mainAxisAlignment:
-                    MainAxisAlignment.center, // 🎯 จัดเรียงให้อยู่กึ่งกลาง
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   // ─── โลโก้ ───
@@ -130,7 +130,7 @@ class _LoginMemberState extends State<LoginMember> {
                           child: const Icon(
                             Icons.delivery_dining_rounded,
                             size: 60,
-                            color: Color(0xFF0A6B29),
+                            color: Color(0xFF64F02D), // 🎯 ปรับสีไอคอน
                           ),
                         );
                       },
@@ -147,7 +147,9 @@ class _LoginMemberState extends State<LoginMember> {
                       borderRadius: BorderRadius.circular(24),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF0A6B29).withOpacity(0.06),
+                          color: const Color(
+                            0xFF64F02D,
+                          ).withOpacity(0.06), // 🎯 ปรับสีเงา
                           blurRadius: 30,
                           spreadRadius: 4,
                           offset: const Offset(0, 10),
@@ -189,7 +191,9 @@ class _LoginMemberState extends State<LoginMember> {
                             child: ElevatedButton(
                               onPressed: _isLoading ? null : doLogin,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF055E24),
+                                backgroundColor: const Color(
+                                  0xFF64F02D,
+                                ), // 🎯 ปรับสีปุ่มหลัก
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 shape: RoundedRectangleBorder(
@@ -276,7 +280,7 @@ class _LoginMemberState extends State<LoginMember> {
                               },
                               style: OutlinedButton.styleFrom(
                                 side: const BorderSide(
-                                  color: Color(0xFF055E24),
+                                  color: Color(0xFF64F02D), // 🎯 ปรับสีขอบปุ่ม
                                   width: 1.5,
                                 ),
                                 shape: RoundedRectangleBorder(
@@ -289,7 +293,7 @@ class _LoginMemberState extends State<LoginMember> {
                                 style: TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
-                                  color: Color(0xFF055E24),
+                                  color: Color(0xFF64F02D), // 🎯 ปรับสีข้อความ
                                 ),
                               ),
                             ),
@@ -352,7 +356,7 @@ class _LoginMemberState extends State<LoginMember> {
                   children: [
                     const Icon(
                       Icons.person_pin_rounded,
-                      color: Color(0xFF0A6B29),
+                      color: Color(0xFF64F02D), // 🎯 ปรับสีไอคอน Active
                       size: 24,
                     ),
                     const SizedBox(height: 2),
@@ -433,7 +437,10 @@ class _LoginMemberState extends State<LoginMember> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF055E24), width: 1.2),
+          borderSide: const BorderSide(
+            color: Color(0xFF64F02D),
+            width: 1.5,
+          ), // 🎯 ปรับสีขอบตอนกดพิมพ์
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),

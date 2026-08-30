@@ -56,6 +56,9 @@ public class Order {
     @Column(length = 100)
     private String canceldetail;
 
+    @Column
+    private String cancelimage;
+
     @ManyToOne
     @JoinColumn(name = "memberId", nullable = false)
     @JsonIgnoreProperties({"orders", "hibernateLazyInitializer", "handler"})

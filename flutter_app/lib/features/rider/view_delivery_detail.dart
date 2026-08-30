@@ -28,9 +28,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
   String _drivingDistance = "กำลังคำนวณ...";
   String _drivingDuration = "...";
 
-  // 🎯 ตัวแปรเก็บค่าสถานะที่เลือกจาก Dropdown
-  String? _selectedNextStatus;
-
   final String googleMapsApiKey = "ใส่_API_KEY_ของคุณที่นี่";
 
   @override
@@ -45,34 +42,48 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     super.dispose();
   }
 
-  // 🎯 ฟังก์ชันดึงสถานะปัจจุบัน เพื่อบังคับว่าไรเดอร์อยู่ Step ไหน (เหลือ 2 Step)
+  // 🎯 ฟังก์ชันดึงสถานะปัจจุบันของไรเดอร์ (แก้เป็นเทียบคำเป๊ะๆ เพื่อป้องกันสถานะเพี้ยนกระโดดไปจัดส่งสำเร็จ)
   int _getCurrentRiderStep() {
     final status = (widget.orderModel.orderStatus ?? "").trim().toLowerCase();
 
-    // Step 0: ออเดอร์กำลังเตรียม หรือไรเดอร์กำลังไปรับอาหาร
-    // สถานะถัดไปที่ต้องทำ -> "รับอาหารแล้ว (เริ่มจัดส่ง)"
-    if (status.contains("waitingrestaurant") ||
-        status.contains("waitingrider") ||
-        status.contains("goingtorestaurant") ||
-        status.contains("riderarrived") ||
-        status.contains("preparing") ||
-        status.contains("cooking") ||
-        status.contains("foodready")) {
-      return 0;
-    }
-    // Step 1: ไรเดอร์รับอาหารแล้ว กำลังนำไปส่งลูกค้า
-    // สถานะถัดไปที่ต้องทำ -> "จัดส่งสำเร็จ"
-    else if (status.contains("delivery") ||
-        status.contains("delivering") ||
-        status.contains("ontheway") ||
-        status.contains("pickedup")) {
+    // Step 1: รอร้านค้ายืนยัน (ปุ่มจะถูกล็อก)
+    if (status.isEmpty ||
+        status == "waitingrider" ||
+        status == "waitingrestaurant" ||
+        status == "pending") {
       return 1;
     }
-    // Step 2: จัดส่งสำเร็จแล้ว
-    else if (status.contains("success") || status.contains("completed")) {
+    // Step 2: ร้านรับออเดอร์แล้ว (ปลดล็อกปุ่มให้ไรเดอร์กด "กำลังไปรับออเดอร์")
+    else if (status == "preparing" ||
+        status == "cooking" ||
+        status == "foodready") {
       return 2;
     }
-    return -1; // อื่นๆ หรือยกเลิก
+    // Step 3: ผู้จัดส่งกำลังไปรับ
+    else if (status == "goingtorestaurant" ||
+        status == "going" ||
+        status == "riderarrived") {
+      return 3;
+    }
+    // Step 4: กำลังจัดส่ง (รับอาหารแล้ว กำลังไปส่งลูกค้า)
+    else if (status == "delivery" ||
+        status == "delivering" ||
+        status == "ontheway" ||
+        status == "pickedup") {
+      return 4;
+    }
+    // Step 5: ถึงที่หมายแล้ว
+    else if (status == "arrived" || status == "reached") {
+      return 5;
+    }
+    // Step 6: จัดส่งสำเร็จ ปิดงาน
+    else if (status == "success" ||
+        status == "completed" ||
+        status == "reviewsuccess" ||
+        status == "delivered") {
+      return 6;
+    }
+    return 1;
   }
 
   Future<void> _calculateDrivingRoute() async {
@@ -483,6 +494,142 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     );
   }
 
+  // 🎯 สร้าง Widget จุดและเส้น Timeline 5 จุด
+  Widget _buildTimelineDot(
+    String label,
+    bool isCompleted,
+    bool isLineCompleted, {
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 3,
+                  color: isFirst
+                      ? Colors.transparent
+                      : (isCompleted ? primaryOrange : Colors.grey.shade300),
+                ),
+              ),
+              Container(
+                width: 14,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: isCompleted ? primaryOrange : Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isCompleted
+                        ? Colors.orange.shade800
+                        : Colors.grey.shade400,
+                    width: 1,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  height: 3,
+                  color: isLast
+                      ? Colors.transparent
+                      : (isLineCompleted
+                            ? primaryOrange
+                            : Colors.grey.shade300),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10.5, // 🎯 ปรับฟอนต์ให้ใหญ่ขึ้นมานิดนึงสำหรับ 5 จุด
+              color: isCompleted ? Colors.black87 : Colors.grey.shade500,
+              fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🎯 Popup สำหรับยืนยันการเปลี่ยนสถานะ
+  Future<void> _confirmActionDialog(
+    String title,
+    String content,
+    String nextStatus,
+    String successMsg,
+  ) async {
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.help_outline_rounded,
+              color: Colors.orange.shade700,
+              size: 28,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+            ),
+          ],
+        ),
+        content: Text(
+          content,
+          style: const TextStyle(fontSize: 14.5, height: 1.5),
+        ),
+        actionsPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              "ยกเลิก",
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: primaryOrange,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              "ยืนยัน",
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      _updateStatus(nextStatus, successMsg);
+    }
+  }
+
   Future<void> _updateStatus(String nextStatus, String successMessage) async {
     if (_isUpdating) return;
     setState(() => _isUpdating = true);
@@ -524,28 +671,60 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     }
   }
 
-  // 🎯 สร้าง Widget แถบ Dropdown ให้เลือกสถานะ (เหลือ 2 ขั้นตอน)
-  Widget _buildBottomStatusDropdown() {
-    final int currentStep = _getCurrentRiderStep();
-
-    // ถ้าออเดอร์สำเร็จแล้วหรือถูกยกเลิก ไม่ต้องแสดงแถบจัดการสถานะ
-    if (currentStep < 0 || currentStep >= 2) {
-      return const SizedBox.shrink();
+  // 🎯 สร้างแผงควบคุมด้านล่าง (Timeline 5 สเต็ป ตัดหาไรเดอร์ออก)
+  Widget _buildBottomPanel(int currentStep) {
+    if (currentStep <= 0) {
+      return const SizedBox.shrink(); // ถ้าโดนยกเลิกไปแล้วให้ซ่อน
     }
 
-    // ตัวเลือกสถานะของไรเดอร์ (เหลือแค่ 2 สถานะ)
-    final List<Map<String, dynamic>> statusOptions = [
-      {
-        'value': 'delivery',
-        'label': '1. รับอาหารแล้ว (เริ่มจัดส่ง)',
-        'step': 0,
-      },
-      {'value': 'Success', 'label': '2. จัดส่งสำเร็จ', 'step': 1},
-    ];
+    String buttonText = "";
+    String nextStatus = "";
+    String successMsg = "";
+    String dialogTitle = "";
+    String dialogContent = "";
+    IconData buttonIcon = Icons.hourglass_empty_rounded;
+    bool isButtonEnabled = true;
+
+    // ลอจิกปุ่มตาม Step ที่สอดคล้องกับ Timeline 5 จุด
+    if (currentStep == 1) {
+      buttonText = "รอร้านค้ายืนยันออเดอร์";
+      isButtonEnabled = false;
+      buttonIcon = Icons.access_time_rounded;
+    } else if (currentStep == 2) {
+      buttonText = "กำลังไปรับออเดอร์";
+      nextStatus = "goingtorestaurant";
+      successMsg = "อัปเดตสถานะ: กำลังเดินทางไปร้านอาหาร";
+      dialogTitle = "ยืนยันการเดินทาง";
+      dialogContent = "คุณกำลังออกเดินทางไปรับอาหารที่ร้านค้าใช่หรือไม่?";
+      buttonIcon = Icons.directions_bike_rounded;
+    } else if (currentStep == 3) {
+      buttonText = "รับอาหารแล้ว (เริ่มจัดส่ง)";
+      nextStatus = "delivery";
+      successMsg = "อัปเดตสถานะ: เริ่มจัดส่งอาหารให้ลูกค้า";
+      dialogTitle = "ยืนยันรับอาหาร";
+      dialogContent =
+          "คุณได้รับอาหารจากร้านค้าเรียบร้อยแล้ว และพร้อมออกเดินทางไปส่งให้ลูกค้าใช่หรือไม่?";
+      buttonIcon = Icons.delivery_dining_rounded;
+    } else if (currentStep == 4) {
+      buttonText = "ถึงที่หมายแล้ว";
+      nextStatus = "arrived";
+      successMsg = "อัปเดตสถานะ: ถึงที่หมายแล้ว";
+      dialogTitle = "ยืนยันถึงที่หมาย";
+      dialogContent = "คุณเดินทางมาถึงจุดส่งอาหารของลูกค้าแล้วใช่หรือไม่?";
+      buttonIcon = Icons.location_on_rounded;
+    } else if (currentStep == 5) {
+      buttonText = "จัดส่งสำเร็จ (รับเงินแล้ว)";
+      nextStatus = "success";
+      successMsg = "จัดส่งและรับเงินสำเร็จเรียบร้อย";
+      dialogTitle = "ยืนยันจัดส่งสำเร็จ";
+      dialogContent =
+          "คุณได้ส่งมอบอาหารและรับเงินจากลูกค้าเรียบร้อยแล้วใช่หรือไม่?";
+      buttonIcon = Icons.check_circle_outline_rounded;
+    }
 
     return SafeArea(
       child: Container(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
@@ -559,93 +738,87 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Dropdown เลือกสถานะ (ตัวที่ไม่ได้คิวจะถูก Disabled)
-            DropdownButtonFormField<String>(
-              decoration: InputDecoration(
-                labelText: "อัปเดตสถานะถัดไป",
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
+            // 🎯 แถบ Timeline แบบ 5 สเต็ปของไรเดอร์ (ไม่มีหาไรเดอร์แล้ว)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.orange.shade100),
               ),
-              value: _selectedNextStatus,
-              hint: const Text("กดเพื่อเลือกสถานะ"),
-              items: statusOptions.map((option) {
-                // 🎯 ล็อกให้กดได้เฉพาะ Step ถัดไปเท่านั้น! (ข้ามและย้อนกลับไม่ได้)
-                final bool isEnabled = (option['step'] == currentStep);
-                return DropdownMenuItem<String>(
-                  value: option['value'],
-                  enabled: isEnabled,
-                  child: Text(
-                    option['label'],
-                    style: TextStyle(
-                      color: isEnabled ? Colors.black87 : Colors.grey.shade400,
-                      fontWeight: isEnabled
-                          ? FontWeight.bold
-                          : FontWeight.normal,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTimelineDot(
+                    "รอร้านค้า\nยืนยัน",
+                    currentStep >= 1,
+                    currentStep >=
+                        3, // เส้นนี้จะเต็มเมื่อไรเดอร์กดกำลังไปรับแล้ว
+                    isFirst: true,
+                  ),
+                  _buildTimelineDot(
+                    "กำลัง\nไปรับ",
+                    currentStep >= 3,
+                    currentStep >= 4,
+                  ),
+                  _buildTimelineDot(
+                    "กำลัง\nจัดส่ง",
+                    currentStep >= 4,
+                    currentStep >= 5,
+                  ),
+                  _buildTimelineDot(
+                    "ถึงที่\nหมาย",
+                    currentStep >= 5,
+                    currentStep >= 6,
+                  ),
+                  _buildTimelineDot(
+                    "จัดส่ง\nสำเร็จ",
+                    currentStep >= 6,
+                    false,
+                    isLast: true,
+                  ),
+                ],
+              ),
+            ),
+
+            // 🎯 ซ่อนปุ่มถ้าจัดส่งสำเร็จแล้ว (Step >= 6)
+            if (currentStep < 6) ...[
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: (isButtonEnabled && !_isUpdating)
+                      ? () => _confirmActionDialog(
+                          dialogTitle,
+                          dialogContent,
+                          nextStatus,
+                          successMsg,
+                        )
+                      : null,
+                  icon: Icon(buttonIcon, color: Colors.white),
+                  label: Text(
+                    buttonText,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                );
-              }).toList(),
-              onChanged: (val) {
-                setState(() {
-                  _selectedNextStatus = val;
-                });
-              },
-            ),
-            const SizedBox(height: 12),
-
-            // ปุ่มกดยืนยันบันทึกข้อมูล
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: (_isUpdating || _selectedNextStatus == null)
-                    ? null
-                    : () {
-                        String successMsg = "อัปเดตสถานะสำเร็จ";
-                        if (_selectedNextStatus == "delivery") {
-                          successMsg = "อัปเดตสถานะ: กำลังเดินทางไปส่งลูกค้า ";
-                        } else if (_selectedNextStatus == "success") {
-                          successMsg = "จัดส่งสำเร็จเรียบร้อย ";
-                        }
-
-                        _updateStatus(_selectedNextStatus!, successMsg);
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryOrange,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isButtonEnabled
+                        ? primaryOrange
+                        : Colors.grey.shade400,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    disabledBackgroundColor: Colors.grey.shade300,
                   ),
-                  disabledBackgroundColor: Colors.grey.shade300,
                 ),
-                child: _isUpdating
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                    : const Text(
-                        "บันทึกการเปลี่ยนสถานะ",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
               ),
-            ),
+            ],
           ],
         ),
       ),
@@ -690,6 +863,8 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       orderTimeText =
           "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} น.";
     }
+
+    final int currentStep = _getCurrentRiderStep();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -754,7 +929,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1013,13 +1188,13 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                 ),
               ],
             ),
-            const SizedBox(height: 100),
+            const SizedBox(height: 40),
           ],
         ),
       ),
 
-      // 🎯 แสดง Dropdown Bar อัปเดตสถานะ (2 สถานะ)
-      bottomNavigationBar: _buildBottomStatusDropdown(),
+      // 🎯 แทรก Timeline ไว้ด้านล่างเสมอ
+      bottomNavigationBar: _buildBottomPanel(currentStep),
     );
   }
 }

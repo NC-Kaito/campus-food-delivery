@@ -2,9 +2,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/order_service.dart';
+import 'package:flutter_app/features/member/account_management_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/member_review.dart';
 import 'package:flutter_app/features/member/view_active_order_member.dart';
+import 'package:flutter_app/features/member/cancel_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
@@ -21,12 +23,14 @@ class ListActiveOrderMember extends StatefulWidget {
   State<ListActiveOrderMember> createState() => _ListConfirmOrderMemberState();
 }
 
-class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
+class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
+    with SingleTickerProviderStateMixin {
   final OrderService _orderService = OrderService();
   List<OrderModel> _orderHistoryList = [];
   bool _isLoading = true;
 
   Timer? _timer;
+  late TabController _tabController;
 
   final menuTextStyle = TextStyle(
     fontSize: 12,
@@ -37,6 +41,8 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 4, vsync: this);
+
     _fetchOrderHistory();
 
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) {
@@ -47,6 +53,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
   @override
   void dispose() {
     _timer?.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -128,39 +135,54 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
     final status = (rawStatus ?? '').trim().toLowerCase();
 
     switch (status) {
-      case 'waitingrider':
-        return {
-          'text': 'รอผู้จัดส่งรับงาน',
-          'color': Colors.orange[800]!,
-          'bgColor': Colors.orange[50]!,
-          'icon': Icons.directions_bike_rounded,
-        };
       case 'waitingrestaurant':
+      case 'pending':
         return {
           'text': 'รอร้านค้ายืนยัน',
           'color': Colors.blue[800]!,
           'bgColor': Colors.blue[50]!,
           'icon': Icons.storefront_rounded,
         };
-      case 'cooking':
       case 'preparing':
+      case 'cooking':
+      case 'foodready':
+      case 'waitingrider':
         return {
-          'text': 'ร้านกำลังปรุงอาหาร',
+          'text': 'ร้านรับออเดอร์แล้ว',
           'color': Colors.deepOrange[800]!,
           'bgColor': Colors.deepOrange[50]!,
           'icon': Icons.soup_kitchen_rounded,
         };
+      case 'goingtorestaurant':
+      case 'going':
+      case 'riderarrived':
+        return {
+          'text': 'ผู้จัดส่งกำลังไปรับ',
+          'color': Colors.orange[800]!,
+          'bgColor': Colors.orange[50]!,
+          'icon': Icons.directions_bike_rounded,
+        };
       case 'delivery':
+      case 'delivering':
       case 'ontheway':
+      case 'pickedup':
         return {
           'text': 'กำลังจัดส่ง',
           'color': Colors.indigo[800]!,
           'bgColor': Colors.indigo[50]!,
           'icon': Icons.local_shipping_rounded,
         };
+      case 'arrived':
+      case 'reached':
+        return {
+          'text': 'ถึงที่หมายแล้ว',
+          'color': Colors.pink[800]!,
+          'bgColor': Colors.pink[50]!,
+          'icon': Icons.location_on_rounded,
+        };
       case 'delivered':
         return {
-          'text': 'รอยืนยันออเดอร์',
+          'text': 'รอยืนยันรับอาหาร',
           'color': Colors.purple[800]!,
           'bgColor': Colors.purple[50]!,
           'icon': Icons.assignment_turned_in_rounded,
@@ -188,6 +210,13 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
           'bgColor': Colors.red[50]!,
           'icon': Icons.cancel_rounded,
         };
+      case 'issue_reported':
+        return {
+          'text': 'มีการแจ้งปัญหาคำสั่งซื้อ',
+          'color': Colors.red[800]!,
+          'bgColor': Colors.red[50]!,
+          'icon': Icons.support_agent_rounded,
+        };
       default:
         return {
           'text': status.isEmpty ? 'ไม่ระบุสถานะ' : status,
@@ -208,7 +237,8 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
             status != 'completed' &&
             status != 'reviewsuccess' &&
             status != 'cancel' &&
-            status != 'cancelled';
+            status != 'cancelled' &&
+            status != 'issue_reported';
       } else if (type == 'success') {
         return status == 'delivered' ||
             status == 'success' ||
@@ -216,7 +246,9 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
       } else if (type == 'history') {
         return status == 'reviewsuccess';
       } else if (type == 'cancel') {
-        return status == 'cancel' || status == 'cancelled';
+        return status == 'cancel' ||
+            status == 'cancelled' ||
+            status == 'issue_reported';
       }
       return true;
     }).toList();
@@ -237,6 +269,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
             Container(
               color: Colors.white,
               child: TabBar(
+                controller: _tabController,
                 indicatorColor: const Color(0xFF64F02D),
                 indicatorWeight: 3,
                 labelColor: const Color(0xFF2E7D32),
@@ -263,31 +296,45 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
                 ],
               ),
             ),
+            // 🎯 แก้ไขโครงสร้างตรงนี้ ไม่ให้โดนถอด TabBarView ออกตอนกำลังโหลด
             Expanded(
-              child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Colors.green),
-                    )
-                  : TabBarView(
-                      children: [
-                        _buildOrderListView(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.green),
+                        )
+                      : _buildOrderListView(
                           _filterOrders('pending'),
                           "ไม่มีคำสั่งซื้อที่กำลังดำเนินการ",
                         ),
-                        _buildOrderListView(
+                  _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.green),
+                        )
+                      : _buildOrderListView(
                           _filterOrders('success'),
                           "ไม่มีคำสั่งซื้อรอรีวิว",
                         ),
-                        _buildOrderListView(
+                  _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.green),
+                        )
+                      : _buildOrderListView(
                           _filterOrders('history'),
                           "ยังไม่มีประวัติคำสั่งซื้อ",
                         ),
-                        _buildOrderListView(
+                  _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(color: Colors.green),
+                        )
+                      : _buildOrderListView(
                           _filterOrders('cancel'),
                           "ไม่มีคำสั่งซื้อที่ถูกยกเลิก",
                         ),
-                      ],
-                    ),
+                ],
+              ),
             ),
           ],
         ),
@@ -324,11 +371,11 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
                     isActive: true,
                     badgeCount: activeOrderCount,
                   ),
-                  _buildNavItem(Icons.person, "โปรไฟล์", () {
+                  _buildNavItem(Icons.settings, "ตั้งค่า", () {
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => const ProfileMember(),
+                        builder: (context) => const AccountManagementMember(),
                       ),
                     );
                   }),
@@ -475,7 +522,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
         int hour = 0;
         int minute = 0;
 
-        // 🎯 ตัวถอดรหัสเวลาแบบครอบจักรวาล (รองรับแบบ Array [14, 30] และ String "14:30")
         if (rawSuccessTime is List) {
           hour = int.tryParse(rawSuccessTime[0].toString()) ?? 0;
           if (rawSuccessTime.length > 1) {
@@ -534,15 +580,19 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16.0),
-        onTap: () {
-          Navigator.push(
+        // 🎯 แก้ไขการ Navigate แบบ Async/Await เพื่อให้เปลี่ยนแท็บก่อนโหลด
+        onTap: () async {
+          final result = await Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => ViewActiveOrderMember(order: order),
             ),
-          ).then((_) {
-            _fetchOrderHistory();
-          });
+          );
+
+          if (result == true) {
+            _tabController.animateTo(3); // 🎯 สไลด์ไปแท็บยกเลิกทันที!
+          }
+          _fetchOrderHistory(); // 🎯 ค่อยอัปเดตข้อมูลตามหลัง
         },
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -680,16 +730,23 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
                           if (isWithinOneHour) ...[
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () {
-                                  Navigator.push(
+                                // 🎯 แก้ไขปุ่มให้ทำงานแบบ Async / Await เหมือนกัน
+                                onPressed: () async {
+                                  final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) =>
-                                          ViewActiveOrderMember(order: order),
+                                      builder: (context) => CancelOrderMember(
+                                        orderId: order.orderId ?? 0,
+                                      ),
                                     ),
-                                  ).then((_) {
-                                    _fetchOrderHistory();
-                                  });
+                                  );
+
+                                  if (result == true) {
+                                    _tabController.animateTo(
+                                      3,
+                                    ); // 🎯 สไลด์แท็บทันที
+                                  }
+                                  _fetchOrderHistory(); // 🎯 รีเฟรชข้อมูลตามทีหลัง
                                 },
                                 icon: Icon(
                                   Icons.warning_amber_rounded,
@@ -723,7 +780,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
 
                             Expanded(
                               child: OutlinedButton.icon(
-                                onPressed: () {
+                                onPressed: () async {
                                   if (isReviewed) {
                                     Navigator.push(
                                       context,
@@ -733,15 +790,14 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
                                       ),
                                     );
                                   } else {
-                                    Navigator.push(
+                                    final result = await Navigator.push(
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) =>
                                             MemberReview(order: order),
                                       ),
-                                    ).then((result) {
-                                      if (result == true) _fetchOrderHistory();
-                                    });
+                                    );
+                                    if (result == true) _fetchOrderHistory();
                                   }
                                 },
                                 icon: Icon(
@@ -784,7 +840,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
                             ),
                           ] else ...[
                             OutlinedButton.icon(
-                              onPressed: () {
+                              onPressed: () async {
                                 if (isReviewed) {
                                   Navigator.push(
                                     context,
@@ -794,15 +850,14 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember> {
                                     ),
                                   );
                                 } else {
-                                  Navigator.push(
+                                  final result = await Navigator.push(
                                     context,
                                     MaterialPageRoute(
                                       builder: (context) =>
                                           MemberReview(order: order),
                                     ),
-                                  ).then((result) {
-                                    if (result == true) _fetchOrderHistory();
-                                  });
+                                  );
+                                  if (result == true) _fetchOrderHistory();
                                 }
                               },
                               icon: Icon(

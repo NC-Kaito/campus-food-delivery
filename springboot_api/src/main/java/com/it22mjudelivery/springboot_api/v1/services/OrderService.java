@@ -14,6 +14,8 @@ public interface OrderService {
 
     List<Order> getOrdersByMember(String username);
 
+    boolean reportIssue(int orderId, String issueDetail, org.springframework.web.multipart.MultipartFile issueImage);
+
     //---- Rider ----
 
     List<Order> getWaitingOrders();

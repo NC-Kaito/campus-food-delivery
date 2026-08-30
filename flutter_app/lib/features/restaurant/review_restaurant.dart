@@ -1,8 +1,21 @@
 // features/restaurant/review_restaurant.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/data/models/order_model.dart';
+import 'package:flutter_app/data/models/review_model.dart';
+import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
+import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/global_data.dart';
+
+class _RestaurantReviewEntry {
+  final OrderModel order;
+  final ReviewSubmitModel? review;
+
+  _RestaurantReviewEntry({required this.order, required this.review});
+
+  int get rating => review?.restaurantrating ?? 0;
+}
 
 class ReviewRestaurant extends StatefulWidget {
   const ReviewRestaurant({super.key});
@@ -13,412 +26,244 @@ class ReviewRestaurant extends StatefulWidget {
 
 class _ReviewRestaurantState extends State<ReviewRestaurant> {
   final OrderService _orderService = OrderService();
+  final MemberService _memberService = MemberService();
 
-  List<dynamic> _allReviews = [];
+  static const Color _primary = Color(0xFF16A34A);
+
   bool _isLoading = true;
+  String? _errorMessage;
 
-  int _star5 = 0, _star4 = 0, _star3 = 0, _star2 = 0, _star1 = 0;
-  double _averageRating = 0.0;
-  int _totalReviewCount = 0;
+  List<_RestaurantReviewEntry> _allReviews = [];
+
+  /// null = แสดงทั้งหมด, ไม่งั้นกรองเฉพาะดาวนั้น (1-5)
+  int? _selectedStar;
 
   @override
   void initState() {
     super.initState();
-    _fetchRestaurantReviews();
+    _fetchAllReviews();
   }
 
-  Future<void> _fetchRestaurantReviews() async {
+  Future<void> _fetchAllReviews() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     try {
-      String username = GlobalData.usernameRestaurant;
-      final orders = await _orderService.getReviewSuccessOrdersByRestaurant(
+      final String username = GlobalData.usernameRestaurant;
+
+      // 1. ดึงออเดอร์ที่มีรีวิวของร้าน
+      final rawOrders = await _orderService.getReviewSuccessOrdersByRestaurant(
         username,
       );
 
-      int s1 = 0, s2 = 0, s3 = 0, s4 = 0, s5 = 0;
-      double totalStars = 0;
+      final List<OrderModel> orders = rawOrders
+          .map((o) => OrderModel.fromJson(o))
+          .where((o) => o.orderId != null)
+          .toList();
 
-      for (var order in orders) {
-        final double rating =
-            double.tryParse((order['reviewRating'] ?? 5.0).toString()) ?? 5.0;
-        totalStars += rating;
-
-        if (rating >= 5)
-          s5++;
-        else if (rating >= 4)
-          s4++;
-        else if (rating >= 3)
-          s3++;
-        else if (rating >= 2)
-          s2++;
-        else
-          s1++;
+      // 2. ดึงรายละเอียดรีวิวของแต่ละออเดอร์
+      final List<_RestaurantReviewEntry> entries = [];
+      for (final order in orders) {
+        ReviewSubmitModel? review;
+        try {
+          review = await _memberService.getReviewByOrderId(order.orderId!);
+        } catch (e) {
+          debugPrint("โหลดรีวิวของออเดอร์ ${order.orderId} ไม่สำเร็จ: $e");
+        }
+        entries.add(_RestaurantReviewEntry(order: order, review: review));
       }
+
+      // เรียงรีวิวล่าสุดขึ้นก่อน
+      entries.sort((a, b) {
+        final da = a.order.orderdate;
+        final db = b.order.orderdate;
+        if (da == null || db == null) return 0;
+        return db.compareTo(da);
+      });
 
       if (mounted) {
         setState(() {
-          _allReviews = orders;
-          _totalReviewCount = orders.length;
-          _star5 = s5;
-          _star4 = s4;
-          _star3 = s3;
-          _star2 = s2;
-          _star1 = s1;
-          _averageRating = _totalReviewCount > 0
-              ? (totalStars / _totalReviewCount)
-              : 0.0;
+          _allReviews = entries;
           _isLoading = false;
         });
       }
     } catch (e) {
-      debugPrint("🚨 เกิดข้อผิดพลาดในการโหลดหน้ารวมรีวิวร้านค้า: $e");
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _errorMessage = "โหลดรีวิวไม่สำเร็จ: $e";
+          _isLoading = false;
+        });
       }
     }
   }
 
+  String _getFinalImageUrl(String? rawPath) {
+    if (rawPath == null || rawPath.isEmpty) return "";
+    if (rawPath.startsWith('http')) return rawPath;
+    final String baseUrl = DioClient.dio.options.baseUrl;
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+  }
+
+  // ---- คำนวณสรุปคะแนนจากลิสต์ที่ดึงมา ----
+  double get _averageRating {
+    final rated = _allReviews.where((e) => e.rating > 0).toList();
+    if (rated.isEmpty) return 0.0;
+    final sum = rated.fold<int>(0, (acc, e) => acc + e.rating);
+    return double.parse((sum / rated.length).toStringAsFixed(1));
+  }
+
+  int _countForStar(int star) {
+    return _allReviews.where((e) => e.rating == star).length;
+  }
+
+  Color _colorForStar(int star) {
+    switch (star) {
+      case 5:
+        return const Color(0xFF16A34A); // เขียว
+      case 4:
+        return const Color(0xFFEA7C1E); // ส้ม
+      case 3:
+        return const Color(0xFFF5A623); // เหลือง/ส้มอ่อน
+      case 2:
+        return const Color(0xFFEF6C4D); // ส้มแดง
+      default:
+        return const Color(0xFFE53935); // แดง
+    }
+  }
+
+  List<_RestaurantReviewEntry> get _filteredReviews {
+    if (_selectedStar == null) return _allReviews;
+    return _allReviews.where((e) => e.rating == _selectedStar).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final goodReviews = _allReviews.where((o) {
-      final r = double.tryParse((o['reviewRating'] ?? 5.0).toString()) ?? 5.0;
-      return r >= 4.0;
-    }).toList();
-
-    final updateReviews = _allReviews.where((o) {
-      final r = double.tryParse((o['reviewRating'] ?? 5.0).toString()) ?? 5.0;
-      return r <= 3.0;
-    }).toList();
-
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: AppBar(
-          title: const Text(
-            "รีวิวร้านค้า",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          backgroundColor: Colors.white,
-          foregroundColor: Colors.black,
-          elevation: 0,
-          centerTitle: true,
-        ),
-        body: _isLoading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFF16A34A)),
-              )
-            : NestedScrollView(
-                headerSliverBuilder: (context, innerBoxIsScrolled) {
-                  return [
-                    SliverToBoxAdapter(child: _buildSummaryBox()),
-                    SliverPersistentHeader(
-                      pinned: true,
-                      delegate: _SliverAppBarDelegate(
-                        TabBar(
-                          indicatorColor: Colors.black,
-                          indicatorWeight: 3,
-                          labelColor: Colors.black,
-                          unselectedLabelColor: Colors.black87,
-                          labelStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                          ),
-                          tabs: const [
-                            Tab(text: "ทั้งหมด"),
-                            Tab(text: "ดี"),
-                            Tab(text: "ปรับปรุง"),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ];
-                },
-                body: TabBarView(
-                  children: [
-                    _buildReviewList(_allReviews),
-                    _buildReviewList(goodReviews),
-                    _buildReviewList(updateReviews),
-                  ],
-                ),
+    return Scaffold(
+      backgroundColor: Colors.grey.shade100,
+      appBar: const RestaurantNavbar(title: "รีวิวร้านค้า"),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: _primary))
+          : _errorMessage != null
+          ? _buildErrorState()
+          : RefreshIndicator(
+              onRefresh: _fetchAllReviews,
+              color: _primary,
+              child: ListView(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                children: [
+                  _buildSummaryHeader(),
+                  const SizedBox(height: 16),
+                  _buildFilterChips(),
+                  const SizedBox(height: 16),
+                  if (_filteredReviews.isEmpty)
+                    _buildEmptyState()
+                  else
+                    ..._filteredReviews.map(_buildReviewCard),
+                  const SizedBox(height: 24),
+                ],
               ),
+            ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _fetchAllReviews,
+              style: ElevatedButton.styleFrom(backgroundColor: _primary),
+              child: const Text(
+                "ลองอีกครั้ง",
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSummaryBox() {
-    double p5 = _totalReviewCount > 0 ? (_star5 / _totalReviewCount) : 0.0;
-    double p4 = _totalReviewCount > 0 ? (_star4 / _totalReviewCount) : 0.0;
-    double p3 = _totalReviewCount > 0 ? (_star3 / _totalReviewCount) : 0.0;
-    double p2 = _totalReviewCount > 0 ? (_star2 / _totalReviewCount) : 0.0;
-    double p1 = _totalReviewCount > 0 ? (_star1 / _totalReviewCount) : 0.0;
-
+  // ------------------- ส่วนหัว: สรุปคะแนนเฉลี่ย (รวมดาวและคะแนนไว้ในกล่องเดียวกัน) -------------------
+  Widget _buildSummaryHeader() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6F6F6),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.star_rounded, color: Colors.orange, size: 50),
-              const SizedBox(width: 8),
-              Text(
-                _averageRating.toStringAsFixed(1),
-                style: const TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.orange,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildProgressBar(5, p5, _star5),
-          const SizedBox(height: 8),
-          _buildProgressBar(4, p4, _star4),
-          const SizedBox(height: 8),
-          _buildProgressBar(3, p3, _star3),
-          const SizedBox(height: 8),
-          _buildProgressBar(2, p2, _star2),
-          const SizedBox(height: 8),
-          _buildProgressBar(1, p1, _star1),
-          const SizedBox(height: 20),
-          const Text(
-            "คะแนนรีวิวร้านค้า",
-            style: TextStyle(fontSize: 15, color: Colors.black87),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            "${_averageRating.toStringAsFixed(1)} / 5.0 ($_totalReviewCount+ รีวิว)",
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildProgressBar(int star, double percent, int count) {
-    return Row(
-      children: [
-        Text(
-          '$star',
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(width: 4),
-        const Icon(Icons.star_rounded, color: Colors.orange, size: 20),
-        const SizedBox(width: 8),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: LinearProgressIndicator(
-              value: percent,
-              backgroundColor: Colors.grey.shade300,
-              color: Colors.orange,
-              minHeight: 10,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        SizedBox(
-          width: 24,
-          child: Text(
-            '$count',
-            textAlign: TextAlign.end,
-            style: const TextStyle(fontSize: 14, color: Colors.black87),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildReviewList(List<dynamic> ordersList) {
-    if (ordersList.isEmpty) {
-      return const Center(
-        child: Text(
-          "ยังไม่มีข้อมูลรีวิวในส่วนนี้",
-          style: TextStyle(
-            fontSize: 15,
-            color: Colors.black54,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: EdgeInsets.zero,
-      itemCount: ordersList.length,
-      itemBuilder: (context, index) {
-        final order = ordersList[index];
-
-        String customerName = "ลูกค้าปริศนา";
-        if (order['member'] != null) {
-          final String fName = order['member']['firstname'] ?? "";
-          final String lName = order['member']['lastname'] ?? "";
-          if (fName.isNotEmpty || lName.isNotEmpty) {
-            customerName = "$fName $lName".trim();
-          }
-        }
-
-        final int orderId = order['orderId'] ?? 0;
-        final double rating =
-            double.tryParse((order['reviewRating'] ?? 5.0).toString()) ?? 5.0;
-        final String comment =
-            order['reviewComment'] ?? "ไม่มีข้อความติชมเพิ่มเติม";
-
-        String dateText = "ไม่ระบุวันที่";
-        if (order['orderdate'] != null) {
-          try {
-            final DateTime dateTime = DateTime.parse(
-              order['orderdate'].toString(),
-            );
-            dateText =
-                "${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year}";
-          } catch (_) {}
-        }
-
-        final bool isClean = order['cleanliness'] == true;
-        final bool isTasty = order['tasteRating'] == true;
-
-        return Column(
-          children: [
-            _buildReviewItem(
-              name: customerName,
-              orderId: "K${orderId.toString().padLeft(6, '0')}",
-              date: dateText,
-              rating: rating.toInt(),
-              comment: comment,
-              isClean: isClean,
-              isTasty: isTasty,
-            ),
-            if (index < ordersList.length - 1)
-              const Divider(
-                height: 1,
-                thickness: 1,
-                color: Colors.black12,
-                indent: 20,
-                endIndent: 20,
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  // 🎯 ฟังก์ชันสำหรับวาดแท็กสีส้มสวยๆ (แบบเดียวกับหน้ารายละเอียด)
-  Widget _buildTagIfTrue(String label, bool isSelected) {
-    if (!isSelected) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.orange,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReviewItem({
-    required String name,
-    required String orderId,
-    required String date,
-    required int rating,
-    required String comment,
-    required bool isClean,
-    required bool isTasty,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: Colors.grey.shade300,
-            child: const Icon(Icons.person, color: Colors.white, size: 28),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.star_rounded, color: Colors.orange, size: 28),
+                const SizedBox(width: 6),
+                Text(
+                  _averageRating.toStringAsFixed(1),
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          orderId,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          date,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 2),
-                Row(
-                  children: List.generate(5, (index) {
-                    return Icon(
-                      index < rating
-                          ? Icons.star_rounded
-                          : Icons.star_border_rounded,
-                      color: Colors.orange,
-                      size: 20,
-                    );
-                  }),
-                ),
-
-                // 🎯 เรียกใช้แท็กสีส้มแทนข้อความธรรมดาครับ
-                if (isClean || isTasty) ...[
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8.0,
-                    runSpacing: 8.0,
-                    children: [
-                      _buildTagIfTrue("ถูกสุขลักษณะ ✨", isClean),
-                      _buildTagIfTrue("รสชาติดี 😋", isTasty),
-                    ],
-                  ),
-                ],
-
-                const SizedBox(height: 12),
-                Text(
-                  comment,
-                  style: const TextStyle(
+                const Text(
+                  "คะแนนรวมของร้าน",
+                  style: TextStyle(
                     fontSize: 15,
+                    fontWeight: FontWeight.bold,
                     color: Colors.black87,
-                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "จากทั้งหมด ${_allReviews.length} รีวิว",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -428,29 +273,247 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
       ),
     );
   }
-}
 
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  _SliverAppBarDelegate(this._tabBar);
+  // ------------------- แถบปุ่มกรองตามดาว (แสดงเฉพาะดาวที่มีรีวิว) -------------------
+  Widget _buildFilterChips() {
+    final availableStars = <int>[];
+    for (int star = 5; star >= 1; star--) {
+      if (_countForStar(star) > 0) {
+        availableStars.add(star);
+      }
+    }
 
-  final TabBar _tabBar;
-
-  @override
-  double get minExtent => _tabBar.preferredSize.height;
-  @override
-  double get maxExtent => _tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return Container(color: const Color(0xFFF9F7CD), child: _tabBar);
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          _buildChip(
+            label: "ทั้งหมด (${_allReviews.length})",
+            isSelected: _selectedStar == null,
+            baseColor: Colors.black87,
+            onTap: () => setState(() => _selectedStar = null),
+          ),
+          for (int star in availableStars) ...[
+            const SizedBox(width: 8),
+            _buildChip(
+              label: "$star (${_countForStar(star)})",
+              icon: Icons.star_rounded,
+              isSelected: _selectedStar == star,
+              baseColor: _colorForStar(star),
+              onTap: () => setState(() => _selectedStar = star),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return false;
+  Widget _buildChip({
+    required String label,
+    required bool isSelected,
+    required Color baseColor,
+    required VoidCallback onTap,
+    IconData? icon,
+  }) {
+    final Color bg = isSelected ? Colors.black87 : baseColor.withOpacity(0.12);
+    final Color fg = isSelected ? Colors.white : baseColor;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16, color: isSelected ? Colors.amber : fg),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: fg,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60),
+      child: Center(
+        child: Text(
+          "ยังไม่มีข้อมูลรีวิวในส่วนนี้",
+          style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+        ),
+      ),
+    );
+  }
+
+  // ------------------- การ์ดรีวิวแต่ละใบ -------------------
+  Widget _buildReviewCard(_RestaurantReviewEntry entry) {
+    final order = entry.order;
+    final review = entry.review;
+
+    String memberName = "ไม่ระบุชื่อลูกค้า";
+    String finalImgUrl = "";
+    if (order.member != null) {
+      final firstName = order.member?.firstname ?? "";
+      final lastName = order.member?.lastname ?? "";
+      if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        memberName = "$firstName $lastName".trim();
+      }
+      finalImgUrl = _getFinalImageUrl(order.member?.profileimg);
+    }
+
+    String dateText = "";
+    if (order.orderdate != null) {
+      final d = order.orderdate!;
+      dateText =
+          "${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}";
+    }
+
+    String itemsText = "";
+    if (order.items.isNotEmpty) {
+      itemsText = order.items
+          .map((it) => it.menu?.menuName ?? "")
+          .where((name) => name.isNotEmpty)
+          .join(", ");
+    }
+
+    final int rating = entry.rating;
+    final String comment =
+        (review?.commentrestaurant != null &&
+            review!.commentrestaurant!.isNotEmpty)
+        ? review.commentrestaurant!
+        : "ลูกค้าไม่ได้ให้ความคิดเห็นเพิ่มเติม";
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.orange.shade50,
+                backgroundImage: finalImgUrl.isNotEmpty
+                    ? NetworkImage(finalImgUrl)
+                    : null,
+                child: finalImgUrl.isEmpty
+                    ? Icon(Icons.person, color: Colors.orange.shade400)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      memberName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: List.generate(5, (i) {
+                        return Icon(
+                          i < rating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 16,
+                          color: Colors.orange,
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+              Text(
+                dateText,
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+
+          if (itemsText.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              "รายการ : $itemsText",
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
+            ),
+          ],
+
+          if (review?.cleanliness == true || review?.tasteRating == true) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (review?.cleanliness == true) _buildTag("ถูกสุขลักษณะ"),
+                if (review?.tasteRating == true) _buildTag("รสชาติดี"),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 10),
+          Text(
+            comment,
+            style: TextStyle(
+              fontSize: 13.5,
+              color:
+                  (review?.commentrestaurant != null &&
+                      review!.commentrestaurant!.isNotEmpty)
+                  ? Colors.black87
+                  : Colors.grey,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTag(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.orange,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
   }
 }

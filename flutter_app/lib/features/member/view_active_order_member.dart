@@ -8,9 +8,8 @@ import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:dio/dio.dart' as dio_package;
-
+// 🎯 Import หน้าแจ้งปัญหา
+import 'package:flutter_app/features/member/cancel_order_member.dart';
 import 'package:flutter_app/features/member/member_review.dart';
 import 'package:flutter_app/features/member/view_review.dart';
 
@@ -78,293 +77,7 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
     super.dispose();
   }
 
-  // 🎯 ยิง API กดยืนยันความถูกต้องของอาหาร
-  Future<void> _confirmSuccess() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) =>
-          const Center(child: CircularProgressIndicator(color: Colors.green)),
-    );
-
-    try {
-      var response = await DioClient.dio.post(
-        '/v1/order/confirmSuccess?orderId=${widget.order.orderId}',
-      );
-      Navigator.pop(context); // ปิด Loading
-
-      if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("ยืนยันรับอาหารสำเร็จ! ขอบคุณที่ใช้บริการ"),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.pop(
-          context,
-          true,
-        ); // เด้งกลับหน้า List พร้อมส่ง true ไปเพื่อบอกให้รีเฟรชหน้า
-      }
-    } catch (e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("เกิดข้อผิดพลาด: $e"),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // 🎯 เปิดหน้าต่าง (Dialog) แจ้งปัญหาอาหารผิด
-  Future<void> _showReportIssueDialog() async {
-    File? selectedImage;
-    final TextEditingController detailController = TextEditingController();
-    bool isUploading = false;
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setStateDialog) {
-            return AlertDialog(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-              ),
-              title: Row(
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.red.shade700,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 8),
-                  const Text(
-                    "แจ้งปัญหา",
-                    style: TextStyle(
-                      color: Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  ),
-                ],
-              ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "รายละเอียดปัญหา:",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: detailController,
-                      maxLines: 3,
-                      decoration: InputDecoration(
-                        hintText: "เช่น ได้รับข้าวหมูทอด แทนข้าวกะเพรา...",
-                        filled: true,
-                        fillColor: Colors.grey.shade50,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        focusedBorder: const OutlineInputBorder(
-                          borderRadius: BorderRadius.all(Radius.circular(12)),
-                          borderSide: BorderSide(color: Colors.red, width: 1.5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "อัปโหลดรูปภาพหลักฐาน:",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () async {
-                        final XFile? image = await ImagePicker().pickImage(
-                          source: ImageSource.camera,
-                          imageQuality: 80,
-                        );
-                        if (image != null) {
-                          setStateDialog(
-                            () => selectedImage = File(image.path),
-                          );
-                        }
-                      },
-                      child: Container(
-                        height: 140,
-                        width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.grey.shade300,
-                            width: 1.5,
-                          ),
-                        ),
-                        child: selectedImage != null
-                            ? ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: Image.file(
-                                  selectedImage!,
-                                  fit: BoxFit.cover,
-                                ),
-                              )
-                            : Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.add_a_photo_rounded,
-                                    color: Colors.grey.shade400,
-                                    size: 36,
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    "แตะเพื่อถ่ายรูป",
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              actionsPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              actions: [
-                TextButton(
-                  onPressed: isUploading ? null : () => Navigator.pop(context),
-                  child: Text(
-                    "ยกเลิก",
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ),
-                ElevatedButton(
-                  onPressed: isUploading
-                      ? null
-                      : () async {
-                          if (detailController.text.trim().isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("กรุณาระบุรายละเอียด"),
-                              ),
-                            );
-                            return;
-                          }
-                          if (selectedImage == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text("กรุณาอัปโหลดรูปภาพหลักฐาน"),
-                              ),
-                            );
-                            return;
-                          }
-
-                          setStateDialog(() => isUploading = true);
-
-                          try {
-                            String fileName = selectedImage!.path
-                                .split('/')
-                                .last;
-                            dio_package.FormData formData =
-                                dio_package.FormData.fromMap({
-                                  'orderId': widget.order.orderId,
-                                  'issueDetail': detailController.text.trim(),
-                                  'issueImage':
-                                      await dio_package.MultipartFile.fromFile(
-                                        selectedImage!.path,
-                                        filename: fileName,
-                                      ),
-                                });
-
-                            var response = await DioClient.dio.post(
-                              '/v1/order/reportIssue',
-                              data: formData,
-                            );
-                            if (response.statusCode == 200) {
-                              Navigator.pop(context); // ปิด dialog
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    "ส่งเรื่องแจ้งปัญหาเรียบร้อยแล้ว",
-                                  ),
-                                  backgroundColor: Colors.green,
-                                ),
-                              );
-                              Navigator.pop(context, true); // เด้งกลับหน้า List
-                            }
-                          } catch (e) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text("เกิดข้อผิดพลาด: $e"),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                            setStateDialog(() => isUploading = false);
-                          }
-                        },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                  ),
-                  child: isUploading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          "ส่งหลักฐาน",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // 🎯 เปิด Popup ยืนยันก่อนเข้าสู่หน้าแจ้งปัญหา
+  // 🎯 เปิด Popup ยืนยันก่อนเด้งไปหน้าแจ้งปัญหา (CancelOrderMember)
   Future<void> _confirmReportIssue() async {
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -386,7 +99,7 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
           ],
         ),
         content: const Text(
-          "คุณต้องการแจ้งปัญหา 'อาหารไม่ถูกต้อง' ใช่หรือไม่?\n\n(คุณจำเป็นต้องถ่ายรูปอาหารที่ได้รับผิดเพื่อใช้เป็นหลักฐานในการตรวจสอบ)",
+          "คุณต้องการแจ้งปัญหา 'อาหารไม่ตรงกับออเดอร์' ใช่หรือไม่?\n\n(คุณจำเป็นต้องถ่ายรูปอาหารที่ได้รับผิดเพื่อใช้เป็นหลักฐานในการตรวจสอบ)",
           style: TextStyle(fontSize: 15, height: 1.5),
         ),
         actionsPadding: const EdgeInsets.symmetric(
@@ -426,9 +139,20 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       ),
     );
 
-    // 🎯 ถ้าลูกค้ากด "ใช่" ค่อยเปิดฟอร์มสำหรับพิมพ์และอัปโหลดรูป
+    // 🎯 ถ้าลูกค้ากด "ใช่" ให้กระโดดไปหน้า CancelOrderMember โดยส่งไปแค่ orderId ตามเดิม
     if (confirm == true) {
-      _showReportIssueDialog();
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              CancelOrderMember(orderId: widget.order.orderId ?? 0),
+        ),
+      ).then((result) {
+        if (result == true) {
+          Navigator.pop(context, true);
+        }
+      });
     }
   }
 
@@ -442,7 +166,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // 🎯 1. ดึงรายการกับข้าว
     List<dynamic> rawCurries = [];
     if (item.orderDetailCurries != null &&
         item.orderDetailCurries!.isNotEmpty) {
@@ -463,7 +186,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
-    // 🎯 2. แกะรายชื่อ รูปกับข้าว และดึงราคา
     List<Map<String, dynamic>> curriesList = [];
     for (var e in rawCurries) {
       String name = '';
@@ -511,7 +233,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       }
     }
 
-    // 🎯 3. ดึงรายการ Add-on
     List<dynamic> rawAddons = [];
     if (item.addons.isNotEmpty) {
       rawAddons = item.addons;
@@ -521,7 +242,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       } catch (_) {}
     }
 
-    // 🎯 4. จัดกลุ่ม Add-on (รวมจำนวนและราคา)
     Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in rawAddons) {
       String name = '';
@@ -559,7 +279,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       }
     }
 
-    // 🎯 5. คำนวณราคาด้วย "วิธีย้อนกลับ" เพื่อให้ตัวเลขเป๊ะทุกกรณี
     int totalItemPrice = 0;
     int baseUnitNoAddonPrice = 0;
 
@@ -882,8 +601,9 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       widget.order.longitude,
     );
 
-    // 🎯 อัปเดตเงื่อนไข Timeline ให้ครอบคลุมสถานะ
     String status = (widget.order.orderStatus ?? "").toLowerCase();
+
+    // 🎯 แก้ไขการเช็กลำดับขั้นตอน 6 Step ใหม่ให้ครบสมบูรณ์
     int currentStep = 1;
 
     if (status.contains("waitingrestaurant") ||
@@ -892,32 +612,33 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       currentStep = 2;
     } else if (status.contains("rideraccepted") ||
         status.contains("riderarrived") ||
-        status.contains("goingtorestaurant")) {
+        status.contains("goingtorestaurant") ||
+        status.contains("going")) {
       currentStep = 3;
     } else if (status.contains("delivery") ||
         status.contains("delivering") ||
         status.contains("ontheway") ||
         status.contains("pickedup")) {
       currentStep = 4;
+    } else if (status.contains("arrived") || status.contains("reached")) {
+      // 🎯 เพื่มสถานะ arrived เป็น Step 5
+      currentStep = 5;
     } else if (status.contains("delivered") ||
         status.contains("success") ||
         status.contains("completed") ||
         status.contains("reviewsuccess")) {
-      currentStep = 5; // ถึงที่หมายแล้ว
+      currentStep = 6; // 🎯 ขยับ success ให้เป็น Step 6 (จุดสุดท้าย)
     }
 
-    // 🎯 ดึงสถานะที่แท้จริงแบบเดียวกับการ์ดด้านนอก
     final bool isCompleted =
         status == 'success' ||
         status == 'completed' ||
         status == 'reviewsuccess';
     final bool isReviewed = status == 'reviewsuccess';
 
-    // ⏱️ เช็กเวลา 1 ชั่วโมง สำหรับการแจ้งปัญหา (นำระบบแกะเวลาจากหน้า List มาใช้)
     bool isWithinOneHour = true;
     try {
       dynamic rawSuccessTime;
-      // พยายามหาชื่อตัวแปรที่ตรงกับใน OrderModel (ป้องกัน NoSuchMethodError)
       try {
         rawSuccessTime = (widget.order as dynamic).successtime;
       } catch (_) {
@@ -968,7 +689,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
           minute,
         );
 
-        // 🎯 ตัดวินาทีทิ้ง ป้องกันบั๊กเวลาสั่ง 10:00:55 เทียบกับเวลาส่ง 10:00:00
         DateTime strippedOrderDate = DateTime(
           orderDate.year,
           orderDate.month,
@@ -1105,14 +825,20 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
             ),
             const SizedBox(height: 12),
 
-            if (status.contains("cancel"))
+            if (status.contains("cancel") || status.contains("issue_reported"))
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: status.contains("cancel")
+                      ? Colors.red.shade50
+                      : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(
+                    color: status.contains("cancel")
+                        ? Colors.red.shade200
+                        : Colors.orange.shade200,
+                  ),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1120,60 +846,92 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
                     Row(
                       children: [
                         Icon(
-                          Icons.cancel_rounded,
-                          color: Colors.red.shade700,
-                          size: 24,
+                          status.contains("cancel")
+                              ? Icons.cancel_rounded
+                              : Icons.support_agent_rounded,
+                          color: status.contains("cancel")
+                              ? Colors.red.shade700
+                              : Colors.orange.shade700,
+                          size: 28,
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          "คำสั่งซื้อนี้ถูกยกเลิกแล้ว",
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.red.shade700,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            status.contains("cancel")
+                                ? "คำสั่งซื้อนี้ถูกยกเลิกแล้ว"
+                                : "มีการแจ้งปัญหาออเดอร์นี้\nกรุณาติดต่อร้านค้าเพื่อเคลียร์ปัญหา",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: status.contains("cancel")
+                                  ? Colors.red.shade700
+                                  : Colors.orange.shade800,
+                              height: 1.3,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "สาเหตุ: ${widget.order.cancelDetail ?? 'ไม่มีผู้จัดส่งรับงานภายในเวลาที่กำหนด'}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black87,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else if (status.contains("issue_reported"))
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.orange.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.support_agent_rounded,
-                      color: Colors.orange.shade700,
-                      size: 28,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        "มีการแจ้งปัญหาออเดอร์นี้\nระบบกำลังดำเนินการตรวจสอบ",
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange.shade800,
-                          height: 1.3,
+                    if (status.contains("cancel")) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        "สาเหตุ: ${widget.order.cancelDetail ?? 'ไม่มีผู้จัดส่งรับงานภายในเวลาที่กำหนด'}",
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.4,
                         ),
                       ),
+                    ],
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Colors.black12),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "ข้อมูลติดต่อร้านค้า:",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.storefront_rounded,
+                          size: 20,
+                          color: Colors.green.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            widget.order.restaurant?.restaurantName ??
+                                "ไม่ระบุชื่อร้าน",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_in_talk_rounded,
+                          size: 20,
+                          color: Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          widget.order.restaurant?.phone ?? "ไม่ระบุเบอร์โทร",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1205,7 +963,7 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
                       currentStep >= 3,
                     ),
                     _buildTimelineDot(
-                      "ผู้จัดส่งไปรับ",
+                      "ไปรับออเดอร์",
                       currentStep >= 3,
                       currentStep >= 4,
                     ),
@@ -1215,9 +973,14 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
                       currentStep >= 5,
                     ),
                     _buildTimelineDot(
-                      "จัดส่งสำเร็จ",
+                      "ถึงที่หมายแล้ว",
                       currentStep >= 5,
                       currentStep >= 6,
+                    ),
+                    _buildTimelineDot(
+                      "จัดส่งสำเร็จ",
+                      currentStep >= 6,
+                      currentStep >= 7,
                       isLast: true,
                     ),
                   ],
@@ -1455,7 +1218,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
         ),
       ),
 
-      // 🎯 แท็บเครื่องมือด้านล่าง อัปเดตใหม่ให้โชว์ปุ่มรีวิวและแจ้งปัญหาแบบแยกเงื่อนไข
       bottomNavigationBar: isCompleted
           ? Container(
               padding: const EdgeInsets.all(16),
@@ -1473,7 +1235,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ⭐ 1. แสดงปุ่ม รีวิวคำสั่งซื้อ หรือ ดูรีวิว (เช็กแค่สถานะรีวิว)
                     if (!isReviewed)
                       SizedBox(
                         width: double.infinity,
@@ -1549,7 +1310,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
                         ),
                       ),
 
-                    // 🚨 2. ปุ่มแจ้งปัญหา (เช็กแค่ว่าอยู่ในเวลา 1 ชั่วโมงหรือไม่ โดยไม่สนว่ารีวิวไปหรือยัง)
                     if (isWithinOneHour) ...[
                       const SizedBox(height: 12),
                       SizedBox(
@@ -1585,7 +1345,7 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
                 ),
               ),
             )
-          : null, // ถ้าออเดอร์ยังไม่เสร็จ ก็ไม่ต้องโชว์แท็บด้านล่าง
+          : null,
     );
   }
 }

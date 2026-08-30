@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
-import 'package:flutter_app/features/member/home_member.dart';
-import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart'; // 🎯 นำเข้า NavbarMember ส่วนกลาง
 import 'package:flutter_app/global_data.dart';
 import 'dart:io';
@@ -245,7 +243,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                         child: Column(
                           children: [
                             const SizedBox(height: 10),
-                            // ─── ส่วนรูปภาพโปรไฟล์วงกลมแบบสैक्ट ───
+                            // ─── ส่วนรูปภาพโปรไฟล์วงกลมแบบสแต็ก ───
                             SizedBox(
                               width: 110,
                               height: 110,
@@ -378,7 +376,7 @@ class _ProfileMemberState extends State<ProfileMember> {
 
                       const SizedBox(height: 40),
 
-                      // ─── 🎯 ส่วนควบคุมสลับสถานะ และปุ่มออกจากระบบ ───
+                      // ─── 🎯 ส่วนควบคุมสลับสถานะ (แก้ไข / ยกเลิก / บันทึก) ───
                       _isEditable
                           ? Row(
                               children: [
@@ -529,174 +527,6 @@ class _ProfileMemberState extends State<ProfileMember> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                // ── 🎯 ปุ่มออกจากระบบที่จะแสดงผลเมื่อไม่ได้อยู่ในโหมดแก้ไข ──
-                                Container(
-                                  decoration: BoxDecoration(
-                                    color: Colors.grey[100],
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: const Color.fromARGB(
-                                        255,
-                                        206,
-                                        206,
-                                        206,
-                                      ),
-                                    ),
-                                  ),
-                                  child: _buildMenuTile(
-                                    icon: Icons.logout,
-                                    iconColor: Colors.orange,
-                                    label: 'ออกจากระบบ',
-                                    onTap: () async {
-                                      final confirm = await showDialog<bool>(
-                                        context: context,
-                                        barrierColor: Colors.black.withOpacity(
-                                          0.4,
-                                        ),
-                                        builder: (context) => Dialog(
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              16,
-                                            ),
-                                          ),
-                                          backgroundColor: Colors.white,
-                                          child: Padding(
-                                            padding: const EdgeInsets.all(28),
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                Container(
-                                                  width: 64,
-                                                  height: 64,
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                        color: Color(
-                                                          0xFFFFEBEE,
-                                                        ),
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                  child: const Icon(
-                                                    Icons.logout_rounded,
-                                                    color: Color(0xFFE53935),
-                                                    size: 32,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 20),
-                                                const Text(
-                                                  'ออกจากระบบ',
-                                                  style: TextStyle(
-                                                    fontSize: 18,
-                                                    fontWeight: FontWeight.bold,
-                                                    color: Color(0xFF1A1A2E),
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 10),
-                                                const Text(
-                                                  'คุณต้องการออกจากระบบใช่หรือไม่?',
-                                                  textAlign: TextAlign.center,
-                                                  style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.black,
-                                                    height: 1.5,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 28),
-                                                Row(
-                                                  children: [
-                                                    Expanded(
-                                                      child: OutlinedButton(
-                                                        onPressed: () =>
-                                                            Navigator.pop(
-                                                              context,
-                                                              false,
-                                                            ),
-                                                        style: OutlinedButton.styleFrom(
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                vertical: 14,
-                                                              ),
-                                                          side: BorderSide(
-                                                            color: Colors
-                                                                .grey
-                                                                .shade300,
-                                                          ),
-                                                          shape: RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  10,
-                                                                ),
-                                                          ),
-                                                        ),
-                                                        child: Text(
-                                                          'ยกเลิก',
-                                                          style: TextStyle(
-                                                            fontSize: 16,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: Colors
-                                                                .grey[700],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    const SizedBox(width: 12),
-                                                    Expanded(
-                                                      child: ElevatedButton(
-                                                        onPressed: () =>
-                                                            Navigator.pop(
-                                                              context,
-                                                              true,
-                                                            ),
-                                                        style: ElevatedButton.styleFrom(
-                                                          backgroundColor:
-                                                              const Color(
-                                                                0xFFE53935,
-                                                              ),
-                                                          padding:
-                                                              const EdgeInsets.symmetric(
-                                                                vertical: 14,
-                                                              ),
-                                                          elevation: 0,
-                                                          shape: RoundedRectangleBorder(
-                                                            borderRadius:
-                                                                BorderRadius.circular(
-                                                                  10,
-                                                                ),
-                                                          ),
-                                                        ),
-                                                        child: const Text(
-                                                          'ออกจากระบบ',
-                                                          style: TextStyle(
-                                                            fontSize: 16,
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                            color: Colors.white,
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      );
-
-                                      if (confirm == true && mounted) {
-                                        Navigator.pushAndRemoveUntil(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const LoginMember(),
-                                          ),
-                                          (route) => false,
-                                        );
-                                      }
-                                    },
-                                  ),
-                                ),
                               ],
                             ),
                       const SizedBox(height: 30),
@@ -767,32 +597,6 @@ class _ProfileMemberState extends State<ProfileMember> {
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: Color(0xFF64F02D), width: 1.5),
           ),
-        ),
-      ),
-    );
-  }
-
-  // ─── 🎯 ฟังก์ชันสำหรับสร้างแถบเมนูรายการออกจากระบบให้ตรงตามแมตช์หน้า ProfileRestaurant ───
-  Widget _buildMenuTile({
-    required IconData icon,
-    required Color iconColor,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            Icon(icon, color: iconColor, size: 26),
-            const SizedBox(width: 14),
-            Text(
-              label,
-              style: const TextStyle(fontSize: 15, color: Colors.black87),
-            ),
-          ],
         ),
       ),
     );
