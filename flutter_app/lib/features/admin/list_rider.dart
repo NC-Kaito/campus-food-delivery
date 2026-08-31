@@ -1,4 +1,5 @@
 // features/admin/list_rider.dart
+import 'dart:async'; // 🎯 เพิ่ม import สำหรับ Timer
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
@@ -31,23 +32,36 @@ class _ListRiderState extends State<ListRider> {
 
   List<RiderModel> riderList = [];
   bool isLoading = false;
+  Timer? _refreshTimer; // 🎯 สร้างตัวแปรเก็บ Timer
 
-  void fetchAll() async {
+  // 🎯 เพิ่มตัวแปร showLoading เพื่อเช็กว่าจะโชว์วงกลมโหลดไหม
+  void fetchAll({bool showLoading = true}) async {
     try {
-      setState(() => isLoading = true);
+      if (showLoading && mounted) setState(() => isLoading = true);
       var riderResponse = await adminService.getListRider();
-      setState(() => riderList = riderResponse);
+      if (mounted) setState(() => riderList = riderResponse);
     } on DioException catch (e) {
       debugPrint(e.toString());
     } finally {
-      setState(() => isLoading = false);
+      if (showLoading && mounted) setState(() => isLoading = false);
     }
   }
 
   @override
   void initState() {
     super.initState();
-    fetchAll();
+    fetchAll(); // โหลดครั้งแรกโชว์วงกลมปกติ
+
+    // 🎯 ตั้งเวลาดึงข้อมูลใหม่แบบเบื้องหลังทุก 10 วินาที
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      fetchAll(showLoading: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel(); // 🎯 ยกเลิกการนับเวลาเมื่อปิดหน้านี้ทิ้ง
+    super.dispose();
   }
 
   @override
@@ -170,8 +184,9 @@ class _ListRiderState extends State<ListRider> {
                                             riderFullName: fullName,
                                             registerDate: registerDate,
                                             registerTime: registerTime,
-                                            onTap: () {
-                                              Navigator.push(
+                                            onTap: () async {
+                                              // 🎯 ใช้ await เพื่อให้รอการกลับมาจากหน้าดูรายละเอียด แล้วค่อยรีเฟรช
+                                              await Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
                                                   builder: (context) =>
@@ -181,7 +196,7 @@ class _ListRiderState extends State<ListRider> {
                                                       ),
                                                 ),
                                               );
-                                              fetchAll();
+                                              fetchAll(showLoading: false);
                                             },
                                           );
                                         },

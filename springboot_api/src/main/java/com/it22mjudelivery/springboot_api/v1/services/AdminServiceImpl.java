@@ -68,10 +68,7 @@ public class AdminServiceImpl implements AdminService {
         Restaurant restaurant = restaurantRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งานร้านค้า: " + username));
 
-        restaurant.setVerificationstatus("false");
-        restaurant.setNotapprovedetail(reason);
-        restaurantRepository.save(restaurant);
-
+        // 1. ส่งอีเมลแจ้งผลก่อน
         if (restaurant.getEmail() != null && !restaurant.getEmail().isEmpty()) {
             String subject = "แจ้งผลการพิจารณาการสมัครใช้งานระบบร้านค้า -  " + restaurant.getRestaurantname();
             String body =
@@ -81,13 +78,15 @@ public class AdminServiceImpl implements AdminService {
                             "<div style='background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-left: 5px solid #dc3545; padding: 12px 16px; border-radius: 4px; margin: 15px 0;'>" +
                             "<strong>เหตุผล:</strong> " + reason +
                             "</div>" +
-                            "<p>ท่านสามารถเข้าสู่ระบบเพื่อทำการแก้ไขการสมัครอีกครั้งได้</p>" +
-                            "<p>ขอแสดงความนับถือ,<br>ทีมงาน ระบบจัดส่งอาหารร้านค้าภายในมหาวิทยาลัยแม่โจ้</p>";
+                            "<p>ท่านสามารถทำการสมัครสมาชิกใหม่อีกครั้งได้</p>" +
+                            "<p>ขอแสดงความนับถือ,<br>ทีมงาน ระบบจัดส่งอาหารร้านค้าภายในมหาวิทยาลัย</p>";
 
             emailService.sendEmailHtml(restaurant.getEmail(), subject, body);
         }
-    }
 
+        // 2. ลบข้อมูลออกจากฐานข้อมูล
+        restaurantRepository.delete(restaurant);
+    }
     //--------Rider-------------------------------------------------------------------------------------
     @Override
     public List<Rider> getList_register_rider() {
@@ -129,10 +128,7 @@ public class AdminServiceImpl implements AdminService {
         Rider rider = riderRepository.findByStudentid(studentId)
                 .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน: " + studentId));
 
-        rider.setVerificationStatus("false");
-        rider.setNotApproveDetail(reason);
-        riderRepository.save(rider);
-
+        // 1. ส่งอีเมลแจ้งผลก่อน
         if (rider.getEmail() != null && !rider.getEmail().isEmpty()) {
             String subject = "แจ้งผลการพิจารณาการสมัครผู้จัดส่งอาหาร - " + rider.getFirstName() + " " + rider.getLastName();
             String body =
@@ -142,10 +138,13 @@ public class AdminServiceImpl implements AdminService {
                             "<div style='background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; border-left: 5px solid #dc3545; padding: 12px 16px; border-radius: 4px; margin: 15px 0;'>" +
                             "<strong>เหตุผล:</strong> " + reason +
                             "</div>" +
-                            "<p>ท่านสามารถเข้าสู่ระบบเพื่อทำการแก้ไขการสมัครอีกครั้งได้ </p>" +
-                            "<p>ขอแสดงความนับถือ,<br>ทีมงาน ระบบจัดส่งอาหารร้านค้าภายในมหาวิทยาลัยแม่โจ้</p>";
+                            "<p>ท่านสามารถทำการสมัครสมาชิกใหม่อีกครั้งได้</p>" +
+                            "<p>ขอแสดงความนับถือ,<br>ทีมงาน ระบบจัดส่งอาหารร้านค้าภายในมหาวิทยาลัย</p>";
 
             emailService.sendEmailHtml(rider.getEmail(), subject, body);
         }
+
+        // 2. ลบข้อมูลออกจากฐานข้อมูล
+        riderRepository.delete(rider);
     }
 }

@@ -4,7 +4,6 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/agrees_restaurant.dart';
 import 'package:flutter_app/features/restaurant/home_restaurant.dart';
-import 'package:flutter_app/features/restaurant/wait_approve.dart';
 import 'package:flutter_app/global_data.dart';
 
 class LoginRestaurant extends StatefulWidget {
@@ -50,24 +49,73 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
 
           final status = restaurant.verificationStatus;
 
-          // --- ส่วนตรวจสอบสถานะ 'close' ---
+          // 🎯 กรณีถูกปิดบัญชี (แสดงเป็น Popup เหมือนไรเดอร์)
           if (status == 'close') {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text(
-                  'บัญชีนี้ถูกปิดใช้งานแล้ว',
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.red.shade700,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "บัญชีถูกปิดใช้งาน",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
+                ),
+                content: const Text(
+                  "คุณได้ทำการปิดบัญชีร้านค้าในระบบเรียบร้อยแล้ว หากต้องการความช่วยเหลือหรือมีข้อสงสัยเพิ่มเติมให้ทำการติดต่อผู้ดูแลระบบเพื่อสอบถามเพิ่มเติม",
                   style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 14.5,
+                    height: 1.5,
+                    color: Colors.black87,
                   ),
                 ),
-                backgroundColor: Colors.orange,
-                behavior: SnackBarBehavior.floating,
+                actionsPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                actions: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade600,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "ตกลง",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             );
             return;
           }
 
+          // 🎯 กรณีอนุมัติแล้ว
           if (status == 'true') {
             Navigator.pushAndRemoveUntil(
               context,
@@ -75,15 +123,69 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
               (route) => false,
             );
           } else {
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(
-                builder: (context) => WaitApprove(
-                  verificationStatus: status ?? 'wait',
-                  notApproveDetail: restaurant.notApproveDetail,
+            // 🎯 กรณีรออนุมัติ (wait หรือสถานะอื่นๆ) โชว์ Popup แจ้งให้รอรับผลทางอีเมล
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
                 ),
+                title: Row(
+                  children: [
+                    Icon(
+                      Icons.mark_email_unread_rounded,
+                      color: Colors.orange.shade700,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "รอการอนุมัติ",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
+                ),
+                content: const Text(
+                  "บัญชีร้านค้าของคุณกำลังอยู่ในระหว่างการตรวจสอบ\nหากแอดมินพิจารณาอนุมัติเรียบร้อยแล้ว จะแจ้งผลให้ทราบทางอีเมล",
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    height: 1.5,
+                    color: Colors.black87,
+                  ),
+                ),
+                actionsPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                actions: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(
+                          0xFF76FF03,
+                        ), // สีเขียวหลักของร้านค้า
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "ตกลง",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              (route) => false,
             );
           }
         }
@@ -214,10 +316,10 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                           children: [
                             const SizedBox(height: 10),
 
-                            Text(
+                            const Text(
                               "ชื่อผู้ใช้ (Username)",
                               style: TextStyle(
-                                color: const Color.fromARGB(255, 0, 0, 0),
+                                color: Color.fromARGB(255, 0, 0, 0),
                                 fontSize: 14,
                               ),
                             ),
@@ -230,10 +332,12 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                               icon: Icons.person_outline_rounded,
                               obscure: false,
                               validator: (value) {
-                                if (value == null || value.isEmpty)
+                                if (value == null || value.isEmpty) {
                                   return "กรุณากรอกชื่อผู้ใช้";
-                                if (value.contains(' '))
+                                }
+                                if (value.contains(' ')) {
                                   return "ต้องไม่มีช่องว่าง";
+                                }
                                 if (!RegExp(
                                   r'^[a-zA-Z0-9]+$',
                                 ).hasMatch(value)) {
@@ -247,10 +351,10 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                             ),
                             const SizedBox(height: 20),
 
-                            Text(
+                            const Text(
                               "รหัสผ่าน (Password)",
                               style: TextStyle(
-                                color: const Color.fromARGB(255, 0, 0, 0),
+                                color: Color.fromARGB(255, 0, 0, 0),
                                 fontSize: 14,
                               ),
                             ),
@@ -275,10 +379,12 @@ class _LoginRestaurantState extends State<LoginRestaurant> {
                                 ),
                               ),
                               validator: (value) {
-                                if (value == null || value.isEmpty)
+                                if (value == null || value.isEmpty) {
                                   return "กรุณากรอกรหัสผ่าน";
-                                if (value.length < 8)
+                                }
+                                if (value.length < 8) {
                                   return "รหัสผ่านต้องมี 8 ตัวอักษรขึ้นไป";
+                                }
                                 return null;
                               },
                             ),
