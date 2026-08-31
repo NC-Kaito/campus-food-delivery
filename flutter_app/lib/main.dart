@@ -28,8 +28,8 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         textTheme: GoogleFonts.kanitTextTheme(Theme.of(context).textTheme),
       ),
-      home: SelectRolePage(),
-      // home: LoginAdmin(),
+      // home: SelectRolePage(),
+      home: LoginAdmin(),
     );
   }
 }

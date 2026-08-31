@@ -1,5 +1,8 @@
 // features/member/view_confirm_order_member.dart
 import 'dart:io';
+import 'dart:ui' as ui;
+import 'dart:typed_data';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
@@ -8,10 +11,10 @@ import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:gal/gal.dart';
 // 🎯 Import หน้าแจ้งปัญหา
 import 'package:flutter_app/features/member/cancel_order_member.dart';
 import 'package:flutter_app/features/member/member_review.dart';
-import 'package:flutter_app/features/member/view_review.dart';
 
 class ViewActiveOrderMember extends StatefulWidget {
   final OrderModel order;
@@ -30,6 +33,9 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
 
   final MemberService memberService = MemberService();
   final Color primaryGreen = const Color(0xFF64F02D);
+
+  // 🎯 Key สำหรับจับภาพใบเสร็จ
+  final GlobalKey _receiptKey = GlobalKey();
 
   @override
   void initState() {
@@ -75,6 +81,725 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
   void dispose() {
     _miniMapController?.dispose();
     super.dispose();
+  }
+
+  // 🎯 ฟังก์ชันสำหรับแปลงวันที่ให้เป็นภาษาไทยและรูปแบบสวยงาม
+  String _formatThaiDate(dynamic rawDate) {
+    if (rawDate == null) return "-";
+    DateTime d;
+    if (rawDate is DateTime) {
+      d = rawDate.toLocal();
+    } else {
+      d = DateTime.tryParse(rawDate.toString())?.toLocal() ?? DateTime.now();
+    }
+    final months = [
+      "มกราคม",
+      "กุมภาพันธ์",
+      "มีนาคม",
+      "เมษายน",
+      "พฤษภาคม",
+      "มิถุนายน",
+      "กรกฎาคม",
+      "สิงหาคม",
+      "กันยายน",
+      "ตุลาคม",
+      "พฤศจิกายน",
+      "ธันวาคม",
+    ];
+    final year = d.year + 543;
+    return "${d.day} ${months[d.month - 1]} $year - ${d.hour.toString().padLeft(2, '0')}.${d.minute.toString().padLeft(2, '0')} น.";
+  }
+
+  // 🎯 ฟังก์ชันแปลง Widget เป็นรูปภาพและบันทึกลงเครื่อง
+  // 🎯 ฟังก์ชันแปลง Widget เป็นรูปภาพและบันทึกลงเครื่อง (อัปเดตใหม่)
+  Future<void> _saveReceiptToGallery() async {
+    try {
+      RenderRepaintBoundary boundary =
+          _receiptKey.currentContext!.findRenderObject()
+              as RenderRepaintBoundary;
+      ui.Image image = await boundary.toImage(pixelRatio: 3.0);
+      ByteData? byteData = await image.toByteData(
+        format: ui.ImageByteFormat.png,
+      );
+
+      if (byteData != null) {
+        await Gal.putImageBytes(byteData.buffer.asUint8List());
+
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("บันทึกใบเสร็จลงในอัลบั้มรูปภาพเรียบร้อยแล้ว"),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "ไม่สามารถบันทึกได้ โปรดให้สิทธิ์แอปเข้าถึงรูปภาพ ($e)",
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // 🎯 ฟังก์ชันแสดง Popup ใบเสร็จ
+  Future<void> _showReceiptDialog() async {
+    double deliveryFee = widget.order.deliveryFee;
+    double totalPrice = widget.order.totalPrice;
+    double subtotalPrice = totalPrice - deliveryFee;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 🎯 ส่วนของใบเสร็จที่จะถูก Capture เป็นรูปภาพ
+                RepaintBoundary(
+                  key: _receiptKey,
+                  child: Container(
+                    color: Colors.grey.shade300,
+                    padding: const EdgeInsets.all(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text(
+                            "Campus Food Delivery",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "เลขที่ใบเสร็จ K${widget.order.orderId?.toString().padLeft(6, '0')}",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          Text(
+                            "วันที่ ${_formatThaiDate(widget.order.orderdate)}",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "ผู้สั่งซื้อ",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      "ชื่อ : $_loggedInMemberName",
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    Text(
+                                      "โทร: $_loggedInMemberPhone",
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      "ผู้จัดส่ง",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      "ชื่อ : ${widget.order.rider?.firstName ?? '-'} ${widget.order.rider?.lastName ?? '-'}",
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    Text(
+                                      "โทร: ${widget.order.rider?.phone ?? '-'}",
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // 🎯 ตารางรายการอาหาร
+                          Table(
+                            border: TableBorder.all(color: Colors.black87),
+                            columnWidths: const {
+                              0: FlexColumnWidth(3),
+                              1: FlexColumnWidth(1),
+                              2: FlexColumnWidth(1),
+                              3: FlexColumnWidth(1),
+                            },
+                            children: [
+                              const TableRow(
+                                children: [
+                                  Padding(
+                                    padding: EdgeInsets.all(6),
+                                    child: Text(
+                                      "รายการ",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: EdgeInsets.all(6),
+                                    child: Text(
+                                      "ราคา",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: EdgeInsets.all(6),
+                                    child: Text(
+                                      "จำนวน",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: EdgeInsets.all(6),
+                                    child: Text(
+                                      "รวม",
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              ...widget.order.items.asMap().entries.map((
+                                entry,
+                              ) {
+                                int index = entry.key + 1;
+                                var item = entry.value;
+
+                                List<dynamic> rawCurries = [];
+                                if (item.orderDetailCurries != null &&
+                                    item.orderDetailCurries!.isNotEmpty) {
+                                  rawCurries = item.orderDetailCurries!;
+                                } else {
+                                  try {
+                                    final jsonItem = (item as dynamic).toJson();
+                                    rawCurries =
+                                        jsonItem['orderDetailCurries'] ??
+                                        jsonItem['orderdetailcurries'] ??
+                                        [];
+                                  } catch (_) {}
+                                }
+
+                                String displayMenuName =
+                                    item.menu?.menuName ?? "รายการเมนู";
+                                if (rawCurries.isNotEmpty) {
+                                  displayMenuName =
+                                      "ข้าวราดแกง (${rawCurries.length} อย่าง)";
+                                }
+
+                                List<Map<String, dynamic>> curriesList = [];
+                                for (var e in rawCurries) {
+                                  String name = '';
+                                  int price = 0;
+                                  if (e is Map) {
+                                    final menuMap = (e['menu'] is Map)
+                                        ? e['menu'] as Map
+                                        : e;
+                                    name =
+                                        (menuMap['menuname'] ??
+                                                menuMap['menuName'] ??
+                                                menuMap['name'] ??
+                                                '')
+                                            .toString();
+                                    price =
+                                        (e['priceAtOrder'] ??
+                                                e['priceatorder'] ??
+                                                0)
+                                            .toInt();
+                                  } else {
+                                    try {
+                                      name =
+                                          ((e as dynamic).menu?.menuName ??
+                                                  (e as dynamic)
+                                                      .menu
+                                                      ?.menuname ??
+                                                  (e as dynamic).name ??
+                                                  '')
+                                              .toString();
+                                      price = ((e as dynamic).priceAtOrder ?? 0)
+                                          .toInt();
+                                    } catch (_) {}
+                                  }
+                                  if (name.isNotEmpty)
+                                    curriesList.add({
+                                      'name': name,
+                                      'price': price,
+                                    });
+                                }
+
+                                List<dynamic> rawAddons = [];
+                                if (item.addons.isNotEmpty) {
+                                  rawAddons = item.addons;
+                                } else {
+                                  try {
+                                    rawAddons =
+                                        (item as dynamic).toJson()['addons'] ??
+                                        [];
+                                  } catch (_) {}
+                                }
+
+                                Map<String, Map<String, dynamic>>
+                                groupedAddons = {};
+                                for (var addon in rawAddons) {
+                                  String name = '';
+                                  int price = 0;
+                                  if (addon is Map) {
+                                    name =
+                                        addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
+                                        addon['addonMenu']?['addonName'] ??
+                                        addon['name'] ??
+                                        '';
+                                    price =
+                                        (addon['priceAtOrder'] ??
+                                                addon['menuAddonDetail']?['addonPrice'] ??
+                                                0)
+                                            .toInt();
+                                  } else {
+                                    try {
+                                      name =
+                                          (addon as dynamic)
+                                              .menuAddonDetail
+                                              ?.addonMenu
+                                              ?.addonName ??
+                                          '';
+                                      price =
+                                          ((addon as dynamic).priceAtOrder ??
+                                                  (addon as dynamic)
+                                                      .menuAddonDetail
+                                                      ?.addonPrice ??
+                                                  0)
+                                              .toInt();
+                                    } catch (_) {}
+                                  }
+                                  if (name.isNotEmpty) {
+                                    if (groupedAddons.containsKey(name)) {
+                                      groupedAddons[name]!['qty'] =
+                                          (groupedAddons[name]!['qty'] as int) +
+                                          1;
+                                    } else {
+                                      groupedAddons[name] = {
+                                        'qty': 1,
+                                        'unitPrice': price,
+                                      };
+                                    }
+                                  }
+                                }
+
+                                List<Map<String, dynamic>> addonLines = [];
+                                for (var curry in curriesList) {
+                                  addonLines.add({
+                                    'name': curry['name'],
+                                    'qty': 1,
+                                    'price': curry['price'],
+                                  });
+                                }
+                                for (var entry in groupedAddons.entries) {
+                                  addonLines.add({
+                                    'name': entry.key,
+                                    'qty': entry.value['qty'],
+                                    'price': entry.value['unitPrice'],
+                                  });
+                                }
+
+                                int addonsSum = 0;
+                                for (var line in addonLines) {
+                                  addonsSum +=
+                                      (line['price'] as int) *
+                                      (line['qty'] as int);
+                                }
+
+                                int totalItemPrice = 0;
+                                int baseUnitNoAddonPrice = 0;
+
+                                try {
+                                  final jsonItem = (item as dynamic).toJson();
+                                  var rawSubtotal =
+                                      jsonItem['subtotal'] ??
+                                      jsonItem['subTotal'];
+                                  if (rawSubtotal != null)
+                                    totalItemPrice = (rawSubtotal as num)
+                                        .toInt();
+                                } catch (_) {}
+
+                                if (totalItemPrice > 0) {
+                                  int unitTotal =
+                                      totalItemPrice ~/
+                                      (item.qty > 0 ? item.qty : 1);
+                                  baseUnitNoAddonPrice = unitTotal - addonsSum;
+                                  if (baseUnitNoAddonPrice < 0)
+                                    baseUnitNoAddonPrice = 0;
+                                } else {
+                                  int baseMenuPrice =
+                                      item.menu?.price?.toInt() ?? 0;
+                                  if (baseMenuPrice == 0) {
+                                    try {
+                                      final jsonItem = (item as dynamic)
+                                          .toJson();
+                                      baseMenuPrice =
+                                          (jsonItem['menu']?['price'] ?? 0)
+                                              .toInt();
+                                    } catch (_) {}
+                                  }
+                                  baseUnitNoAddonPrice = baseMenuPrice;
+                                  totalItemPrice =
+                                      (baseUnitNoAddonPrice + addonsSum) *
+                                      item.qty;
+                                }
+
+                                return TableRow(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(6.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            "$index $displayMenuName",
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                          for (var line in addonLines)
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    " • ${line['name']}",
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.black87,
+                                                    ),
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  "x${line['qty']}",
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    color: Colors.black87,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(6.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            "$baseUnitNoAddonPrice",
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.black,
+                                            ),
+                                          ),
+                                          for (var line in addonLines)
+                                            Text(
+                                              "${line['price']}",
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(6.0),
+                                      child: Center(
+                                        child: Text(
+                                          "${item.qty}",
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(6.0),
+                                      child: Center(
+                                        child: Text(
+                                          "$totalItemPrice",
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                            ],
+                          ),
+
+                          // 🎯 แถวสรุปยอดรวม (ต่อท้ายตารางให้เส้นขอบเนียนติดกัน)
+                          IntrinsicHeight(
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  left: BorderSide(color: Colors.black87),
+                                  right: BorderSide(color: Colors.black87),
+                                  bottom: BorderSide(color: Colors.black87),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 50,
+                                    child: const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(6.0),
+                                        child: Text(
+                                          "ยอดรวม",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const VerticalDivider(
+                                    width: 1,
+                                    thickness: 1,
+                                    color: Colors.black87,
+                                  ),
+                                  Expanded(
+                                    flex: 10,
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(6.0),
+                                        child: Text(
+                                          "${subtotalPrice.toInt()}",
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          IntrinsicHeight(
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                border: Border(
+                                  left: BorderSide(color: Colors.black87),
+                                  right: BorderSide(color: Colors.black87),
+                                  bottom: BorderSide(color: Colors.black87),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 50,
+                                    child: const Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(6.0),
+                                        child: Text(
+                                          "ค่าจัดส่ง",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const VerticalDivider(
+                                    width: 1,
+                                    thickness: 1,
+                                    color: Colors.black87,
+                                  ),
+                                  Expanded(
+                                    flex: 10,
+                                    child: Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(6.0),
+                                        child: Text(
+                                          "${deliveryFee.toInt()}",
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                "ยอดรวมทั้งหมด",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              Text(
+                                "${totalPrice.toInt()} บาท",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 24),
+                // 🎯 ปุ่มบันทึกและปิด
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton.icon(
+                    onPressed: _saveReceiptToGallery,
+                    icon: const Icon(
+                      Icons.download_rounded,
+                      color: Colors.white,
+                    ),
+                    label: const Text(
+                      "บันทึกใบเสร็จ",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green.shade600,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "ปิด",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // 🎯 เปิด Popup ยืนยันก่อนเด้งไปหน้าแจ้งปัญหา (CancelOrderMember)
@@ -139,7 +864,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
       ),
     );
 
-    // 🎯 ถ้าลูกค้ากด "ใช่" ให้กระโดดไปหน้า CancelOrderMember โดยส่งไปแค่ orderId ตามเดิม
     if (confirm == true) {
       if (!mounted) return;
       Navigator.push(
@@ -603,7 +1327,6 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
 
     String status = (widget.order.orderStatus ?? "").toLowerCase();
 
-    // 🎯 แก้ไขการเช็กลำดับขั้นตอน 6 Step ใหม่ให้ครบสมบูรณ์
     int currentStep = 1;
 
     if (status.contains("waitingrestaurant") ||
@@ -621,13 +1344,12 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
         status.contains("pickedup")) {
       currentStep = 4;
     } else if (status.contains("arrived") || status.contains("reached")) {
-      // 🎯 เพื่มสถานะ arrived เป็น Step 5
       currentStep = 5;
     } else if (status.contains("delivered") ||
         status.contains("success") ||
         status.contains("completed") ||
         status.contains("reviewsuccess")) {
-      currentStep = 6; // 🎯 ขยับ success ให้เป็น Step 6 (จุดสุดท้าย)
+      currentStep = 6;
     }
 
     final bool isCompleted =
@@ -1272,25 +1994,18 @@ class _ViewConfirmOrderMemberState extends State<ViewActiveOrderMember> {
                         ),
                       )
                     else
+                      // 🎯 เปลี่ยนเป็นปุ่มใบเสร็จ
                       SizedBox(
                         width: double.infinity,
                         height: 52,
                         child: OutlinedButton.icon(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ViewReview(order: widget.order),
-                              ),
-                            );
-                          },
+                          onPressed: _showReceiptDialog,
                           icon: const Icon(
-                            Icons.rate_review_rounded,
+                            Icons.receipt_long_rounded,
                             color: Colors.blue,
                           ),
                           label: const Text(
-                            "ดูการรีวิวของคุณ",
+                            "ใบเสร็จคำสั่งซื้อ",
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

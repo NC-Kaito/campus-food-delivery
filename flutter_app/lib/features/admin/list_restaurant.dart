@@ -1,4 +1,5 @@
 // features/admin/list_restaurant.dart
+import 'dart:async'; // 🎯 เพิ่ม import สำหรับ Timer
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
@@ -31,23 +32,36 @@ class _ListRestaurantState extends State<ListRestaurant> {
 
   List<RestaurantModel> restaurant = [];
   bool isLoading = false;
+  Timer? _refreshTimer; // 🎯 สร้างตัวแปรเก็บ Timer
 
-  void fetchAll() async {
+  // 🎯 เพิ่มตัวแปร showLoading เพื่อเช็กว่าจะโชว์วงกลมโหลดไหม
+  void fetchAll({bool showLoading = true}) async {
     try {
-      setState(() => isLoading = true);
+      if (showLoading && mounted) setState(() => isLoading = true);
       var restaurantResponse = await adminService.getListRestaurant();
-      setState(() => restaurant = restaurantResponse);
+      if (mounted) setState(() => restaurant = restaurantResponse);
     } on DioException catch (e) {
       debugPrint(e.toString());
     } finally {
-      setState(() => isLoading = false);
+      if (showLoading && mounted) setState(() => isLoading = false);
     }
   }
 
   @override
   void initState() {
     super.initState();
-    fetchAll();
+    fetchAll(); // โหลดครั้งแรกโชว์วงกลมปกติ
+
+    // 🎯 ตั้งเวลาดึงข้อมูลใหม่แบบเบื้องหลังทุก 10 วินาที
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      fetchAll(showLoading: false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel(); // 🎯 ยกเลิกการนับเวลาเมื่อปิดหน้านี้ทิ้ง
+    super.dispose();
   }
 
   @override
@@ -155,7 +169,7 @@ class _ListRestaurantState extends State<ListRestaurant> {
                                             rest.registerDate ?? '',
                                           );
                                           final registerDate = dt != null
-                                              ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${(dt.year - 543).toString().substring(2)}'
+                                              ? '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${(dt.year > 2500 ? dt.year : dt.year + 543).toString().substring(2)}'
                                               : '-';
                                           final registerTime = dt != null
                                               ? '${dt.hour.toString().padLeft(2, '0')}.${dt.minute.toString().padLeft(2, '0')} น.'
@@ -169,8 +183,9 @@ class _ListRestaurantState extends State<ListRestaurant> {
                                                 rest.restaurantName ?? '-',
                                             registerDate: registerDate,
                                             registerTime: registerTime,
-                                            onTap: () {
-                                              Navigator.push(
+                                            onTap: () async {
+                                              // 🎯 ใช้ await เพื่อให้รอการกลับมาจากหน้าดูรายละเอียด แล้วค่อยรีเฟรช
+                                              await Navigator.push(
                                                 context,
                                                 MaterialPageRoute(
                                                   builder: (context) =>
@@ -180,7 +195,7 @@ class _ListRestaurantState extends State<ListRestaurant> {
                                                       ),
                                                 ),
                                               );
-                                              fetchAll();
+                                              fetchAll(showLoading: false);
                                             },
                                           );
                                         },

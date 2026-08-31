@@ -72,7 +72,13 @@ class _LoginRiderState extends State<LoginRider>
           password: passwordController.text,
         );
 
+        // 🎯 1. ทำการล็อกอิน (ฟังก์ชันนี้ return เป็น void)
         await riderService.doLoginRider(rider);
+
+        // 🎯 2. ดึงข้อมูลไรเดอร์มาเพื่อตรวจสถานะ
+        final loggedInRider = await riderService.getRiderByStudentId(
+          studentIdController.text,
+        );
 
         if (mounted) {
           setState(() {
@@ -80,11 +86,148 @@ class _LoginRiderState extends State<LoginRider>
           });
           GlobalData.usernameRider = studentIdController.text;
 
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeRider()),
-            (route) => false,
-          );
+          final status = loggedInRider.verificationStatus;
+
+          // 🎯 กรณีถูกปิดบัญชี (เปลี่ยนเป็น Popup แล้วครับ)
+          if (status == 'close') {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: Row(
+                  children: [
+                    Icon(
+                      Icons.error_outline_rounded,
+                      color: Colors.red.shade700,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "บัญชีถูกปิดใช้งาน",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
+                ),
+                content: const Text(
+                  "คุณได้ทำการปิดบัญชีผู้จัดส่งในระบบเรียบร้อยแล้ว หากต้องการความช่วยเหลือหรือมีข้อสงสัยเพิ่มเติมให้ทำการติดต่อผู้ดูแลระบบเพื่อสอบถามเพิ่มเติม",
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    height: 1.5,
+                    color: Colors.black87,
+                  ),
+                ),
+                actionsPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                actions: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade600,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "ตกลง",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+            return;
+          }
+
+          // 🎯 กรณีอนุมัติแล้ว
+          if (status == 'true') {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const HomeRider()),
+              (route) => false,
+            );
+          } else {
+            // 🎯 กรณีรออนุมัติ (wait หรือสถานะอื่นๆ) โชว์ Popup ทันที
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                backgroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                title: Row(
+                  children: [
+                    Icon(
+                      Icons.mark_email_unread_rounded,
+                      color: Colors.orange.shade700,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      "รอการอนุมัติ",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 20,
+                      ),
+                    ),
+                  ],
+                ),
+                content: const Text(
+                  "บัญชีผู้จัดส่งของคุณกำลังอยู่ในระหว่างการตรวจสอบ\nหากแอดมินพิจารณาอนุมัติเรียบร้อยแล้ว จะแจ้งผลให้ทราบทางอีเมล",
+
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    height: 1.5,
+                    color: Colors.black87,
+                  ),
+                ),
+                actionsPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                actions: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(
+                          0xFF64F02D,
+                        ), // สี _accentGreen
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        "ตกลง",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
         }
       } catch (e) {
         if (mounted) {
@@ -105,7 +248,6 @@ class _LoginRiderState extends State<LoginRider>
 
   @override
   Widget build(BuildContext context) {
-    // 🎯 หาความสูงหน้าจอ เพื่อใช้กางและดันฟอร์มให้อยู่กลางจอ
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
@@ -115,7 +257,6 @@ class _LoginRiderState extends State<LoginRider>
         bottom: true,
         child: SingleChildScrollView(
           child: ConstrainedBox(
-            // 🎯 บังคับให้ ScrollView มีความสูงอย่างน้อยเท่ากับหน้าจอ
             constraints: BoxConstraints(minHeight: screenHeight),
             child: Form(
               key: formKey,
@@ -140,7 +281,6 @@ class _LoginRiderState extends State<LoginRider>
     );
   }
 
-  // ── ส่วนหัวฮีโร่: 🎯 ขยายความสูงให้กินพื้นที่เพื่อดันฟอร์มลง ──
   Widget _buildHero(BuildContext context, double screenHeight) {
     final double topInset = MediaQuery.of(context).padding.top;
 
@@ -148,7 +288,6 @@ class _LoginRiderState extends State<LoginRider>
       clipper: _RoadCurveClipper(),
       child: Container(
         width: double.infinity,
-        // 🎯 กำหนดความสูง 38% ของหน้าจอ เพื่อดันฟอร์มให้ตกมาตรงกลางพอดี
         height: screenHeight * 0.38,
         padding: EdgeInsets.fromLTRB(24, topInset + 10, 24, 40),
         decoration: const BoxDecoration(
@@ -163,8 +302,7 @@ class _LoginRiderState extends State<LoginRider>
           children: [
             Positioned(right: -10, top: 34, child: _speedStreaks()),
             Column(
-              mainAxisAlignment: MainAxisAlignment
-                  .center, // 🎯 จัดข้อความให้อยู่กึ่งกลางพื้นที่ฮีโร่
+              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
@@ -366,9 +504,9 @@ class _LoginRiderState extends State<LoginRider>
     return Row(
       children: [
         Expanded(child: Divider(color: Colors.grey.shade300, thickness: 1)),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: const Text(
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
             'หรือ',
             style: TextStyle(
               color: _muted,
@@ -432,11 +570,7 @@ class _LoginRiderState extends State<LoginRider>
                   color: _accentGreen.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  icon,
-                  color: _midGreen,
-                  size: 18,
-                ), // 🎯 ลบคำว่า const ออก
+                child: Icon(icon, color: _midGreen, size: 18),
               ),
             ),
             suffixIcon: suffixIcon,
