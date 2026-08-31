@@ -4,13 +4,15 @@ import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 class OrderDetailAddonModel {
   final int addonDetailId;
   final double? priceAtOrder;
-  final MenuAddonDetailModel?
-  menuAddonDetail; // ← เพิ่มใหม่: เก็บรายละเอียดเต็ม (มีชื่อ addon ซ้อนอยู่ข้างใน) ไว้ใช้แสดงผล
+  int? addonQty;
+
+  final MenuAddonDetailModel? menuAddonDetail;
 
   OrderDetailAddonModel({
     required this.addonDetailId,
     this.priceAtOrder,
     this.menuAddonDetail,
+    this.addonQty,
   });
 
   factory OrderDetailAddonModel.fromJson(Map<String, dynamic> json) {
@@ -27,7 +29,11 @@ class OrderDetailAddonModel {
                 ? (json['price_at_order'] as num).toDouble()
                 : 0.0),
 
-      // ← เพิ่มบรรทัดนี้: parse object ทั้งก้อนเก็บไว้ (มีชื่อ addon อยู่ข้างใน)
+      // 🎯 ดึงจำนวน Add-on จาก JSON ที่รับมาจาก Spring Boot
+      addonQty: json['addon_qty'] != null
+          ? (json['addon_qty'] as num).toInt()
+          : (json['addonQty'] != null ? (json['addonQty'] as num).toInt() : 1),
+
       menuAddonDetail: rawDetail != null
           ? MenuAddonDetailModel.fromJson(rawDetail)
           : null,
@@ -38,6 +44,7 @@ class OrderDetailAddonModel {
     return {
       'addondetailid': addonDetailId,
       'priceAtOrder': priceAtOrder ?? 0.0,
+      'addon_qty': addonQty,
     };
   }
 }

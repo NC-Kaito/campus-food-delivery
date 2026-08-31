@@ -1,11 +1,15 @@
+// features/restaurant/restaurant_navbar.dart
+import 'dart:async'; // 🎯 นำเข้า Timer สำหรับดึงออเดอร์ Real-time
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
+import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
 import 'package:flutter_app/features/restaurant/account_management.dart';
 import 'package:flutter_app/features/restaurant/profile_restaurant.dart';
 // TODO: แก้ path นี้ให้ตรงกับตำแหน่งไฟล์ LoginRestaurant จริงในโปรเจกต์ของคุณ
 import 'package:flutter_app/features/restaurant/login_restaurant.dart';
+import 'package:flutter_app/features/restaurant/list_order_restaurant.dart'; // 🎯 นำเข้าหน้า List Order
 import 'package:flutter_app/global_data.dart';
 
 class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
@@ -36,14 +40,53 @@ class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
 
 class _RestaurantNavbarState extends State<RestaurantNavbar> {
   final RestaurantService restaurantService = RestaurantService();
+  final OrderService _orderService =
+      OrderService(); // 🎯 สแตนด์บาย OrderService
   RestaurantModel? restaurantModel;
   String? restaurantImage;
   bool _isLoadingProfile = true;
+
+  // 🎯 ตัวแปรจัดการ Real-time สำหรับจำนวนออเดอร์ใหม่ (Navbar ดึงเอง ไม่ต้องรับจากหน้าอื่น)
+  Timer? _autoRefreshTimer;
+  int _newOrderCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadRestaurantData();
+    _fetchNewOrderCount(); // 🎯 ดึงจำนวนออเดอร์ตอนเปิด Navbar
+    _startAutoRefresh(); // 🎯 รีเฟรชทุกๆ 10 วิ
+  }
+
+  @override
+  void dispose() {
+    _autoRefreshTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) _fetchNewOrderCount();
+    });
+  }
+
+  // 🎯 ดึงจำนวนออเดอร์ที่ยังรอดำเนินการ (waiting) ของร้าน มาโชว์เป็น badge
+  Future<void> _fetchNewOrderCount() async {
+    try {
+      final waitingOrders = await _orderService.getWaitingOrdersByRestaurant(
+        GlobalData.usernameRestaurant,
+      );
+
+      final int count = waitingOrders.length;
+
+      if (mounted && _newOrderCount != count) {
+        setState(() {
+          _newOrderCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint("Navbar order fetch error: $e");
+    }
   }
 
   Future<void> _loadRestaurantData() async {
@@ -158,7 +201,6 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
     );
 
     if (confirm == true) {
-      // TODO: ใส่โค้ดเคลียร์ Session (เช่น ลบ token, ล้าง GlobalData) ก่อนเปลี่ยนหน้า
       if (!context.mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (context) => const LoginRestaurant()),
@@ -192,11 +234,8 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
               children: [
                 _HomeButton(
                   onTap: () {
-                    // 🎯 ดักเช็กสถานะ Route ปัจจุบัน
                     final isFirst = ModalRoute.of(context)?.isFirst ?? false;
-
                     if (isFirst) {
-                      // ถ้าอยู่หน้า Home อยู่แล้ว ให้ดึง Controller และเลื่อนขึ้นบนสุด
                       final scrollController = PrimaryScrollController.maybeOf(
                         context,
                       );
@@ -209,7 +248,6 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
                         );
                       }
                     } else {
-                      // ถ้าอยู่หน้าอื่น ให้ Pop กลับมาที่หน้าแรกตามปกติ
                       Navigator.popUntil(context, (route) => route.isFirst);
                     }
                   },
@@ -229,11 +267,19 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
                 ),
                 const SizedBox(width: gap),
 
+                // 🎯 Navbar ดึงจำนวนออเดอร์ใหม่เอง (_newOrderCount) ไม่ต้องพึ่ง prop จากหน้าที่เรียกใช้
                 _IconAction(
                   icon: Icons.notifications_outlined,
-                  badgeCount: widget.notificationCount,
+                  badgeCount: _newOrderCount,
                   tooltip: 'การแจ้งเตือน',
-                  onTap: () {},
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ListOrderRestaurant(),
+                      ),
+                    ).then((_) => _fetchNewOrderCount()); // กลับมาแล้วรีเฟรชเลข
+                  },
                 ),
                 const SizedBox(width: gap),
                 _IconAction(

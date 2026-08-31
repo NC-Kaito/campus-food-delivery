@@ -9,7 +9,6 @@ import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/features/rider/navbar_rider.dart';
 import 'package:flutter_app/global_data.dart';
 
-// 🎯 Import หน้าบัญชี (ตรวจสอบชื่อไฟล์ของคุณให้ตรง)
 import 'package:flutter_app/features/rider/account_menagement_rider.dart';
 
 import 'package:flutter_app/features/rider/view_waiting_pickup_order.dart'
@@ -36,26 +35,22 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
   bool _isLoadingStatus = true;
   int _selectedTabIndex = 0;
 
-  // 🎯 ตัวแปรเก็บจำนวนออเดอร์แจ้งเตือน (Badge)
   int _activeOrderCount = 0;
 
   late final TabController _tabController;
   List<dynamic> _realOrders = [];
   Timer? _autoRefreshTimer;
 
-  final Color _primaryOrange = const Color(
-    0xFFF97316,
-  ); // 🎯 โทนสีส้มเดียวกับระบบ Rider
+  final Color _primaryOrange = const Color(0xFFF97316);
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _fetchRiderStatus();
-    _fetchActiveOrderBadgeCount(); // 🎯 ดึงจำนวนออเดอร์แจ้งเตือนเมื่อเปิดหน้า
+    _fetchActiveOrderBadgeCount();
   }
 
-  // 🎯 ฟังก์ชันโหลดจำนวนแจ้งเตือน (แบบเดียวกับหน้า Home)
   Future<void> _fetchActiveOrderBadgeCount() async {
     try {
       String studentId = GlobalData.usernameRider;
@@ -78,7 +73,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (_isReady && !_isLoadingOrders && !_isUpdating) {
         _fetchOrdersBackground();
-        _fetchActiveOrderBadgeCount(); // 🎯 ให้อัปเดตตัวเลขแจ้งเตือนอัตโนมัติด้วย
+        _fetchActiveOrderBadgeCount();
       }
     });
   }
@@ -175,7 +170,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         });
       }
 
-      // 🎯 ดึงตัวเลขแจ้งเตือนใหม่ทุกครั้งที่มีการเปลี่ยนแท็บหรือโหลดข้อมูลใหม่
       _fetchActiveOrderBadgeCount();
     } catch (e) {
       if (mounted) {
@@ -312,7 +306,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       );
     }
 
-    if (result == true || _selectedTabIndex == 1) {
+    if (result == true || _selectedTabIndex == 1 || _selectedTabIndex == 2) {
       _fetchOrders();
     }
   }
@@ -387,15 +381,28 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
           "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} น.";
     }
 
+    // 🎯 จัดการรูปแบบปุ่มให้ตรงตามสถานะการจัดส่ง
     String buttonText = "ดูรายละเอียด";
     bool isReviewTab = _selectedTabIndex == 3;
+    Color buttonColor = const Color(0xFF64FF20);
+    Color textColor = Colors.black;
 
     if (_selectedTabIndex == 0) {
       buttonText = "ดูรายละเอียดเพื่อรับงาน";
     } else if (_selectedTabIndex == 1) {
       buttonText = "ดูเส้นทาง / Status จัดส่ง";
     } else if (_selectedTabIndex == 2) {
-      buttonText = "ดูรายละเอียดการจัดส่ง";
+      // 🎯 ถ้าออเดอร์ถูกตั้งเป็น delivered แล้ว (ไรเดอร์กดส่งแล้ว) แต่ลูกค้ายืนยันยังไม่เสร็จ
+      if ((orderModel.orderStatus ?? '').toLowerCase() == 'delivered') {
+        buttonText = "ส่งแล้ว (รอลูกค้ายืนยัน)";
+        buttonColor = Colors.orange.shade100;
+        textColor = Colors.orange.shade900;
+      } else {
+        // 🎯 ถ้าลูกค้ากดยืนยันแล้ว (Success)
+        buttonText = "จัดส่งสำเร็จเรียบร้อย";
+        buttonColor = Colors.green.shade100;
+        textColor = Colors.green.shade900;
+      }
     } else if (isReviewTab) {
       buttonText = "ดูรีวิวการจัดส่ง";
     }
@@ -608,7 +615,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                     isReviewTab: isReviewTab,
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF64FF20),
+                    backgroundColor: buttonColor,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
@@ -617,8 +624,8 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                   ),
                   child: Text(
                     buttonText,
-                    style: const TextStyle(
-                      color: Colors.black,
+                    style: TextStyle(
+                      color: textColor,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -787,7 +794,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
               ],
             ),
 
-      // 🎯 แถบ Navbar ด้านล่าง
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -802,15 +808,13 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
           selectedItemColor: _primaryOrange,
           unselectedItemColor: Colors.blueGrey.shade300,
           backgroundColor: Colors.white,
-          currentIndex: 1, // 🎯 ชี้สถานะไปที่แท็บที่ 2 (รับงาน)
+          currentIndex: 1,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
           onTap: (index) {
             if (index == 0) {
-              // กลับไปหน้าหลัก (HomeRider)
               Navigator.popUntil(context, (route) => route.isFirst);
             } else if (index == 2) {
-              // ไปหน้าตั้งค่าบัญชี
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
@@ -825,7 +829,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
               label: "หน้าหลัก",
             ),
             BottomNavigationBarItem(
-              // 🎯 ซ้อน Stack ใส่ Badge แดงตรงปุ่มรับงาน
               icon: Stack(
                 clipBehavior: Clip.none,
                 children: [

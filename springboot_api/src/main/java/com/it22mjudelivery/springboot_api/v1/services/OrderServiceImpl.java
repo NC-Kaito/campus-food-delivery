@@ -110,6 +110,7 @@ public class OrderServiceImpl implements OrderService {
                                     .orderDetail(savdOrderDetail)
                                     .menuaddondetail(menuaddondetail)
                                     .priceAtOrder(menuaddondetail.getAddonprice())
+                                    .addon_qty(addOnDto.getAddon_qty())
                                     .build();
 
                             orderDetailAddonRepo.save(orderdetailaddon);
@@ -144,6 +145,7 @@ public class OrderServiceImpl implements OrderService {
 
         return false;
     }
+
     @Override
     @Transactional(readOnly = true)
     public List<Order> getOrdersByMember(String username) {
@@ -352,7 +354,7 @@ public class OrderServiceImpl implements OrderService {
     public List<Order> getSuccessOrdersByRider(String username) {
         try {
             // ดึงเฉพาะออเดอร์ที่สถานะเป็น Success หรือ Completed
-            List<String> successStatus = Arrays.asList("Success");
+            List<String> successStatus = Arrays.asList("delivered", "Success");
             return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, successStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่สำเร็จแล้วได้: " + e.getMessage());

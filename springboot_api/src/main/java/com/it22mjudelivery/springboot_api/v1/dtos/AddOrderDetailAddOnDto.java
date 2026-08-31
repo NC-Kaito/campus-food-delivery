@@ -9,4 +9,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AddOrderDetailAddOnDto {
     private int addondetailid;
+
+    private int addon_qty;
 }

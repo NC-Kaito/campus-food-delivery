@@ -95,82 +95,168 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
   // ── 🎯 การ์ดรายการอาหารปรับแต่งใหม่ (เหมือนหน้า ViewOrderMember) ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // 1. ตรวจสอบว่าเป็นข้าวราดแกงหรือไม่
-    final bool isCurryDish =
-        (item.orderDetailCurries != null &&
-        item.orderDetailCurries!.isNotEmpty);
-
-    int curryCount = isCurryDish ? item.orderDetailCurries!.length : 0;
-    String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
-    if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง ($curryCount อย่าง)";
+    List<dynamic> rawCurries = [];
+    if (item.orderDetailCurries != null &&
+        item.orderDetailCurries!.isNotEmpty) {
+      rawCurries = item.orderDetailCurries!;
+    } else {
+      try {
+        final jsonItem = (item as dynamic).toJson();
+        rawCurries =
+            jsonItem['orderDetailCurries'] ??
+            jsonItem['orderdetailcurries'] ??
+            [];
+      } catch (_) {}
     }
 
-    // 2. ดึงรายการกับข้าวทั้งหมดพร้อมรูปภาพ
-    List<Map<String, String>> curriesList = [];
+    final bool isCurryDish = rawCurries.isNotEmpty;
+    String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
-      for (var e in item.orderDetailCurries!) {
-        if (e is Map<String, dynamic>) {
-          final menuMap = (e['menu'] is Map<String, dynamic>)
-              ? e['menu'] as Map<String, dynamic>
-              : e;
+      displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
+    }
 
-          String name = (menuMap['menuname'] ?? menuMap['menuName'] ?? '')
-              .toString();
-          String img = (menuMap['menuimage'] ?? menuMap['menuImage'] ?? '')
-              .toString();
+    List<Map<String, String>> curriesList = [];
+    for (var e in rawCurries) {
+      String name = '';
+      String img = '';
 
-          if (name.isNotEmpty) {
-            curriesList.add({'name': name, 'image': img});
-          }
+      if (e is Map) {
+        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
+        name =
+            (menuMap['menuname'] ??
+                    menuMap['menuName'] ??
+                    menuMap['name'] ??
+                    '')
+                .toString();
+        img =
+            (menuMap['imageurl'] ??
+                    menuMap['imageUrl'] ??
+                    menuMap['menuimage'] ??
+                    menuMap['menuImage'] ??
+                    menuMap['image'] ??
+                    '')
+                .toString();
+      } else {
+        try {
+          name =
+              ((e as dynamic).menu?.menuName ??
+                      (e as dynamic).menu?.menuname ??
+                      (e as dynamic).name ??
+                      '')
+                  .toString();
+          img =
+              ((e as dynamic).menu?.menuImage ??
+                      (e as dynamic).menu?.imageurl ??
+                      (e as dynamic).menu?.imageUrl ??
+                      (e as dynamic).image ??
+                      '')
+                  .toString();
+        } catch (_) {}
+      }
+
+      if (name.isNotEmpty) {
+        curriesList.add({'name': name, 'image': img});
+      }
+    }
+
+    List<dynamic> rawAddons = [];
+    if (item.addons.isNotEmpty) {
+      rawAddons = item.addons;
+    } else {
+      try {
+        rawAddons = (item as dynamic).toJson()['addons'] ?? [];
+      } catch (_) {}
+    }
+
+    // 🎯 จัดกลุ่ม Add-on เหมือนฝั่งลูกค้า
+    Map<String, Map<String, dynamic>> groupedAddons = {};
+    for (var addon in rawAddons) {
+      String name = '';
+      int price = 0;
+      int qty = 1;
+
+      if (addon is Map) {
+        name =
+            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
+            addon['addonMenu']?['addonName'] ??
+            addon['name'] ??
+            '';
+        price =
+            (addon['priceAtOrder'] ??
+                    addon['menuAddonDetail']?['addonPrice'] ??
+                    0)
+                .toInt();
+        qty = (addon['addonQty'] ?? addon['addon_qty'] ?? 1).toInt();
+      } else {
+        try {
+          name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
+          price =
+              ((addon as dynamic).priceAtOrder ??
+                      (addon as dynamic).menuAddonDetail?.addonPrice ??
+                      0)
+                  .toInt();
+          qty = ((addon as dynamic).addonQty ?? 1).toInt();
+        } catch (_) {}
+      }
+
+      if (name.isNotEmpty) {
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + qty;
+        } else {
+          groupedAddons[name] = {'qty': qty, 'unitPrice': price};
         }
       }
     }
 
-    // 3. จัดกลุ่มและนับจำนวน Add-on ที่เลือกมาทั้งหมด (เช่น ไข่ดาว x2)
-    Map<String, int> addonCounts = {};
-    for (var addon in item.addons) {
-      String name = '';
-      if (addon.menuAddonDetail != null &&
-          addon.menuAddonDetail!.addonMenu != null) {
-        name = addon.menuAddonDetail!.addonMenu!.addonName ?? '';
-      }
-      if (name.isNotEmpty) {
-        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
-      }
+    int totalItemPrice = 0;
+    int baseUnitNoAddonPrice = 0;
+
+    int addonsSum = 0;
+    for (var addon in groupedAddons.values) {
+      addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
     }
 
-    // 4. คำนวณราคาต่อหน่วย
-    int finalPricePerUnit = 0;
-    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+    try {
+      final jsonItem = (item as dynamic).toJson();
+      var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
 
-    if (isCurryDish) {
+      if (rawSubtotal != null) {
+        totalItemPrice = (rawSubtotal as num).toInt();
+      }
+    } catch (_) {}
+
+    // คำนวณราคาเฉพาะเมนูตั้งต้น
+    if (totalItemPrice > 0) {
+      int unitTotal = totalItemPrice ~/ (item.qty > 0 ? item.qty : 1);
+      baseUnitNoAddonPrice = unitTotal - addonsSum;
+      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0;
+    } else {
+      int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+      if (baseMenuPrice == 0) {
+        try {
+          final jsonItem = (item as dynamic).toJson();
+          baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
+        } catch (_) {}
+      }
+
       int curriesSum = 0;
-      for (var curry in item.orderDetailCurries!) {
-        if (curry is Map<String, dynamic>) {
-          final num? price = curry['priceAtOrder'] as num?;
+      for (var curry in rawCurries) {
+        if (curry is Map) {
+          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
           curriesSum += (price ?? 0).toInt();
         }
       }
-      int addonsSum = 0;
-      for (var addon in item.addons) {
-        addonsSum +=
-            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
-                .toInt();
-      }
-      finalPricePerUnit =
-          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
-    } else {
-      int addonsSum = 0;
-      for (var addon in item.addons) {
-        addonsSum +=
-            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
-                .toInt();
-      }
-      finalPricePerUnit = baseMenuPrice + addonsSum;
+
+      baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
+      totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
     }
 
-    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
+    String rawMenuUrl = item.menu?.menuImage ?? '';
+    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
+      rawMenuUrl = curriesList.first['image'] ?? '';
+    }
+    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -186,16 +272,16 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: isCurryDish || finalMenuUrl.isEmpty
-                  ? _buildPlaceholderIcon()
-                  : Image.network(
+              child: finalMenuUrl.isNotEmpty
+                  ? Image.network(
                       Uri.encodeFull(finalMenuUrl),
                       width: 65,
                       height: 65,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildPlaceholderIcon(),
-                    ),
+                    )
+                  : _buildPlaceholderIcon(),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -211,15 +297,16 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  // 🎯 โชว์ราคาเฉพาะเมนู
                   Text(
-                    "ราคา $finalPricePerUnit บาท",
+                    "ราคา $baseUnitNoAddonPrice บาท",
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
 
-                  // แสดงผลกับข้าวทุกอย่างแบบ Badge พร้อมรูปภาพย่อย
+                  // แสดงผลข้าวราดแกง
                   if (curriesList.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -284,13 +371,30 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     ),
                   ],
 
-                  // แสดงผล Add-on แบบ Badge สีส้ม พร้อมรวมจำนวน (เช่น ไข่ดาว x2)
-                  if (addonCounts.isNotEmpty) ...[
+                  // 🎯 แสดงผล Add-on แบบรวมจำนวนและราคา
+                  if (groupedAddons.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6.0,
                       runSpacing: 6.0,
-                      children: addonCounts.entries.map((entry) {
+                      children: groupedAddons.entries.map((entry) {
+                        String name = entry.key;
+                        int qty = entry.value['qty'] as int;
+                        int unitPrice = entry.value['unitPrice'] as int;
+
+                        String displayText = name;
+                        if (qty > 1) {
+                          int totalAddonPrice = unitPrice * qty;
+                          displayText += " x$qty";
+                          if (totalAddonPrice > 0) {
+                            displayText += " (+฿$totalAddonPrice)";
+                          }
+                        } else {
+                          if (unitPrice > 0) {
+                            displayText += " (+฿$unitPrice)";
+                          }
+                        }
+
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -311,9 +415,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                entry.value > 1
-                                    ? "${entry.key} x${entry.value}"
-                                    : entry.key,
+                                displayText,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.orange.shade900,
@@ -341,12 +443,26 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                   const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      "จำนวน ${item.qty}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "จำนวน ${item.qty}",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          "รวม $totalItemPrice บาท",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: _primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -541,8 +657,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors
-                    .black, // 🎯 แก้ไขสีตรงนี้ให้เป็น Colors.black แล้วครับ
+                color: Colors.black,
               ),
             ),
             const SizedBox(height: 10),

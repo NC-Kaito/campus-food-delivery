@@ -1,4 +1,5 @@
 // features/restaurant/home_restaurant.dart
+import 'dart:async'; // 🎯 นำเข้า Timer สำหรับดึงออเดอร์ Real-time
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/menu_addon_group_model.dart';
@@ -9,6 +10,7 @@ import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
+import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
 import 'package:flutter_app/features/restaurant/add_addon.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/edit_addon.dart';
@@ -40,6 +42,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   final RestaurantService restaurantService = RestaurantService();
   final MenuService menuService = MenuService();
   final MenuAddonService _addonService = MenuAddonService();
+  final OrderService _orderService =
+      OrderService(); // 🎯 สแตนด์บาย OrderService
 
   RestaurantModel? restaurantModel;
   TabController? _tabController;
@@ -60,25 +64,55 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   final Map<int, bool> _groupExpanded = {};
   final Map<int, bool> _itemChecked = {};
 
-  // 🎯 เก็บจำนวนกลุ่มตัวเลือกที่ผูกกับแต่ละเมนู
   final Map<int, int> _menuAddonGroupCounts = {};
+
+  // 🎯 ตัวแปรจัดการ Real-time
+  Timer? _autoRefreshTimer;
+  int _newOrderCount = 0;
 
   @override
   void initState() {
     super.initState();
     loadRestaurantData();
+    _fetchNewOrderCount(); // 🎯 ดึงจำนวนออเดอร์ตอนเปิดหน้า
+    _startAutoRefresh(); // 🎯 รีเฟรชทุกๆ 10 วิ
   }
 
   @override
   void dispose() {
+    _autoRefreshTimer?.cancel();
     _tabController?.dispose();
     super.dispose();
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+      if (mounted) _fetchNewOrderCount();
+    });
+  }
+
+  // 🎯 เปลี่ยนมาใช้ getWaitingOrdersByRestaurant เพื่อดึงออเดอร์ใหม่ตรงๆ ตัวเลขจะไม่กระโดดหรือหายไปไหน
+  Future<void> _fetchNewOrderCount() async {
+    try {
+      final waitingOrders = await _orderService.getWaitingOrdersByRestaurant(
+        GlobalData.usernameRestaurant,
+      );
+
+      int count = waitingOrders.length;
+
+      if (mounted && _newOrderCount != count) {
+        setState(() {
+          _newOrderCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint("Background order fetch error: $e");
+    }
   }
 
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
-
     final String baseUrl = DioClient.dio.options.baseUrl;
     if (rawPath.startsWith('/')) {
       return "$baseUrl$rawPath";
@@ -135,9 +169,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     _tabController?.dispose();
 
     setState(() {
-      // 🎯 [เพิ่มจุดนี้] ล้างแคชทั้งหมดทิ้งเวลาโหลดร้านค้าใหม่ (เช่น กลับมาจากหน้า AddMenu)
       _menuAddonGroupCounts.clear();
-
       typeMenus = validEntries.map((e) => e.key).toList();
       categoryMenus
         ..clear()
@@ -152,7 +184,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       _tabController = newController;
     });
 
-    // 🎯 โหลดจำนวนกลุ่มตัวเลือกตอนดึงเมนูเสร็จ
     _loadAddonCountsFor(validEntries.expand((e) => e.value).toList());
   }
 
@@ -202,13 +233,11 @@ class _HomeRestaurantState extends State<HomeRestaurant>
           categoryMenus[typeMenuId] = menuData;
           categoryLoading[typeMenuId] = false;
 
-          // 🎯 [เพิ่มจุดนี้] ลบแคชจำนวน Add-on เฉพาะหมวดหมู่นี้ทิ้ง เพื่อบังคับให้อัปเดตใหม่
           for (var m in menuData) {
             if (m.menuId != null) _menuAddonGroupCounts.remove(m.menuId);
           }
         });
 
-        // 🎯 โหลดจำนวนกลุ่มตัวเลือกตอน Pull-to-refresh
         _loadAddonCountsFor(menuData);
       }
     } catch (e) {
@@ -218,7 +247,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
-  // 🎯 ฟังก์ชันดึงจำนวนกลุ่มตัวเลือกที่ใช้งานของแต่ละเมนู
   Future<void> _loadAddonCountsFor(List<MenuModel> menus) async {
     final idsToLoad = menus
         .where(
@@ -603,15 +631,19 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final String finalImageUrl = _getFinalImageUrl(restaurantimage);
 
     if (_tabController == null) {
-      return Scaffold(
-        appBar: const RestaurantNavbar(title: ""),
+      return const Scaffold(
+        appBar: RestaurantNavbar(
+          title: "",
+        ), // 🎯 ไม่แตะต้อง Navbar โครงสร้างเดิม
         backgroundColor: _bg,
-        body: const Center(child: CircularProgressIndicator(color: _primary)),
+        body: Center(child: CircularProgressIndicator(color: _primary)),
       );
     }
 
     return Scaffold(
-      appBar: const RestaurantNavbar(title: ""),
+      appBar: const RestaurantNavbar(
+        title: "",
+      ), // 🎯 คงโครงสร้าง Navbar เดิมเป๊ะๆ
       backgroundColor: _bg,
       extendBodyBehindAppBar: true,
       body: NestedScrollView(
@@ -699,6 +731,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         ),
                         const SizedBox(height: 16),
 
+                        // 🎯 แถบเมนู 4 ปุ่ม (เพิ่มแจ้งเตือนตรงนี้)
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: _buildQuickActionsRow(),
@@ -1007,7 +1040,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
                 const SizedBox(height: 6),
 
-                // 🎯 แสดงจำนวนกลุ่มตัวเลือก และดันปุ่มแก้ไขให้ชิดขวา
                 Row(
                   children: [
                     if (!isRiceCurry)
@@ -1104,15 +1136,22 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         ),
         const SizedBox(width: 8),
         Expanded(
-          child: _buildQuickAction(
+          // 🎯 เรียกใช้ Badge ตรงนี้
+          child: _buildQuickActionWithBadge(
             icon: Icons.list_alt_rounded,
             label: "ออเดอร์",
             iconColor: _accent,
             active: false,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ListOrderRestaurant()),
-            ),
+            badgeCount: _newOrderCount,
+            onTap: () =>
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const ListOrderRestaurant(),
+                  ),
+                ).then(
+                  (_) => _fetchNewOrderCount(),
+                ), // ดึงออเดอร์ใหม่หลังกลับมาจากหน้า List
           ),
         ),
         const SizedBox(width: 8),
@@ -1132,6 +1171,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
+  // 🎯 ปุ่ม Quick Action แบบปกติ (ไม่มี Badge)
   Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -1155,6 +1195,86 @@ class _HomeRestaurantState extends State<HomeRestaurant>
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 22, color: iconColor),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.visible,
+              style: TextStyle(
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
+                color: active ? _primary : _textDark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🎯 ปุ่ม Quick Action แบบพิเศษที่มี Badge สีแดงซ้อนทับ (ดีไซน์แบบเดียวกับหน้า List)
+  Widget _buildQuickActionWithBadge({
+    required IconData icon,
+    required String label,
+    required Color iconColor,
+    required bool active,
+    required VoidCallback onTap,
+    required int badgeCount,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+        decoration: BoxDecoration(
+          color: active ? _primary.withOpacity(0.08) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active ? _primary.withOpacity(0.5) : Colors.grey.shade300,
+            width: active ? 1.4 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
+              children: [
+                Icon(icon, size: 22, color: iconColor),
+                // 🎯 โชว์ Badge สีแดง
+                if (badgeCount > 0)
+                  Positioned(
+                    right: -8,
+                    top: -6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white, width: 1),
+                      ),
+                      child: Text(
+                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                          height: 1.2,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             const SizedBox(height: 6),
             Text(
               label,

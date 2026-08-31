@@ -162,83 +162,170 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     );
   }
 
-  // ── 🎯 การ์ดรายการอาหารปรับแต่งใหม่ให้เหมือนหน้า view_order_member ──
+  // ── 🎯 การ์ดรายการอาหารปรับแต่งใหม่ให้ตรงกับฝั่ง Member ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    final bool isCurryDish =
-        (item.orderDetailCurries != null &&
-        item.orderDetailCurries!.isNotEmpty);
+    List<dynamic> rawCurries = [];
+    if (item.orderDetailCurries != null &&
+        item.orderDetailCurries!.isNotEmpty) {
+      rawCurries = item.orderDetailCurries!;
+    } else {
+      try {
+        final jsonItem = (item as dynamic).toJson();
+        rawCurries =
+            jsonItem['orderDetailCurries'] ??
+            jsonItem['orderdetailcurries'] ??
+            [];
+      } catch (_) {}
+    }
 
-    int curryCount = isCurryDish ? item.orderDetailCurries!.length : 0;
+    final bool isCurryDish = rawCurries.isNotEmpty;
     String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง ($curryCount อย่าง)";
+      displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
-    // ดึงรายการกับข้าวทั้งหมดพร้อมรูปภาพ
-    List<Map<String, String>> curriesList = [];
-    if (isCurryDish) {
-      for (var e in item.orderDetailCurries!) {
-        if (e is Map<String, dynamic>) {
-          final menuMap = (e['menu'] is Map<String, dynamic>)
-              ? e['menu'] as Map<String, dynamic>
-              : e;
-
-          String name = (menuMap['menuname'] ?? menuMap['menuName'] ?? '')
-              .toString();
-          String img = (menuMap['menuimage'] ?? menuMap['menuImage'] ?? '')
-              .toString();
-
-          if (name.isNotEmpty) {
-            curriesList.add({'name': name, 'image': img});
-          }
-        }
-      }
-    }
-
-    // จัดกลุ่มและนับจำนวน Add-on ที่เลือกมาทั้งหมด (เช่น ไข่ดาว x2)
-    Map<String, int> addonCounts = {};
-    for (var addon in item.addons) {
+    List<Map<String, dynamic>> curriesList = [];
+    for (var e in rawCurries) {
       String name = '';
-      if (addon.menuAddonDetail != null &&
-          addon.menuAddonDetail!.addonMenu != null) {
-        name = addon.menuAddonDetail!.addonMenu!.addonName ?? '';
+      String img = '';
+      int price = 0;
+
+      if (e is Map) {
+        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
+        name =
+            (menuMap['menuname'] ??
+                    menuMap['menuName'] ??
+                    menuMap['name'] ??
+                    '')
+                .toString();
+        img =
+            (menuMap['imageurl'] ??
+                    menuMap['imageUrl'] ??
+                    menuMap['menuimage'] ??
+                    menuMap['menuImage'] ??
+                    menuMap['image'] ??
+                    '')
+                .toString();
+        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0).toInt();
+      } else {
+        try {
+          name =
+              ((e as dynamic).menu?.menuName ??
+                      (e as dynamic).menu?.menuname ??
+                      (e as dynamic).name ??
+                      '')
+                  .toString();
+          img =
+              ((e as dynamic).menu?.menuImage ??
+                      (e as dynamic).menu?.imageurl ??
+                      (e as dynamic).menu?.imageUrl ??
+                      (e as dynamic).image ??
+                      '')
+                  .toString();
+          price = ((e as dynamic).priceAtOrder ?? 0).toInt();
+        } catch (_) {}
       }
+
       if (name.isNotEmpty) {
-        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+        curriesList.add({'name': name, 'image': img, 'price': price});
       }
     }
 
-    // คำนวณราคาต่อหน่วย
-    int finalPricePerUnit = 0;
-    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+    List<dynamic> rawAddons = [];
+    if (item.addons.isNotEmpty) {
+      rawAddons = item.addons;
+    } else {
+      try {
+        rawAddons = (item as dynamic).toJson()['addons'] ?? [];
+      } catch (_) {}
+    }
 
-    if (isCurryDish) {
-      int curriesSum = 0;
-      for (var curry in item.orderDetailCurries!) {
-        if (curry is Map<String, dynamic>) {
-          final num? price = curry['priceAtOrder'] as num?;
-          curriesSum += (price ?? 0).toInt();
+    // 🎯 จัดกลุ่ม Add-on (นับจำนวนและราคาต่อหน่วย)
+    Map<String, Map<String, dynamic>> groupedAddons = {};
+    for (var addon in rawAddons) {
+      String name = '';
+      int price = 0;
+      int qty = 1;
+
+      if (addon is Map) {
+        name =
+            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
+            addon['addonMenu']?['addonName'] ??
+            addon['name'] ??
+            '';
+        price =
+            (addon['priceAtOrder'] ??
+                    addon['menuAddonDetail']?['addonPrice'] ??
+                    0)
+                .toInt();
+        qty = (addon['addonQty'] ?? addon['addon_qty'] ?? 1).toInt();
+      } else {
+        try {
+          name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
+          price =
+              ((addon as dynamic).priceAtOrder ??
+                      (addon as dynamic).menuAddonDetail?.addonPrice ??
+                      0)
+                  .toInt();
+          qty = ((addon as dynamic).addonQty ?? 1).toInt();
+        } catch (_) {}
+      }
+
+      if (name.isNotEmpty) {
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + qty;
+        } else {
+          groupedAddons[name] = {'qty': qty, 'unitPrice': price};
         }
       }
-      int addonsSum = 0;
-      for (var addon in item.addons) {
-        addonsSum +=
-            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
-                .toInt();
-      }
-      finalPricePerUnit =
-          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
-    } else {
-      int addonsSum = 0;
-      for (var addon in item.addons) {
-        addonsSum +=
-            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
-                .toInt();
-      }
-      finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
-    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
+    int totalItemPrice = 0;
+    int baseUnitNoAddonPrice = 0;
+
+    int addonsSum = 0;
+    for (var addon in groupedAddons.values) {
+      addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
+    }
+
+    try {
+      final jsonItem = (item as dynamic).toJson();
+      var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
+
+      if (rawSubtotal != null) {
+        totalItemPrice = (rawSubtotal as num).toInt();
+      }
+    } catch (_) {}
+
+    // 🎯 คำนวณราคาเฉพาะเมนูตั้งต้น (ลบราคาแอดออนออก)
+    if (totalItemPrice > 0) {
+      int unitTotal = totalItemPrice ~/ (item.qty > 0 ? item.qty : 1);
+      baseUnitNoAddonPrice = unitTotal - addonsSum;
+      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0;
+    } else {
+      int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+      if (baseMenuPrice == 0) {
+        try {
+          final jsonItem = (item as dynamic).toJson();
+          baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
+        } catch (_) {}
+      }
+
+      int curriesSum = 0;
+      for (var curry in curriesList) {
+        curriesSum += curry['price'] as int;
+      }
+
+      baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
+      totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
+    }
+
+    String rawMenuUrl = item.menu?.menuImage ?? '';
+    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
+      rawMenuUrl = curriesList.first['image'] as String;
+    }
+    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -279,23 +366,25 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                     ),
                   ),
                   const SizedBox(height: 2),
+                  // 🎯 โชว์ราคาตั้งต้นที่ไม่รวมแอดออน
                   Text(
-                    "ราคา $finalPricePerUnit บาท",
+                    "ราคา $baseUnitNoAddonPrice บาท",
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
 
-                  // แสดงผลกับข้าวทั้งหมดแบบ Badge พร้อมรูปภาพย่อย
+                  // ข้าวราดแกง
                   if (curriesList.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 6.0,
                       runSpacing: 6.0,
                       children: curriesList.map((curry) {
-                        String rawCurryImage = curry['image'] ?? '';
+                        String rawCurryImage = curry['image'] as String;
                         String finalCurryUrl = _getFinalImageUrl(rawCurryImage);
+                        String curryName = curry['name'] as String;
 
                         return Container(
                           padding: const EdgeInsets.only(
@@ -338,7 +427,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                curry['name'] ?? "ไม่มีชื่อ",
+                                curryName,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.green.shade900,
@@ -352,13 +441,30 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                     ),
                   ],
 
-                  // แสดงผล Add-on แบบ Badge สีส้ม พร้อมรวมจำนวน (เช่น ไข่ดาว x2)
-                  if (addonCounts.isNotEmpty) ...[
+                  // 🎯 โชว์ Add-on แบบจัดกลุ่ม + จำนวน และรวมราคา
+                  if (groupedAddons.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6.0,
                       runSpacing: 6.0,
-                      children: addonCounts.entries.map((entry) {
+                      children: groupedAddons.entries.map((entry) {
+                        String name = entry.key;
+                        int qty = entry.value['qty'] as int;
+                        int unitPrice = entry.value['unitPrice'] as int;
+
+                        String displayText = name;
+                        if (qty > 1) {
+                          int totalAddonPrice = unitPrice * qty;
+                          displayText += " x$qty";
+                          if (totalAddonPrice > 0) {
+                            displayText += " (+฿$totalAddonPrice)";
+                          }
+                        } else {
+                          if (unitPrice > 0) {
+                            displayText += " (+฿$unitPrice)";
+                          }
+                        }
+
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -379,9 +485,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                entry.value > 1
-                                    ? "${entry.key} x${entry.value}"
-                                    : entry.key,
+                                displayText,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.orange.shade900,
@@ -409,12 +513,26 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                   const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      "จำนวน ${item.qty}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "จำนวน ${item.qty}",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          "รวม $totalItemPrice บาท",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],

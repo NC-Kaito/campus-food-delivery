@@ -118,13 +118,10 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     String? rawMenuImage = item.menu.menuImage;
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
-    int totalAddonPricePerUnit = 0;
-    for (var addon in item.selectedAddons) {
-      totalAddonPricePerUnit += addon.addonPrice?.toInt() ?? 0;
-    }
-    int finalPricePerUnit = item.unitPrice + totalAddonPricePerUnit;
+    // 🎯 แก้ไขตรงนี้: ไม่รวมราคา Add-on ให้แสดงแค่ราคาเฉพาะเมนูตามที่คุณต้องการ
+    int menuUnitPrice = item.unitPrice;
 
-    // 🎯 ปรับลอจิก Add-on ใหม่: จัดกลุ่มเพื่อคำนวณราคารวมของแต่ละ Add-on ให้อ่านง่าย
+    // จัดกลุ่มเพื่อคำนวณราคารวมของแต่ละ Add-on ให้อ่านง่าย
     Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in item.selectedAddons) {
       String name = addon.addonMenu?.addonName ?? '';
@@ -238,7 +235,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      "ราคา $finalPricePerUnit บาท",
+                      "ราคา $menuUnitPrice บาท", // 🎯 อัปเดตการแสดงผลราคาที่นี่
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -318,7 +315,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       ),
                     ],
 
-                    // 🎯 แสดงผล Add-on แบบใหม่
+                    // แสดงผล Add-on
                     if (groupedAddons.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Wrap(
@@ -336,7 +333,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                             displayText += " x$qty"; // โชว์จำนวนก่อน
                             if (totalAddonPrice > 0) {
                               displayText +=
-                                  " (ราคา +$totalAddonPrice บาท)"; // วงเล็บราคารวมท้ายสุด
+                                  " (+฿$totalAddonPrice)"; // วงเล็บราคารวมท้ายสุด
                             }
                           } else {
                             if (unitPrice > 0) {
@@ -402,7 +399,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   Widget build(BuildContext context) {
     int subtotalPrice = 0;
 
-    // 🎯 [แก้ไขแล้ว] รวมราคา Add-on ไม่ว่าจะเป็นเมนูไหนก็ตาม
     for (var item in widget.storeItems) {
       int addonsSum = 0;
       for (var addon in item.selectedAddons) {
@@ -762,30 +758,47 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   );
 
                   try {
-                    // 🎯 [แก้ไขแล้ว] รวมราคา Add-on ไม่ว่าจะเป็นเมนูไหนก็ตามตอนกดยืนยันออเดอร์
                     List<OrderDetailModel> orderItems = widget.storeItems.map((
                       cartItem,
                     ) {
                       int currentAddonsSum = 0;
+
+                      Map<int, Map<String, dynamic>> groupedAddonsForApi = {};
+
                       for (var addon in cartItem.selectedAddons) {
-                        currentAddonsSum += addon.addonPrice?.toInt() ?? 0;
+                        int id = addon.addonDetailId ?? 0;
+                        double price = (addon.addonPrice ?? 0).toDouble();
+                        currentAddonsSum += price.toInt();
+
+                        if (groupedAddonsForApi.containsKey(id)) {
+                          groupedAddonsForApi[id]!['qty'] += 1;
+                        } else {
+                          groupedAddonsForApi[id] = {
+                            'priceAtOrder': price,
+                            'qty': 1,
+                          };
+                        }
                       }
+
                       double actualSubTotal =
                           (cartItem.unitPrice + currentAddonsSum) *
                           cartItem.quantity.toDouble();
+
+                      List<OrderDetailAddonModel> finalAddons =
+                          groupedAddonsForApi.entries.map((e) {
+                            return OrderDetailAddonModel(
+                              addonDetailId: e.key,
+                              priceAtOrder: e.value['priceAtOrder'],
+                              addonQty: e.value['qty'],
+                            );
+                          }).toList();
 
                       return OrderDetailModel(
                         menuId: cartItem.menu.menuId ?? 0,
                         qty: cartItem.quantity,
                         subTotal: actualSubTotal,
                         note: cartItem.note,
-                        addons: cartItem.selectedAddons.map((addonDetail) {
-                          return OrderDetailAddonModel(
-                            addonDetailId: addonDetail.addonDetailId ?? 0,
-                            priceAtOrder: (addonDetail.addonPrice ?? 0)
-                                .toDouble(),
-                          );
-                        }).toList(),
+                        addons: finalAddons,
                         orderDetailCurries: cartItem.selectedCurries.map((
                           curry,
                         ) {

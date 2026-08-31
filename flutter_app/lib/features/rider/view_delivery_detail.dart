@@ -1,3 +1,4 @@
+// features/rider/view_delivery_detail.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/order_model.dart';
@@ -42,45 +43,35 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     super.dispose();
   }
 
-  // 🎯 ฟังก์ชันดึงสถานะปัจจุบันของไรเดอร์ (แก้เป็นเทียบคำเป๊ะๆ เพื่อป้องกันสถานะเพี้ยนกระโดดไปจัดส่งสำเร็จ)
+  // 🎯 ฟังก์ชันดึงสถานะปัจจุบันของไรเดอร์
   int _getCurrentRiderStep() {
     final status = (widget.orderModel.orderStatus ?? "").trim().toLowerCase();
 
-    // Step 1: รอร้านค้ายืนยัน (ปุ่มจะถูกล็อก)
     if (status.isEmpty ||
         status == "waitingrider" ||
         status == "waitingrestaurant" ||
         status == "pending") {
       return 1;
-    }
-    // Step 2: ร้านรับออเดอร์แล้ว (ปลดล็อกปุ่มให้ไรเดอร์กด "กำลังไปรับออเดอร์")
-    else if (status == "preparing" ||
+    } else if (status == "preparing" ||
         status == "cooking" ||
         status == "foodready") {
       return 2;
-    }
-    // Step 3: ผู้จัดส่งกำลังไปรับ
-    else if (status == "goingtorestaurant" ||
+    } else if (status == "goingtorestaurant" ||
         status == "going" ||
         status == "riderarrived") {
       return 3;
-    }
-    // Step 4: กำลังจัดส่ง (รับอาหารแล้ว กำลังไปส่งลูกค้า)
-    else if (status == "delivery" ||
+    } else if (status == "delivery" ||
         status == "delivering" ||
         status == "ontheway" ||
         status == "pickedup") {
       return 4;
-    }
-    // Step 5: ถึงที่หมายแล้ว
-    else if (status == "arrived" || status == "reached") {
+    } else if (status == "arrived" || status == "reached") {
       return 5;
-    }
-    // Step 6: จัดส่งสำเร็จ ปิดงาน
-    else if (status == "success" ||
+    } else if (status == "success" ||
         status == "completed" ||
         status == "reviewsuccess" ||
         status == "delivered") {
+      // 🎯 ถ้ารอรับยืนยัน (delivered) ถือว่าจบงานฝั่งไรเดอร์แล้ว
       return 6;
     }
     return 1;
@@ -266,22 +257,85 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       }
     }
 
-    Map<String, int> addonCounts = {};
-    for (var addon in item.addons) {
+    List<dynamic> rawAddons = [];
+    if (item.addons.isNotEmpty) {
+      rawAddons = item.addons;
+    } else {
+      try {
+        rawAddons = (item as dynamic).toJson()['addons'] ?? [];
+      } catch (_) {}
+    }
+
+    Map<String, Map<String, dynamic>> groupedAddons = {};
+    for (var addon in rawAddons) {
       String name = '';
-      if (addon.menuAddonDetail != null &&
-          addon.menuAddonDetail!.addonMenu != null) {
-        name = addon.menuAddonDetail!.addonMenu!.addonName ?? '';
+      int price = 0;
+      int qty = 1;
+
+      if (addon is Map) {
+        name =
+            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
+            addon['addonMenu']?['addonName'] ??
+            addon['name'] ??
+            '';
+        price =
+            (addon['priceAtOrder'] ??
+                    addon['menuAddonDetail']?['addonPrice'] ??
+                    0)
+                .toInt();
+        qty = (addon['addonQty'] ?? addon['addon_qty'] ?? 1).toInt();
+      } else {
+        try {
+          name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
+          price =
+              ((addon as dynamic).priceAtOrder ??
+                      (addon as dynamic).menuAddonDetail?.addonPrice ??
+                      0)
+                  .toInt();
+          qty = ((addon as dynamic).addonQty ?? 1).toInt();
+        } catch (_) {}
       }
+
       if (name.isNotEmpty) {
-        addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + qty;
+        } else {
+          groupedAddons[name] = {'qty': qty, 'unitPrice': price};
+        }
       }
     }
 
-    int finalPricePerUnit = 0;
-    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+    int totalItemPrice = 0;
+    int baseUnitNoAddonPrice = 0;
 
-    if (isCurryDish) {
+    int addonsSum = 0;
+    for (var addon in groupedAddons.values) {
+      addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
+    }
+
+    try {
+      final jsonItem = (item as dynamic).toJson();
+      var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
+
+      if (rawSubtotal != null) {
+        totalItemPrice = (rawSubtotal as num).toInt();
+      }
+    } catch (_) {}
+
+    if (totalItemPrice > 0) {
+      int unitTotal = totalItemPrice ~/ (item.qty > 0 ? item.qty : 1);
+      baseUnitNoAddonPrice = unitTotal - addonsSum;
+      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0;
+    } else {
+      int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+      if (baseMenuPrice == 0) {
+        try {
+          final jsonItem = (item as dynamic).toJson();
+          baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
+        } catch (_) {}
+      }
+
       int curriesSum = 0;
       for (var curry in rawCurries) {
         if (curry is Map) {
@@ -289,22 +343,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
           curriesSum += (price ?? 0).toInt();
         }
       }
-      int addonsSum = 0;
-      for (var addon in item.addons) {
-        addonsSum +=
-            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
-                .toInt();
-      }
-      finalPricePerUnit =
-          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
-    } else {
-      int addonsSum = 0;
-      for (var addon in item.addons) {
-        addonsSum +=
-            (addon.priceAtOrder ?? addon.menuAddonDetail?.addonPrice ?? 0)
-                .toInt();
-      }
-      finalPricePerUnit = baseMenuPrice + addonsSum;
+
+      baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
+      totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
     }
 
     String rawMenuUrl = item.menu?.menuImage ?? '';
@@ -353,12 +394,13 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    "ราคา $finalPricePerUnit บาท",
+                    "ราคา $baseUnitNoAddonPrice บาท",
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
+
                   if (curriesList.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Wrap(
@@ -422,12 +464,30 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                       }).toList(),
                     ),
                   ],
-                  if (addonCounts.isNotEmpty) ...[
+
+                  if (groupedAddons.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 6.0,
                       runSpacing: 6.0,
-                      children: addonCounts.entries.map((entry) {
+                      children: groupedAddons.entries.map((entry) {
+                        String name = entry.key;
+                        int qty = entry.value['qty'] as int;
+                        int unitPrice = entry.value['unitPrice'] as int;
+
+                        String displayText = name;
+                        if (qty > 1) {
+                          int totalAddonPrice = unitPrice * qty;
+                          displayText += " x$qty";
+                          if (totalAddonPrice > 0) {
+                            displayText += " (+฿$totalAddonPrice)";
+                          }
+                        } else {
+                          if (unitPrice > 0) {
+                            displayText += " (+฿$unitPrice)";
+                          }
+                        }
+
                         return Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 8,
@@ -448,9 +508,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                entry.value > 1
-                                    ? "${entry.key} x${entry.value}"
-                                    : entry.key,
+                                displayText,
                                 style: TextStyle(
                                   fontSize: 11.5,
                                   color: Colors.orange.shade900,
@@ -463,6 +521,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                       }).toList(),
                     ),
                   ],
+
                   if (item.note.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Text(
@@ -477,12 +536,26 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                   const SizedBox(height: 6),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Text(
-                      "จำนวน ${item.qty}",
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "จำนวน ${item.qty}",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          "รวม $totalItemPrice บาท",
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -494,7 +567,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     );
   }
 
-  // 🎯 สร้าง Widget จุดและเส้น Timeline 5 จุด
   Widget _buildTimelineDot(
     String label,
     bool isCompleted,
@@ -547,7 +619,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
             label,
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 10.5, // 🎯 ปรับฟอนต์ให้ใหญ่ขึ้นมานิดนึงสำหรับ 5 จุด
+              fontSize: 10.5,
               color: isCompleted ? Colors.black87 : Colors.grey.shade500,
               fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
               height: 1.2,
@@ -558,7 +630,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     );
   }
 
-  // 🎯 Popup สำหรับยืนยันการเปลี่ยนสถานะ
   Future<void> _confirmActionDialog(
     String title,
     String content,
@@ -646,7 +717,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       await _orderService.updateOrderStatus(orderId, nextStatus);
 
       if (!mounted) return;
-      Navigator.pop(context); // ปิด Loading Dialog
+      Navigator.pop(context);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -656,7 +727,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         ),
       );
 
-      Navigator.pop(context, true); // กลับไปหน้าก่อนหน้าและรีเฟรช
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
@@ -671,10 +742,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     }
   }
 
-  // 🎯 สร้างแผงควบคุมด้านล่าง (Timeline 5 สเต็ป ตัดหาไรเดอร์ออก)
   Widget _buildBottomPanel(int currentStep) {
     if (currentStep <= 0) {
-      return const SizedBox.shrink(); // ถ้าโดนยกเลิกไปแล้วให้ซ่อน
+      return const SizedBox.shrink();
     }
 
     String buttonText = "";
@@ -685,7 +755,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     IconData buttonIcon = Icons.hourglass_empty_rounded;
     bool isButtonEnabled = true;
 
-    // ลอจิกปุ่มตาม Step ที่สอดคล้องกับ Timeline 5 จุด
     if (currentStep == 1) {
       buttonText = "รอร้านค้ายืนยันออเดอร์";
       isButtonEnabled = false;
@@ -713,12 +782,13 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       dialogContent = "คุณเดินทางมาถึงจุดส่งอาหารของลูกค้าแล้วใช่หรือไม่?";
       buttonIcon = Icons.location_on_rounded;
     } else if (currentStep == 5) {
-      buttonText = "จัดส่งสำเร็จ (รับเงินแล้ว)";
-      nextStatus = "success";
-      successMsg = "จัดส่งและรับเงินสำเร็จเรียบร้อย";
-      dialogTitle = "ยืนยันจัดส่งสำเร็จ";
+      // 🎯 เปลี่ยนเป็นสถานะ 'delivered' เพื่อรอลูกค้ายืนยันความสำเร็จ
+      buttonText = "จัดส่งสำเร็จ (รอลูกค้ายืนยัน)";
+      nextStatus = "delivered";
+      successMsg = "อัปเดตสถานะ: รอลูกค้ายืนยันรับอาหาร";
+      dialogTitle = "ยืนยันการจัดส่งสำเร็จ";
       dialogContent =
-          "คุณได้ส่งมอบอาหารและรับเงินจากลูกค้าเรียบร้อยแล้วใช่หรือไม่?";
+          "คุณได้ส่งมอบอาหารให้ลูกค้าเรียบร้อยแล้วใช่หรือไม่?\n\n(เมื่อกดยืนยัน ระบบจะส่งแจ้งเตือนให้ลูกค้ายืนยันการรับในแอป)";
       buttonIcon = Icons.check_circle_outline_rounded;
     }
 
@@ -738,7 +808,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 🎯 แถบ Timeline แบบ 5 สเต็ปของไรเดอร์ (ไม่มีหาไรเดอร์แล้ว)
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
@@ -753,8 +822,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                   _buildTimelineDot(
                     "รอร้านค้า\nยืนยัน",
                     currentStep >= 1,
-                    currentStep >=
-                        3, // เส้นนี้จะเต็มเมื่อไรเดอร์กดกำลังไปรับแล้ว
+                    currentStep >= 3,
                     isFirst: true,
                   ),
                   _buildTimelineDot(
@@ -782,7 +850,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
               ),
             ),
 
-            // 🎯 ซ่อนปุ่มถ้าจัดส่งสำเร็จแล้ว (Step >= 6)
             if (currentStep < 6) ...[
               const SizedBox(height: 16),
               SizedBox(
@@ -1192,8 +1259,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
           ],
         ),
       ),
-
-      // 🎯 แทรก Timeline ไว้ด้านล่างเสมอ
       bottomNavigationBar: _buildBottomPanel(currentStep),
     );
   }
