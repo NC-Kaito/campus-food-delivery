@@ -38,16 +38,34 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
   /// null = แสดงทั้งหมด, ไม่งั้นกรองเฉพาะดาวนั้น (1-5)
   int? _selectedStar;
 
+  /// จำนวนรีวิวที่จะแสดงเพิ่มในแต่ละครั้ง (ตั้งเป็น 15 ตามต้องการครับ)
+  /// *** หากต้องการทดสอบให้เห็นปุ่มตอนมีรีวิวแค่ 2 อัน ให้ลองเปลี่ยนเป็น 1 ก่อนนะครับ ***
+  final int _itemsPerPage = 10;
+
+  /// จำกัดจำนวนที่จะแสดงผล ณ ปัจจุบัน
+  late int _displayLimit;
+
+  /// ตัวจัดการการเลื่อนหน้าจอ
+  final ScrollController _scrollController = ScrollController();
+
   @override
   void initState() {
     super.initState();
+    _displayLimit = _itemsPerPage; // กำหนดค่าเริ่มต้น
     _fetchAllReviews();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchAllReviews() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
+      _displayLimit = _itemsPerPage; // รีเซ็ตเมื่อโหลดข้อมูลใหม่
     });
 
     try {
@@ -138,8 +156,30 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
     return _allReviews.where((e) => e.rating == _selectedStar).toList();
   }
 
+  /// ฟังก์ชันสำหรับเปลี่ยนแท็บดาว หรือ กลับไปดูทั้งหมด
+  void _onFilterTapped(int? star) {
+    setState(() {
+      _selectedStar = star;
+      _displayLimit =
+          _itemsPerPage; // รีเซ็ตให้กลับไปแสดงเท่ากับค่าเริ่มต้นเสมอ
+    });
+
+    // เลื่อนหน้าจอกลับขึ้นไปด้านบนอย่างนุ่มนวล
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final filtered = _filteredReviews;
+    final currentDisplay = filtered.take(_displayLimit).toList();
+    final hasMore = filtered.length > _displayLimit;
+
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: const RestaurantNavbar(title: "รีวิวร้านค้า"),
@@ -151,16 +191,55 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
               onRefresh: _fetchAllReviews,
               color: _primary,
               child: ListView(
+                controller: _scrollController,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 children: [
                   _buildSummaryHeader(),
                   const SizedBox(height: 16),
                   _buildFilterChips(),
                   const SizedBox(height: 16),
-                  if (_filteredReviews.isEmpty)
+                  if (filtered.isEmpty)
                     _buildEmptyState()
-                  else
-                    ..._filteredReviews.map(_buildReviewCard),
+                  else ...[
+                    ...currentDisplay.map(_buildReviewCard),
+                    if (hasMore)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0),
+                        child: Center(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                _displayLimit +=
+                                    _itemsPerPage; // กด 1 ครั้ง เพิ่มตามจำนวนที่ตั้งไว้
+                              });
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: _primary,
+                              elevation: 0,
+                              side: const BorderSide(
+                                color: _primary,
+                                width: 1.5,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
+                            child: const Text(
+                              "ดูเพิ่มเติม",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                   const SizedBox(height: 24),
                 ],
               ),
@@ -197,7 +276,7 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
     );
   }
 
-  // ------------------- ส่วนหัว: สรุปคะแนนเฉลี่ย (รวมดาวและคะแนนไว้ในกล่องเดียวกัน) -------------------
+  // ------------------- ส่วนหัว: สรุปคะแนนเฉลี่ย -------------------
   Widget _buildSummaryHeader() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -274,7 +353,7 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
     );
   }
 
-  // ------------------- แถบปุ่มกรองตามดาว (แสดงเฉพาะดาวที่มีรีวิว) -------------------
+  // ------------------- แถบปุ่มกรองตามดาว -------------------
   Widget _buildFilterChips() {
     final availableStars = <int>[];
     for (int star = 5; star >= 1; star--) {
@@ -292,7 +371,7 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
             label: "ทั้งหมด (${_allReviews.length})",
             isSelected: _selectedStar == null,
             baseColor: Colors.black87,
-            onTap: () => setState(() => _selectedStar = null),
+            onTap: () => _onFilterTapped(null),
           ),
           for (int star in availableStars) ...[
             const SizedBox(width: 8),
@@ -301,7 +380,7 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
               icon: Icons.star_rounded,
               isSelected: _selectedStar == star,
               baseColor: _colorForStar(star),
-              onTap: () => setState(() => _selectedStar = star),
+              onTap: () => _onFilterTapped(star),
             ),
           ],
         ],
@@ -469,18 +548,6 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
             ),
           ],
 
-          if (review?.cleanliness == true || review?.tasteRating == true) ...[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                if (review?.cleanliness == true) _buildTag("ถูกสุขลักษณะ"),
-                if (review?.tasteRating == true) _buildTag("รสชาติดี"),
-              ],
-            ),
-          ],
-
           const SizedBox(height: 10),
           Text(
             comment,
@@ -495,24 +562,6 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTag(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.orange,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 12,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
       ),
     );
   }

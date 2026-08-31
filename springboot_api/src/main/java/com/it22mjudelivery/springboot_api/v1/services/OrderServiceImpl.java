@@ -16,8 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.lang.reflect.Array;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.Arrays;
-import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -245,6 +245,47 @@ public class OrderServiceImpl implements OrderService {
         }catch (Exception e){
             new RuntimeException("เกิดข้อผิดพลาดที่ระบบ");
             return false;
+        }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getRiderIncomeByDateRange(String studentId, LocalDateTime startDate, LocalDateTime endDate) {
+        try {
+            // 1. ดึงข้อมูลจาก Query ที่เราสร้างไว้
+            List<Order> orders = orderRepo.findRiderSuccessOrdersByDateRange(studentId, startDate, endDate);
+
+            // 2. สร้าง Map เพื่อจัดกลุ่มข้อมูลเป็น "รายวัน" (เช่น "26 ส.ค. 2569" -> ออเดอร์ทั้งหมดในวันนั้น)
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+            // ใช้ LinkedHashMap เพื่อรักษาลำดับของวันที่เอาไว้
+            Map<String, Map<String, Object>> dailySummary = new LinkedHashMap<>();
+
+            for (Order order : orders) {
+                String dateKey = order.getOrderdate().format(formatter); // แปลงวันที่เป็น String
+
+                // ถ้ามีวันที่นี้ใน Map แล้ว ให้ดึงมาบวกเพิ่ม
+                Map<String, Object> dayData = dailySummary.getOrDefault(dateKey, new LinkedHashMap<>());
+
+                int currentRounds = (int) dayData.getOrDefault("rounds", 0);
+                double currentIncome = (double) dayData.getOrDefault("amount", 0.0);
+
+                // สมมติว่ารายได้ของไรเดอร์คือค่าจัดส่ง (Delivery Fee)
+                double deliveryFee = order.getDelivery_fee();
+
+                dayData.put("date", dateKey);
+                dayData.put("rounds", currentRounds + 1);
+                dayData.put("amount", currentIncome + deliveryFee);
+
+                dailySummary.put(dateKey, dayData);
+            }
+
+            // 3. แปลง Map กลับเป็น List เพื่อส่งเป็น JSON
+            return new ArrayList<>(dailySummary.values());
+
+        } catch (Exception e) {
+            System.err.println("🚨 เกิดข้อผิดพลาดในการดึงรายงานรายได้: " + e.getMessage());
+            return List.of();
         }
     }
 

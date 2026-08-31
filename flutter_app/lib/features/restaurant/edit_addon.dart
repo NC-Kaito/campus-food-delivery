@@ -643,6 +643,7 @@ class _EditAddonState extends State<EditAddon> {
 
   Widget _buildAddonRow(int index) {
     final addon = selectedAddons[index];
+    final bool isRowActive = addon.status;
 
     final layerLink = _layerLinks.putIfAbsent(addon, () => LayerLink());
     final focusNode = _nameFocusNodes.putIfAbsent(addon, () {
@@ -655,33 +656,36 @@ class _EditAddonState extends State<EditAddon> {
       return node;
     });
 
+    Widget leadingWidget = Container(
+      width: 26,
+      height: 26,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: _AddonTheme.primary.withOpacity(0.14),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        "${index + 1}",
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: _AddonTheme.primary,
+        ),
+      ),
+    );
+
     return Container(
+      key: ValueKey(addon),
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: _AddonTheme.fieldBg,
+        color: isRowActive ? _AddonTheme.fieldBg : Colors.grey.shade300,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _AddonTheme.primary.withOpacity(0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              "${index + 1}",
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: _AddonTheme.primary,
-              ),
-            ),
-          ),
+          leadingWidget,
           const SizedBox(width: 10),
           Expanded(
             flex: 4,
@@ -774,17 +778,55 @@ class _EditAddonState extends State<EditAddon> {
           ),
           const SizedBox(width: 6),
           _isEditMode
-              ? _buildDeleteButton(index)
-              : SizedBox(
-                  width: 44,
-                  child: Transform.scale(
-                    scale: 0.8,
-                    child: Switch(
-                      value: addon.status,
-                      onChanged: (val) => _toggleAddonDetailStatus(addon, val),
-                      activeColor: _AddonTheme.accent,
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildDeleteButton(index),
+                    const SizedBox(width: 2),
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Icon(
+                          Icons.drag_indicator_rounded,
+                          size: 24,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
                     ),
-                  ),
+                  ],
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isRowActive ? "เปิด" : "ปิด",
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isRowActive
+                            ? _AddonTheme.accent
+                            : Colors.grey.shade600,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    SizedBox(
+                      width: 44,
+                      child: Transform.scale(
+                        scale: 0.8,
+                        child: Switch(
+                          value: isRowActive,
+                          onChanged: (val) =>
+                              _toggleAddonDetailStatus(addon, val),
+                          activeColor: _AddonTheme.accent,
+                          inactiveThumbColor: Colors.grey.shade400,
+                          inactiveTrackColor: Colors.grey.shade400.withOpacity(
+                            0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
         ],
       ),
@@ -850,7 +892,7 @@ class _EditAddonState extends State<EditAddon> {
                         ),
                         Text(
                           _isEditMode
-                              ? "ปรับปรุงกลุ่มตัวเลือกที่มีอยู่ให้ตรงกับเมนูของคุณ"
+                              ? "ปรับปรุงกลุ่มตัวเลือกที่มีอยู่ให้ตรงกับเมนูของคุณ (ลากจุดด้านหลังเพื่อจัดเรียง)"
                               : "ดูข้อมูลกลุ่มตัวเลือก (กดปุ่มแก้ไขด้านล่างเพื่อปรับปรุง)",
                           style: const TextStyle(
                             fontSize: 12.5,
@@ -923,9 +965,9 @@ class _EditAddonState extends State<EditAddon> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Row(
-                        children: const [
-                          SizedBox(width: 36),
-                          Expanded(
+                        children: [
+                          const SizedBox(width: 36),
+                          const Expanded(
                             flex: 4,
                             child: Text(
                               "ชื่อตัวเลือก",
@@ -936,8 +978,8 @@ class _EditAddonState extends State<EditAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(width: 8),
-                          Expanded(
+                          const SizedBox(width: 8),
+                          const Expanded(
                             flex: 3,
                             child: Text(
                               "ราคา",
@@ -949,11 +991,11 @@ class _EditAddonState extends State<EditAddon> {
                             ),
                           ),
                           SizedBox(
-                            width: 44,
+                            width: _isEditMode ? 68 : 76,
                             child: Center(
                               child: Text(
-                                "สถานะ",
-                                style: TextStyle(
+                                _isEditMode ? "" : "สถานะ",
+                                style: const TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                   color: Color.fromARGB(255, 0, 0, 0),
@@ -965,14 +1007,35 @@ class _EditAddonState extends State<EditAddon> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      primary: false,
-                      padding: EdgeInsets.zero,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: selectedAddons.length,
-                      itemBuilder: (context, index) => _buildAddonRow(index),
-                    ),
+                    _isEditMode
+                        ? ReorderableListView.builder(
+                            shrinkWrap: true,
+                            primary: false,
+                            physics: const NeverScrollableScrollPhysics(),
+                            padding: EdgeInsets.zero,
+                            buildDefaultDragHandles: false,
+                            itemCount: selectedAddons.length,
+                            onReorder: (oldIndex, newIndex) {
+                              setState(() {
+                                if (newIndex > oldIndex) {
+                                  newIndex -= 1;
+                                }
+                                final item = selectedAddons.removeAt(oldIndex);
+                                selectedAddons.insert(newIndex, item);
+                              });
+                            },
+                            itemBuilder: (context, index) =>
+                                _buildAddonRow(index),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            primary: false,
+                            padding: EdgeInsets.zero,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: selectedAddons.length,
+                            itemBuilder: (context, index) =>
+                                _buildAddonRow(index),
+                          ),
                     if (_isEditMode) ...[
                       const SizedBox(height: 10),
                       Material(

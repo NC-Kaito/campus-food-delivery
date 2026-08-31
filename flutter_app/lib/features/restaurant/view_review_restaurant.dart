@@ -85,25 +85,6 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
     );
   }
 
-  Widget _buildTagIfTrue(String label, bool? isSelected) {
-    if (isSelected != true) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.orange,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
   Widget _buildProOrderItemCard(dynamic item) {
     List<dynamic> rawCurries = [];
     if (item.orderDetailCurries != null &&
@@ -393,7 +374,6 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
-      // 🎯 ใส่ RestaurantNavbar ตรงนี้ให้เหมือนกับหน้า list_order_restaurant ครับ
       appBar: const RestaurantNavbar(title: ""),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
@@ -410,12 +390,12 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade100,
+                          color: const Color.fromARGB(255, 200, 230, 201),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.person,
-                          color: Colors.orange.shade800,
+                          color: Color.fromARGB(255, 53, 151, 58),
                           size: 24,
                         ),
                       ),
@@ -673,12 +653,12 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade100,
+                          color: const Color.fromARGB(255, 200, 230, 201),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.star_rounded,
-                          color: Colors.green.shade800,
+                          color: Color.fromARGB(255, 53, 151, 58),
                           size: 24,
                         ),
                       ),
@@ -721,32 +701,6 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                         ),
                         const SizedBox(height: 8),
                         _buildStarRating(displayRating),
-
-                        const SizedBox(height: 16),
-                        const Text(
-                          "คำชม / Tag จากลูกค้า",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        Wrap(
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: [
-                            _buildTagIfTrue(
-                              'ถูกสุขลักษณะ ✨',
-                              _reviewData?.cleanliness,
-                            ),
-                            _buildTagIfTrue(
-                              'รสชาติดี 😋',
-                              _reviewData?.tasteRating,
-                            ),
-                          ],
-                        ),
 
                         const SizedBox(height: 16),
                         const Text(

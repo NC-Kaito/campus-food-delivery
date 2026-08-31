@@ -26,4 +26,14 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
 
     @Query("SELECT o FROM Order o WHERE o.orderstatus = :status AND o.orderdate <= :cutoffTime")
     List<Order> findExpiredOrders(@Param("status") String status, @Param("cutoffTime") LocalDateTime cutoffTime);
+
+    @Query("SELECT o FROM Order o WHERE o.rider.studentid = :studentId " +
+            "AND LOWER(o.orderstatus) IN ('success', 'completed', 'reviewsuccess') " +
+            "AND o.orderdate >= :startDate AND o.orderdate <= :endDate " +
+            "ORDER BY o.orderdate DESC")
+    List<Order> findRiderSuccessOrdersByDateRange(
+            @Param("studentId") String studentId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
 }

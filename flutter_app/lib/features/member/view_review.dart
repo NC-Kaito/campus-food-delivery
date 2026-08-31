@@ -114,25 +114,6 @@ class _ViewReviewState extends State<ViewReview> {
     );
   }
 
-  Widget _buildTagIfTrue(String label, bool? isSelected) {
-    if (isSelected != true) return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.orange,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 13,
-          color: Colors.white,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-
   Widget _buildProOrderItemCard(dynamic item) {
     List<dynamic> rawCurries = [];
     if (item.orderDetailCurries != null &&
@@ -515,18 +496,17 @@ class _ViewReviewState extends State<ViewReview> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 🎯 หัวข้อคะแนนร้านค้าอยู่ "นอกกรอบ"
                   Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade100,
+                          color: const Color.fromARGB(255, 200, 230, 201),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.storefront_rounded,
-                          color: Colors.orange.shade800,
+                          color: Color.fromARGB(255, 53, 151, 58),
                           size: 24,
                         ),
                       ),
@@ -543,7 +523,6 @@ class _ViewReviewState extends State<ViewReview> {
                   ),
                   const SizedBox(height: 12),
 
-                  // กรอบขาวส่วนของร้านค้า
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -757,7 +736,7 @@ class _ViewReviewState extends State<ViewReview> {
 
                         const SizedBox(height: 16),
                         const Text(
-                          "ความพึงพอใจต่อร้านค้า",
+                          "รสชาติอาหารเป็นอย่างไรบ้าง?",
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -774,21 +753,6 @@ class _ViewReviewState extends State<ViewReview> {
                             fontWeight: FontWeight.w600,
                             color: Colors.black87,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: [
-                            _buildTagIfTrue(
-                              'ถูกสุขลักษณะ',
-                              _reviewData?.cleanliness,
-                            ),
-                            _buildTagIfTrue(
-                              'รสชาติดี',
-                              _reviewData?.tasteRating,
-                            ),
-                          ],
                         ),
                         const SizedBox(height: 12),
                         Container(
@@ -817,18 +781,17 @@ class _ViewReviewState extends State<ViewReview> {
 
                   const SizedBox(height: 24),
 
-                  // 🎯 หัวข้อคะแนนผู้จัดส่งอยู่ "นอกกรอบ"
                   Row(
                     children: [
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: Colors.green.shade100,
+                          color: const Color.fromARGB(255, 200, 230, 201),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.moped_rounded,
-                          color: Colors.green.shade800,
+                          color: Color.fromARGB(255, 53, 151, 58),
                           size: 24,
                         ),
                       ),
@@ -845,7 +808,6 @@ class _ViewReviewState extends State<ViewReview> {
                   ),
                   const SizedBox(height: 12),
 
-                  // กรอบขาวส่วนของไรเดอร์
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -892,7 +854,7 @@ class _ViewReviewState extends State<ViewReview> {
                         ),
                         const SizedBox(height: 20),
                         const Text(
-                          "ความพึงพอใจต่อผู้จัดส่ง",
+                          "ให้คะแนนการบริการของผู้จัดส่ง",
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
@@ -909,21 +871,6 @@ class _ViewReviewState extends State<ViewReview> {
                             fontWeight: FontWeight.w600,
                             color: Colors.black87,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8.0,
-                          runSpacing: 8.0,
-                          children: [
-                            _buildTagIfTrue(
-                              'ส่งเร็ว',
-                              _reviewData?.deliverySpeed,
-                            ),
-                            _buildTagIfTrue(
-                              'รักษาสภาพอาหารดี',
-                              _reviewData?.foodCondition,
-                            ),
-                          ],
                         ),
                         const SizedBox(height: 12),
                         Container(

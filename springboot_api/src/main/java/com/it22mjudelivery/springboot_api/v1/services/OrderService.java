@@ -7,7 +7,9 @@ import com.it22mjudelivery.springboot_api.v1.entities.Order;
 import com.it22mjudelivery.springboot_api.v1.entities.OrderDetail;
 import com.it22mjudelivery.springboot_api.v1.entities.Orderdetailaddon;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 public interface OrderService {
     boolean memberConfirmOrder(AddOrderDto addOrderDto);
@@ -23,6 +25,9 @@ public interface OrderService {
     List<Order> getActiveOrdersByRider(String username);
 
     boolean doConfirmOrderByRider(String studentId, int orderId);
+
+    // เพิ่ม Response DTO แบบง่ายๆ ใช้ Map หรือสร้างคลาสใหม่ก็ได้ (ในที่นี้ขอคืนเป็น List<Map> เพื่อความรวดเร็ว)
+    List<Map<String, Object>> getRiderIncomeByDateRange(String studentId, LocalDateTime startDate, LocalDateTime endDate);
 
     //---- Restaurant ----
     List<Order> getWaitingOrdersByRestaurant(String username);

@@ -4,12 +4,15 @@ import com.it22mjudelivery.springboot_api.v1.dtos.AddOrderDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Order; // 🎯 อิมพอร์ต Entity Order เพิ่มเข้ามา
 import com.it22mjudelivery.springboot_api.v1.services.OrderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List; // 🎯 อิมพอร์ต List เพิ่มเข้ามา
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/v1/order")
@@ -134,6 +137,22 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/rider/{studentId}/income")
+    public ResponseEntity<?> getRiderIncome(
+            @PathVariable String studentId,
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+
+        try {
+            // เรียกใช้ Service ที่เราเขียนไว้
+            List<Map<String, Object>> incomeSummary = orderService.getRiderIncomeByDateRange(studentId, startDate, endDate);
+            return ResponseEntity.ok(incomeSummary);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("ไม่สามารถดึงข้อมูลรายได้ได้: " + e.getMessage());
+        }
+    }
+
     /// //////////////// Restaurant
     @GetMapping("/restaurant/{username}/waitingOrdersByRestaurant")
     public ResponseEntity<?> getWaitingOrdersByRestaurant(@PathVariable String username) {
@@ -231,6 +250,50 @@ public class OrderController {
         }
     }
 
+    // 🎯 1. สร้าง Map เก็บสถานะการล็อกไว้ใน Memory ของ Spring Boot
+    private final ConcurrentHashMap<Integer, OrderLock> lockedOrders = new ConcurrentHashMap<>();
 
+    // 🎯 2. คลาสย่อยสำหรับเก็บข้อมูลคนล็อกและเวลา
+    private static class OrderLock {
+        String riderId;
+        LocalDateTime lockedAt;
 
+        OrderLock(String riderId) {
+            this.riderId = riderId;
+            this.lockedAt = LocalDateTime.now();
+        }
+    }
+
+    // 🎯 3. API สำหรับขอล็อกออเดอร์
+    @PostMapping("/lockOrder")
+    public ResponseEntity<?> lockOrder(@RequestParam int orderId, @RequestParam String riderId) {
+        OrderLock currentLock = lockedOrders.get(orderId);
+
+        if (currentLock != null) {
+            // ถ้ามีคนล็อกค้างไว้นานเกิน 1 นาที (เผื่อแอปเขาค้างหรือเน็ตหลุด) ให้ปลดล็อกอัตโนมัติ
+            if (currentLock.lockedAt.isBefore(LocalDateTime.now().minusMinutes(1))) {
+                lockedOrders.remove(orderId);
+            }
+            // ถ้าเวลาไม่เกิน 1 นาที และคนที่ล็อกอยู่ "ไม่ใช่" ไรเดอร์คนนี้ ให้เด้งกลับไปบอกว่ามีคนดูอยู่
+            else if (!currentLock.riderId.equals(riderId)) {
+                return ResponseEntity.status(409).body("มีไรเดอร์คนอื่นกำลังพิจารณาออเดอร์นี้อยู่");
+            }
+        }
+
+        // อนุมัติให้ล็อกได้
+        lockedOrders.put(orderId, new OrderLock(riderId));
+        return ResponseEntity.ok("ล็อกออเดอร์สำเร็จ");
+    }
+
+    // 🎯 4. API สำหรับปลดล็อกออเดอร์
+    @PostMapping("/unlockOrder")
+    public ResponseEntity<?> unlockOrder(@RequestParam int orderId, @RequestParam String riderId) {
+        OrderLock currentLock = lockedOrders.get(orderId);
+
+        // ยอมให้ปลดล็อกได้เฉพาะคนที่ล็อกไว้เท่านั้น
+        if (currentLock != null && currentLock.riderId.equals(riderId)) {
+            lockedOrders.remove(orderId);
+        }
+        return ResponseEntity.ok("ปลดล็อกออเดอร์สำเร็จ");
+    }
 }
