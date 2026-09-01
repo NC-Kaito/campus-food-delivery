@@ -369,7 +369,7 @@ class _HomeMemberState extends State<HomeMember> {
             height: 150,
             decoration: const BoxDecoration(
               image: DecorationImage(
-                image: AssetImage('assets/images/member_home.png'),
+                image: AssetImage('assets/images/campusFoodDelivery_logo.png'),
                 fit: BoxFit.cover,
               ),
             ),
@@ -531,7 +531,7 @@ class _HomeMemberState extends State<HomeMember> {
                   ),
                   label: Text(isAllTab ? "ทั้งหมด" : typeName ?? ""),
                   selected: isSelected,
-                  selectedColor: const Color(0xFF64F02D),
+                  selectedColor: const Color.fromARGB(255, 213, 104, 124),
                   backgroundColor: Colors.white,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.white : Colors.black87,

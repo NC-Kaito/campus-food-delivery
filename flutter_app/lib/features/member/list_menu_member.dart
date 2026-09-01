@@ -461,7 +461,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                   style: const TextStyle(
                                     fontSize: 30,
                                     fontWeight: FontWeight.bold,
-                                    color: Colors.black,
+                                    color: Color.fromARGB(255, 5, 86, 151),
                                   ),
                                 ),
                               ),
