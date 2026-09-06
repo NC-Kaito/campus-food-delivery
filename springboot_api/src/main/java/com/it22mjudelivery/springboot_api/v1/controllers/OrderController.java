@@ -202,6 +202,18 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/restaurant/{username}/cancel")
+    public ResponseEntity<?> getCancelOrdersByRestaurant(@PathVariable String username) {
+        try {
+            List<Order> activeOrders = orderService.getCancelOrdersByRestaurant(username);
+            return ResponseEntity.ok(activeOrders);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+
+
     @PostMapping("/updateStatus")
     public ResponseEntity<?> updateOrderStatus(@RequestBody Map<String, Object> requestData) {
         try {

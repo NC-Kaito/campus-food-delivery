@@ -1,17 +1,18 @@
 // features/user/home_user.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/models/type_restaurant_model.dart';
-import 'package:flutter_app/features/admin/list_restaurant.dart';
-import 'package:flutter_app/features/member/login_member.dart';
+import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/features/user/list_menu_user.dart';
-import 'package:flutter_app/features/user/view_restaurant_user.dart';
 import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/main_login.dart';
 
 class HomeUser extends StatefulWidget {
   const HomeUser({super.key});
@@ -25,10 +26,15 @@ class _HomeUserState extends State<HomeUser> {
   final RestaurantService _restaurantService = RestaurantService();
   final TypeRestaurantService _typeRestaurantService = TypeRestaurantService();
   final MenuService _menuService = MenuService();
+  final OrderService _orderService = OrderService();
+  final MemberService _memberService = MemberService();
 
   List<RestaurantModel> _results = [];
   List<TypeRestaurantModel> typeList = [];
   Map<String, List<MenuModel>> _restaurantMenusIndex = {};
+
+  // 🎯 เก็บค่าคะแนนรีวิวเฉลี่ยของแต่ละร้านค้า (null = ไม่มีรีวิว)
+  final Map<String, double?> _restaurantRatings = {};
 
   bool _isLoading = true;
   Set<int> _selectedTypeIds = {};
@@ -36,7 +42,7 @@ class _HomeUserState extends State<HomeUser> {
   final menuTextStyle = const TextStyle(
     fontSize: 12,
     fontWeight: FontWeight.bold,
-    color: Color(0xFF64F02D),
+    color: Color(0xFF00B300),
   );
 
   @override
@@ -67,6 +73,51 @@ class _HomeUserState extends State<HomeUser> {
     }
   }
 
+  // 🎯 ดึงและคำนวณคะแนนรีวิวเฉลี่ยของร้านค้าตาม logic เดียวกับ ReviewRestaurant
+  Future<void> _fetchRatingForRestaurant(String username) async {
+    try {
+      final rawOrders = await _orderService.getReviewSuccessOrdersByRestaurant(
+        username,
+      );
+      final List<OrderModel> orders = rawOrders
+          .map((o) => OrderModel.fromJson(o))
+          .where((o) => o.orderId != null)
+          .toList();
+
+      if (orders.isEmpty) {
+        _restaurantRatings[username] = null;
+        return;
+      }
+
+      int totalScore = 0;
+      int count = 0;
+
+      for (final order in orders) {
+        try {
+          final review = await _memberService.getReviewByOrderId(
+            order.orderId!,
+          );
+          if (review != null &&
+              review.restaurantrating != null &&
+              review.restaurantrating! > 0) {
+            totalScore += review.restaurantrating!;
+            count++;
+          }
+        } catch (_) {}
+      }
+
+      if (count > 0) {
+        _restaurantRatings[username] = double.parse(
+          (totalScore / count).toStringAsFixed(1),
+        );
+      } else {
+        _restaurantRatings[username] = null;
+      }
+    } catch (e) {
+      _restaurantRatings[username] = null;
+    }
+  }
+
   Future<void> _loadResults(String keyword) async {
     if (!mounted) return;
     setState(() => _isLoading = true);
@@ -81,16 +132,23 @@ class _HomeUserState extends State<HomeUser> {
           .toList();
     }
 
-    for (var rest in data) {
-      if (rest.username != null) {
-        try {
-          final menus = await _menuService.getMenusByRestaurant(rest.username!);
-          _restaurantMenusIndex[rest.username!] = menus;
-        } catch (e) {
-          _restaurantMenusIndex[rest.username!] = [];
+    // โหลดเมนูและคะแนนรีวิวของแต่ละร้านพร้อมกัน
+    await Future.wait(
+      data.map((rest) async {
+        if (rest.username != null) {
+          try {
+            final menus = await _menuService.getMenusByRestaurant(
+              rest.username!,
+            );
+            _restaurantMenusIndex[rest.username!] = menus;
+          } catch (e) {
+            _restaurantMenusIndex[rest.username!] = [];
+          }
+
+          await _fetchRatingForRestaurant(rest.username!);
         }
-      }
-    }
+      }),
+    );
 
     if (mounted) {
       setState(() {
@@ -103,7 +161,6 @@ class _HomeUserState extends State<HomeUser> {
   String _formatTime(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
-  // 🎯 [FIXED] จัดกลุ่มวันเวลาเปิด-ปิดทำการ (ถ้า hour.open == true คือวันนั้นเปิดร้าน)
   String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
     if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
       return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
@@ -132,7 +189,6 @@ class _HomeUserState extends State<HomeUser> {
         ),
       );
 
-      // 🎯 ร้านเปิดทำการในวันนี้ (open == true)
       if (hour.open) {
         final String timeString =
             "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
@@ -153,7 +209,6 @@ class _HomeUserState extends State<HomeUser> {
     return resultLines.join(" | ");
   }
 
-  // 🎯 [FIXED] แสดงเวลาเปิด-ปิดของวันนี้โดยเฉพาะ
   String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
     if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาทำการ";
 
@@ -168,12 +223,10 @@ class _HomeUserState extends State<HomeUser> {
       ),
     );
 
-    // 🎯 ถ้า !today.open ( open == false ) แปลว่าวันนี้ปิดทำการ
     if (!today.open) return "วันนี้ร้านปิดทำการ";
     return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
   }
 
-  // 🎯 [FIXED] ตรวจสอบสถานะเปิดอยู่จริง ณ เวลาปัจจุบัน
   bool _isCurrentlyOpen(RestaurantModel item) {
     if (item.statusOpen == false) return false;
 
@@ -260,7 +313,7 @@ class _HomeUserState extends State<HomeUser> {
                           decoration: InputDecoration(
                             prefixIcon: const Icon(
                               Icons.search_rounded,
-                              color: Color(0xFF64F02D),
+                              color: Color(0xFF00B300),
                             ),
                             suffixIcon: searchController.text.isNotEmpty
                                 ? IconButton(
@@ -303,7 +356,7 @@ class _HomeUserState extends State<HomeUser> {
                       ),
                       child: CircleAvatar(
                         radius: 24,
-                        backgroundColor: const Color(0xFF64F02D),
+                        backgroundColor: const Color(0xFF00B300),
                         child: IconButton(
                           onPressed: () => _loadResults(searchController.text),
                           icon: const Icon(
@@ -360,11 +413,11 @@ class _HomeUserState extends State<HomeUser> {
                         ? Icons.all_inclusive_rounded
                         : Icons.local_dining_rounded,
                     size: 15,
-                    color: isSelected ? Colors.white : const Color(0xFF64F02D),
+                    color: isSelected ? Colors.white : const Color(0xFF00B300),
                   ),
                   label: Text(isAllTab ? "ทั้งหมด" : typeName ?? ""),
                   selected: isSelected,
-                  selectedColor: const Color(0xFF64F02D),
+                  selectedColor: const Color(0xFF00B300),
                   backgroundColor: Colors.white,
                   labelStyle: TextStyle(
                     color: isSelected ? Colors.white : Colors.black87,
@@ -377,7 +430,7 @@ class _HomeUserState extends State<HomeUser> {
                   side: BorderSide(
                     color: isSelected
                         ? Colors.transparent
-                        : const Color(0xFF64F02D).withOpacity(0.3),
+                        : const Color(0xFF00B300).withOpacity(0.3),
                   ),
                   onSelected: (bool selected) {
                     setState(() {
@@ -415,7 +468,7 @@ class _HomeUserState extends State<HomeUser> {
           Expanded(
             child: _isLoading
                 ? const Center(
-                    child: CircularProgressIndicator(color: Color(0xFF64F02D)),
+                    child: CircularProgressIndicator(color: Color(0xFF00B300)),
                   )
                 : _results.isEmpty
                 ? Center(
@@ -470,7 +523,7 @@ class _HomeUserState extends State<HomeUser> {
                 children: [
                   const Icon(
                     Icons.home_rounded,
-                    color: Color(0xFF64F02D),
+                    color: Color(0xFF00B300),
                     size: 26,
                   ),
                   const SizedBox(height: 2),
@@ -481,9 +534,7 @@ class _HomeUserState extends State<HomeUser> {
                 onTap: () {
                   Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginMember(),
-                    ),
+                    MaterialPageRoute(builder: (context) => const MainLogin()),
                   );
                 },
                 borderRadius: BorderRadius.circular(50),
@@ -526,7 +577,8 @@ class _HomeUserState extends State<HomeUser> {
         )
         .toList();
 
-    final Color primaryGreen = const Color(0xFF64F02D);
+    final Color primaryGreen = const Color(0xFF00B300);
+    final double? rating = _restaurantRatings[item.username ?? ''];
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -636,6 +688,76 @@ class _HomeUserState extends State<HomeUser> {
                       ),
                     ),
                   ),
+
+                // ── 🎯 ป้ายคะแนนรีวิวเฉลี่ย (มุมขวาบนของรูปภาพ) ──
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.12),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: rating != null
+                        ? Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                color: Colors.amber,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                rating.toStringAsFixed(1),
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              Text(
+                                " / 5",
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.star_outline_rounded,
+                                color: Colors.grey.shade400,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                "ไม่มีรีวิว",
+                                style: TextStyle(
+                                  color: Colors.grey.shade700,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
               ],
             ),
 

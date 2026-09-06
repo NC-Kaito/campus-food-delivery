@@ -148,4 +148,23 @@ public class MemberController {
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
         }
     }
+
+    @PostMapping("/updateLocationMember")
+    public ResponseEntity<?> updateLocationMember(@RequestBody MemberDto memberDto){
+        try{
+            boolean isResult = memberService.updateLocationMember(memberDto.getUsername(), memberDto.getLatitude(), memberDto.getLongitude(), memberDto.getDefaultLocation());
+
+            if (isResult){
+                return ResponseEntity.ok("แก้ไขจุดส่งสำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("แก้ไขไม่สำเร็จ ข้อมูลไม่ถูกต้อง");
+        }catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+
 }

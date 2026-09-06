@@ -1,6 +1,7 @@
 // features/admin/register_rider2.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_app/main_login.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_app/data/models/faculty_model.dart';
 import 'package:flutter_app/data/models/major_model.dart';
@@ -59,7 +60,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
 
   int? _selectedFacultyId;
   int? _selectedMajorId;
-  String? _selectedProvince; // 🎯 ตัวแปรเก็บจังหวัดที่ไรเดอร์เลือก
+  String? _selectedProvince;
 
   File? _studentCardImage;
   File? _drivingLicenseImage;
@@ -73,9 +74,8 @@ class _RegisterRider2State extends State<RegisterRider2> {
   String? _drivingLicenseError;
   String? _vehicleImageError;
   String? _plateError;
-  String? _provinceError; // 🎯 เก็บแจ้งเตือนกรณีลืมเลือกจังหวัด
+  String? _provinceError;
 
-  // 🎯 รายชื่อ 77 จังหวัดประเทศไทยสำหรับ Dropdown ตัวเลือกไรเดอร์
   final List<String> _provinces = [
     "กรุงเทพมหานคร",
     "กระบี่",
@@ -167,7 +167,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
     _drivingLicenseImage = widget.savedDrivingLicense;
     _vehicleImage = widget.savedVehicleImage;
 
-    // ตรวจสอบและแกะค่าแยก เลขทะเบียน และ จังหวัด ออกจากข้อมูลเก่า (ถ้ามีบันทึกมา)
     if (widget.savedPlate != null && widget.savedPlate!.isNotEmpty) {
       final oldPlate = widget.savedPlate!;
       String detectedProvince = "";
@@ -194,7 +193,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
     }
   }
 
-  // --- API Functions ---
   Future<void> _loadFaculties() async {
     try {
       final data = await _facultyService.getAllFaculty();
@@ -234,9 +232,8 @@ class _RegisterRider2State extends State<RegisterRider2> {
         _drivingLicenseImage,
         "รูปใบขับขี่",
       );
-      _vehicleImageError = _validateImage(_vehicleImage, "รูปรัด");
+      _vehicleImageError = _validateImage(_vehicleImage, "รูปรถ");
 
-      // ตรวจสอบความถูกต้องของจังหวัด
       _provinceError = _selectedProvince == null
           ? "กรุณาเลือกจังหวัดทะเบียนรถ"
           : null;
@@ -270,7 +267,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
     setState(() => _isRegistering = true);
 
     try {
-      // 🎯 ประกบรวมร่างข้อความ: "[เลขทะเบียน] [จังหวัด]" ส่งเข้าฟิลด์รถตามมาตรฐานโครงสร้างเดิม
       final finalVehiclePlate = "$plateNumber $_selectedProvince";
 
       RiderModel rider = RiderModel(
@@ -307,7 +303,12 @@ class _RegisterRider2State extends State<RegisterRider2> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.of(context).popUntil((route) => route.isFirst);
+        // redError
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const MainLogin()),
+          (route) => false,
+        );
       }
     } catch (e) {
       _showError(e.toString());
@@ -325,14 +326,22 @@ class _RegisterRider2State extends State<RegisterRider2> {
     }
 
     final sizeInBytes = file.lengthSync();
-    if (sizeInBytes > 2 * 1024 * 1024)
+    if (sizeInBytes > 2 * 1024 * 1024) {
       return "$fieldName ต้องมีขนาดไม่เกิน 2MB";
+    }
 
     return null;
   }
 
+  // 🎯 บีบอัดขนาดภาพและลด Quality เหลือ 75%
   Future<void> _pickImage(int type) async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 75,
+    );
+
     if (image != null) {
       setState(() {
         if (type == 0) {
@@ -409,7 +418,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
 
                     _buildSectionTitle("ข้อมูลยานพาหนะ"),
 
-                    // 🎯 ประกอบโครงสร้างกล่องข้อความ ทะเบียน และดรอปดาวน์จังหวัดให้อยู่ในชุดเดียวกัน
                     _buildLabel("เลขทะเบียนรถ (License Plate)"),
                     _buildTextField(
                       _licensePlateController,
@@ -527,7 +535,6 @@ class _RegisterRider2State extends State<RegisterRider2> {
     );
   }
 
-  // 🎯 วิดเจ็ต Dropdown เลือกจังหวัด 77 จังหวัดสลักขอบขนานสวยงาม
   Widget _buildProvinceDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,8 +571,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
           onChanged: (val) {
             setState(() {
               _selectedProvince = val;
-              _provinceError =
-                  null; // เคลียร์พาร์ทสีแดงแจ้งเตือนเมื่อกดยืนยันเลือก
+              _provinceError = null;
             });
           },
         ),
@@ -723,7 +729,7 @@ class _RegisterRider2State extends State<RegisterRider2> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
         padding: const EdgeInsets.symmetric(vertical: 15),
         backgroundColor: Colors.grey[300],
-        side: BorderSide(),
+        side: const BorderSide(),
       ),
       child: Text(text, style: const TextStyle(color: Colors.black)),
     );

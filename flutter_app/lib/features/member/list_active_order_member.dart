@@ -138,24 +138,32 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
     final status = (rawStatus ?? '').trim().toLowerCase();
 
     switch (status) {
-      case 'waitingrestaurant':
-      case 'pending':
+      // 🎯 1. สถานะค้นหาผู้จัดส่ง (ตอนพึ่งกดสั่งซื้อใหม่ๆ)
+      case 'waitingrider':
+      case 'findrider':
+      case 'searching':
         return {
-          'text': 'รอร้านค้ายืนยัน',
+          'text': 'ค้นหาผู้จัดส่ง',
           'color': Colors.blue[800]!,
           'bgColor': Colors.blue[50]!,
-          'icon': Icons.storefront_rounded,
+          'icon': Icons.hourglass_empty_rounded,
         };
+
+      // 🎯 2. สถานะร้านรับออเดอร์ / กำลังปรุงอาหาร
+      case 'waitingrestaurant':
+      case 'pending':
       case 'preparing':
       case 'cooking':
       case 'foodready':
-      case 'waitingrider':
         return {
           'text': 'ร้านรับออเดอร์แล้ว',
           'color': Colors.deepOrange[800]!,
           'bgColor': Colors.deepOrange[50]!,
           'icon': Icons.soup_kitchen_rounded,
         };
+
+      // 🎯 3. ไรเดอร์รับงานแล้ว กำลังเดินทางไปที่ร้าน
+      case 'rideraccepted':
       case 'goingtorestaurant':
       case 'going':
       case 'riderarrived':
@@ -165,6 +173,8 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.orange[50]!,
           'icon': Icons.directions_bike_rounded,
         };
+
+      // 🎯 4. ไรเดอร์รับอาหารจากร้านแล้ว กำลังมาส่งให้ลูกค้า
       case 'delivery':
       case 'delivering':
       case 'ontheway':
@@ -175,6 +185,8 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.indigo[50]!,
           'icon': Icons.local_shipping_rounded,
         };
+
+      // 🎯 5. ไรเดอร์เดินทางมาถึงจุดส่งแล้ว
       case 'arrived':
       case 'reached':
         return {
@@ -183,6 +195,8 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.pink[50]!,
           'icon': Icons.location_on_rounded,
         };
+
+      // 🎯 6. ส่งมอบอาหารแล้ว รอลูกค้ากดยืนยัน
       case 'delivered':
         return {
           'text': 'รอยืนยันรับอาหาร',
@@ -190,6 +204,8 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.purple[50]!,
           'icon': Icons.assignment_turned_in_rounded,
         };
+
+      // 🎯 7. ลูกค้ายืนยันแล้ว (รอรีวิว)
       case 'success':
       case 'completed':
         return {
@@ -198,6 +214,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.green[50]!,
           'icon': Icons.check_circle_rounded,
         };
+
       case 'reviewsuccess':
         return {
           'text': 'รีวิวเสร็จสิ้น',
@@ -205,6 +222,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.teal[50]!,
           'icon': Icons.stars_rounded,
         };
+
       case 'cancel':
       case 'cancelled':
         return {
@@ -213,6 +231,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.red[50]!,
           'icon': Icons.cancel_rounded,
         };
+
       case 'issue_reported':
         return {
           'text': 'มีการแจ้งปัญหาคำสั่งซื้อ',
@@ -220,6 +239,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'bgColor': Colors.red[50]!,
           'icon': Icons.support_agent_rounded,
         };
+
       default:
         return {
           'text': status.isEmpty ? 'ไม่ระบุสถานะ' : status,
@@ -276,7 +296,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
               color: Colors.white,
               child: TabBar(
                 controller: _tabController,
-                indicatorColor: const Color(0xFF64F02D),
+                indicatorColor: const Color(0xFF00B300),
                 indicatorWeight: 3,
                 labelColor: const Color(0xFF2E7D32),
                 unselectedLabelColor: Colors.grey[600],
@@ -715,7 +735,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF64F02D),
+                            backgroundColor: const Color(0xFF00B300),
                             elevation: 0,
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(

@@ -4,7 +4,7 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/services/order_service.dart';
-import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class ViewOrderRestaurant extends StatefulWidget {
   final OrderModel orderModel;
@@ -17,13 +17,19 @@ class ViewOrderRestaurant extends StatefulWidget {
 
 class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
   final OrderService _orderService = OrderService();
+  GoogleMapController? _miniMapController;
 
-  static const Color _primary = Color(0xFF16A34A);
-  static const Color _primaryDark = Color(0xFF0F7A38);
-  static const Color _accent = Color(0xFFEA7C1E);
+  final Color primaryGreen = const Color(0xFF00B300);
+  final Color accentGreen = const Color(0xFF64F02D);
   static const Color _danger = Color(0xFFE53935);
 
   bool _isUpdating = false;
+
+  @override
+  void dispose() {
+    _miniMapController?.dispose();
+    super.dispose();
+  }
 
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
@@ -32,7 +38,65 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  // ── 🎯 ฟังก์ชันหลักฟังก์ชันเดียวสำหรับจัดการสถานะทั้งหมด ──
+  String _formatDateTime(dynamic rawDate) {
+    if (rawDate == null || rawDate.toString().isEmpty) return "ไม่ระบุเวลา";
+    try {
+      DateTime dt;
+      if (rawDate is DateTime) {
+        dt = rawDate.toLocal();
+      } else {
+        dt = DateTime.parse(rawDate.toString()).toLocal();
+      }
+      final d = dt.day.toString().padLeft(2, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final y = dt.year + 543;
+      final hr = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return "$d/$m/$y $hr:$min น.";
+    } catch (e) {
+      return rawDate.toString();
+    }
+  }
+
+  void _showImageDialog(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: InteractiveViewer(
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    padding: const EdgeInsets.all(30),
+                    color: Colors.white,
+                    child: const Text(
+                      "ไม่สามารถโหลดรูปภาพได้",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: () => Navigator.pop(context),
+              icon: const CircleAvatar(
+                backgroundColor: Colors.black54,
+                child: Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _updateOrderStatus(
     String newStatus,
     String successMessage, {
@@ -46,14 +110,13 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       barrierDismissible: false,
       builder: (context) => Center(
         child: CircularProgressIndicator(
-          color: isDangerMessage ? _danger : _primary,
+          color: isDangerMessage ? _danger : primaryGreen,
         ),
       ),
     );
 
     try {
       final int orderId = widget.orderModel.orderId ?? 0;
-
       await _orderService.updateOrderStatus(orderId, newStatus);
 
       await Future.delayed(const Duration(seconds: 1));
@@ -64,7 +127,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(successMessage),
-          backgroundColor: isDangerMessage ? _danger : _primary,
+          backgroundColor: isDangerMessage ? _danger : primaryGreen,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -86,14 +149,79 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
   Widget _buildPlaceholderIcon() {
     return Container(
-      width: 65,
-      height: 65,
+      width: 70,
+      height: 70,
       color: Colors.orange.shade50,
       child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
     );
   }
 
-  // ── 🎯 การ์ดรายการอาหารปรับแต่งใหม่ (เหมือนหน้า ViewOrderMember) ──
+  Widget _buildTimelineDot(
+    String label,
+    bool isCompleted,
+    bool isLineCompleted, {
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 4,
+                  color: isFirst
+                      ? Colors.transparent
+                      : (isCompleted
+                            ? const Color(0xFF00B300)
+                            : Colors.grey.shade300),
+                ),
+              ),
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: isCompleted
+                      ? const Color(0xFF00B300)
+                      : Colors.grey.shade300,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: isCompleted
+                        ? const Color(0xFF2E7D32)
+                        : Colors.grey.shade400,
+                    width: 1,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  height: 4,
+                  color: isLast
+                      ? Colors.transparent
+                      : (isLineCompleted
+                            ? const Color(0xFF00B300)
+                            : Colors.grey.shade300),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 10.5,
+              color: isCompleted ? Colors.black87 : Colors.grey.shade500,
+              fontWeight: isCompleted ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildOrderItemCard(OrderDetailModel item) {
     List<dynamic> rawCurries = [];
     if (item.orderDetailCurries != null &&
@@ -115,10 +243,11 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
-    List<Map<String, String>> curriesList = [];
+    List<Map<String, dynamic>> curriesList = [];
     for (var e in rawCurries) {
       String name = '';
       String img = '';
+      int price = 0;
 
       if (e is Map) {
         final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
@@ -133,9 +262,9 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     menuMap['imageUrl'] ??
                     menuMap['menuimage'] ??
                     menuMap['menuImage'] ??
-                    menuMap['image'] ??
                     '')
                 .toString();
+        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0).toInt();
       } else {
         try {
           name =
@@ -147,15 +276,15 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           img =
               ((e as dynamic).menu?.menuImage ??
                       (e as dynamic).menu?.imageurl ??
-                      (e as dynamic).menu?.imageUrl ??
                       (e as dynamic).image ??
                       '')
                   .toString();
+          price = ((e as dynamic).priceAtOrder ?? 0).toInt();
         } catch (_) {}
       }
 
       if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img});
+        curriesList.add({'name': name, 'image': img, 'price': price});
       }
     }
 
@@ -168,12 +297,12 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       } catch (_) {}
     }
 
-    // 🎯 จัดกลุ่ม Add-on เหมือนฝั่งลูกค้า
     Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in rawAddons) {
       String name = '';
       int price = 0;
       int qty = 1;
+      bool canIncreaseQty = false;
 
       if (addon is Map) {
         name =
@@ -187,6 +316,20 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     0)
                 .toInt();
         qty = (addon['addonQty'] ?? addon['addon_qty'] ?? 1).toInt();
+
+        final dynamic menu =
+            addon['menuAddonDetail']?['addonMenu'] ??
+            addon['addonMenu'] ??
+            addon['menuAddon'];
+        if (menu != null) {
+          if (menu['canIncreaseQuantity'] != null) {
+            canIncreaseQty = menu['canIncreaseQuantity'] == true;
+          } else if (menu['allowQuantity'] != null) {
+            canIncreaseQty = menu['allowQuantity'] == true;
+          } else if (menu['isMultiple'] != null) {
+            canIncreaseQty = menu['isMultiple'] == true;
+          }
+        }
       } else {
         try {
           name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
@@ -196,6 +339,19 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                       0)
                   .toInt();
           qty = ((addon as dynamic).addonQty ?? 1).toInt();
+
+          final dynamic menu =
+              (addon as dynamic).menuAddonDetail?.addonMenu ??
+              (addon as dynamic).addonMenu;
+          if (menu != null) {
+            if (menu.canIncreaseQuantity != null) {
+              canIncreaseQty = menu.canIncreaseQuantity == true;
+            } else if (menu.allowQuantity != null) {
+              canIncreaseQty = menu.allowQuantity == true;
+            } else if (menu.isMultiple != null) {
+              canIncreaseQty = menu.isMultiple == true;
+            }
+          }
         } catch (_) {}
       }
 
@@ -203,15 +359,18 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
         if (groupedAddons.containsKey(name)) {
           groupedAddons[name]!['qty'] =
               (groupedAddons[name]!['qty'] as int) + qty;
+          groupedAddons[name]!['canIncreaseQty'] = true;
         } else {
-          groupedAddons[name] = {'qty': qty, 'unitPrice': price};
+          groupedAddons[name] = {
+            'qty': qty,
+            'unitPrice': price,
+            'canIncreaseQty': canIncreaseQty,
+          };
         }
       }
     }
 
     int totalItemPrice = 0;
-    int baseUnitNoAddonPrice = 0;
-
     int addonsSum = 0;
     for (var addon in groupedAddons.values) {
       addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
@@ -220,18 +379,12 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     try {
       final jsonItem = (item as dynamic).toJson();
       var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
-
       if (rawSubtotal != null) {
         totalItemPrice = (rawSubtotal as num).toInt();
       }
     } catch (_) {}
 
-    // คำนวณราคาเฉพาะเมนูตั้งต้น
-    if (totalItemPrice > 0) {
-      int unitTotal = totalItemPrice ~/ (item.qty > 0 ? item.qty : 1);
-      baseUnitNoAddonPrice = unitTotal - addonsSum;
-      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0;
-    } else {
+    if (totalItemPrice == 0) {
       int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       if (baseMenuPrice == 0) {
         try {
@@ -239,31 +392,26 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
         } catch (_) {}
       }
-
       int curriesSum = 0;
-      for (var curry in rawCurries) {
-        if (curry is Map) {
-          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
-          curriesSum += (price ?? 0).toInt();
-        }
+      for (var curry in curriesList) {
+        curriesSum += curry['price'] as int;
       }
-
-      baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
+      int baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
       totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
     }
 
     String rawMenuUrl = item.menu?.menuImage ?? '';
     if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] ?? '';
+      rawMenuUrl = curriesList.first['image'] as String;
     }
     final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
+    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(16),
-        border: const Border(left: BorderSide(color: _primary, width: 4)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -272,197 +420,181 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: finalMenuUrl.isNotEmpty
-                  ? Image.network(
+              child: isCurryDish || finalMenuUrl.isEmpty
+                  ? _buildPlaceholderIcon()
+                  : Image.network(
                       Uri.encodeFull(finalMenuUrl),
-                      width: 65,
-                      height: 65,
+                      width: 70,
+                      height: 70,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildPlaceholderIcon(),
-                    )
-                  : _buildPlaceholderIcon(),
+                    ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    displayMenuName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayMenuName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "$totalItemPrice บาท",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  // 🎯 โชว์ราคาเฉพาะเมนู
-                  Text(
-                    "ราคา $baseUnitNoAddonPrice บาท",
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                  const SizedBox(height: 6),
+                  const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                  const SizedBox(height: 8),
+
+                  if (hasAddons) ...[
+                    const Text(
+                      "รายการเพิ่มเติม",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF007AFF),
+                      ),
                     ),
-                  ),
-
-                  // แสดงผลข้าวราดแกง
-                  if (curriesList.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6.0,
-                      runSpacing: 6.0,
-                      children: curriesList.map((curry) {
-                        String rawCurryImage = curry['image'] ?? '';
-                        String finalCurryUrl = _getFinalImageUrl(rawCurryImage);
-
-                        return Container(
-                          padding: const EdgeInsets.only(
-                            left: 2,
-                            right: 8,
-                            top: 2,
-                            bottom: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: Colors.green.shade200),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  color: Colors.grey.shade200,
-                                  child: finalCurryUrl.isNotEmpty
-                                      ? Image.network(
-                                          Uri.encodeFull(finalCurryUrl),
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Icon(
-                                                Icons.fastfood_rounded,
-                                                size: 12,
-                                                color: Colors.grey,
-                                              ),
-                                        )
-                                      : const Icon(
-                                          Icons.fastfood_rounded,
-                                          size: 12,
-                                          color: Colors.grey,
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                curry['name'] ?? "ไม่มีชื่อ",
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Colors.green.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-
-                  // 🎯 แสดงผล Add-on แบบรวมจำนวนและราคา
-                  if (groupedAddons.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6.0,
-                      runSpacing: 6.0,
-                      children: groupedAddons.entries.map((entry) {
-                        String name = entry.key;
-                        int qty = entry.value['qty'] as int;
-                        int unitPrice = entry.value['unitPrice'] as int;
-
-                        String displayText = name;
-                        if (qty > 1) {
-                          int totalAddonPrice = unitPrice * qty;
-                          displayText += " x$qty";
-                          if (totalAddonPrice > 0) {
-                            displayText += " (+฿$totalAddonPrice)";
-                          }
-                        } else {
-                          if (unitPrice > 0) {
-                            displayText += " (+฿$unitPrice)";
-                          }
-                        }
-
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 3.5,
+                            decoration: BoxDecoration(
+                              color: primaryGreen,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.orange.shade200),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (var curry in curriesList)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            curry['name'] as String,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        const Text(
+                                          "1 จำนวน",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                for (var entry in groupedAddons.entries)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            entry.key,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        if (entry.value['canIncreaseQty'] ==
+                                                true ||
+                                            (entry.value['qty'] as int) > 1)
+                                          RichText(
+                                            text: TextSpan(
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87,
+                                              ),
+                                              children: [
+                                                TextSpan(
+                                                  text:
+                                                      "${entry.value['qty']} ",
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const TextSpan(text: "จำนวน"),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.add_circle_rounded,
-                                size: 14,
-                                color: Colors.orange,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                displayText,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Colors.orange.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 8),
                   ],
 
                   if (item.note.isNotEmpty) ...[
-                    const SizedBox(height: 6),
                     Text(
                       "หมายเหตุ: ${item.note}",
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 12,
                         color: Colors.grey.shade600,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
+                    const SizedBox(height: 6),
                   ],
-                  const SizedBox(height: 6),
+
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "จำนวน ${item.qty}",
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          "รวม $totalItemPrice บาท",
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: _primary,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      "${item.qty} จำนวน",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
                     ),
                   ),
                 ],
@@ -480,9 +612,34 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
     final int rawOrderId = order.orderId ?? 0;
     final String orderId = rawOrderId.toString().padLeft(6, '0');
-    final String currentStatus = order.orderStatus ?? "WaitingRestaurant";
+    final String currentStatus = (order.orderStatus ?? "").trim().toLowerCase();
 
-    // ── ข้อมูลลูกค้า ──
+    final bool isIssueReported = currentStatus == "issue_reported";
+    final bool isCanceled =
+        currentStatus == "cancel" || currentStatus == "cancelled";
+
+    int currentStep = 1;
+    if (currentStatus == "waitingrestaurant" || currentStatus == "pending") {
+      currentStep = 2;
+    } else if (currentStatus == "goingtorestaurant" ||
+        currentStatus == "going" ||
+        currentStatus == "rideraccepted" ||
+        currentStatus == "riderarrived") {
+      currentStep = 3;
+    } else if (currentStatus == "delivery" ||
+        currentStatus == "delivering" ||
+        currentStatus == "ontheway" ||
+        currentStatus == "pickedup") {
+      currentStep = 4;
+    } else if (currentStatus == "arrived" || currentStatus == "reached") {
+      currentStep = 5;
+    } else if (currentStatus == "delivered" ||
+        currentStatus == "success" ||
+        currentStatus == "completed" ||
+        currentStatus == "reviewsuccess") {
+      currentStep = 6;
+    }
+
     String customerName = "ไม่ระบุชื่อผู้รับ";
     String customerPhone = order.member?.phone ?? "-";
     String customerImgUrl = _getFinalImageUrl(order.member?.profileimg);
@@ -495,7 +652,6 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       }
     }
 
-    // ── ข้อมูลไรเดอร์ ──
     final bool hasRider = order.rider != null;
     String riderName = hasRider
         ? "${order.rider?.firstName ?? ''} ${order.rider?.lastName ?? ''}"
@@ -505,27 +661,53 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     String vehiclePlate = hasRider ? (order.rider?.vehiclePlate ?? "-") : "-";
     String riderImgUrl = _getFinalImageUrl(order.rider?.studentCardImage);
 
-    // ── เวลาสั่งซื้อ ──
-    String orderTimeText = "--:--";
-    if (order.orderdate != null) {
-      final DateTime dateTime = order.orderdate!;
-      orderTimeText =
-          "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} น.";
-    }
+    // 🎯 ดึงรูปภาพหลักฐานผ่าน JSON ป้องกัน NoSuchMethodError
+    String cancelImageUrl = "";
+    try {
+      final jsonOrder = (order as dynamic).toJson();
+      dynamic rawCancelImg =
+          jsonOrder['cancelImage'] ??
+          jsonOrder['cancel_image'] ??
+          jsonOrder['evidenceImage'] ??
+          jsonOrder['evidence_image'] ??
+          jsonOrder['cancelImg'] ??
+          jsonOrder['cancel_img'] ??
+          jsonOrder['image'];
+      cancelImageUrl = _getFinalImageUrl(rawCancelImg?.toString());
+    } catch (_) {}
+
+    final String formattedDate = _formatDateTime(order.orderdate);
 
     double deliveryFee = order.deliveryFee;
     double totalPrice = order.totalPrice;
     double foodSubtotal = totalPrice - deliveryFee;
 
+    LatLng deliveryLocation = LatLng(order.latitude, order.longitude);
+
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: const RestaurantNavbar(title: "รายละเอียดออเดอร์"),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: primaryGreen),
+          onPressed: () => Navigator.pop(context, true),
+        ),
+        title: const Text(
+          "รายละเอียดออเดอร์",
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── เลขที่ออเดอร์และเวลา ──
             Center(
               child: RichText(
                 text: TextSpan(
@@ -540,41 +722,455 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     ),
                     TextSpan(
                       text: "K$orderId",
-                      style: const TextStyle(color: _accent),
+                      style: TextStyle(color: primaryGreen),
                     ),
                   ],
                 ),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Center(
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.access_time_rounded,
-                    size: 16,
+                    Icons.calendar_today_rounded,
+                    size: 15,
                     color: Colors.grey.shade600,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Text(
-                    "เวลาสั่งซื้อ: $orderTimeText",
+                    "สั่งซื้อเมื่อ: $formattedDate",
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
+
+            // ── 1. กล่องแจ้งปัญหา ──
+            if (isIssueReported) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.support_agent_rounded,
+                          color: Colors.orange.shade700,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            "มีการแจ้งปัญหาออเดอร์นี้\nกรุณาตรวจสอบรายละเอียดอาหาร",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade800,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          color: Colors.black87,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text: "สาเหตุ / รายละเอียด: ",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(
+                            text: "${order.cancelDetail ?? 'ไม่มีข้อมูลระบุ'}",
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (cancelImageUrl.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        "รูปภาพหลักฐานจากลูกค้า:",
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () => _showImageDialog(cancelImageUrl),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              Image.network(
+                                cancelImageUrl,
+                                width: double.infinity,
+                                height: 180,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      width: double.infinity,
+                                      height: 120,
+                                      color: Colors.grey.shade200,
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.broken_image,
+                                          color: Colors.grey,
+                                          size: 40,
+                                        ),
+                                      ),
+                                    ),
+                              ),
+                              Container(
+                                margin: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.zoom_in,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "แตะเพื่อดูภาพขยาย",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    const SizedBox(height: 16),
+                    const Divider(height: 1, color: Colors.black12),
+                    const SizedBox(height: 12),
+                    const Text(
+                      "ข้อมูลติดต่อลูกค้าและผู้จัดส่ง:",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.person_rounded,
+                          size: 20,
+                          color: Colors.orange.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "ลูกค้า: $customerName",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_in_talk_rounded,
+                          size: 20,
+                          color: Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          customerPhone,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.two_wheeler_rounded,
+                          size: 20,
+                          color: primaryGreen,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "ไรเดอร์: $riderName",
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_in_talk_rounded,
+                          size: 20,
+                          color: Colors.blue.shade700,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          riderPhone,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── 2. กล่องยกเลิกคำสั่งซื้อ ──
+            if (isCanceled) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.cancel_rounded,
+                          color: Colors.red.shade700,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Text(
+                            "คำสั่งซื้อนี้ถูกยกเลิกแล้ว",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.red,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    RichText(
+                      text: TextSpan(
+                        style: const TextStyle(
+                          fontSize: 14,
+                          height: 1.4,
+                          color: Colors.black87,
+                        ),
+                        children: [
+                          const TextSpan(
+                            text: "สาเหตุการยกเลิก: ",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(
+                            text:
+                                "${order.cancelDetail ?? 'ไม่มีผู้จัดส่งรับงานภายในเวลาที่กำหนด'}",
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (cancelImageUrl.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        "รูปภาพหลักฐานการยกเลิก:",
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: () => _showImageDialog(cancelImageUrl),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              Image.network(
+                                cancelImageUrl,
+                                width: double.infinity,
+                                height: 180,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Container(
+                                      width: double.infinity,
+                                      height: 120,
+                                      color: Colors.grey.shade200,
+                                      child: const Center(
+                                        child: Icon(
+                                          Icons.broken_image,
+                                          color: Colors.grey,
+                                          size: 40,
+                                        ),
+                                      ),
+                                    ),
+                              ),
+                              Container(
+                                margin: const EdgeInsets.all(8),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.zoom_in,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
+                                    SizedBox(width: 4),
+                                    Text(
+                                      "แตะเพื่อดูภาพขยาย",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
+            // ── 3. Timeline สถานะ 6 ระดับ ──
+            if (!isCanceled && !isIssueReported) ...[
+              const Text(
+                "สถานะคำสั่งซื้อ",
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 20,
+                  horizontal: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFBFBFB),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTimelineDot(
+                      "ค้นหาผู้จัดส่ง",
+                      currentStep >= 1,
+                      currentStep >= 2,
+                      isFirst: true,
+                    ),
+                    _buildTimelineDot(
+                      "ร้านรับออเดอร์",
+                      currentStep >= 2,
+                      currentStep >= 3,
+                    ),
+                    _buildTimelineDot(
+                      "ไปรับออเดอร์",
+                      currentStep >= 3,
+                      currentStep >= 4,
+                    ),
+                    _buildTimelineDot(
+                      "กำลังจัดส่ง",
+                      currentStep >= 4,
+                      currentStep >= 5,
+                    ),
+                    _buildTimelineDot(
+                      "ถึงที่หมายแล้ว",
+                      currentStep >= 5,
+                      currentStep >= 6,
+                    ),
+                    _buildTimelineDot(
+                      "จัดส่งสำเร็จ",
+                      currentStep >= 6,
+                      currentStep >= 7,
+                      isLast: true,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
-            // ── 👤 บล็อกข้อมูลลูกค้า ──
+            // ── 4. ข้อมูลลูกค้า ──
             const Text(
-              "ลูกค้า",
+              "ข้อมูลลูกค้า",
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -598,7 +1194,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                         ? NetworkImage(customerImgUrl)
                         : null,
                     child: customerImgUrl.isEmpty
-                        ? const Icon(Icons.person, color: _accent)
+                        ? const Icon(Icons.person, color: Colors.orange)
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -628,30 +1224,9 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
               ),
             ),
 
-            if (order.addressDetail.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.amber.shade200),
-                ),
-                child: Text(
-                  "สถานที่จัดส่ง: ${order.addressDetail}",
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.amber.shade900,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-
             const SizedBox(height: 20),
 
-            // ── 🏍️ บล็อกข้อมูลไรเดอร์ ──
+            // ── 5. ผู้จัดส่ง ──
             const Text(
               "ผู้จัดส่ง",
               style: TextStyle(
@@ -672,12 +1247,12 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: _primary.withOpacity(0.15),
+                    backgroundColor: primaryGreen.withOpacity(0.15),
                     backgroundImage: riderImgUrl.isNotEmpty
                         ? NetworkImage(riderImgUrl)
                         : null,
                     child: riderImgUrl.isEmpty
-                        ? const Icon(Icons.two_wheeler, color: _primary)
+                        ? Icon(Icons.two_wheeler, color: primaryGreen)
                         : null,
                   ),
                   const SizedBox(width: 12),
@@ -711,17 +1286,100 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
             ),
 
             const SizedBox(height: 20),
+
+            // ── 6. ตำแหน่งที่อยู่จัดส่งของลูกค้า ──
+            Row(
+              children: [
+                const Text(
+                  "ตำแหน่งที่อยู่จัดส่งของลูกค้า",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(Icons.location_on, color: primaryGreen, size: 22),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              height: 180,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.grey.shade300, width: 1.5),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: deliveryLocation,
+                    zoom: 16.0,
+                  ),
+                  onMapCreated: (controller) => _miniMapController = controller,
+                  zoomControlsEnabled: false,
+                  zoomGesturesEnabled: false,
+                  scrollGesturesEnabled: false,
+                  rotateGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
+                  markers: {
+                    Marker(
+                      markerId: const MarkerId('restaurant_delivery_pos'),
+                      position: deliveryLocation,
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueRed,
+                      ),
+                      infoWindow: InfoWindow(title: "จุดจัดส่ง: $customerName"),
+                    ),
+                  },
+                ),
+              ),
+            ),
+
+            if (order.addressDetail.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "จุดสังเกต / รายละเอียดที่อยู่:",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.green.shade900,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      order.addressDetail,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            const SizedBox(height: 20),
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
 
-            // ── 🍱 รายการอาหาร ──
+            // ── 7. รายการอาหาร ──
             const Text(
-              "รายการสั่งซื้อ",
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
+              "รายการอาหาร",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
             ListView.builder(
@@ -734,12 +1392,11 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
             ),
             const SizedBox(height: 12),
 
-            // ── 💰 สรุปยอดเงินของร้าน ──
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  "รวมยอดเงิน",
+                  "รวมยอดเงินของร้าน",
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -748,10 +1405,10 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                 ),
                 Text(
                   "${foodSubtotal.toStringAsFixed(0)} บาท",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
-                    color: _primary,
+                    color: primaryGreen,
                   ),
                 ),
               ],
@@ -761,23 +1418,27 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
         ),
       ),
 
-      // ── 🎯 ปุ่มกดอัปเดตสถานะสำหรับร้านค้า ──
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: _buildActionButtonByStatus(currentStatus),
-          ),
-        ),
-      ),
+      bottomNavigationBar: isIssueReported || isCanceled
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: _buildActionButtonByStatus(
+                    order.orderStatus ?? "WaitingRestaurant",
+                  ),
+                ),
+              ),
+            ),
     );
   }
 
-  // 🎯 สลับปุ่มกดตามสถานะออเดอร์
   Widget _buildActionButtonByStatus(String status) {
-    if (status == "WaitingRestaurant") {
+    final statusLower = status.toLowerCase();
+
+    if (statusLower == "waitingrestaurant" || statusLower == "pending") {
       return Row(
         children: [
           Expanded(
@@ -813,7 +1474,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                       "รับออเดอร์สำเร็จ! เริ่มปรุงอาหารแล้ว 👨‍🍳",
                     ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: _primary,
+                backgroundColor: primaryGreen,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(30),
                 ),
@@ -832,28 +1493,32 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           ),
         ],
       );
-    } else if (status == "delivery") {
-      return ElevatedButton(
-        onPressed: _isUpdating
-            ? null
-            : () => _updateOrderStatus(
-                "goingToRestaurant",
-                "ทำอาหารเสร็จแล้ว! แจ้งไรเดอร์มารับอาหาร 🍱🛵",
-              ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF64FF20),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-          elevation: 0,
+    } else if (statusLower == "goingtorestaurant" ||
+        statusLower == "going" ||
+        statusLower == "preparing" ||
+        statusLower == "cooking" ||
+        statusLower == "foodready") {
+      return Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE8FCD0),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: primaryGreen.withOpacity(0.5)),
         ),
-        child: const Text(
-          "ทำอาหารเสร็จแล้ว (พร้อมส่ง)",
-          style: TextStyle(
-            color: Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.soup_kitchen_rounded, color: primaryGreen, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              "รับออเดอร์แล้ว (กำลังรอไรเดอร์มารับอาหาร 🛵)",
+              style: TextStyle(
+                color: primaryGreen,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
       );
     } else {

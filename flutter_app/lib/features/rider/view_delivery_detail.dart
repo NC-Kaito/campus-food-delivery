@@ -15,15 +15,18 @@ class ViewDeliveryDetail extends StatefulWidget {
   const ViewDeliveryDetail({super.key, required this.orderModel});
 
   @override
-  State<ViewDeliveryDetail> createState() => _ViewWaitingPickupOrderState();
+  State<ViewDeliveryDetail> createState() => _ViewDeliveryDetailState();
 }
 
-class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
+class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
   final OrderService _orderService = OrderService();
   bool _isUpdating = false;
+  late String _currentStatus;
 
   GoogleMapController? _mapController;
-  final Color primaryOrange = Colors.orange;
+
+  final Color primaryGreen = const Color(0xFF00B300);
+  final Color accentGreen = const Color(0xFF64F02D);
 
   Set<Polyline> _polylines = {};
   String _drivingDistance = "กำลังคำนวณ...";
@@ -34,6 +37,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
   @override
   void initState() {
     super.initState();
+    _currentStatus = widget.orderModel.orderStatus ?? "";
     _calculateDrivingRoute();
   }
 
@@ -43,9 +47,10 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     super.dispose();
   }
 
-  // 🎯 ฟังก์ชันดึงสถานะปัจจุบันของไรเดอร์
   int _getCurrentRiderStep() {
-    final status = (widget.orderModel.orderStatus ?? "").trim().toLowerCase();
+    final status = _currentStatus
+        .trim()
+        .toLowerCase(); // 🎯 อ่านจากตัวแปร State
 
     if (status.isEmpty ||
         status == "waitingrider" ||
@@ -71,7 +76,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         status == "completed" ||
         status == "reviewsuccess" ||
         status == "delivered") {
-      // 🎯 ถ้ารอรับยืนยัน (delivered) ถือว่าจบงานฝั่งไรเดอร์แล้ว
       return 6;
     }
     return 1;
@@ -113,7 +117,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
             _polylines.add(
               Polyline(
                 polylineId: const PolylineId("driving_route"),
-                color: primaryOrange,
+                color: primaryGreen,
                 width: 5,
                 points: polylineCoordinates,
                 jointType: JointType.round,
@@ -187,12 +191,117 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
+  String _formatDateTime(dynamic rawDate) {
+    if (rawDate == null || rawDate.toString().isEmpty) return "ไม่ระบุเวลา";
+    try {
+      DateTime dt;
+      if (rawDate is DateTime) {
+        dt = rawDate.toLocal();
+      } else {
+        dt = DateTime.parse(rawDate.toString()).toLocal();
+      }
+      final d = dt.day.toString().padLeft(2, '0');
+      final m = dt.month.toString().padLeft(2, '0');
+      final y = dt.year + 543;
+      final hr = dt.hour.toString().padLeft(2, '0');
+      final min = dt.minute.toString().padLeft(2, '0');
+      return "$d/$m/$y $hr:$min น.";
+    } catch (e) {
+      return rawDate.toString();
+    }
+  }
+
   Widget _buildPlaceholderIcon() {
     return Container(
-      width: 65,
-      height: 65,
-      color: Colors.orange.shade50,
-      child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
+      width: 70,
+      height: 70,
+      color: Colors.grey.shade100,
+      child: Icon(Icons.fastfood_rounded, color: primaryGreen, size: 30),
+    );
+  }
+
+  Widget _buildCustomerCard() {
+    final member = widget.orderModel.member;
+    String memberFullName = "ไม่ระบุชื่อลูกค้า";
+    if (member != null) {
+      final String firstName = member.firstname ?? "";
+      final String lastName = member.lastname ?? "";
+      if (firstName.isNotEmpty || lastName.isNotEmpty) {
+        memberFullName = "$firstName $lastName".trim();
+      }
+    }
+
+    String phone = member?.phone ?? member?.phone ?? "ไม่ระบุเบอร์ติดต่อ";
+    String profileImg = _getFinalImageUrl(member?.profileimg);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: primaryGreen.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 26,
+            backgroundColor: primaryGreen.withOpacity(0.15),
+            backgroundImage: profileImg.isNotEmpty
+                ? NetworkImage(profileImg)
+                : null,
+            child: profileImg.isEmpty
+                ? Icon(Icons.person_rounded, size: 30, color: primaryGreen)
+                : null,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "ข้อมูลลูกค้า",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                Text(
+                  memberFullName,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Icon(Icons.phone_rounded, size: 14, color: primaryGreen),
+                    const SizedBox(width: 4),
+                    Text(
+                      phone,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -217,10 +326,11 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
-    List<Map<String, String>> curriesList = [];
+    List<Map<String, dynamic>> curriesList = [];
     for (var e in rawCurries) {
       String name = '';
       String img = '';
+      int price = 0;
 
       if (e is Map) {
         final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
@@ -235,25 +345,29 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                     menuMap['imageUrl'] ??
                     menuMap['menuimage'] ??
                     menuMap['menuImage'] ??
-                    menuMap['image'] ??
                     '')
                 .toString();
+        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0).toInt();
       } else {
         try {
-          name = (e.menu?.menuName ?? e.menu?.menuname ?? e.name ?? '')
-              .toString();
-          img =
-              (e.menu?.menuImage ??
-                      e.menu?.imageurl ??
-                      e.menu?.imageUrl ??
-                      e.image ??
+          name =
+              ((e as dynamic).menu?.menuName ??
+                      (e as dynamic).menu?.menuname ??
+                      (e as dynamic).name ??
                       '')
                   .toString();
+          img =
+              ((e as dynamic).menu?.menuImage ??
+                      (e as dynamic).menu?.imageurl ??
+                      (e as dynamic).image ??
+                      '')
+                  .toString();
+          price = ((e as dynamic).priceAtOrder ?? 0).toInt();
         } catch (_) {}
       }
 
       if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img});
+        curriesList.add({'name': name, 'image': img, 'price': price});
       }
     }
 
@@ -271,6 +385,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       String name = '';
       int price = 0;
       int qty = 1;
+      bool canIncreaseQty = false;
 
       if (addon is Map) {
         name =
@@ -284,6 +399,17 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                     0)
                 .toInt();
         qty = (addon['addonQty'] ?? addon['addon_qty'] ?? 1).toInt();
+        final dynamic menu =
+            addon['menuAddonDetail']?['addonMenu'] ??
+            addon['addonMenu'] ??
+            addon['menuAddon'];
+        if (menu != null) {
+          canIncreaseQty =
+              (menu['canIncreaseQuantity'] ??
+                  menu['allowQuantity'] ??
+                  menu['isMultiple']) ==
+              true;
+        }
       } else {
         try {
           name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
@@ -300,15 +426,18 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         if (groupedAddons.containsKey(name)) {
           groupedAddons[name]!['qty'] =
               (groupedAddons[name]!['qty'] as int) + qty;
+          groupedAddons[name]!['canIncreaseQty'] = true;
         } else {
-          groupedAddons[name] = {'qty': qty, 'unitPrice': price};
+          groupedAddons[name] = {
+            'qty': qty,
+            'unitPrice': price,
+            'canIncreaseQty': canIncreaseQty,
+          };
         }
       }
     }
 
     int totalItemPrice = 0;
-    int baseUnitNoAddonPrice = 0;
-
     int addonsSum = 0;
     for (var addon in groupedAddons.values) {
       addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
@@ -317,17 +446,12 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     try {
       final jsonItem = (item as dynamic).toJson();
       var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
-
       if (rawSubtotal != null) {
         totalItemPrice = (rawSubtotal as num).toInt();
       }
     } catch (_) {}
 
-    if (totalItemPrice > 0) {
-      int unitTotal = totalItemPrice ~/ (item.qty > 0 ? item.qty : 1);
-      baseUnitNoAddonPrice = unitTotal - addonsSum;
-      if (baseUnitNoAddonPrice < 0) baseUnitNoAddonPrice = 0;
-    } else {
+    if (totalItemPrice == 0) {
       int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
       if (baseMenuPrice == 0) {
         try {
@@ -335,31 +459,26 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
           baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
         } catch (_) {}
       }
-
       int curriesSum = 0;
-      for (var curry in rawCurries) {
-        if (curry is Map) {
-          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
-          curriesSum += (price ?? 0).toInt();
-        }
+      for (var curry in curriesList) {
+        curriesSum += curry['price'] as int;
       }
-
-      baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
+      int baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
       totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
     }
 
     String rawMenuUrl = item.menu?.menuImage ?? '';
     if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] ?? '';
+      rawMenuUrl = curriesList.first['image'] as String;
     }
     final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
+    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(16),
-        border: Border(left: BorderSide(color: primaryOrange, width: 4)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -368,194 +487,181 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: finalMenuUrl.isNotEmpty
-                  ? Image.network(
+              child: isCurryDish || finalMenuUrl.isEmpty
+                  ? _buildPlaceholderIcon()
+                  : Image.network(
                       Uri.encodeFull(finalMenuUrl),
-                      width: 65,
-                      height: 65,
+                      width: 70,
+                      height: 70,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) =>
                           _buildPlaceholderIcon(),
-                    )
-                  : _buildPlaceholderIcon(),
+                    ),
             ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    displayMenuName,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayMenuName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "$totalItemPrice บาท",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: primaryGreen,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    "ราคา $baseUnitNoAddonPrice บาท",
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
+                  const SizedBox(height: 6),
+                  const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                  const SizedBox(height: 8),
+
+                  if (hasAddons) ...[
+                    const Text(
+                      "รายการเพิ่มเติม",
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF007AFF),
+                      ),
                     ),
-                  ),
-
-                  if (curriesList.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6.0,
-                      runSpacing: 6.0,
-                      children: curriesList.map((curry) {
-                        String rawCurryImage = curry['image'] ?? '';
-                        String finalCurryUrl = _getFinalImageUrl(rawCurryImage);
-
-                        return Container(
-                          padding: const EdgeInsets.only(
-                            left: 2,
-                            right: 8,
-                            top: 2,
-                            bottom: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            border: Border.all(color: Colors.green.shade200),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(20),
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  color: Colors.grey.shade200,
-                                  child: finalCurryUrl.isNotEmpty
-                                      ? Image.network(
-                                          Uri.encodeFull(finalCurryUrl),
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) =>
-                                              const Icon(
-                                                Icons.fastfood_rounded,
-                                                size: 12,
-                                                color: Colors.grey,
-                                              ),
-                                        )
-                                      : const Icon(
-                                          Icons.fastfood_rounded,
-                                          size: 12,
-                                          color: Colors.grey,
-                                        ),
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                curry['name'] ?? "ไม่มีชื่อ",
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Colors.green.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-
-                  if (groupedAddons.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6.0,
-                      runSpacing: 6.0,
-                      children: groupedAddons.entries.map((entry) {
-                        String name = entry.key;
-                        int qty = entry.value['qty'] as int;
-                        int unitPrice = entry.value['unitPrice'] as int;
-
-                        String displayText = name;
-                        if (qty > 1) {
-                          int totalAddonPrice = unitPrice * qty;
-                          displayText += " x$qty";
-                          if (totalAddonPrice > 0) {
-                            displayText += " (+฿$totalAddonPrice)";
-                          }
-                        } else {
-                          if (unitPrice > 0) {
-                            displayText += " (+฿$unitPrice)";
-                          }
-                        }
-
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 3.5,
+                            decoration: BoxDecoration(
+                              color: primaryGreen,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.orange.shade200),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (var curry in curriesList)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            curry['name'] as String,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        const Text(
+                                          "1 จำนวน",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                for (var entry in groupedAddons.entries)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            entry.key,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        if (entry.value['canIncreaseQty'] ==
+                                                true ||
+                                            (entry.value['qty'] as int) > 1)
+                                          RichText(
+                                            text: TextSpan(
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87,
+                                              ),
+                                              children: [
+                                                TextSpan(
+                                                  text:
+                                                      "${entry.value['qty']} ",
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const TextSpan(text: "จำนวน"),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.add_circle_rounded,
-                                size: 14,
-                                color: Colors.orange,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                displayText,
-                                style: TextStyle(
-                                  fontSize: 11.5,
-                                  color: Colors.orange.shade900,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                        ],
+                      ),
                     ),
+                    const SizedBox(height: 8),
                   ],
 
                   if (item.note.isNotEmpty) ...[
-                    const SizedBox(height: 6),
                     Text(
                       "หมายเหตุ: ${item.note}",
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 12,
                         color: Colors.grey.shade600,
                         fontStyle: FontStyle.italic,
                       ),
                     ),
+                    const SizedBox(height: 6),
                   ],
-                  const SizedBox(height: 6),
+
                   Align(
                     alignment: Alignment.centerRight,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          "จำนวน ${item.qty}",
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          "รวม $totalItemPrice บาท",
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.orange,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      "${item.qty} จำนวน",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: primaryGreen,
+                      ),
                     ),
                   ),
                 ],
@@ -585,18 +691,18 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                   height: 3,
                   color: isFirst
                       ? Colors.transparent
-                      : (isCompleted ? primaryOrange : Colors.grey.shade300),
+                      : (isCompleted ? primaryGreen : Colors.grey.shade300),
                 ),
               ),
               Container(
                 width: 14,
                 height: 14,
                 decoration: BoxDecoration(
-                  color: isCompleted ? primaryOrange : Colors.grey.shade300,
+                  color: isCompleted ? primaryGreen : Colors.grey.shade300,
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: isCompleted
-                        ? Colors.orange.shade800
+                        ? const Color(0xFF008000)
                         : Colors.grey.shade400,
                     width: 1,
                   ),
@@ -607,9 +713,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                   height: 3,
                   color: isLast
                       ? Colors.transparent
-                      : (isLineCompleted
-                            ? primaryOrange
-                            : Colors.grey.shade300),
+                      : (isLineCompleted ? primaryGreen : Colors.grey.shade300),
                 ),
               ),
             ],
@@ -643,11 +747,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [
-            Icon(
-              Icons.help_outline_rounded,
-              color: Colors.orange.shade700,
-              size: 28,
-            ),
+            Icon(Icons.help_outline_rounded, color: primaryGreen, size: 28),
             const SizedBox(width: 8),
             Text(
               title,
@@ -678,7 +778,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryOrange,
+              backgroundColor: primaryGreen,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -709,7 +809,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       context: context,
       barrierDismissible: false,
       builder: (context) =>
-          const Center(child: CircularProgressIndicator(color: Colors.orange)),
+          Center(child: CircularProgressIndicator(color: primaryGreen)),
     );
 
     try {
@@ -717,7 +817,13 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       await _orderService.updateOrderStatus(orderId, nextStatus);
 
       if (!mounted) return;
-      Navigator.pop(context);
+      Navigator.pop(context); // ปิด Dialog โหลด
+
+      // 🎯 อัปเดตตัวแปร State เพื่อเปลี่ยนหน้าตา UI ทันที
+      setState(() {
+        _currentStatus = nextStatus;
+        _isUpdating = false;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -726,8 +832,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
           duration: const Duration(seconds: 2),
         ),
       );
-
-      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
       Navigator.pop(context);
@@ -743,9 +847,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
   }
 
   Widget _buildBottomPanel(int currentStep) {
-    if (currentStep <= 0) {
-      return const SizedBox.shrink();
-    }
+    if (currentStep <= 0) return const SizedBox.shrink();
 
     String buttonText = "";
     String nextStatus = "";
@@ -782,7 +884,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       dialogContent = "คุณเดินทางมาถึงจุดส่งอาหารของลูกค้าแล้วใช่หรือไม่?";
       buttonIcon = Icons.location_on_rounded;
     } else if (currentStep == 5) {
-      // 🎯 เปลี่ยนเป็นสถานะ 'delivered' เพื่อรอลูกค้ายืนยันความสำเร็จ
       buttonText = "จัดส่งสำเร็จ (รอลูกค้ายืนยัน)";
       nextStatus = "delivered";
       successMsg = "อัปเดตสถานะ: รอลูกค้ายืนยันรับอาหาร";
@@ -811,9 +912,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: const Color(0xFFF4FBF4),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.shade100),
+                border: Border.all(color: primaryGreen.withOpacity(0.2)),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -849,7 +950,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                 ],
               ),
             ),
-
             if (currentStep < 6) ...[
               const SizedBox(height: 16),
               SizedBox(
@@ -864,18 +964,21 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                           successMsg,
                         )
                       : null,
-                  icon: Icon(buttonIcon, color: Colors.white),
+                  icon: Icon(
+                    buttonIcon,
+                    color: isButtonEnabled ? Colors.black : Colors.white,
+                  ),
                   label: Text(
                     buttonText,
-                    style: const TextStyle(
-                      color: Colors.white,
+                    style: TextStyle(
+                      color: isButtonEnabled ? Colors.black : Colors.white,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: isButtonEnabled
-                        ? primaryOrange
+                        ? accentGreen
                         : Colors.grey.shade400,
                     elevation: 0,
                     shape: RoundedRectangleBorder(
@@ -923,14 +1026,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
     double subtotalPrice = totalPrice - deliveryFee;
 
     LatLng deliveryLocation = LatLng(order.latitude, order.longitude);
-
-    String orderTimeText = "--:--";
-    if (order.orderdate != null) {
-      final DateTime dateTime = order.orderdate!;
-      orderTimeText =
-          "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} น.";
-    }
-
+    final String formattedDate = _formatDateTime(order.orderdate);
     final int currentStep = _getCurrentRiderStep();
 
     return Scaffold(
@@ -938,7 +1034,10 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        iconTheme: IconThemeData(color: primaryOrange),
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: primaryGreen),
+          onPressed: () => Navigator.pop(context, true),
+        ),
         title: const Text(
           "รายละเอียดออเดอร์",
           style: TextStyle(
@@ -968,7 +1067,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                     ),
                     TextSpan(
                       text: "K$orderId",
-                      style: TextStyle(color: primaryOrange),
+                      style: TextStyle(color: primaryGreen),
                     ),
                   ],
                 ),
@@ -980,24 +1079,25 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    Icons.access_time_rounded,
-                    size: 16,
+                    Icons.calendar_today_rounded,
+                    size: 15,
                     color: Colors.grey.shade600,
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   Text(
-                    "เวลาสั่งซื้อ: $orderTimeText",
+                    "สั่งซื้อเมื่อ: $formattedDate",
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(height: 18),
+            _buildCustomerCard(),
             const SizedBox(height: 20),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1012,7 +1112,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: primaryOrange.withOpacity(0.1),
+                      color: primaryGreen.withOpacity(0.12),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
@@ -1020,7 +1120,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                           ? "≈ $_drivingDistance ($_drivingDuration)"
                           : _drivingDistance,
                       style: TextStyle(
-                        color: primaryOrange,
+                        color: primaryGreen,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -1077,11 +1177,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                 "ไม่พบตำแหน่งร้านค้าในระบบ",
                 style: TextStyle(fontSize: 13.5, color: Colors.grey[600]),
               ),
-
             const SizedBox(height: 20),
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 20),
-
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1089,7 +1187,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                   children: [
                     Icon(
                       Icons.storefront_rounded,
-                      color: primaryOrange,
+                      color: primaryGreen,
                       size: 24,
                     ),
                     Container(
@@ -1137,7 +1235,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                 ),
               ],
             ),
-
             if (order.addressDetail.isNotEmpty) ...[
               const SizedBox(height: 12),
               Container(
@@ -1170,11 +1267,9 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                 ),
               ),
             ],
-
             const SizedBox(height: 20),
             const Divider(height: 1, color: Colors.black12),
             const SizedBox(height: 16),
-
             const Text(
               "รายการอาหาร",
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -1189,7 +1284,6 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
               },
             ),
             const SizedBox(height: 16),
-
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -1250,7 +1344,7 @@ class _ViewWaitingPickupOrderState extends State<ViewDeliveryDetail> {
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: primaryOrange,
+                    color: primaryGreen,
                   ),
                 ),
               ],

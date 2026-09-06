@@ -229,6 +229,27 @@ class OrderService {
     }
   }
 
+  Future<List<dynamic>> getcancelOrdersByRestaurant(String username) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/order/restaurant/$username/cancel",
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List<dynamic>;
+      } else {
+        throw "เกิดข้อผิดพลาดในการดึงข้อมูลออเดอร์: ${response.statusCode}";
+      }
+    } on DioException catch (e) {
+      final errorMessage =
+          e.response?.data?["message"] ??
+          "ไม่สามารถดึงข้อมูลคำสั่งซื้อได้ หรือเซิร์ฟเวอร์ไม่ได้เปิดอยู่";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   // 🎯 เปลี่ยนชนิดข้อมูลและแก้พาร์ทให้ตรงกับ Spring Boot เรียบร้อยแล้วครับ
   Future<List<dynamic>> getReviewSuccessOrders(String studentId) async {
     try {

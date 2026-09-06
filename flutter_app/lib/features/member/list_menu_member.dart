@@ -121,7 +121,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
     return resultLines.join(" | ");
   }
 
-  // 🎯 ฟังก์ชันเช็กว่าปัจจุบันร้านเปิดอยู่หรือไม่
+  // 🎯 ฟังก์ชันเช็กว่าปัจจุบันร้านเปิดอยู่หรือไม่ (สำหรับซ่อนปุ่ม เพิ่มตะกร้า)
   bool _isCurrentlyOpen() {
     final item = widget.restaurantModel;
     if (item.statusOpen == false) return false;
@@ -151,6 +151,45 @@ class _ListMenuMemberState extends State<ListMenuMember>
       return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
     }
     return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+  }
+
+  // 🎯 ฟังก์ชันเพื่อดึงข้อความสถานะร้านค้า (เปิดอยู่ / ปิดชั่วคราว / ปิดทำการ)
+  String _getRestaurantStatusText() {
+    final item = widget.restaurantModel;
+
+    // ถ้าตั้งค่าสถานะปิดชั่วคราว
+    if (item.statusOpen == false) return "ปิดชั่วคราว";
+
+    // เช็กว่าอยู่ในเวลาทำการหรือไม่
+    bool isTimeOpen = false;
+    final hours = item.openingHours;
+    if (hours != null && hours.isNotEmpty) {
+      final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
+      final today = hours.firstWhere(
+        (h) => h.dayOfWeek == todayEnum,
+        orElse: () => RestaurantOpeningHourModel(
+          dayOfWeek: todayEnum,
+          opentime: const TimeOfDay(hour: 0, minute: 0),
+          closetime: const TimeOfDay(hour: 0, minute: 0),
+          open: false,
+        ),
+      );
+
+      if (today.open) {
+        final now = TimeOfDay.now();
+        final nowMinutes = now.hour * 60 + now.minute;
+        final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
+        final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
+
+        if (openMinutes <= closeMinutes) {
+          isTimeOpen = nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+        } else {
+          isTimeOpen = nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+        }
+      }
+    }
+
+    return isTimeOpen ? "เปิดอยู่" : "ปิดทำการ";
   }
 
   // 🎯 ฟังก์ชันเด้ง Alert เมื่อร้านปิดทำการ
@@ -374,7 +413,8 @@ class _ListMenuMemberState extends State<ListMenuMember>
   @override
   Widget build(BuildContext context) {
     final bool isRestaurantOpen = _isCurrentlyOpen();
-    final bool shouldScroll = _typeMenus.length > 3;
+    final String restaurantStatusText = _getRestaurantStatusText();
+    final bool isGreenBadge = restaurantStatusText == "เปิดอยู่";
 
     if (_isLoading || _tabController == null) {
       return const Scaffold(
@@ -452,130 +492,220 @@ class _ListMenuMemberState extends State<ListMenuMember>
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // 🎯 ส่วนแสดงข้อมูลร้านค้า
                               Padding(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 24,
+                                  vertical: 12,
                                 ),
-                                child: Text(
-                                  restaurantname ?? "-",
-                                  style: const TextStyle(
-                                    fontSize: 30,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color.fromARGB(255, 5, 86, 151),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-
-                              // 🎯 แสดงวันเวลาเปิดปิดร้านใต้ชื่อร้าน
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 24,
-                                ),
-                                child: Row(
+                                child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Icon(
-                                      Icons.calendar_today_rounded,
-                                      size: 16,
-                                      color: Colors.grey.shade600,
+                                    // บรรทัดที่ 1: ชื่อร้าน + สถานะเปิด/ปิด
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            restaurantname ?? "-",
+                                            style: const TextStyle(
+                                              fontSize: 22,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 10,
+                                            vertical: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: isGreenBadge
+                                                ? Colors.green.shade100
+                                                : Colors.red.shade100,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 8,
+                                                height: 8,
+                                                decoration: BoxDecoration(
+                                                  color: isGreenBadge
+                                                      ? Colors.green.shade700
+                                                      : Colors.red.shade700,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                restaurantStatusText,
+                                                style: TextStyle(
+                                                  color: isGreenBadge
+                                                      ? Colors.green.shade700
+                                                      : Colors.red.shade700,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 13,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        _getGroupedOpeningHoursText(
-                                          widget.restaurantModel.openingHours,
+                                    const SizedBox(height: 16),
+
+                                    // บรรทัดที่ 2: ไอคอนปฏิทิน + เวลาเปิดปิดแบบกลุ่ม
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today_outlined,
+                                          size: 18,
+                                          color: Colors.grey.shade600,
                                         ),
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.grey.shade700,
-                                          height: 1.4,
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            _getGroupedOpeningHoursText(
+                                              widget
+                                                  .restaurantModel
+                                                  .openingHours,
+                                            ),
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                              color: Colors.grey.shade700,
+                                              height: 1.4,
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // บรรทัดที่ 3: ไอคอนโทรศัพท์
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.phone_in_talk_outlined,
+                                          size: 18,
+                                          color: Colors.orange.shade700,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          widget.restaurantModel.phone ?? "-",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.grey.shade800,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
-
-                              if (!isRestaurantOpen)
-                                Container(
-                                  margin: const EdgeInsets.only(top: 14),
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  color: Colors.red.shade50,
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.lock_clock_outlined,
-                                        color: Colors.red.shade700,
-                                        size: 20,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        "ขณะนี้ร้านปิดให้บริการชั่วคราว",
-                                        style: TextStyle(
-                                          color: Colors.red.shade700,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 14,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              const SizedBox(height: 14),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.orange.shade50,
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: Colors.orange.shade200,
-                                      width: 1,
-                                    ),
-                                  ),
-                                ),
-                                child: TabBar(
-                                  controller: _tabController!,
-                                  isScrollable: shouldScroll,
-                                  tabAlignment: shouldScroll
-                                      ? TabAlignment.start
-                                      : TabAlignment.fill,
-                                  labelColor: Colors.deepOrange,
-                                  unselectedLabelColor: Colors.black54,
-                                  indicatorColor: Colors.deepOrange,
-                                  indicatorWeight: 3,
-                                  indicatorSize: TabBarIndicatorSize.tab,
-                                  dividerColor: Colors.transparent,
-                                  labelStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  unselectedLabelStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  labelPadding: shouldScroll
-                                      ? const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                        )
-                                      : EdgeInsets.zero,
-                                  tabs: _typeMenus.isEmpty
-                                      ? [const Tab(text: "ไม่มีประเภท")]
-                                      : _typeMenus
-                                            .map(
-                                              (type) =>
-                                                  Tab(text: type.typemenuName),
-                                            )
-                                            .toList(),
-                                ),
-                              ),
+                              const SizedBox(height: 10),
                             ],
                           ),
                         ),
                       ],
+                    ),
+                  ),
+
+                  // 🎯 Sticky Header แถบเมนูรายการอาหาร
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _StickyTabBarDelegate(
+                      height: 50.0,
+                      child: Container(
+                        color: Colors.white, // พื้นหลังของแถบเมนูเป็นสีขาว
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  // ป้าย "รายการอาหาร" สีส้ม
+                                  Container(
+                                    margin: const EdgeInsets.only(
+                                      top: 6,
+                                      bottom: 6,
+                                      right: 8,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    alignment: Alignment.center,
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade600,
+                                      borderRadius: const BorderRadius.only(
+                                        topRight: Radius.circular(12),
+                                        bottomRight: Radius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      "รายการอาหาร",
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+
+                                  // TabBar หมวดหมู่เมนูที่เลื่อนซ้ายขวาได้
+                                  Expanded(
+                                    child: TabBar(
+                                      controller: _tabController!,
+                                      isScrollable: true,
+                                      tabAlignment: TabAlignment.start,
+                                      labelColor: Colors.orange.shade700,
+                                      unselectedLabelColor:
+                                          Colors.grey.shade500,
+                                      indicatorColor: Colors.orange.shade700,
+                                      indicatorWeight: 3,
+                                      indicatorSize: TabBarIndicatorSize.tab,
+                                      dividerColor: Colors.transparent,
+                                      labelPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                      ),
+                                      labelStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      unselectedLabelStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      tabs: _typeMenus.isEmpty
+                                          ? [const Tab(text: "ไม่มีประเภท")]
+                                          : _typeMenus
+                                                .map(
+                                                  (type) => Tab(
+                                                    text: type.typemenuName,
+                                                  ),
+                                                )
+                                                .toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // เส้นบางๆ คั่นด้านล่าง
+                            Container(height: 1, color: Colors.grey.shade200),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ];
@@ -1495,5 +1625,33 @@ class _ListMenuMemberState extends State<ListMenuMember>
       color: Colors.grey[200],
       child: const Icon(Icons.fastfood, color: Colors.grey, size: 36),
     );
+  }
+}
+
+// 🎯 คลาส Delegate สำหรับทำให้ TabBar ติดอยู่ด้านบนตอนเลื่อนจอ
+class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _StickyTabBarDelegate({required this.child, required this.height});
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox(height: height, child: child);
+  }
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return true;
   }
 }

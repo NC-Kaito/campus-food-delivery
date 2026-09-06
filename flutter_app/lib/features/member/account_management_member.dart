@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/features/member/edit_location_member.dart';
 import 'package:flutter_app/features/member/list_active_order_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
@@ -11,12 +12,13 @@ import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/features/restaurant/view_agrees.dart';
+import 'package:flutter_app/main_login.dart';
 
 // ============================================================
 // 🎨 Design tokens — โทนสีเขียวสำหรับฝั่งลูกคัา (Member)
 // ============================================================
 class _AccountTheme {
-  static const Color primary = Color(0xFF2E7D32); // สีเขียวหลัก
+  static const Color primary = Color(0xFF00B300); // สีเขียวหลัก
   static const Color primarySoft = Color(0xFFE8FCD0); // เขียวอ่อน
   static const Color danger = Color(0xFFE53935);
   static const Color dangerSoft = Color(0xFFFFEBEE);
@@ -193,7 +195,7 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginMember()),
+        MaterialPageRoute(builder: (context) => const MainLogin()),
         (route) => false,
       );
     }
@@ -354,6 +356,23 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => const ProfileMember(),
+                      ),
+                    ).then((_) {
+                      // รีเฟรชข้อมูลเผื่อมีการเปลี่ยนชื่อหรือเปลี่ยนรูปภาพ
+                      _loadMemberData();
+                    }),
+              ),
+              const _MenuDivider(),
+
+              _AccountMenuItem(
+                icon: Icons.location_on_outlined,
+                iconColor: _AccountTheme.primary,
+                label: "แก้ไขที่อยู่จัดส่ง",
+                onTap: () =>
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EditLocationMember(),
                       ),
                     ).then((_) {
                       // รีเฟรชข้อมูลเผื่อมีการเปลี่ยนชื่อหรือเปลี่ยนรูปภาพ

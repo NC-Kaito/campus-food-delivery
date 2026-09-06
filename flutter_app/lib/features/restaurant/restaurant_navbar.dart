@@ -11,6 +11,7 @@ import 'package:flutter_app/features/restaurant/profile_restaurant.dart';
 import 'package:flutter_app/features/restaurant/login_restaurant.dart';
 import 'package:flutter_app/features/restaurant/list_order_restaurant.dart'; // 🎯 นำเข้าหน้า List Order
 import 'package:flutter_app/global_data.dart';
+import 'package:flutter_app/main_login.dart';
 
 class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
   final String title;
@@ -203,7 +204,7 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
     if (confirm == true) {
       if (!context.mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginRestaurant()),
+        MaterialPageRoute(builder: (context) => const MainLogin()),
         (route) => false,
       );
     }

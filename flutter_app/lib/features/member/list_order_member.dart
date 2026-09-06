@@ -198,7 +198,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: isActive ? Colors.green : Colors.grey),
+                Icon(icon, color: isActive ? Color(0xFF00B300) : Colors.grey),
                 if (badgeCount > 0)
                   Positioned(
                     right: -6,
@@ -234,7 +234,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
             Text(
               label,
               style: menuTextStyle.copyWith(
-                color: isActive ? Colors.green[700] : Colors.grey,
+                color: isActive ? Color(0xFF00B300) : Colors.grey,
               ),
             ),
           ],

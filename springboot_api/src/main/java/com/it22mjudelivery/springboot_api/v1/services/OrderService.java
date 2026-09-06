@@ -36,6 +36,8 @@ public interface OrderService {
 
     List<Order> getActiveOrdersByRestaurant(String username);
 
+    List<Order> getCancelOrdersByRestaurant(String username);
+
     // เพิ่มไว้ตรงไหนก็ได้ใน interface (เช่น ต่อจาก getActiveOrdersByRider)
     boolean updateOrderStatus(int orderId, String newStatus);
 

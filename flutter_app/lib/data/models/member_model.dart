@@ -1,6 +1,4 @@
 class MemberModel {
-  // ส่วนเก็บข้อมูล
-  // ใช้เก็บค่าต่างๆ เช่น ชื่อผู้ใช้, รหัสผ่าน, อีเมล
   String? username;
   String? password;
   String? firstname;
@@ -8,9 +6,10 @@ class MemberModel {
   String? email;
   String? phone;
   String? profileimg;
-  //-----------------------------------------------------------------------
-  // Constructor (ตัวสร้าง Object)
-  // ใช้สำหรับสร้าง Instance หรือ "ตัวตน" ของข้อมูลสมาชิกขึ้นมาใหม่
+  double? latitude;
+  double? longitude;
+  String? defaultlocation;
+
   MemberModel({
     this.username,
     this.password,
@@ -19,36 +18,45 @@ class MemberModel {
     this.email,
     this.phone,
     this.profileimg,
+    this.latitude,
+    this.longitude,
+    this.defaultlocation,
   });
-  //-----------------------------------------------------------------------
-  // toJson() (แปลง Object เป็น Map/JSON)
-  // เวลา Flutter จะส่งข้อมูลไปยัง API (Spring Boot) จะเรียก toJson() เพื่อให้ได้ Map ที่สามารถ encode เป็น JSON ได้
+
   Map<String, dynamic> toJson() {
     final map = <String, dynamic>{};
     if (username != null) map["username"] = username;
-    map["username"] = username;
     map["password"] = password;
     map["firstname"] = firstname;
     map["lastname"] = lastname;
     map["email"] = email;
     map["phone"] = phone;
     map["profileimg"] = profileimg;
+    map["latitude"] = latitude;
+    map["longitude"] = longitude;
+
+    // 🎯 ส่งทั้งแบบ CamelCase และ Lowercase เพื่อป้องกันปัญหาฝั่ง API
+    map["defaultLocation"] = defaultlocation;
+    map["defaultlocation"] = defaultlocation;
     return map;
   }
 
-  //-----------------------------------------------------------------------
-  // fromJson() (แปลง JSON เป็น Object)
-
-  // เวลา Flutter ได้ response จาก API (Spring Boot) จะใช้ MemberModel.fromJson(responseData) เพื่อสร้าง object ที่ใช้งานในแอปได้ทันที
-  factory MemberModel.fromJson(Map<String, dynamic> Json) {
+  factory MemberModel.fromJson(Map<String, dynamic> json) {
     return MemberModel(
-      username: Json["username"],
-      password: Json["password"],
-      firstname: Json["firstname"],
-      lastname: Json["lastname"],
-      email: Json["email"],
-      phone: Json["phone"],
-      profileimg: Json["profileimg"],
+      username: json["username"],
+      password: json["password"],
+      firstname: json["firstname"],
+      lastname: json["lastname"],
+      email: json["email"],
+      phone: json["phone"],
+      profileimg: json["profileimg"],
+      latitude: json['latitude'] != null
+          ? (json['latitude'] as num).toDouble()
+          : null,
+      longitude: json['longitude'] != null
+          ? (json['longitude'] as num).toDouble()
+          : null,
+      defaultlocation: json['defaultLocation'] ?? json['defaultlocation'],
     );
   }
 }

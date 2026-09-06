@@ -41,7 +41,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
   List<dynamic> _realOrders = [];
   Timer? _autoRefreshTimer;
 
-  final Color _primaryOrange = const Color(0xFFF97316);
+  final Color _primaryOrange = const Color(0xFF00B300);
 
   @override
   void initState() {
@@ -676,7 +676,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                             _isReady ? "พร้อมรับงาน" : "พักการทำงาน",
                             style: TextStyle(
                               color: _isReady
-                                  ? const Color(0xFF64FF20)
+                                  ? const Color(0xFF00B300)
                                   : Colors.grey,
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
@@ -696,7 +696,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(
                                     color: _isReady
-                                        ? const Color(0xFF64FF20)
+                                        ? const Color(0xFF00B300)
                                         : Colors.grey,
                                     width: 2,
                                   ),
@@ -713,7 +713,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                                         child: Text(
                                           "ON",
                                           style: TextStyle(
-                                            color: Color(0xFF64FF20),
+                                            color: Color(0xFF00B300),
                                             fontSize: 10,
                                             fontWeight: FontWeight.bold,
                                           ),
@@ -726,7 +726,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                                       decoration: BoxDecoration(
                                         shape: BoxShape.circle,
                                         color: _isReady
-                                            ? const Color(0xFF64FF20)
+                                            ? const Color(0xFF00B300)
                                             : Colors.grey,
                                       ),
                                     ),

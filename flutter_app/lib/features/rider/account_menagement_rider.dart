@@ -12,6 +12,7 @@ import 'package:flutter_app/features/rider/profile_rider.dart';
 import 'package:flutter_app/features/rider/login_rider.dart';
 import 'package:flutter_app/features/restaurant/view_agrees.dart';
 import 'package:flutter_app/features/rider/list_waiting_pickup_order.dart';
+import 'package:flutter_app/main_login.dart';
 
 // ============================================================
 // 🎨 Design tokens
@@ -208,7 +209,7 @@ class _AccountManagementRiderState extends State<AccountManagementRider> {
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginRider()),
+        MaterialPageRoute(builder: (context) => const MainLogin()),
         (route) => false,
       );
     }

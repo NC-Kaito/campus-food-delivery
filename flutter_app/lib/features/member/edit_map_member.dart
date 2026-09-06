@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:maps_toolkit/maps_toolkit.dart' as toolkit;
 
-class TestMap extends StatefulWidget {
-  const TestMap({super.key});
+class ChooseMapMember extends StatefulWidget {
+  const ChooseMapMember({super.key});
 
   @override
-  State<TestMap> createState() => _TestMapState();
+  State<ChooseMapMember> createState() => _ChooseMapMemberState();
 }
 
-class _TestMapState extends State<TestMap> {
+class _ChooseMapMemberState extends State<ChooseMapMember> {
   GoogleMapController? _mapController;
   LatLng? _shopPos; // เก็บพิกัดร้านค้าที่จะเลือก
 
@@ -70,7 +70,7 @@ class _TestMapState extends State<TestMap> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('เลือกตำแหน่งที่ตั้งร้าน'),
-        backgroundColor: Colors.green,
+        backgroundColor: Color(0xFF00B300),
         foregroundColor: Colors.white,
       ),
       body: Stack(
@@ -95,8 +95,8 @@ class _TestMapState extends State<TestMap> {
               Polygon(
                 polygonId: const PolygonId("mju_fence"),
                 points: _mjuFencePoints,
-                fillColor: Colors.green.withOpacity(0.25),
-                strokeColor: Colors.green.withOpacity(0.9),
+                fillColor: Color(0xFF00B300),
+                strokeColor: Color(0xFF00B300),
                 strokeWidth: 2,
               ),
             },
@@ -137,7 +137,7 @@ class _TestMapState extends State<TestMap> {
                       height: 50,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: Color(0xFF00B300),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),

@@ -87,7 +87,7 @@ class _ProfileMemberState extends State<ProfileMember> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color(0xFF64F02D)),
+              leading: const Icon(Icons.camera_alt, color: Color(0xFF00B300)),
               title: const Text("ถ่ายรูปโปรไฟล์ใหม่"),
               onTap: () async {
                 Navigator.pop(context);
@@ -103,7 +103,7 @@ class _ProfileMemberState extends State<ProfileMember> {
             ListTile(
               leading: const Icon(
                 Icons.photo_library,
-                color: Color(0xFF64F02D),
+                color: Color(0xFF00B300),
               ),
               title: const Text("เลือกรูปจากคลังภาพ"),
               onTap: () async {
@@ -227,7 +227,7 @@ class _ProfileMemberState extends State<ProfileMember> {
       appBar: const NavbarMember(title: ""),
       body: isLooding
           ? const Center(
-              child: CircularProgressIndicator(color: Color(0xFF64F02D)),
+              child: CircularProgressIndicator(color: Color(0xFF00B300)),
             )
           : SafeArea(
               top: false, // ปล่อยให้ Navbar คุมหัวสเปซด้านบนไปเลยครับ
@@ -258,7 +258,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                         shape: BoxShape.circle,
                                         border: Border.all(
                                           color: _isEditable
-                                              ? const Color(0xFF64F02D)
+                                              ? const Color(0xFF00B300)
                                               : Colors.grey.shade400,
                                           width: 2.5,
                                         ),
@@ -304,7 +304,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                         child: CircleAvatar(
                                           radius: 16,
                                           backgroundColor: const Color(
-                                            0xFF64F02D,
+                                            0xFF00B300,
                                           ),
                                           child: const Icon(
                                             Icons.camera_alt_rounded,
@@ -430,7 +430,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                       boxShadow: [
                                         BoxShadow(
                                           color: const Color(
-                                            0xFF64F02D,
+                                            0xFF00B300,
                                           ).withOpacity(0.25),
                                           blurRadius: 10,
                                           offset: const Offset(0, 4),
@@ -443,7 +443,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                           : doUpdateProfile,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: const Color(
-                                          0xFF64F02D,
+                                          0xFF00B300,
                                         ),
                                         foregroundColor: Colors.white,
                                         elevation: 0,
@@ -484,7 +484,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                     boxShadow: [
                                       BoxShadow(
                                         color: const Color(
-                                          0xFF64F02D,
+                                          0xFF00B300,
                                         ).withOpacity(0.2),
                                         blurRadius: 12,
                                         offset: const Offset(0, 5),
@@ -498,7 +498,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                       });
                                     },
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF64F02D),
+                                      backgroundColor: const Color(0xFF00B300),
                                       foregroundColor: Colors.white,
                                       elevation: 0,
                                       shape: RoundedRectangleBorder(
@@ -595,7 +595,7 @@ class _ProfileMemberState extends State<ProfileMember> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF64F02D), width: 1.5),
+            borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.5),
           ),
         ),
       ),

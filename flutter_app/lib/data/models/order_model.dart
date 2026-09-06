@@ -15,8 +15,7 @@ class OrderModel {
   final String restaurantUsername;
   final DateTime? orderdate;
   final String? cancelDetail;
-
-  // 🎯 เพิ่มตัวแปรสำหรับเก็บเวลาที่จัดส่งสำเร็จ
+  final String? cancelimage; // 🎯 1. เพิ่มตัวแปรเก็บ URL รูปยกเลิก/แจ้งปัญหา
   final String? successtime;
 
   final RestaurantModel? restaurant;
@@ -41,7 +40,8 @@ class OrderModel {
     this.rider,
     this.orderStatus,
     this.cancelDetail,
-    this.successtime, // 🎯 นำเข้า Constructor
+    this.cancelimage, // 🎯 2. เพิ่มใน Constructor
+    this.successtime,
     required this.items,
   });
 
@@ -56,7 +56,9 @@ class OrderModel {
       addressDetail: json['addressDetail'] ?? json['addressdetail'] ?? "",
       cancelDetail: json['canceldetail'] ?? json['cancelDetail'],
 
-      // 🎯 ดักจับ JSON ก้อนเวลาจัดส่งสำเร็จ และครอบ .toString() ป้องกัน Error จาก Array ของ Spring Boot
+      // 🎯 3. ดักจับฟิลด์รูปภาพจาก Spring Boot (ทั้ง camelCase และ lowercase)
+      cancelimage: json['cancelimage'] ?? json['cancelImage'],
+
       successtime:
           json['successtime']?.toString() ?? json['successTime']?.toString(),
 
@@ -100,6 +102,7 @@ class OrderModel {
       'longitude': longitude,
       'addressDetail': addressDetail,
       'canceldetail': cancelDetail,
+      'cancelimage': cancelimage, // 🎯 4. ใส่กลับเข้าไปใน JSON
       'memberUsername': memberUsername,
       'restaurantUsername': restaurantUsername,
       'items': items.map((item) => item.toJson()).toList(),
@@ -108,8 +111,6 @@ class OrderModel {
     if (orderId != null) data['orderId'] = orderId;
     if (orderStatus != null) data['orderstatus'] = orderStatus;
     if (orderdate != null) data['orderdate'] = orderdate!.toIso8601String();
-
-    // 🎯 แปลงกลับเป็น JSON
     if (successtime != null) data['successtime'] = successtime;
 
     return data;

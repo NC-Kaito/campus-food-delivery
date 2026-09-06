@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/rider/rider_service.dart';
-import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
+import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/rider/home_rider.dart';
-import 'package:flutter_app/features/rider/list_waiting_pickup_order.dart'; // 🎯 นำเข้าหน้ารับงาน
+import 'package:flutter_app/features/rider/list_waiting_pickup_order.dart';
 import 'package:flutter_app/features/rider/profile_rider.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -14,8 +14,8 @@ class NavbarRider extends StatefulWidget implements PreferredSizeWidget {
 
   const NavbarRider({super.key, required this.title});
 
-  // 🎯 กำหนดสีส้มหลักของ Rider
-  static const Color _themeOrange = Color(0xFFF97316);
+  // 🎯 ปรับให้ใช้โทนสีเดียวกับ Member
+  static const Color _orange = Color(0xFFFF8C00);
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -26,7 +26,7 @@ class NavbarRider extends StatefulWidget implements PreferredSizeWidget {
 
 class _NavbarRiderState extends State<NavbarRider> {
   final RiderService riderService = RiderService();
-  final OrderService _orderService = OrderService(); // 🎯 เรียกใช้ OrderService
+  final OrderService _orderService = OrderService();
   RiderModel? riderModel;
   String? riderImage;
 
@@ -37,7 +37,7 @@ class _NavbarRiderState extends State<NavbarRider> {
   void initState() {
     super.initState();
     loadRiderData();
-    _fetchActiveOrderBadgeCount(); // 🎯 โหลดจำนวนแจ้งเตือน
+    _fetchActiveOrderBadgeCount();
   }
 
   String _getFinalImageUrl(String? rawPath) {
@@ -87,14 +87,15 @@ class _NavbarRiderState extends State<NavbarRider> {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: NavbarRider._themeOrange, // 🎯 เปลี่ยนพื้นหลังเป็นสีส้ม
-      elevation: 0, // เอาเงาออกให้กลืนไปกับหน้า Home
+      backgroundColor: Colors.white, // 🎯 เปลี่ยนพื้นหลังเป็นสีขาวแบบ Member
+      elevation: 4, // 🎯 เพิ่มเงาแบบ Member
+      shadowColor: Colors.black.withOpacity(0.25),
       automaticallyImplyLeading: false,
       title: Text(
         widget.title,
         style: const TextStyle(
-          color: Colors.white, // 🎯 เปลี่ยนข้อความเป็นสีขาว
-          fontSize: 22,
+          color: Colors.black87, // 🎯 ข้อความสีดำ/เทาเข้มแบบ Member
+          fontSize: 20,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.5,
         ),
@@ -105,8 +106,8 @@ class _NavbarRiderState extends State<NavbarRider> {
       leading: IconButton(
         icon: const Icon(
           Icons.home_outlined,
-          color: Colors.white, // 🎯 เปลี่ยนไอคอนเป็นสีขาว
-          size: 32,
+          color: NavbarRider._orange, // 🎯 เปลี่ยนไอคอนเป็นสีส้มแบบ Member
+          size: 35, // 🎯 ขนาดไอคอนเท่ากับ Member
         ),
         onPressed: () {
           Navigator.popUntil(context, (route) => route.isFirst);
@@ -121,8 +122,9 @@ class _NavbarRiderState extends State<NavbarRider> {
             IconButton(
               icon: const Icon(
                 Icons.notifications_active_outlined,
-                color: Colors.white,
-                size: 26,
+                color:
+                    NavbarRider._orange, // 🎯 เปลี่ยนไอคอนเป็นสีส้มแบบ Member
+                size: 32, // 🎯 ขนาดไอคอนใกล้เคียงกับตะกร้าของ Member
               ),
               onPressed: () {
                 // 🎯 เมื่อคลิกให้เปิดหน้า ListWaitingPickupOrder
@@ -139,22 +141,22 @@ class _NavbarRiderState extends State<NavbarRider> {
             ),
             if (_activeOrderCount > 0)
               Positioned(
-                right: 8,
-                top: 8,
+                right: 4, // 🎯 ปรับตำแหน่งให้เหมือน Member
+                top: 4,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 5,
                     vertical: 1,
                   ),
                   constraints: const BoxConstraints(
-                    minWidth: 16,
-                    minHeight: 16,
+                    minWidth: 18, // 🎯 ขนาด badge แบบ Member
+                    minHeight: 18,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.redAccent,
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: NavbarRider._themeOrange,
+                      color: Colors.white, // 🎯 ขอบสีขาวให้เหมือน Member
                       width: 1.5,
                     ),
                   ),
@@ -163,7 +165,7 @@ class _NavbarRiderState extends State<NavbarRider> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: Colors.white,
-                      fontSize: 9,
+                      fontSize: 10,
                       fontWeight: FontWeight.bold,
                       height: 1.2,
                     ),
@@ -172,7 +174,7 @@ class _NavbarRiderState extends State<NavbarRider> {
               ),
           ],
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
 
         // ─── รูปโปรไฟล์ (มุมขวาบน) ───
         Padding(
@@ -187,9 +189,10 @@ class _NavbarRiderState extends State<NavbarRider> {
               });
             },
             child: CircleAvatar(
-              radius: 16,
-              backgroundColor:
-                  Colors.white, // 🎯 พื้นหลังสีขาวให้ตัดกับ AppBar สีส้ม
+              radius: 18, // 🎯 ขนาดวงกลมโปรไฟล์เท่า Member
+              backgroundColor: const Color(
+                0xFFFFEBCC,
+              ), // 🎯 พื้นหลังสีส้มอ่อนแบบ Member
               backgroundImage: (riderImage != null && riderImage!.isNotEmpty)
                   ? NetworkImage(Uri.encodeFull(riderImage!))
                   : null,
@@ -200,8 +203,7 @@ class _NavbarRiderState extends State<NavbarRider> {
               child: (riderImage == null || riderImage!.isEmpty)
                   ? const Icon(
                       Icons.sports_motorsports_rounded,
-                      color: NavbarRider
-                          ._themeOrange, // 🎯 ไอคอนคน/หมวกข้างในเป็นสีส้ม
+                      color: NavbarRider._orange, // 🎯 ไอคอนข้างในสีส้ม
                       size: 20,
                     )
                   : null,

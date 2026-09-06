@@ -63,6 +63,16 @@ public class MemberServiceImpl implements MemberService{
         return true;
     }
 
+    public boolean updateLocationMember(String username, double latitude, double longitude, String location){
+        Member member = memberRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+
+        member.setLatitude(latitude);
+        member.setLongitude(longitude);
+        member.setDefaultLocation(location);
+        memberRepository.save(member);
+        return  true;
+    }
+
     @Override
     public Review addReview(ReviewDto reviewDto) {
 

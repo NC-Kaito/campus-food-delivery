@@ -1,6 +1,9 @@
 // features/rider/home_rider.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/order_model.dart';
+import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/features/rider/account_menagement_rider.dart';
+import 'package:flutter_app/features/rider/list_review_rider.dart';
 import 'package:flutter_app/features/rider/list_waiting_pickup_order.dart';
 
 import 'package:flutter_app/data/services/rider/rider_service.dart';
@@ -31,11 +34,16 @@ class _HomeRiderState extends State<HomeRider>
   // 🎯 ตัวแปรเก็บจำนวนออเดอร์แจ้งเตือนที่ปุ่ม "รับงาน"
   int _activeOrderCount = 0;
 
+  // 🎯 ตัวแปรเก็บคะแนนรีวิวเฉลี่ยของไรเดอร์ (null = ยังไม่มีรีวิว)
+  double? _riderRating;
+  bool _isLoadingRating = true;
+
   String? _profileImageUrl;
   final RiderService _riderService = RiderService();
   final OrderService _orderService = OrderService();
+  final MemberService _memberService = MemberService();
 
-  final Color _primaryOrange = const Color(0xFFF97316);
+  final Color _primaryGreen = const Color(0xFF00B300);
   final Color _accentBlue = const Color(0xFF3B82F6);
   final Color _bgCoolGray = const Color(0xFFF8FAFC);
   final Color _textDark = const Color(0xFF1E293B);
@@ -45,8 +53,9 @@ class _HomeRiderState extends State<HomeRider>
   void initState() {
     super.initState();
     _loadRiderProfile();
-    _loadIncomeData(); // โหลดข้อมูลทันที
-    _fetchActiveOrderCount(); // 🎯 โหลดจำนวนออเดอร์แจ้งเตือน
+    _loadIncomeData();
+    _fetchActiveOrderCount();
+    _fetchRiderRating(); // 🎯 ดึงและคำนวณคะแนนรีวิว
   }
 
   Future<void> _loadRiderProfile() async {
@@ -64,14 +73,77 @@ class _HomeRiderState extends State<HomeRider>
     }
   }
 
-  // 🎯 ฟังก์ชันโหลดจำนวนออเดอร์ใหม่และออเดอร์ที่กำลังจัดส่ง เพื่อโชว์ Badge แดง
+  // 🎯 ดึงและคำนวณคะแนนรีวิวเฉลี่ยของไรเดอร์ (เต็ม 5 คะแนน)
+  Future<void> _fetchRiderRating() async {
+    try {
+      String studentId = GlobalData.usernameRider.trim();
+      if (studentId.isEmpty) {
+        if (mounted) setState(() => _isLoadingRating = false);
+        return;
+      }
+
+      // ดึงออเดอร์ที่มีการรีวิวเสร็จสิ้นของไรเดอร์
+      final rawOrders = await _orderService.getReviewSuccessOrders(studentId);
+      final List<OrderModel> orders = rawOrders
+          .map((o) => OrderModel.fromJson(o))
+          .where((o) => o.orderId != null)
+          .toList();
+
+      if (orders.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _riderRating = null;
+            _isLoadingRating = false;
+          });
+        }
+        return;
+      }
+
+      int totalScore = 0;
+      int count = 0;
+
+      for (final order in orders) {
+        try {
+          final review = await _memberService.getReviewByOrderId(
+            order.orderId!,
+          );
+          if (review != null &&
+              review.riderrating != null &&
+              review.riderrating! > 0) {
+            totalScore += review.riderrating!;
+            count++;
+          }
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() {
+          if (count > 0) {
+            _riderRating = double.parse(
+              (totalScore / count).toStringAsFixed(1),
+            );
+          } else {
+            _riderRating = null;
+          }
+          _isLoadingRating = false;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการโหลดคะแนนรีวิวไรเดอร์: $e");
+      if (mounted) {
+        setState(() {
+          _riderRating = null;
+          _isLoadingRating = false;
+        });
+      }
+    }
+  }
+
   Future<void> _fetchActiveOrderCount() async {
     try {
       String studentId = GlobalData.usernameRider;
 
-      // 1. ดึงงานใหม่ที่ยังไม่มีใครรับ
       final waitingOrders = await _orderService.getWaitingOrders();
-      // 2. ดึงงานที่ไรเดอร์คนนี้รับแล้ว แต่ยังส่งไม่เสร็จ
       final activeOrders = await _orderService.getActiveOrders(studentId);
 
       if (mounted) {
@@ -84,7 +156,6 @@ class _HomeRiderState extends State<HomeRider>
     }
   }
 
-  // 🎯 สร้าง List ตัวเลือกใน Dropdown แบบเรียบง่าย ใช้งานสะดวก
   List<DropdownMenuItem<String>> _buildFilterOptions() {
     return const [
       DropdownMenuItem(value: 'today', child: Text('วันนี้')),
@@ -97,7 +168,6 @@ class _HomeRiderState extends State<HomeRider>
     ];
   }
 
-  // 🎯 ฟังก์ชันเรียกปฏิทินให้ไรเดอร์เลือกช่วงเวลาแบบ Custom
   Future<void> _pickDateRange() async {
     final pickedRange = await showDateRangePicker(
       context: context,
@@ -113,7 +183,7 @@ class _HomeRiderState extends State<HomeRider>
         return Theme(
           data: ThemeData.light().copyWith(
             colorScheme: ColorScheme.light(
-              primary: _primaryOrange,
+              primary: _primaryGreen,
               onPrimary: Colors.white,
               surface: Colors.white,
               onSurface: Colors.black87,
@@ -131,14 +201,12 @@ class _HomeRiderState extends State<HomeRider>
       });
       _loadIncomeData();
     } else {
-      // ถ้ายกเลิก ให้กลับไปใช้ Filter ก่อนหน้า
       setState(() {
         _selectedFilter = _previousFilter;
       });
     }
   }
 
-  // 🎯 ฟังก์ชันโหลดข้อมูลรายได้ โดยแปลง Filter เป็นวันที่ Start/End
   Future<void> _loadIncomeData() async {
     setState(() => _isLoadingIncome = true);
 
@@ -203,7 +271,6 @@ class _HomeRiderState extends State<HomeRider>
     return "${date.day}/${date.month}/${date.year + 543}";
   }
 
-  // 🎯 แปลงเลขเดือนเป็นชื่อภาษาไทย
   String _getMonthNameThai(String monthStr) {
     const months = [
       "ม.ค.",
@@ -262,7 +329,7 @@ class _HomeRiderState extends State<HomeRider>
           ],
         ),
         child: BottomNavigationBar(
-          selectedItemColor: _primaryOrange,
+          selectedItemColor: _primaryGreen,
           unselectedItemColor: Colors.blueGrey.shade300,
           backgroundColor: Colors.white,
           currentIndex: 0,
@@ -276,7 +343,6 @@ class _HomeRiderState extends State<HomeRider>
                   builder: (context) => const ListWaitingPickupOrder(),
                 ),
               ).then((_) {
-                // 🎯 รีเฟรชแจ้งเตือนเมื่อกลับมา
                 _fetchActiveOrderCount();
               });
             } else if (index == 2) {
@@ -294,7 +360,6 @@ class _HomeRiderState extends State<HomeRider>
               label: "หน้าหลัก",
             ),
             BottomNavigationBarItem(
-              // 🎯 ซ้อน Stack ใส่ Badge แดงตรงปุ่มรับงาน
               icon: Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -313,7 +378,7 @@ class _HomeRiderState extends State<HomeRider>
                           minHeight: 18,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.redAccent,
+                          color: Colors.red,
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
@@ -429,7 +494,6 @@ class _HomeRiderState extends State<HomeRider>
               ),
             ],
           ),
-          // 🎯 เปลี่ยนสี Switch ตรงนี้เป็นสีเขียว
           Switch(
             value: _isOnline,
             activeColor: Colors.green.shade600,
@@ -610,7 +674,6 @@ class _HomeRiderState extends State<HomeRider>
             rounds: totalRounds.toString(),
           ),
 
-          // ── ส่วนตารางข้อมูล (ยืดเต็มความกว้าง 100%) ──
           Container(
             width: double.infinity,
             decoration: BoxDecoration(
@@ -643,7 +706,6 @@ class _HomeRiderState extends State<HomeRider>
                     )
                   : Column(
                       children: [
-                        // หัวตาราง
                         Container(
                           color: Colors.grey.shade50,
                           padding: const EdgeInsets.symmetric(
@@ -690,7 +752,6 @@ class _HomeRiderState extends State<HomeRider>
                             ],
                           ),
                         ),
-                        // ข้อมูลแต่ละแถว
                         ...displayTableData.map((data) {
                           final double amount = (data['amount'] as num)
                               .toDouble();
@@ -803,7 +864,7 @@ class _HomeRiderState extends State<HomeRider>
                     Icon(
                       Icons.two_wheeler_rounded,
                       size: 16,
-                      color: _primaryOrange,
+                      color: _primaryGreen,
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -848,12 +909,16 @@ class _HomeRiderState extends State<HomeRider>
     );
   }
 
+  // 🎯 ปรับปรุงส่วนแสดงคะแนนรีวิว: ดึงคะแนนจริง / แสดง "ไม่มีรีวิว" / กดเปิด ListReviewRider
   Widget _buildPerformanceSection(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GestureDetector(
         onTap: () {
-          // TODO: ไปหน้าดูรีวิว
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const ListReviewRider()),
+          ).then((_) => _fetchRiderRating());
         },
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
@@ -876,67 +941,92 @@ class _HomeRiderState extends State<HomeRider>
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.amber.withOpacity(0.4),
-                          blurRadius: 12,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.star_rounded,
-                      color: Color(0xFFF59E0B),
-                      size: 42,
-                    ),
-                  ),
-                  const SizedBox(width: 24),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        "คะแนนรีวิวของคุณ",
-                        style: TextStyle(
-                          color: Colors.orange.shade800,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          const Text(
-                            "4.9",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 38,
-                              color: Color(0xFF1E293B),
-                              letterSpacing: -1,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            "/ 5.0",
-                            style: TextStyle(
-                              color: Colors.grey.shade500,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withOpacity(0.4),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ],
+                      child: Icon(
+                        _riderRating != null
+                            ? Icons.star_rounded
+                            : Icons.star_outline_rounded,
+                        color: const Color(0xFFF59E0B),
+                        size: 42,
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "คะแนนรีวิวของคุณ",
+                            style: TextStyle(
+                              color: Colors.orange.shade800,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (_isLoadingRating)
+                            const SizedBox(
+                              height: 28,
+                              width: 28,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.orange,
+                              ),
+                            )
+                          else if (_riderRating != null)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  _riderRating!.toStringAsFixed(1),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 36,
+                                    color: Color(0xFF1E293B),
+                                    letterSpacing: -1,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  "/ 5.0",
+                                  style: TextStyle(
+                                    color: Colors.grey.shade500,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            const Text(
+                              "ไม่มีรีวิว",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 22,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
               Icon(
                 Icons.arrow_forward_ios_rounded,

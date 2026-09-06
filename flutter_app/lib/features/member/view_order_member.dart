@@ -8,8 +8,9 @@ import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/edit_order_member.dart';
-import 'package:flutter_app/features/member/location_order_member.dart';
+import 'package:flutter_app/features/member/edit_location_member.dart'; // 🎯 เปลี่ยนไปเรียกหน้า EditLocationMember
 import 'package:flutter_app/features/member/edit_curry_order_member.dart';
+import 'package:flutter_app/features/member/location_order_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -45,7 +46,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   static const LatLng _mjuCenter = LatLng(18.8920, 99.0145);
   final MemberService memberService = MemberService();
 
-  final Color primaryGreen = const Color(0xFF64F02D);
+  final Color primaryGreen = const Color(0xFF00B300);
 
   @override
   void initState() {
@@ -65,26 +66,47 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     }
   }
 
+  // 🎯 ดึงตำแหน่งและรายละเอียดเริ่มต้นที่เคยบันทึกไว้ใน DB มาแสดงผล
   Future<void> _loadCurrentMemberProfile() async {
     try {
       String username = GlobalData.usernameMember;
       MemberModel mModel = await memberService.getMemberByUsername(username);
 
-      setState(() {
-        _loggedInMemberName =
-            "${mModel.firstname ?? ''} ${mModel.lastname ?? ''}".trim();
+      if (mounted) {
+        setState(() {
+          _loggedInMemberName =
+              "${mModel.firstname ?? ''} ${mModel.lastname ?? ''}".trim();
 
-        if (_loggedInMemberName.isEmpty) {
-          _loggedInMemberName = mModel.username ?? "ไม่ระบุชื่อ";
+          if (_loggedInMemberName.isEmpty) {
+            _loggedInMemberName = mModel.username ?? "ไม่ระบุชื่อ";
+          }
+          _loggedInMemberPhone = mModel.phone ?? "ไม่ระบุเบอร์โทร";
+
+          // 🎯 ดึงตำแหน่งพิกัดและข้อความสถานที่จัดส่งเริ่มต้น
+          if (mModel.latitude != null && mModel.longitude != null) {
+            _selectedUserLocation = LatLng(mModel.latitude!, mModel.longitude!);
+          }
+          if (mModel.defaultlocation != null &&
+              mModel.defaultlocation!.isNotEmpty) {
+            _addressNoteController.text = mModel.defaultlocation!;
+          }
+        });
+
+        // เลื่อนมุมกล้องไปที่ตำแหน่งเริ่มต้น
+        if (_selectedUserLocation != null && _miniMapController != null) {
+          _miniMapController!.animateCamera(
+            CameraUpdate.newLatLngZoom(_selectedUserLocation!, 16.0),
+          );
         }
-        _loggedInMemberPhone = mModel.phone ?? "ไม่ระบุเบอร์โทร";
-      });
+      }
     } catch (e) {
       debugPrint("Error loading member profile: $e");
-      setState(() {
-        _loggedInMemberName = "ไม่สามารถดึงข้อมูลได้";
-        _loggedInMemberPhone = "ไม่ระบุเบอร์โทร";
-      });
+      if (mounted) {
+        setState(() {
+          _loggedInMemberName = "ไม่สามารถดึงข้อมูลได้";
+          _loggedInMemberPhone = "ไม่ระบุเบอร์โทร";
+        });
+      }
     }
   }
 
@@ -97,8 +119,8 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
 
   Widget _buildPlaceholderIcon() {
     return Container(
-      width: 65,
-      height: 65,
+      width: 70,
+      height: 70,
       color: Colors.orange.shade50,
       child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
     );
@@ -118,24 +140,76 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     String? rawMenuImage = item.menu.menuImage;
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
-    // 🎯 แก้ไขตรงนี้: ไม่รวมราคา Add-on ให้แสดงแค่ราคาเฉพาะเมนูตามที่คุณต้องการ
-    int menuUnitPrice = item.unitPrice;
+    int addonsSum = 0;
+    for (var addon in item.selectedAddons) {
+      addonsSum += addon.addonPrice?.toInt() ?? 0;
+    }
+    int curriesSum = 0;
+    for (var curry in item.selectedCurries) {
+      curriesSum += (curry.price ?? 0).toInt();
+    }
+    int singleItemTotal = item.unitPrice + addonsSum + curriesSum;
+    int itemTotalPrice = singleItemTotal * item.quantity;
 
-    // จัดกลุ่มเพื่อคำนวณราคารวมของแต่ละ Add-on ให้อ่านง่าย
     Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in item.selectedAddons) {
       String name = addon.addonMenu?.addonName ?? '';
       int price = addon.addonPrice?.toInt() ?? 0;
 
+      bool canIncreaseQty = false;
+      try {
+        final dynamic a = addon;
+        final dynamic menu =
+            a.addonMenu ?? a.menuAddon ?? a.addonGroup ?? a.menuAddonDetail;
+
+        if (menu != null) {
+          if (menu.canIncreaseQuantity != null) {
+            canIncreaseQty = menu.canIncreaseQuantity == true;
+          } else if (menu.allowQuantity != null) {
+            canIncreaseQty = menu.allowQuantity == true;
+          } else if (menu.isMultiple != null) {
+            canIncreaseQty = menu.isMultiple == true;
+          } else if (menu.isQuantity != null) {
+            canIncreaseQty = menu.isQuantity == true;
+          } else if (menu.maxQuantity != null) {
+            canIncreaseQty = (menu.maxQuantity as num) > 1;
+          } else if (menu.maxQty != null) {
+            canIncreaseQty = (menu.maxQty as num) > 1;
+          } else if (menu.addonType != null) {
+            final typeStr = menu.addonType.toString().toLowerCase();
+            canIncreaseQty =
+                !typeStr.contains('radio') && !typeStr.contains('single');
+          } else if (menu.type != null) {
+            final typeStr = menu.type.toString().toLowerCase();
+            canIncreaseQty =
+                !typeStr.contains('radio') && !typeStr.contains('single');
+          }
+        }
+
+        if (a.canIncreaseQuantity != null) {
+          canIncreaseQty = a.canIncreaseQuantity == true;
+        } else if (a.isMultiple != null) {
+          canIncreaseQty = a.isMultiple == true;
+        }
+      } catch (_) {}
+
       if (name.isNotEmpty) {
         if (groupedAddons.containsKey(name)) {
           groupedAddons[name]!['qty'] =
               (groupedAddons[name]!['qty'] as int) + 1;
+          groupedAddons[name]!['canIncreaseQty'] = true;
         } else {
-          groupedAddons[name] = {'qty': 1, 'unitPrice': price};
+          groupedAddons[name] = {
+            'qty': 1,
+            'unitPrice': price,
+            'canIncreaseQty': canIncreaseQty,
+          };
         }
       }
     }
+
+    final bool hasAddons =
+        groupedAddons.isNotEmpty || item.selectedCurries.isNotEmpty;
 
     return InkWell(
       onTap: () async {
@@ -183,7 +257,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
         decoration: BoxDecoration(
           color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(16),
-          border: Border(left: BorderSide(color: primaryGreen, width: 4)),
         ),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -196,8 +269,8 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     ? _buildPlaceholderIcon()
                     : Image.network(
                         Uri.encodeFull(finalMenuUrl),
-                        width: 65,
-                        height: 65,
+                        width: 70,
+                        height: 70,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) =>
                             _buildPlaceholderIcon(),
@@ -216,174 +289,169 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                           child: Text(
                             displayMenuName,
                             style: const TextStyle(
-                              fontSize: 15,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: Colors.black,
                               height: 1.2,
                             ),
                           ),
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          "แก้ไข",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey.shade700,
+                          "$itemTotalPrice บาท",
+                          style: const TextStyle(
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
+                            color: Colors.orange,
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      "ราคา $menuUnitPrice บาท", // 🎯 อัปเดตการแสดงผลราคาที่นี่
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-
-                    if (item.selectedCurries.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6.0,
-                        runSpacing: 6.0,
-                        children: item.selectedCurries.map((curry) {
-                          String rawCurryImage = curry.menuImage ?? '';
-                          String finalCurryUrl = _getFinalImageUrl(
-                            rawCurryImage,
-                          );
-
-                          double curryPrice = curry.price ?? 0.0;
-                          String displayName = curry.menuName ?? "ไม่มีชื่อ";
-                          if (curryPrice > 0) {
-                            displayName +=
-                                " (+${curryPrice.toStringAsFixed(0)})";
-                          }
-
-                          return Container(
-                            padding: const EdgeInsets.only(
-                              left: 2,
-                              right: 8,
-                              top: 2,
-                              bottom: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              border: Border.all(color: Colors.green.shade200),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: Container(
-                                    width: 20,
-                                    height: 20,
-                                    color: Colors.grey.shade200,
-                                    child: finalCurryUrl.isNotEmpty
-                                        ? Image.network(
-                                            Uri.encodeFull(finalCurryUrl),
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (_, __, ___) =>
-                                                const Icon(
-                                                  Icons.fastfood_rounded,
-                                                  size: 12,
-                                                  color: Colors.grey,
-                                                ),
-                                          )
-                                        : const Icon(
-                                            Icons.fastfood_rounded,
-                                            size: 12,
-                                            color: Colors.grey,
-                                          ),
-                                  ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  displayName,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: Colors.green.shade900,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-
-                    // แสดงผล Add-on
-                    if (groupedAddons.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Wrap(
-                        spacing: 6.0,
-                        runSpacing: 6.0,
-                        children: groupedAddons.entries.map((entry) {
-                          String name = entry.key;
-                          int qty = entry.value['qty'] as int;
-                          int unitPrice = entry.value['unitPrice'] as int;
-
-                          // จัดเรียงข้อความให้อ่านง่าย
-                          String displayText = name;
-                          if (qty > 1) {
-                            int totalAddonPrice = unitPrice * qty;
-                            displayText += " x$qty"; // โชว์จำนวนก่อน
-                            if (totalAddonPrice > 0) {
-                              displayText +=
-                                  " (+฿$totalAddonPrice)"; // วงเล็บราคารวมท้ายสุด
-                            }
-                          } else {
-                            if (unitPrice > 0) {
-                              displayText += " (+฿$unitPrice)";
-                            }
-                          }
-
-                          return Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.orange.shade200),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.add_circle_rounded,
-                                  size: 14,
-                                  color: Colors.orange,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  displayText,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: Colors.orange.shade900,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
                     const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(
-                        "จำนวน ${item.quantity}",
-                        style: const TextStyle(
-                          fontSize: 14,
+                    const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                    const SizedBox(height: 8),
+
+                    if (hasAddons) ...[
+                      const Text(
+                        "รายการเพิ่มเติม",
+                        style: TextStyle(
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
+                          color: Color(0xFF007AFF),
                         ),
                       ),
+                      const SizedBox(height: 6),
+                      IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              width: 3.5,
+                              decoration: BoxDecoration(
+                                color: primaryGreen,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  for (var curry in item.selectedCurries)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 2,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              curry.menuName ?? "แกง",
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          const Text(
+                                            "1 จำนวน",
+                                            style: TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  for (var entry in groupedAddons.entries)
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 2,
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              entry.key,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w500,
+                                                color: Colors.black87,
+                                              ),
+                                            ),
+                                          ),
+                                          if (entry.value['canIncreaseQty'] ==
+                                                  true ||
+                                              (entry.value['qty'] as int) > 1)
+                                            RichText(
+                                              text: TextSpan(
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.black87,
+                                                ),
+                                                children: [
+                                                  TextSpan(
+                                                    text:
+                                                        "${entry.value['qty']} ",
+                                                    style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const TextSpan(text: "จำนวน"),
+                                                ],
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    if (item.note.isNotEmpty) ...[
+                      Text(
+                        "หมายเหตุ: ${item.note}",
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "แก้ไข",
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                        Text(
+                          "${item.quantity} จำนวน",
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -404,7 +472,11 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
       for (var addon in item.selectedAddons) {
         addonsSum += addon.addonPrice?.toInt() ?? 0;
       }
-      int actualMenuPrice = item.unitPrice + addonsSum;
+      int curriesSum = 0;
+      for (var curry in item.selectedCurries) {
+        curriesSum += (curry.price ?? 0).toInt();
+      }
+      int actualMenuPrice = item.unitPrice + addonsSum + curriesSum;
       subtotalPrice += (actualMenuPrice * item.quantity);
     }
 
@@ -542,22 +614,43 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             ),
             const SizedBox(height: 12),
 
+            // 🎯 แผนที่และปุ่มกดแก้ไขจุดจัดส่ง
             InkWell(
               onTap: () async {
-                final LatLng? selectedLocation = await Navigator.push(
+                final dynamic result = await Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => const LocationOrderMember(),
                   ),
                 );
 
-                if (selectedLocation != null) {
-                  setState(() {
-                    _selectedUserLocation = selectedLocation;
-                  });
-                  _miniMapController?.animateCamera(
-                    CameraUpdate.newLatLng(selectedLocation),
-                  );
+                if (result != null) {
+                  if (result is Map<String, dynamic>) {
+                    setState(() {
+                      _selectedUserLocation = LatLng(
+                        result['latitude'],
+                        result['longitude'],
+                      );
+                      if (result['defaultlocation'] != null ||
+                          result['addressDetail'] != null) {
+                        _addressNoteController.text =
+                            result['defaultlocation'] ??
+                            result['addressDetail'] ??
+                            "";
+                      }
+                    });
+                  } else if (result is LatLng) {
+                    setState(() {
+                      _selectedUserLocation = result;
+                    });
+                  }
+
+                  if (_selectedUserLocation != null &&
+                      _miniMapController != null) {
+                    _miniMapController!.animateCamera(
+                      CameraUpdate.newLatLngZoom(_selectedUserLocation!, 16.0),
+                    );
+                  }
                 }
               },
               borderRadius: BorderRadius.circular(16),
@@ -575,10 +668,19 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       GoogleMap(
                         initialCameraPosition: CameraPosition(
                           target: _selectedUserLocation ?? _mjuCenter,
-                          zoom: 15.5,
+                          zoom: _selectedUserLocation != null ? 16.0 : 15.5,
                         ),
-                        onMapCreated: (controller) =>
-                            _miniMapController = controller,
+                        onMapCreated: (controller) {
+                          _miniMapController = controller;
+                          if (_selectedUserLocation != null) {
+                            _miniMapController!.animateCamera(
+                              CameraUpdate.newLatLngZoom(
+                                _selectedUserLocation!,
+                                16.0,
+                              ),
+                            );
+                          }
+                        },
                         zoomControlsEnabled: false,
                         zoomGesturesEnabled: false,
                         scrollGesturesEnabled: false,
@@ -780,8 +882,15 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         }
                       }
 
+                      int curriesSumItem = 0;
+                      for (var curry in cartItem.selectedCurries) {
+                        curriesSumItem += (curry.price ?? 0).toInt();
+                      }
+
                       double actualSubTotal =
-                          (cartItem.unitPrice + currentAddonsSum) *
+                          (cartItem.unitPrice +
+                              currentAddonsSum +
+                              curriesSumItem) *
                           cartItem.quantity.toDouble();
 
                       List<OrderDetailAddonModel> finalAddons =
@@ -804,7 +913,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         ) {
                           return {
                             "menuId": curry.menuId ?? 0,
-                            "priceAtOrder": 0.0,
+                            "priceAtOrder": (curry.price ?? 0.0).toDouble(),
                           };
                         }).toList(),
                       );
@@ -820,11 +929,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       restaurantUsername: widget.storeUsername,
                       items: orderItems,
                     );
-
-                    debugPrint(
-                      "ร้านค้าที่แอปกำลังจะส่งไปคือ: ${widget.storeName}",
-                    );
-                    debugPrint("ก้อนข้อมูลที่จะส่ง: ${finalOrder.toJson()}");
 
                     await OrderService().memberConfirmOrder(finalOrder);
 

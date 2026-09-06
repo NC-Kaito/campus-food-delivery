@@ -58,6 +58,20 @@ class MemberService {
     }
   }
 
+  Future<void> updateLocationMember(MemberModel member) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/member/updateLocationMember",
+        data: member.toJson(),
+      );
+    } on DioException catch (e) {
+      final errorMessage = e.response?.data ?? "เกิดข้อผิดพลาดในการเชื่อมต่อ";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> addReview(ReviewSubmitModel review) async {
     try {
       await DioClient.dio.post("/v1/member/addReview", data: review.toJson());

@@ -1,4 +1,4 @@
-// features/member/location_order_member.dart
+// edit_location_member.dart
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:maps_toolkit/maps_toolkit.dart' as toolkit;
@@ -6,18 +6,18 @@ import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/global_data.dart';
 
-class LocationOrderMember extends StatefulWidget {
-  const LocationOrderMember({super.key});
+class EditLocationMember extends StatefulWidget {
+  const EditLocationMember({super.key});
 
   @override
-  State<LocationOrderMember> createState() => _LocationOrderMemberState();
+  State<EditLocationMember> createState() => _EditLocationMemberState();
 }
 
-class _LocationOrderMemberState extends State<LocationOrderMember> {
+class _EditLocationMemberState extends State<EditLocationMember> {
   GoogleMapController? _mapController;
   LatLng? _deliveryPos;
 
-  // 🎯 เก็บค่าเริ่มต้นที่ดึงมาจาก Database เพื่อใช้สำหรับปุ่มย้อนคืนค่า
+  // 🎯 เก็บค่าเริ่มต้นที่ดึงมาจาก Database เพื่อใช้ย้อนคืนค่า
   LatLng? _initialDeliveryPos;
   String _initialAddressDetail = "";
 
@@ -25,6 +25,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
       TextEditingController();
   final MemberService _memberService = MemberService();
   bool _isLoading = true;
+  bool _isSaving = false;
 
   // ✅ 1. ขอบเขตรั้วแม่โจ้
   final List<LatLng> _mjuFencePoints = [
@@ -95,7 +96,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
     super.dispose();
   }
 
-  // 🎯 ดึงพิกัดและที่อยู่ที่เคยบันทึกไว้ในฐานข้อมูลมาแสดงเป็นค่าเริ่มต้น
+  // 🎯 ดึงพิกัดและที่อยู่ที่เคยบันทึกไว้ และจำค่าเริ่มต้นไว้
   Future<void> _loadSavedLocation() async {
     try {
       MemberModel member = await _memberService.getMemberByUsername(
@@ -106,13 +107,14 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
         setState(() {
           if (member.latitude != null && member.longitude != null) {
             _deliveryPos = LatLng(member.latitude!, member.longitude!);
-            _initialDeliveryPos = _deliveryPos;
+            _initialDeliveryPos = _deliveryPos; // จำพิกัดเริ่มต้น
           }
 
           if (member.defaultlocation != null &&
               member.defaultlocation!.isNotEmpty) {
             _addressDetailController.text = member.defaultlocation!;
-            _initialAddressDetail = member.defaultlocation!;
+            _initialAddressDetail =
+                member.defaultlocation!; // จำข้อความเริ่มต้น
           }
 
           _isLoading = false;
@@ -130,7 +132,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
     }
   }
 
-  // 🎯 ฟังก์ชันคืนค่ากลับไปยังที่อยู่เริ่มต้นจากฐานข้อมูล
+  // 🎯 ฟังก์ชันย้อนกลับไปใช้พิกัดและที่อยู่เริ่มต้นที่ดึงมาจาก DB
   void _resetToDefaultLocation() {
     FocusScope.of(context).unfocus();
 
@@ -229,8 +231,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
     }
   }
 
-  // 🎯 ยืนยันตำแหน่งเฉพาะออเดอร์นี้ (ไม่บันทึกลงฐานข้อมูล)
-  void _confirmLocation() {
+  Future<void> _saveLocation() async {
     FocusScope.of(context).unfocus();
 
     if (_deliveryPos == null) {
@@ -253,13 +254,43 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
       return;
     }
 
-    // 🎯 ส่งค่ากลับไปยังหน้า ViewOrderMember
-    Navigator.pop(context, {
-      'latitude': _deliveryPos!.latitude,
-      'longitude': _deliveryPos!.longitude,
-      'addressDetail': _addressDetailController.text.trim(),
-      'defaultlocation': _addressDetailController.text.trim(),
-    });
+    setState(() => _isSaving = true);
+
+    try {
+      MemberModel updateModel = MemberModel(
+        username: GlobalData.usernameMember,
+        latitude: _deliveryPos!.latitude,
+        longitude: _deliveryPos!.longitude,
+        defaultlocation: _addressDetailController.text.trim(),
+      );
+
+      await _memberService.updateLocationMember(updateModel);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ บันทึกจุดจัดส่งเรียบร้อยแล้ว'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      Navigator.pop(context, {
+        'latitude': _deliveryPos!.latitude,
+        'longitude': _deliveryPos!.longitude,
+        'addressDetail': _addressDetailController.text.trim(),
+        'defaultlocation': _addressDetailController.text.trim(),
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🚨 บันทึกไม่สำเร็จ: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
@@ -274,12 +305,12 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('จุดจัดส่งสำหรับออเดอร์นี้'),
+        title: const Text('จุดจัดส่งของคุณ'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0,
         centerTitle: true,
-        iconTheme: const IconThemeData(color: Color(0xFF00B300)),
+        iconTheme: const IconThemeData(color: Color(0xFF64F02D)),
       ),
       body: Column(
         children: [
@@ -302,7 +333,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
                   ? {}
                   : {
                       Marker(
-                        markerId: const MarkerId('order_delivery_spot'),
+                        markerId: const MarkerId('delivery_spot'),
                         position: _deliveryPos!,
                         infoWindow: const InfoWindow(title: 'จุดส่งอาหาร'),
                         icon: BitmapDescriptor.defaultMarkerWithHue(
@@ -348,7 +379,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
                     children: [
                       const Icon(
                         Icons.location_on,
-                        color: Color(0xFF00B300),
+                        color: Color(0xFF64F02D),
                         size: 28,
                       ),
                       const SizedBox(width: 8),
@@ -402,7 +433,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(15),
                         borderSide: const BorderSide(
-                          color: Color(0xFF00B300),
+                          color: Color(0xFF64F02D),
                           width: 1.5,
                         ),
                       ),
@@ -411,7 +442,7 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 🎯 ปุ่มคืนค่าเดิม (ซ้าย) และปุ่มยืนยันตำแหน่งนี้ (ขวา)
+                  // 🎯 แถวปุ่มกด "คืนค่าเดิม" (ซ้าย) และปุ่ม "ยืนยันและบันทึกข้อมูล" (ขวา)
                   Row(
                     children: [
                       Expanded(
@@ -419,7 +450,9 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
                         child: SizedBox(
                           height: 52,
                           child: OutlinedButton.icon(
-                            onPressed: _resetToDefaultLocation,
+                            onPressed: _isSaving
+                                ? null
+                                : _resetToDefaultLocation,
                             icon: const Icon(Icons.restore_rounded, size: 20),
                             label: const Text(
                               "ค่าเดิม",
@@ -448,22 +481,31 @@ class _LocationOrderMemberState extends State<LocationOrderMember> {
                         child: SizedBox(
                           height: 52,
                           child: ElevatedButton(
-                            onPressed: _confirmLocation,
+                            onPressed: _isSaving ? null : _saveLocation,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00B300),
+                              backgroundColor: const Color(0xFF64F02D),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(15),
                               ),
                             ),
-                            child: const Text(
-                              "ยืนยันตำแหน่งนี้",
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
+                            child: _isSaving
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      color: Colors.white,
+                                      strokeWidth: 2.5,
+                                    ),
+                                  )
+                                : const Text(
+                                    "ยืนยันและบันทึกข้อมูล",
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
                           ),
                         ),
                       ),

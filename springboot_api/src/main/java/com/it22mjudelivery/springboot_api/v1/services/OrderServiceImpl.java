@@ -51,6 +51,8 @@ public class OrderServiceImpl implements OrderService {
     @Autowired
     private final OrderdetailcurryRepository orderdetailcurryRepo;
 
+    private final CloudinaryService cloudinaryService;
+
     @Override
     @Transactional // ดักจับ Transaction เผื่อบันทึกตารางลูกตัวไหนพลาด ระบบจะได้ Rollback อัตโนมัติ
     public boolean memberConfirmOrder(AddOrderDto addOrderDto) {
@@ -175,34 +177,23 @@ public class OrderServiceImpl implements OrderService {
     @Transactional
     public boolean reportIssue(int orderId, String issueDetail, org.springframework.web.multipart.MultipartFile issueImage) {
         try {
-            // 1. ค้นหาออเดอร์ในระบบ
             Order order = orderRepo.findById(orderId)
                     .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อรหัส: " + orderId));
 
-            // 2. อัปโหลดรูปลง Cloudinary (ถ้ามีการแนบรูปมาด้วย)
             String imageUrl = "";
             if (issueImage != null && !issueImage.isEmpty()) {
-                // ⚠️ คำเตือน: ตรงนี้ให้เรียกใช้ Service อัปโหลดรูปภาพของคุณ
-                // สมมติว่ามี CloudinaryService อยู่แล้ว และโยนเข้าโฟลเดอร์ maejo_delivery/issues
-                // imageUrl = cloudinaryService.uploadImage(issueImage, "maejo_delivery/issues");
-
-                // *ตัวอย่างโค้ดถ้าคุณใช้ Cloudinary แบบเดิม:
-                // Map uploadResult = cloudinary.uploader().upload(issueImage.getBytes(), ObjectUtils.asMap("folder", "maejo_delivery/issues"));
-                // imageUrl = uploadResult.get("url").toString();
+                // 🎯 บันทึก/อัปโหลดไฟล์รูปภาพเพื่อรับ URL กลับมา
+                imageUrl = cloudinaryService.uploadImage(issueImage, "maejo_delivery/issues");
             }
 
-            // 3. บันทึกข้อมูลการแจ้งปัญหาลง Entity
-            order.setCanceldetail(issueDetail); // เก็บรายละเอียดปัญหา
+            order.setCanceldetail(issueDetail);
 
             if (!imageUrl.isEmpty()) {
-                order.setCancelimage(imageUrl); // เก็บ URL รูปหลักฐาน
+                order.setCancelimage(imageUrl); // 🎯 บันทึก URL ลง Database
             }
 
-            // 4. เปลี่ยนสถานะให้ตรงกับที่แอป Flutter ดักไว้
             order.setOrderstatus("issue_reported");
-
             orderRepo.save(order);
-            System.out.println("✅ บันทึกข้อมูลการแจ้งปัญหาสำหรับออเดอร์รหัส " + orderId + " สำเร็จ!");
 
             return true;
         } catch (Exception e) {
@@ -327,6 +318,17 @@ public class OrderServiceImpl implements OrderService {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่ต้องทำได้: " + e.getMessage());
         }
     }
+
+    @Override
+    public List<Order> getCancelOrdersByRestaurant(String username) {
+        try {
+            List<String> cancelOrderStatus = Arrays.asList("issue_reported");
+            return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, cancelOrderStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่ต้องทำได้: " + e.getMessage());
+        }
+    }
+
 
     @Override
     @Transactional

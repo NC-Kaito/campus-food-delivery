@@ -17,4 +17,7 @@ public class MemberDto {
     private String email;
     private String phone;
     private String profileimg;
+    private Double latitude;
+    private Double longitude;
+    private String defaultLocation;
 }

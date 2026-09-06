@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/main_login.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/features/admin/login_admin.dart';
 import 'package:flutter_app/features/member/login_member.dart';
-import 'package:flutter_app/features/member/test_map.dart';
+import 'package:flutter_app/features/member/edit_map_member.dart';
 
 import 'package:flutter_app/select_role.dart';
 
@@ -28,7 +29,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         textTheme: GoogleFonts.kanitTextTheme(Theme.of(context).textTheme),
       ),
-      home: SelectRolePage(),
+      home: MainLogin(),
       // home: LoginAdmin(),
     );
   }

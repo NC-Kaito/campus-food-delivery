@@ -33,6 +33,15 @@ public class Member {
     private String phone;
 
     @Column
+    private Double latitude;
+
+    @Column
+    private Double longitude;
+
+    @Column
+    private String defaultLocation;
+
+    @Column
     private String profileimg;
 
 }

@@ -7,9 +7,6 @@ import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/view_order_restaurant.dart';
 import 'package:flutter_app/global_data.dart';
-
-// 🎯 1. เพิ่มการอิมพอร์ตหน้า ViewReviewRestaurant เข้ามาเชื่อมโยงกันครับคุณนารีย์
-// (ตรวจสอบ Path โฟลเดอร์ในเครื่องอีกครั้งให้ตรงกันเป๊ะๆ นะครับ)
 import 'package:flutter_app/features/restaurant/view_review_restaurant.dart'
     as review;
 
@@ -26,11 +23,8 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
   bool _isLoadingOrders = false;
   int _selectedTabIndex = 0;
 
-  List<dynamic> _realOrders = [];
+  List<OrderModel> _allOrders = [];
   Timer? _autoRefreshTimer;
-
-  int _waitingCount = 0;
-  int _activeCount = 0;
 
   static const Color _primary = Color(0xFF16A34A);
   static const Color _accent = Color(0xFFEA7C1E);
@@ -51,104 +45,128 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
     });
   }
 
-  Future<void> _fetchOrdersBackground() async {
-    try {
-      String username = GlobalData.usernameRestaurant;
-
-      final waitingOrders = await _orderService.getWaitingOrdersByRestaurant(
-        username,
-      );
-      final activeOrders = await _orderService.getActiveOrdersByRestaurant(
-        username,
-      );
-
-      if (mounted) {
-        setState(() {
-          _waitingCount = waitingOrders.length;
-          _activeCount = activeOrders.length;
-
-          if (_selectedTabIndex == 0) {
-            _realOrders = waitingOrders;
-          } else if (_selectedTabIndex == 1) {
-            _realOrders = activeOrders;
-          } else if (_selectedTabIndex == 2) {
-            _realOrders = []; // ประวัติสำเร็จ
-          } else if (_selectedTabIndex == 3) {
-            _fetchReviewOrdersSilent(username);
-          }
-        });
-      }
-    } catch (e) {
-      debugPrint("Auto-refresh restaurant orders failure: $e");
-    }
-  }
-
-  Future<void> _fetchReviewOrdersSilent(String username) async {
-    try {
-      final reviewOrders = await _orderService
-          .getReviewSuccessOrdersByRestaurant(username);
-      if (mounted && _selectedTabIndex == 3) {
-        setState(() {
-          _realOrders = reviewOrders;
-        });
-      }
-    } catch (_) {}
-  }
-
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
     super.dispose();
   }
 
+  OrderModel _toOrderModel(dynamic item) {
+    if (item is OrderModel) return item;
+    if (item is Map<String, dynamic>) return OrderModel.fromJson(item);
+    if (item is Map)
+      return OrderModel.fromJson(Map<String, dynamic>.from(item));
+    return OrderModel.fromJson({});
+  }
+
+  // 🎯 ดึงข้อมูลออเดอร์ของร้าน
   Future<void> _fetchOrders() async {
     setState(() => _isLoadingOrders = true);
+    await _loadOrderData();
+    if (mounted) setState(() => _isLoadingOrders = false);
+  }
 
+  Future<void> _fetchOrdersBackground() async {
+    await _loadOrderData();
+  }
+
+  Future<void> _loadOrderData() async {
     try {
-      String username = GlobalData.usernameRestaurant;
+      String username = GlobalData.usernameRestaurant.trim();
+      if (username.isEmpty) return;
 
-      final waitingOrders = await _orderService.getWaitingOrdersByRestaurant(
+      final rawWaiting = await _orderService.getWaitingOrdersByRestaurant(
         username,
       );
-      final activeOrders = await _orderService.getActiveOrdersByRestaurant(
+      final rawActive = await _orderService.getActiveOrdersByRestaurant(
         username,
       );
 
-      List<dynamic> targetOrders = [];
-      if (_selectedTabIndex == 0) {
-        targetOrders = waitingOrders;
-      } else if (_selectedTabIndex == 1) {
-        targetOrders = activeOrders;
-      } else if (_selectedTabIndex == 2) {
-        targetOrders = []; // ประวัติสำเร็จ
-      } else if (_selectedTabIndex == 3) {
-        targetOrders = await _orderService.getReviewSuccessOrdersByRestaurant(
+      List<dynamic> rawCancel = [];
+      try {
+        rawCancel = await _orderService.getcancelOrdersByRestaurant(username);
+      } catch (_) {}
+
+      List<dynamic> rawReview = [];
+      try {
+        rawReview = await _orderService.getReviewSuccessOrdersByRestaurant(
           username,
         );
+      } catch (_) {}
+
+      final Set<int> addedIds = {};
+      final List<OrderModel> combinedList = [];
+
+      for (var list in [rawWaiting, rawActive, rawCancel, rawReview]) {
+        for (var item in list) {
+          final model = _toOrderModel(item);
+          if (model.orderId != null && !addedIds.contains(model.orderId)) {
+            addedIds.add(model.orderId!);
+            combinedList.add(model);
+          }
+        }
       }
 
       if (mounted) {
         setState(() {
-          _waitingCount = waitingOrders.length;
-          _activeCount = activeOrders.length;
-          _realOrders = targetOrders;
-          _isLoadingOrders = false;
+          _allOrders = combinedList;
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingOrders = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("🚨 โหลดรายการออเดอร์ล้มเหลว: $e"),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      debugPrint("🚨 โหลดออเดอร์ร้านค้าล้มเหลว: $e");
     }
   }
 
-  // 🎯 2. แก้ไขฟังก์ชันการกดเปิดหน้าจอรายละเอียด ให้สลับแยกพาร์ทตามแท็บอย่างถูกต้อง
+  // 🎯 กรองสถานะเหมือนฟังก์ชัน _filterOrders ของ Member 100%
+  List<OrderModel> _filterOrders(String type) {
+    return _allOrders.where((order) {
+      final status = (order.orderStatus ?? '').trim().toLowerCase();
+
+      if (type == 'new') {
+        // ออเดอร์ใหม่: รอร้านกดรับ
+        return status == 'waitingrestaurant' || status == 'pending';
+      } else if (type == 'preparing') {
+        // ต้องเตรียม: กำลังทำ / รอไรเดอร์มารับ / กำลังส่ง
+        return status == 'goingtorestaurant' ||
+            status == 'going' ||
+            status == 'rideraccepted' ||
+            status == 'riderarrived' ||
+            status == 'preparing' ||
+            status == 'cooking' ||
+            status == 'foodready' ||
+            status == 'delivery' ||
+            status == 'delivering' ||
+            status == 'ontheway' ||
+            status == 'pickedup' ||
+            status == 'arrived' ||
+            status == 'reached';
+      } else if (type == 'success') {
+        // จัดส่งสำเร็จ
+        return status == 'delivered' ||
+            status == 'success' ||
+            status == 'completed';
+      } else if (type == 'review') {
+        // มีการรีวิวแล้ว
+        return status == 'reviewsuccess';
+      } else if (type == 'cancel') {
+        // ยกเลิก หรือ แจ้งปัญหา
+        return status == 'cancel' ||
+            status == 'cancelled' ||
+            status == 'issue_reported';
+      }
+      return true;
+    }).toList();
+  }
+
+  List<OrderModel> get _currentOrders {
+    if (_selectedTabIndex == 0) return _filterOrders('new');
+    if (_selectedTabIndex == 1) return _filterOrders('preparing');
+    if (_selectedTabIndex == 2) return _filterOrders('success');
+    if (_selectedTabIndex == 3) return _filterOrders('review');
+    if (_selectedTabIndex == 4) return _filterOrders('cancel');
+    return [];
+  }
+
   Future<void> _openOrderDetail(
     OrderModel orderModel, {
     bool isReviewTab = false,
@@ -156,10 +174,8 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
     Widget targetPage;
 
     if (isReviewTab) {
-      // ✨ ถ้ากดจากแท็บที่ 4 (ดูรีวิว) ให้เดินทางไปยังหน้า ViewReviewRestaurant ที่เพิ่งดีไซน์ไว้ครับ
       targetPage = review.ViewReviewRestaurant(orderModel: orderModel);
     } else {
-      // ✨ ถ้ากดจากแท็บงานปกติ ให้เปิดหน้าแสดงรายละเอียดออเดอร์ของร้านค้าตัวเดิมครับ
       targetPage = ViewOrderRestaurant(orderModel: orderModel);
     }
 
@@ -188,10 +204,9 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
         setState(() {
           _selectedTabIndex = index;
         });
-        _fetchOrders();
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
         decoration: BoxDecoration(
           color: isActive ? _primary : Colors.grey.shade200,
           borderRadius: BorderRadius.circular(20),
@@ -217,13 +232,13 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: isActive ? Colors.white : Colors.black87,
-                  fontSize: 12,
+                  fontSize: 11.5,
                 ),
               ),
             ),
             if (badgeCount > 0)
               Positioned(
-                right: 4,
+                right: 2,
                 top: -6,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -259,6 +274,11 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
 
   @override
   Widget build(BuildContext context) {
+    final newCount = _filterOrders('new').length;
+    final preparingCount = _filterOrders('preparing').length;
+    final cancelCount = _filterOrders('cancel').length;
+    final currentOrdersList = _currentOrders;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: const RestaurantNavbar(title: ""),
@@ -284,35 +304,31 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
             child: Row(
               children: [
                 Expanded(
-                  child: _buildTab(
-                    "คำสั่งซื้อใหม่",
-                    0,
-                    badgeCount: _waitingCount,
-                  ),
+                  child: _buildTab("ออเดอร์ใหม่", 0, badgeCount: newCount),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
-                  child: _buildTab(
-                    "ที่ต้องเตรียม",
-                    1,
-                    badgeCount: _activeCount,
-                  ),
+                  child: _buildTab("ต้องเตรียม", 1, badgeCount: preparingCount),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(child: _buildTab("สำเร็จ", 2)),
-                const SizedBox(width: 8),
-                Expanded(child: _buildTab("ดูรีวิว", 3)),
+                const SizedBox(width: 6),
+                Expanded(child: _buildTab("รีวิว", 3)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: _buildTab("ยกเลิก", 4, badgeCount: cancelCount),
+                ),
               ],
             ),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Text(
-              "ทั้งหมด ${_realOrders.length} รายการ",
+              "ทั้งหมด ${currentOrdersList.length} รายการ",
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -326,16 +342,16 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
                 ? const Center(
                     child: CircularProgressIndicator(color: _primary),
                   )
-                : _realOrders.isEmpty
+                : currentOrdersList.isEmpty
                 ? _buildEmptyState()
                 : RefreshIndicator(
                     onRefresh: _fetchOrders,
                     color: _primary,
                     child: ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 20.0),
-                      itemCount: _realOrders.length,
+                      itemCount: currentOrdersList.length,
                       itemBuilder: (context, index) {
-                        return _buildOrderCard(_realOrders[index]);
+                        return _buildOrderCard(currentOrdersList[index]);
                       },
                     ),
                   ),
@@ -345,8 +361,7 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
     );
   }
 
-  Widget _buildOrderCard(dynamic order) {
-    final orderModel = OrderModel.fromJson(order);
+  Widget _buildOrderCard(OrderModel orderModel) {
     final int rawOrderId = orderModel.orderId ?? 0;
     final String orderId = rawOrderId.toString().padLeft(6, '0');
 
@@ -364,14 +379,8 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
     }
 
     int totalItems = 0;
-    if (orderModel.items.isNotEmpty) {
-      for (var item in orderModel.items) {
-        totalItems += item.qty;
-      }
-    } else if (order["orderDetails"] != null && order["orderDetails"] is List) {
-      for (var item in (order["orderDetails"] as List)) {
-        totalItems += (item["qty"] as num?)?.toInt() ?? 1;
-      }
+    for (var item in orderModel.items) {
+      totalItems += item.qty;
     }
 
     String orderTimeText = "--:--";
@@ -382,6 +391,7 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
     }
 
     bool isReviewTab = _selectedTabIndex == 3;
+    bool isCancelTab = _selectedTabIndex == 4;
 
     String buttonText = "ดูรายละเอียด";
     if (_selectedTabIndex == 0) {
@@ -392,10 +402,9 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
       buttonText = "ดูรายละเอียด";
     } else if (isReviewTab) {
       buttonText = "ดูรีวิวจากลูกค้า";
+    } else if (isCancelTab) {
+      buttonText = "ดูเหตุผลการยกเลิก";
     }
-
-    final double cardRating =
-        double.tryParse((order['reviewRating'] ?? 5.0).toString()) ?? 5.0;
 
     return InkWell(
       borderRadius: BorderRadius.circular(16),
@@ -403,9 +412,13 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8F9FA),
+          color: isCancelTab
+              ? const Color(0xFFFFEBEE)
+              : const Color(0xFFF8F9FA),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(
+            color: isCancelTab ? Colors.red.shade200 : Colors.grey.shade300,
+          ),
         ),
         child: Column(
           children: [
@@ -419,15 +432,17 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
                       children: [
                         CircleAvatar(
                           radius: 18,
-                          backgroundColor: _primary.withOpacity(0.15),
+                          backgroundColor: isCancelTab
+                              ? Colors.red.withOpacity(0.15)
+                              : _primary.withOpacity(0.15),
                           backgroundImage: finalImgUrl.isNotEmpty
                               ? NetworkImage(finalImgUrl)
                               : null,
                           child: finalImgUrl.isEmpty
-                              ? const Icon(
+                              ? Icon(
                                   Icons.person,
                                   size: 20,
-                                  color: _primary,
+                                  color: isCancelTab ? Colors.red : _primary,
                                 )
                               : null,
                         ),
@@ -460,10 +475,10 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
                       ),
                       Text(
                         "K$orderId",
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: _accent,
+                          color: isCancelTab ? Colors.red : _accent,
                         ),
                       ),
                     ],
@@ -472,29 +487,35 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
               ),
             ),
 
-            if (isReviewTab) ...[
+            if (isCancelTab &&
+                orderModel.cancelDetail != null &&
+                orderModel.cancelDetail!.isNotEmpty) ...[
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Row(
                   children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      color: Colors.amber,
-                      size: 20,
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: Colors.red.shade700,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "$cardRating คะแนน",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                        fontSize: 14,
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        "สาเหตุ: ${orderModel.cancelDetail}",
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red.shade800,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
             ],
 
             Padding(
@@ -551,7 +572,9 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
                   onPressed: () =>
                       _openOrderDetail(orderModel, isReviewTab: isReviewTab),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _primary,
+                    backgroundColor: isCancelTab
+                        ? Colors.red.shade600
+                        : _primary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(30),
@@ -582,7 +605,9 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
         ? "ไม่มีออเดอร์ที่ต้องเตรียม"
         : _selectedTabIndex == 2
         ? "ยังไม่มีประวัติคำสั่งซื้อสำเร็จ"
-        : "ยังไม่มีรายการที่ได้รับการรีวิว";
+        : _selectedTabIndex == 3
+        ? "ยังไม่มีรายการที่ได้รับการรีวิว"
+        : "ไม่มีรายการคำสั่งซื้อที่ถูกยกเลิก";
 
     return RefreshIndicator(
       onRefresh: _fetchOrders,
@@ -594,7 +619,9 @@ class _ListOrderRestaurantState extends State<ListOrderRestaurant> {
           Icon(
             Icons.inbox_outlined,
             size: 80,
-            color: _primary.withOpacity(0.4),
+            color: _selectedTabIndex == 4
+                ? Colors.red.withOpacity(0.4)
+                : _primary.withOpacity(0.4),
           ),
           const SizedBox(height: 16),
           Center(
