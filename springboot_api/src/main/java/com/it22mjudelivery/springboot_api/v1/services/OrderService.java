@@ -48,5 +48,7 @@ public interface OrderService {
     // 🎯 ดึงออเดอร์รีวิวสำหรับ "ร้านค้า"
     List<Order> getReviewSuccessOrdersByRestaurant(String username);
 
+    List<Map<String, Object>> getRestaurantIncomeByDateRange(String username, LocalDateTime startDate, LocalDateTime endDate);
+
     void autoCancelExpiredOrders();
 }

@@ -36,4 +36,14 @@ public interface OrderRepository extends JpaRepository<Order, Integer> {
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
+
+    @Query("SELECT o FROM Order o WHERE o.restaurant.username = :username " +
+            "AND LOWER(o.orderstatus) IN ('success', 'completed', 'reviewsuccess') " +
+            "AND o.orderdate >= :startDate AND o.orderdate <= :endDate " +
+            "ORDER BY o.orderdate DESC")
+    List<Order> findRestaurantSuccessOrdersByDateRange(
+            @Param("username") String username,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
 }

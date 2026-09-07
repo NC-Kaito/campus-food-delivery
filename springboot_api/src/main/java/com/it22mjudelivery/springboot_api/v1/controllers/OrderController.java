@@ -308,4 +308,19 @@ public class OrderController {
         }
         return ResponseEntity.ok("ปลดล็อกออเดอร์สำเร็จ");
     }
+
+    @GetMapping("/restaurant/{username}/income")
+    public ResponseEntity<?> getRestaurantIncome(
+            @PathVariable String username,
+            @RequestParam("startDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startDate,
+            @RequestParam("endDate") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endDate) {
+
+        try {
+            List<Map<String, Object>> incomeSummary = orderService.getRestaurantIncomeByDateRange(username, startDate, endDate);
+            return ResponseEntity.ok(incomeSummary);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("ไม่สามารถดึงข้อมูลรายได้ร้านค้าได้: " + e.getMessage());
+        }
+    }
 }

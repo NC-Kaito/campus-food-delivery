@@ -296,7 +296,7 @@ class _MainLoginState extends State<MainLogin> {
         : 'สมัครเป็นไรเดอร์';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAF9),
+      backgroundColor: Colors.white,
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
@@ -343,184 +343,210 @@ class _MainLoginState extends State<MainLogin> {
                   // ─── กล่องฟอร์ม ───
                   Container(
                     margin: const EdgeInsets.symmetric(horizontal: 24),
-                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      // 🎯 เส้นขอบไล่เฉดสีเขียว (gradient border) แทนเส้นดำทึบเดิม
                       borderRadius: BorderRadius.circular(24),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          primaryGreen,
+                          primaryGreen.withOpacity(0.45),
+                          const Color(0xFFCFF5B4),
+                        ],
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: primaryGreen.withOpacity(0.06),
-                          blurRadius: 30,
-                          spreadRadius: 4,
+                          color: primaryGreen.withOpacity(0.20),
+                          blurRadius: 28,
+                          spreadRadius: 1,
                           offset: const Offset(0, 10),
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    child: Form(
-                      key: formKey,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // ─── แถบเลือกบทบาท (Role Selector) ───
-                          Container(
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade100,
-                              borderRadius: BorderRadius.circular(12),
+                    // 🎯 padding ตรงนี้คือ "ความหนา" ของเส้นขอบไล่สี
+                    padding: const EdgeInsets.all(1.8),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(22.5),
+                      ),
+                      child: Form(
+                        key: formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ─── แถบเลือกบทบาท (Role Selector) ───
+                            Container(
+                              height: 46,
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.grey.shade300,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  _buildRoleTab(0, "ลูกค้า"),
+                                  _buildRoleTab(1, "ร้านค้า"),
+                                  _buildRoleTab(2, "ไรเดอร์"),
+                                ],
+                              ),
                             ),
-                            child: Row(
+                            const SizedBox(height: 24),
+
+                            // ─── ช่องกรอก Username / ID ───
+                            _buildInputFieldLabel(inputLabel),
+                            const SizedBox(height: 8),
+                            _buildTextFormField(
+                              controller: usernameController,
+                              focusNode: usernameFocus,
+                              hintText: inputHint,
+                              icon: inputIcon,
+                            ),
+                            const SizedBox(height: 20),
+
+                            // ─── ช่องกรอก Password ───
+                            _buildInputFieldLabel('รหัสผ่าน (Password)'),
+                            const SizedBox(height: 8),
+                            _buildTextFormField(
+                              controller: passwordController,
+                              focusNode: passwordFocus,
+                              hintText: 'กรอกรหัสผ่านเพื่อความปลอดภัย',
+                              icon: Icons.lock_outline_rounded,
+                              isPassword: true,
+                            ),
+                            const SizedBox(height: 30),
+
+                            // ─── ปุ่ม เข้าสู่ระบบ ───
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : doLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: primaryGreen,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 24,
+                                        width: 24,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'เข้าสู่ระบบ',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 20,
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+
+                            // ─── เส้นคั่น "หรือ" ───
+                            Row(
                               children: [
-                                _buildRoleTab(0, "ลูกค้า"),
-                                _buildRoleTab(1, "ร้านค้า"),
-                                _buildRoleTab(2, "ไรเดอร์"),
+                                Expanded(
+                                  child: Divider(
+                                    color: Colors.grey.shade300,
+                                    thickness: 1.2,
+                                  ),
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                  ),
+                                  child: Text(
+                                    "หรือ",
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Divider(
+                                    color: Colors.grey.shade300,
+                                    thickness: 1.2,
+                                  ),
+                                ),
                               ],
                             ),
-                          ),
-                          const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                          // ─── ช่องกรอก Username / ID ───
-                          _buildInputFieldLabel(inputLabel),
-                          const SizedBox(height: 8),
-                          _buildTextFormField(
-                            controller: usernameController,
-                            focusNode: usernameFocus,
-                            hintText: inputHint,
-                            icon: inputIcon,
-                          ),
-                          const SizedBox(height: 20),
-
-                          // ─── ช่องกรอก Password ───
-                          _buildInputFieldLabel('รหัสผ่าน (Password)'),
-                          const SizedBox(height: 8),
-                          _buildTextFormField(
-                            controller: passwordController,
-                            focusNode: passwordFocus,
-                            hintText: 'กรอกรหัสผ่านเพื่อความปลอดภัย',
-                            icon: Icons.lock_outline_rounded,
-                            isPassword: true,
-                          ),
-                          const SizedBox(height: 30),
-
-                          // ─── ปุ่ม เข้าสู่ระบบ ───
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : doLogin,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: primaryGreen,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 24,
-                                      width: 24,
-                                      child: CircularProgressIndicator(
-                                        color: Colors.white,
-                                        strokeWidth: 2.5,
-                                      ),
-                                    )
-                                  : const Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        Text(
-                                          'เข้าสู่ระบบ',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        SizedBox(width: 8),
-                                        Icon(
-                                          Icons.arrow_forward_rounded,
-                                          size: 20,
-                                        ),
-                                      ],
+                            // ─── ปุ่ม สร้างบัญชี / สมัคร ───
+                            SizedBox(
+                              width: double.infinity,
+                              height: 52,
+                              child: OutlinedButton(
+                                onPressed: () {
+                                  FocusScope.of(context).unfocus();
+                                  Widget registerPage;
+                                  if (_selectedRole == 0) {
+                                    registerPage = const RegisterMember();
+                                  } else if (_selectedRole == 1) {
+                                    registerPage = const AgreesRestaurant();
+                                  } else {
+                                    registerPage = const AgreesRider();
+                                  }
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => registerPage,
                                     ),
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-
-                          // ─── เส้นคั่น "หรือ" ───
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Divider(
-                                  color: Colors.grey.shade300,
-                                  thickness: 1.2,
-                                ),
-                              ),
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: primaryGreen,
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  backgroundColor: Colors.white,
                                 ),
                                 child: Text(
-                                  "หรือ",
+                                  registerBtnText,
                                   style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 13,
+                                    fontSize: 16,
                                     fontWeight: FontWeight.bold,
+                                    color: primaryGreen,
                                   ),
-                                ),
-                              ),
-                              Expanded(
-                                child: Divider(
-                                  color: Colors.grey.shade300,
-                                  thickness: 1.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
-
-                          // ─── ปุ่ม สร้างบัญชี / สมัคร ───
-                          SizedBox(
-                            width: double.infinity,
-                            height: 52,
-                            child: OutlinedButton(
-                              onPressed: () {
-                                FocusScope.of(context).unfocus();
-                                Widget registerPage;
-                                if (_selectedRole == 0) {
-                                  registerPage = const RegisterMember();
-                                } else if (_selectedRole == 1) {
-                                  registerPage = const AgreesRestaurant();
-                                } else {
-                                  registerPage = const AgreesRider();
-                                }
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) => registerPage,
-                                  ),
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                side: BorderSide(
-                                  color: primaryGreen,
-                                  width: 1.5,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                backgroundColor: Colors.white,
-                              ),
-                              child: Text(
-                                registerBtnText,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: primaryGreen,
                                 ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -537,7 +563,7 @@ class _MainLoginState extends State<MainLogin> {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -701,19 +727,22 @@ class _MainLoginState extends State<MainLogin> {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: Colors.grey.shade300, width: 1.0),
+          borderSide: BorderSide(
+            color: primaryGreen.withOpacity(0.3),
+            width: 1.2,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: primaryGreen, width: 1.5),
+          borderSide: BorderSide(color: primaryGreen, width: 1.8),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.0),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.2),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.8),
         ),
       ),
     );

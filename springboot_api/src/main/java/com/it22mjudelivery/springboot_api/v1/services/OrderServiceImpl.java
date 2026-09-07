@@ -389,6 +389,42 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getRestaurantIncomeByDateRange(String username, LocalDateTime startDate, LocalDateTime endDate) {
+        try {
+            // 1. ดึงออเดอร์ที่สำเร็จแล้วของร้านค้าตามช่วงวันที่กำหนด
+            List<Order> orders = orderRepo.findRestaurantSuccessOrdersByDateRange(username, startDate, endDate);
+
+            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+            Map<String, Map<String, Object>> dailySummary = new LinkedHashMap<>();
+
+            for (Order order : orders) {
+                String dateKey = order.getOrderdate().format(formatter);
+
+                Map<String, Object> dayData = dailySummary.getOrDefault(dateKey, new LinkedHashMap<>());
+
+                int currentOrdersCount = (int) dayData.getOrDefault("rounds", 0);
+                double currentIncome = (double) dayData.getOrDefault("amount", 0.0);
+
+                // 🎯 รายรับของร้านค้า = ยอดรวมทั้งหมด - ค่าจัดส่ง
+                double foodIncome = order.getTotalprice() - order.getDelivery_fee();
+
+                dayData.put("date", dateKey);
+                dayData.put("rounds", currentOrdersCount + 1);
+                dayData.put("amount", currentIncome + foodIncome);
+
+                dailySummary.put(dateKey, dayData);
+            }
+
+            return new ArrayList<>(dailySummary.values());
+
+        } catch (Exception e) {
+            System.err.println("🚨 เกิดข้อผิดพลาดในการดึงรายงานรายได้ร้านค้า: " + e.getMessage());
+            return List.of();
+        }
+    }
+
     // 🎯 cron = "0 * * * * *" หมายถึงให้ฟังก์ชันนี้ทำงานทุกๆ ต้นนาที (เช่น 12:00:00, 12:01:00)
     @Scheduled(cron = "0 * * * * *")
     @Transactional

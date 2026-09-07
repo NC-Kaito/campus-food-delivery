@@ -39,8 +39,9 @@ class _HomeUserState extends State<HomeUser> {
   bool _isLoading = true;
   Set<int> _selectedTypeIds = {};
 
+  // 🎯 ปรับขนาด Font ให้เท่ากับหน้า Login (11px)
   final menuTextStyle = const TextStyle(
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: FontWeight.bold,
     color: Color(0xFF00B300),
   );
@@ -502,61 +503,67 @@ class _HomeUserState extends State<HomeUser> {
           ),
         ],
       ),
+
+      // ─── 🎯 แถบเมนูด้านล่างปรับแต่งขนาดและโครงสร้างให้เหมือนหน้า Login ───
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
           ],
         ),
-        child: BottomAppBar(
-          color: Colors.white,
-          elevation: 0,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.home_rounded,
-                    color: Color(0xFF00B300),
-                    size: 26,
-                  ),
-                  const SizedBox(height: 2),
-                  Text("หน้าหลัก", style: menuTextStyle),
-                ],
-              ),
-              InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const MainLogin()),
-                  );
-                },
-                borderRadius: BorderRadius.circular(50),
-                child: Column(
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.person_pin_rounded,
-                      color: Colors.grey.shade400,
-                      size: 26,
+                    const Icon(
+                      Icons.home_rounded,
+                      color: Color(0xFF00B300),
+                      size: 24,
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      "เข้าสู่ระบบ",
-                      style: menuTextStyle.copyWith(
-                        color: Colors.grey.shade500,
-                      ),
-                    ),
+                    Text("หน้าหลัก", style: menuTextStyle),
                   ],
                 ),
-              ),
-            ],
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const MainLogin(),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(50),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.person_pin_rounded,
+                        color: Colors.grey.shade400,
+                        size: 24,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        "เข้าสู่ระบบ",
+                        style: menuTextStyle.copyWith(
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/data/services/member/order_status_monitor.dart';
 import 'package:flutter_app/features/member/edit_location_member.dart';
 import 'package:flutter_app/features/member/list_active_order_member.dart';
 import 'package:flutter_app/global_data.dart';
@@ -192,6 +193,7 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
 
     if (confirm == true) {
       GlobalData.usernameMember = "";
+      OrderStatusMonitor().stopMonitoring();
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(

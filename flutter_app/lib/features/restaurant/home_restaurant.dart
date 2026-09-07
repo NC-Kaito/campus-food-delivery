@@ -1,5 +1,5 @@
 // features/restaurant/home_restaurant.dart
-import 'dart:async'; // 🎯 นำเข้า Timer สำหรับดึงออเดอร์ Real-time
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/menu_addon_group_model.dart';
@@ -10,14 +10,13 @@ import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
-import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
+import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/restaurant/add_addon.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart';
 import 'package:flutter_app/features/restaurant/edit_addon.dart';
 import 'package:flutter_app/features/restaurant/edit_menu.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/review_restaurant.dart';
-import 'package:flutter_app/features/restaurant/sales_restaurant.dart';
 import 'package:flutter_app/features/restaurant/list_order_restaurant.dart';
 import 'package:flutter_app/global_data.dart';
 
@@ -42,8 +41,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   final RestaurantService restaurantService = RestaurantService();
   final MenuService menuService = MenuService();
   final MenuAddonService _addonService = MenuAddonService();
-  final OrderService _orderService =
-      OrderService(); // 🎯 สแตนด์บาย OrderService
+  final OrderService _orderService = OrderService();
 
   RestaurantModel? restaurantModel;
   TabController? _tabController;
@@ -55,6 +53,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   Map<int, List<MenuModel>> categoryMenus = {};
   Map<int, bool> categoryLoading = {};
 
+  // 🎯 Main Tab Index: 0 = เมนู, 1 = กลุ่มตัวเลือก, 2 = ยอดขาย
   int _mainTabIndex = 0;
 
   bool _isLoadingAddons = false;
@@ -66,16 +65,22 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
   final Map<int, int> _menuAddonGroupCounts = {};
 
-  // 🎯 ตัวแปรจัดการ Real-time
   Timer? _autoRefreshTimer;
   int _newOrderCount = 0;
+
+  // 🎯 ตัวแปรสำหรับ Dashboard ยอดขายร้านค้า
+  String _selectedFilter = '7days';
+  String _previousFilter = '7days';
+  DateTimeRange? _selectedDateRange;
+  List<Map<String, dynamic>> _incomeData = [];
+  bool _isLoadingIncome = true;
 
   @override
   void initState() {
     super.initState();
     loadRestaurantData();
-    _fetchNewOrderCount(); // 🎯 ดึงจำนวนออเดอร์ตอนเปิดหน้า
-    _startAutoRefresh(); // 🎯 รีเฟรชทุกๆ 10 วิ
+    _fetchNewOrderCount();
+    _startAutoRefresh();
   }
 
   @override
@@ -91,7 +96,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     });
   }
 
-  // 🎯 เปลี่ยนมาใช้ getWaitingOrdersByRestaurant เพื่อดึงออเดอร์ใหม่ตรงๆ ตัวเลขจะไม่กระโดดหรือหายไปไหน
   Future<void> _fetchNewOrderCount() async {
     try {
       final waitingOrders = await _orderService.getWaitingOrdersByRestaurant(
@@ -114,11 +118,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
     final String baseUrl = DioClient.dio.options.baseUrl;
-    if (rawPath.startsWith('/')) {
-      return "$baseUrl$rawPath";
-    } else {
-      return "$baseUrl/$rawPath";
-    }
+    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
   Future<void> loadRestaurantData() async {
@@ -568,7 +568,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
     try {
       final groups = await _addonService.getAddonGroupsByRestaurant(
-        GlobalData.usernameRestaurant ?? "",
+        GlobalData.usernameRestaurant,
       );
 
       if (!mounted) return;
@@ -612,6 +612,129 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
+  // 🎯 ดึงข้อมูลยอดขายของร้านค้า
+  Future<void> _loadIncomeData() async {
+    setState(() => _isLoadingIncome = true);
+
+    DateTime start;
+    DateTime end;
+    DateTime now = DateTime.now();
+    DateTime todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    DateTime todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    if (_selectedFilter == 'today') {
+      start = todayStart;
+      end = todayEnd;
+    } else if (_selectedFilter == '3days') {
+      start = todayStart.subtract(const Duration(days: 3));
+      end = todayEnd;
+    } else if (_selectedFilter == '7days') {
+      start = todayStart.subtract(const Duration(days: 7));
+      end = todayEnd;
+    } else if (_selectedFilter == '1month') {
+      start = DateTime(now.year, now.month - 1, now.day);
+      end = todayEnd;
+    } else if (_selectedFilter == '3months') {
+      start = DateTime(now.year, now.month - 3, now.day);
+      end = todayEnd;
+    } else if (_selectedFilter == '6months') {
+      start = DateTime(now.year, now.month - 6, now.day);
+      end = todayEnd;
+    } else if (_selectedFilter == 'custom' && _selectedDateRange != null) {
+      start = _selectedDateRange!.start;
+      end = DateTime(
+        _selectedDateRange!.end.year,
+        _selectedDateRange!.end.month,
+        _selectedDateRange!.end.day,
+        23,
+        59,
+        59,
+      );
+    } else {
+      start = todayStart.subtract(const Duration(days: 7));
+      end = todayEnd;
+    }
+
+    try {
+      final data = await _orderService.getRestaurantIncomeByDateRange(
+        GlobalData.usernameRestaurant,
+        start,
+        end,
+      );
+
+      if (mounted) {
+        setState(() {
+          _incomeData = data;
+          _isLoadingIncome = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingIncome = false);
+    }
+  }
+
+  Future<void> _pickDateRange() async {
+    final pickedRange = await showDateRangePicker(
+      context: context,
+      initialDateRange:
+          _selectedDateRange ??
+          DateTimeRange(
+            start: DateTime.now().subtract(const Duration(days: 7)),
+            end: DateTime.now(),
+          ),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: _primary,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (pickedRange != null) {
+      setState(() {
+        _selectedFilter = 'custom';
+        _selectedDateRange = pickedRange;
+      });
+      _loadIncomeData();
+    } else {
+      setState(() {
+        _selectedFilter = _previousFilter;
+      });
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return "${date.day}/${date.month}/${date.year + 543}";
+  }
+
+  String _getMonthNameThai(String monthStr) {
+    const months = [
+      "ม.ค.",
+      "ก.พ.",
+      "มี.ค.",
+      "เม.ย.",
+      "พ.ค.",
+      "มิ.ย.",
+      "ก.ค.",
+      "ส.ค.",
+      "ก.ย.",
+      "ต.ค.",
+      "พ.ย.",
+      "ธ.ค.",
+    ];
+    int m = int.tryParse(monthStr) ?? 1;
+    return months[m - 1];
+  }
+
   Future<void> _onSelectMainTab(int index) async {
     if (_mainTabIndex == index) return;
     setState(() {
@@ -623,6 +746,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         await Future.delayed(const Duration(milliseconds: 200));
       }
       await _loadAddonOptions();
+    } else if (index == 2) {
+      await _loadIncomeData();
     }
   }
 
@@ -632,18 +757,14 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
     if (_tabController == null) {
       return const Scaffold(
-        appBar: RestaurantNavbar(
-          title: "",
-        ), // 🎯 ไม่แตะต้อง Navbar โครงสร้างเดิม
+        appBar: RestaurantNavbar(title: ""),
         backgroundColor: _bg,
         body: Center(child: CircularProgressIndicator(color: _primary)),
       );
     }
 
     return Scaffold(
-      appBar: const RestaurantNavbar(
-        title: "",
-      ), // 🎯 คงโครงสร้าง Navbar เดิมเป๊ะๆ
+      appBar: const RestaurantNavbar(title: ""),
       backgroundColor: _bg,
       extendBodyBehindAppBar: true,
       body: NestedScrollView(
@@ -731,9 +852,9 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         ),
                         const SizedBox(height: 16),
 
-                        // 🎯 แถบเมนู 4 ปุ่ม (เพิ่มแจ้งเตือนตรงนี้)
+                        // 🎯 แถบเมนู 5 ปุ่ม (รวมยอดขาย)
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: _buildQuickActionsRow(),
                         ),
                         const SizedBox(height: 16),
@@ -770,7 +891,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                 fontWeight: FontWeight.w600,
                               ),
                               labelPadding: const EdgeInsets.symmetric(
-                                horizontal: 50,
+                                horizontal: 40,
                                 vertical: 10,
                               ),
                               onTap: (index) {
@@ -884,69 +1005,75 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         );
                       }).toList(),
               )
-            : _buildAddonOptionsBody(),
+            : _mainTabIndex == 1
+            ? _buildAddonOptionsBody()
+            : _buildSalesDashboardBody(),
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 54,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(18),
-                gradient: const LinearGradient(
-                  colors: [_primary, _primaryDark],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: _primary.withOpacity(0.35),
-                    blurRadius: 16,
-                    offset: const Offset(0, 6),
-                  ),
-                ],
-              ),
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                  ),
-                ),
-                onPressed: () async {
-                  if (_mainTabIndex == 0) {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AddMenu()),
-                    );
-                    await loadRestaurantData();
-                  } else {
-                    final saved = await Navigator.push<bool>(
-                      context,
-                      MaterialPageRoute(builder: (_) => const AddAddon()),
-                    );
-                    if (saved == true) {
-                      _addonsLoaded = false;
-                      await _loadAddonOptions();
-                    }
-                  }
-                },
-                icon: const Icon(Icons.add_rounded, size: 22),
-                label: Text(
-                  _mainTabIndex == 0 ? "เพิ่มเมนู" : "เพิ่มกลุ่มตัวเลือกเสริม",
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+      bottomNavigationBar: _mainTabIndex == 2
+          ? null
+          : SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 54,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(18),
+                      gradient: const LinearGradient(
+                        colors: [_primary, _primaryDark],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _primary.withOpacity(0.35),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.transparent,
+                        shadowColor: Colors.transparent,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                      ),
+                      onPressed: () async {
+                        if (_mainTabIndex == 0) {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AddMenu()),
+                          );
+                          await loadRestaurantData();
+                        } else {
+                          final saved = await Navigator.push<bool>(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AddAddon()),
+                          );
+                          if (saved == true) {
+                            _addonsLoaded = false;
+                            await _loadAddonOptions();
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.add_rounded, size: 22),
+                      label: Text(
+                        _mainTabIndex == 0
+                            ? "เพิ่มเมนู"
+                            : "เพิ่มกลุ่มตัวเลือกเสริม",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -1112,6 +1239,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
+  // 🎯 ปรับเป็น 5 ปุ่ม Quick Actions เรียงครบ: เมนู, กลุ่มตัวเลือก, ออเดอร์, ยอดขาย, รีวิว
   Widget _buildQuickActionsRow() {
     return Row(
       children: [
@@ -1124,7 +1252,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             onTap: () => _onSelectMainTab(0),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(
           child: _buildQuickAction(
             icon: Icons.playlist_add_check_rounded,
@@ -1134,27 +1262,31 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             onTap: () => _onSelectMainTab(1),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
         Expanded(
-          // 🎯 เรียกใช้ Badge ตรงนี้
           child: _buildQuickActionWithBadge(
             icon: Icons.list_alt_rounded,
             label: "ออเดอร์",
             iconColor: _accent,
             active: false,
             badgeCount: _newOrderCount,
-            onTap: () =>
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const ListOrderRestaurant(),
-                  ),
-                ).then(
-                  (_) => _fetchNewOrderCount(),
-                ), // ดึงออเดอร์ใหม่หลังกลับมาจากหน้า List
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ListOrderRestaurant()),
+            ).then((_) => _fetchNewOrderCount()),
           ),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _buildQuickAction(
+            icon: Icons.point_of_sale_rounded,
+            label: "ยอดขาย",
+            iconColor: _mainTabIndex == 2 ? _primary : Colors.teal.shade700,
+            active: _mainTabIndex == 2,
+            onTap: () => _onSelectMainTab(2),
+          ),
+        ),
+        const SizedBox(width: 6),
         Expanded(
           child: _buildQuickAction(
             icon: Icons.star_rounded,
@@ -1171,7 +1303,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // 🎯 ปุ่ม Quick Action แบบปกติ (ไม่มี Badge)
   Widget _buildQuickAction({
     required IconData icon,
     required String label,
@@ -1194,7 +1325,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 22, color: iconColor),
+            Icon(icon, size: 20, color: iconColor),
             const SizedBox(height: 6),
             Text(
               label,
@@ -1202,7 +1333,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               maxLines: 1,
               overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: 9.5,
                 fontWeight: FontWeight.w700,
                 color: active ? _primary : _textDark,
               ),
@@ -1213,7 +1344,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  // 🎯 ปุ่ม Quick Action แบบพิเศษที่มี Badge สีแดงซ้อนทับ (ดีไซน์แบบเดียวกับหน้า List)
   Widget _buildQuickActionWithBadge({
     required IconData icon,
     required String label,
@@ -1241,8 +1371,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               clipBehavior: Clip.none,
               alignment: Alignment.center,
               children: [
-                Icon(icon, size: 22, color: iconColor),
-                // 🎯 โชว์ Badge สีแดง
+                Icon(icon, size: 20, color: iconColor),
                 if (badgeCount > 0)
                   Positioned(
                     right: -8,
@@ -1266,7 +1395,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 9,
+                          fontSize: 8.5,
                           fontWeight: FontWeight.bold,
                           height: 1.2,
                         ),
@@ -1282,7 +1411,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
               maxLines: 1,
               overflow: TextOverflow.visible,
               style: TextStyle(
-                fontSize: 10.5,
+                fontSize: 9.5,
                 fontWeight: FontWeight.w700,
                 color: active ? _primary : _textDark,
               ),
@@ -1339,6 +1468,427 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // 🎯 Body แดชบอร์ดแสดงยอดขายร้านค้า (โครงสร้างเดียวกับ Rider Home)
+  Widget _buildSalesDashboardBody() {
+    bool isGroupByMonth = false;
+    if (_selectedFilter == '3months' || _selectedFilter == '6months') {
+      isGroupByMonth = true;
+    } else if (_selectedFilter == 'custom' && _selectedDateRange != null) {
+      if (_selectedDateRange!.end.difference(_selectedDateRange!.start).inDays >
+          31) {
+        isGroupByMonth = true;
+      }
+    }
+
+    List<Map<String, dynamic>> displayTableData = [];
+    if (isGroupByMonth) {
+      Map<String, Map<String, dynamic>> monthlyMap = {};
+      for (var item in _incomeData) {
+        try {
+          List<String> parts = item['date'].toString().split('/');
+          if (parts.length == 3) {
+            String monthName = _getMonthNameThai(parts[1]);
+            int yearTH = int.parse(parts[2]);
+            String monthYear = "$monthName $yearTH";
+
+            if (!monthlyMap.containsKey(monthYear)) {
+              monthlyMap[monthYear] = {
+                "date": monthYear,
+                "rounds": 0,
+                "amount": 0.0,
+              };
+            }
+            monthlyMap[monthYear]!["rounds"] += (item['rounds'] as num).toInt();
+            monthlyMap[monthYear]!["amount"] += (item['amount'] as num)
+                .toDouble();
+          }
+        } catch (_) {}
+      }
+      displayTableData = monthlyMap.values.toList();
+    } else {
+      displayTableData = List.from(_incomeData);
+    }
+
+    final double totalAmount = _incomeData.fold<double>(
+      0.0,
+      (sum, item) => sum + (item['amount'] as num).toDouble(),
+    );
+    final int totalRounds = _incomeData.fold<int>(
+      0,
+      (sum, item) => sum + (item['rounds'] as num).toInt(),
+    );
+
+    String dateRangeText = "";
+    if (_selectedFilter == 'custom' && _selectedDateRange != null) {
+      if (_selectedDateRange!.start.isAtSameMomentAs(_selectedDateRange!.end)) {
+        dateRangeText = _formatDate(_selectedDateRange!.start);
+      } else {
+        dateRangeText =
+            "${_formatDate(_selectedDateRange!.start)} - ${_formatDate(_selectedDateRange!.end)}";
+      }
+    }
+
+    return RefreshIndicator(
+      color: _primary,
+      onRefresh: _loadIncomeData,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
+        physics: const AlwaysScrollableScrollPhysics(),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                spreadRadius: 2,
+                blurRadius: 15,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "สรุปยอดขาย",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: _textDark,
+                            ),
+                          ),
+                          if (dateRangeText.isNotEmpty &&
+                              _selectedFilter == 'custom')
+                            Text(
+                              dateRangeText,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: _primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      height: 38,
+                      padding: const EdgeInsets.symmetric(horizontal: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.green.shade100),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedFilter,
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 20,
+                            color: _primary,
+                          ),
+                          dropdownColor: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _primary,
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'today',
+                              child: Text('วันนี้'),
+                            ),
+                            DropdownMenuItem(
+                              value: '3days',
+                              child: Text('3 วันย้อนหลัง'),
+                            ),
+                            DropdownMenuItem(
+                              value: '7days',
+                              child: Text('7 วันย้อนหลัง'),
+                            ),
+                            DropdownMenuItem(
+                              value: '1month',
+                              child: Text('1 เดือนย้อนหลัง'),
+                            ),
+                            DropdownMenuItem(
+                              value: '3months',
+                              child: Text('3 เดือนย้อนหลัง'),
+                            ),
+                            DropdownMenuItem(
+                              value: '6months',
+                              child: Text('6 เดือนย้อนหลัง'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'custom',
+                              child: Text('เลือกช่วงเวลาเอง...'),
+                            ),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              if (val == 'custom') {
+                                _previousFilter = _selectedFilter;
+                                _pickDateRange();
+                              } else {
+                                setState(() {
+                                  _selectedFilter = val;
+                                });
+                                _loadIncomeData();
+                              }
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.account_balance_wallet_rounded,
+                                size: 16,
+                                color: _primary,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                "ยอดขายทั้งหมด",
+                                style: TextStyle(
+                                  color: _textMuted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "฿ ${totalAmount.toStringAsFixed(0)}",
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
+                              color: _textDark,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      height: 50,
+                      width: 1.5,
+                      color: Colors.grey.shade200,
+                    ),
+                    const SizedBox(width: 24),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.receipt_long_rounded,
+                                size: 16,
+                                color: _accent,
+                              ),
+                              const SizedBox(width: 6),
+                              const Text(
+                                "ออเดอร์สำเร็จ",
+                                style: TextStyle(
+                                  color: _textMuted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text(
+                                "$totalRounds",
+                                style: const TextStyle(
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                  color: _textDark,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                "ออเดอร์",
+                                style: TextStyle(
+                                  color: _textMuted,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  border: Border(top: BorderSide(color: Colors.grey.shade100)),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
+                  child: _isLoadingIncome
+                      ? const Padding(
+                          padding: EdgeInsets.all(30.0),
+                          child: Center(
+                            child: CircularProgressIndicator(color: _primary),
+                          ),
+                        )
+                      : displayTableData.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(30.0),
+                          child: Center(
+                            child: Text(
+                              "ไม่มีประวัติยอดขายสำเร็จในช่วงเวลานี้",
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Column(
+                          children: [
+                            Container(
+                              color: Colors.grey.shade50,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 12,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    flex: 3,
+                                    child: Text(
+                                      isGroupByMonth ? 'เดือน' : 'วันที่',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  const Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      'จำนวนออเดอร์',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                  const Expanded(
+                                    flex: 2,
+                                    child: Text(
+                                      'ยอดขาย (฿)',
+                                      textAlign: TextAlign.right,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            ...displayTableData.map((data) {
+                              final double amount = (data['amount'] as num)
+                                  .toDouble();
+                              return Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 20,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border(
+                                    top: BorderSide(
+                                      color: Colors.grey.shade100,
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      flex: 3,
+                                      child: Text(
+                                        data['date'].toString(),
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        data['rounds'].toString(),
+                                        textAlign: TextAlign.center,
+                                        style: const TextStyle(fontSize: 13),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      flex: 2,
+                                      child: Text(
+                                        amount.toStringAsFixed(0),
+                                        textAlign: TextAlign.right,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          color: _primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

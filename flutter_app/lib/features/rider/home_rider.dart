@@ -400,7 +400,7 @@ class _HomeRiderState extends State<HomeRider>
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.settings),
-              label: "ตั้งค่าบัญชี",
+              label: "ตั้งค่า",
             ),
           ],
         ),

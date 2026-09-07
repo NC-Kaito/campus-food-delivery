@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/models/review_model.dart';
+import 'package:flutter_app/data/services/member/order_status_monitor.dart';
 import 'package:flutter_app/features/member/account_management_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/list_active_order_member.dart';
@@ -60,6 +61,7 @@ class _HomeMemberState extends State<HomeMember> {
   @override
   void initState() {
     super.initState();
+    OrderStatusMonitor().startMonitoring();
     _initData();
   }
 

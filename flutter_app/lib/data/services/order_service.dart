@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/models/review_model.dart';
+import 'package:flutter/foundation.dart';
 
 class OrderService {
   Future<void> memberConfirmOrder(OrderModel order) async {
@@ -363,6 +364,49 @@ class OrderService {
       return [];
     } catch (e) {
       print("🚨 เกิดข้อผิดพลาดในการดึงข้อมูลรายได้: $e");
+      return [];
+    }
+  }
+
+  // 🎯 ดึงข้อมูลสรุปรายรับของร้านค้าตามช่วงวันที่กำหนด
+  Future<List<Map<String, dynamic>>> getRestaurantIncomeByDateRange(
+    String username,
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    try {
+      // ปรับเวลาให้ครอบคลุมทั้งวัน (ตั้งแต่ 00:00:00 ของวันเริ่ม จนถึง 23:59:59 ของวันสิ้นสุด)
+      final start = DateTime(
+        startDate.year,
+        startDate.month,
+        startDate.day,
+        0,
+        0,
+        0,
+      );
+      final end = DateTime(
+        endDate.year,
+        endDate.month,
+        endDate.day,
+        23,
+        59,
+        59,
+      );
+
+      final response = await DioClient.dio.get(
+        '/v1/order/restaurant/$username/income',
+        queryParameters: {
+          'startDate': start.toIso8601String(),
+          'endDate': end.toIso8601String(),
+        },
+      );
+
+      if (response.statusCode == 200) {
+        return List<Map<String, dynamic>>.from(response.data);
+      }
+      return [];
+    } catch (e) {
+      debugPrint(" เกิดข้อผิดพลาดในการดึงข้อมูลรายได้ร้านค้า: $e");
       return [];
     }
   }

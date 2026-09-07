@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/services/member/in_app_notification_service.dart';
 import 'package:flutter_app/main_login.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -21,11 +22,15 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Campus food Delivery',
+
+      navigatorKey: InAppNotificationService.navigatorKey,
+
       //ปิดแถบDebug เวลารัน
       debugShowCheckedModeBanner: false,
 
       theme: ThemeData(
         useMaterial3: true,
+
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
         textTheme: GoogleFonts.kanitTextTheme(Theme.of(context).textTheme),
       ),

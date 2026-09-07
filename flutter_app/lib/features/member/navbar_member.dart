@@ -5,6 +5,7 @@ import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart'; // ← เพิ่ม import นี้
 import 'package:flutter_app/features/member/home_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
+import 'package:flutter_app/features/member/notify_member.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -103,7 +104,7 @@ class _NavbarMemberState extends State<NavbarMember> with RouteAware {
           children: [
             IconButton(
               icon: const Icon(
-                Icons.shopping_cart_outlined,
+                Icons.notifications,
                 color: NavbarMember._orange,
                 size: 32,
               ),
@@ -112,9 +113,7 @@ class _NavbarMemberState extends State<NavbarMember> with RouteAware {
                 // เผื่อผู้ใช้ลบของออกจากตะกร้าแล้วเลขต้องอัปเดต
                 await Navigator.push(
                   context,
-                  MaterialPageRoute(
-                    builder: (context) => const ListOrderMember(),
-                  ),
+                  MaterialPageRoute(builder: (context) => const NotifyMember()),
                 );
                 if (mounted) setState(() {});
               },

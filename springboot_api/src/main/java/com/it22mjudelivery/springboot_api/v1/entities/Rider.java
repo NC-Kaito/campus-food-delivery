@@ -29,6 +29,9 @@ public class Rider {
     @Column(length = 50, nullable = false)
     private String lastName;
 
+    @Column(length = 255)
+    private String profileRiderImage;
+
     @Column(nullable = false)
     private LocalDate birthday;
 
