@@ -426,7 +426,19 @@ class _ListMenuMemberState extends State<ListMenuMember>
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
-      appBar: const NavbarMember(title: ""),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF00B300),
+            size: 24,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -757,9 +769,41 @@ class _ListMenuMemberState extends State<ListMenuMember>
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
                                 color: isAvailable
-                                    ? const Color(0xFFF0F4E8)
+                                    ? Colors.white
                                     : Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isAvailable
+                                      ? const Color.fromARGB(
+                                          255,
+                                          17,
+                                          156,
+                                          70,
+                                        ).withOpacity(0.28)
+                                      : Colors.grey.shade300,
+                                  width: 1,
+                                ),
+                                boxShadow: isAvailable
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color.fromARGB(
+                                            255,
+                                            0,
+                                            0,
+                                            0,
+                                          ).withOpacity(0.5),
+                                          spreadRadius: 1,
+                                          blurRadius: 0,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ]
+                                    : [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.04),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                               ),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),

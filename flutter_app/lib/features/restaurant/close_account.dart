@@ -4,6 +4,7 @@ import 'package:flutter_app/data/services/Admin/admin_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/login_restaurant.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
+import 'package:flutter_app/main_login.dart';
 
 class CloseAccount extends StatefulWidget {
   final RestaurantModel restaurant; // รับค่า Model เข้ามา
@@ -48,7 +49,7 @@ class _CloseAccountState extends State<CloseAccount> {
 
         Navigator.pushAndRemoveUntil(
           context,
-          MaterialPageRoute(builder: (context) => const LoginRestaurant()),
+          MaterialPageRoute(builder: (context) => const MainLogin()),
           (route) => false,
         );
       }

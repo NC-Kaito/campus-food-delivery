@@ -345,8 +345,8 @@ class _EditLocationMemberState extends State<EditLocationMember> {
                 Polygon(
                   polygonId: const PolygonId("mju_fence"),
                   points: _mjuFencePoints,
-                  fillColor: Colors.green.withOpacity(0.15),
-                  strokeColor: Colors.green.withOpacity(0.8),
+                  fillColor: const Color(0xFF00B300).withOpacity(0.15),
+                  strokeColor: const Color(0xFF00B300).withOpacity(0.8),
                   strokeWidth: 2,
                 ),
               },
@@ -398,13 +398,13 @@ class _EditLocationMemberState extends State<EditLocationMember> {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade50,
+                            color: const Color(0xFFE8F5E9),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: const Text(
                             "ปักหมุดแล้ว",
                             style: TextStyle(
-                              color: Colors.green,
+                              color: const Color(0xFF00B300),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -483,7 +483,7 @@ class _EditLocationMemberState extends State<EditLocationMember> {
                           child: ElevatedButton(
                             onPressed: _isSaving ? null : _saveLocation,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF64F02D),
+                              backgroundColor: const Color(0xFF00B300),
                               elevation: 0,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(15),

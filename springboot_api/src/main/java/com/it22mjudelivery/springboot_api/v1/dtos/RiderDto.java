@@ -1,6 +1,7 @@
 package com.it22mjudelivery.springboot_api.v1.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.persistence.Column;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -20,6 +21,7 @@ public class RiderDto {
     private LocalDate birthday;
     private String email;
     private String phone;
+    private String profileRiderImage;
     private String studentCard_Image;
     private String drivingLicenseImg;
     private String vehiclePlate;

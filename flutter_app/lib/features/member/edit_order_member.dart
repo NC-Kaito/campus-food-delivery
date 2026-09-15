@@ -517,8 +517,8 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                   Navigator.pop(context, updatedItem);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF76FF03),
-                  foregroundColor: Colors.black,
+                  backgroundColor: const Color(0xFF00B300),
+                  foregroundColor: Colors.white,
                   elevation: 2,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),

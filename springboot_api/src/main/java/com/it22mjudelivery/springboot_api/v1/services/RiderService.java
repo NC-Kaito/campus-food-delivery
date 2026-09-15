@@ -13,4 +13,6 @@ public interface RiderService {
     boolean doRegisterRider(RiderDto riderDto);
 
     boolean updateRiderStatus(String studentId, boolean isActive);
+
+    boolean updateProfileRider(String studentId, String phone, String profileImage);
 }

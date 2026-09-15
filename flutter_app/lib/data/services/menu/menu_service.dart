@@ -225,6 +225,8 @@ class MenuService {
     } on DioException catch (e) {
       final msg = e.response?.data;
       throw (msg is String ? msg : "เกิดข้อผิดพลาดในการลบเมนู");
+    } catch (e) {
+      throw e.toString();
     }
   }
 }

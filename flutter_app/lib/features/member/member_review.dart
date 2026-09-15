@@ -26,7 +26,7 @@ class _MemberReviewState extends State<MemberReview> {
       TextEditingController();
   final TextEditingController _riderCommentController = TextEditingController();
 
-  final Color primaryGreen = const Color(0xFF64F02D);
+  final Color primaryGreen = const Color(0xFF00B300);
 
   final MemberService memberService = MemberService();
   bool _isSubmitting = false;
@@ -141,30 +141,39 @@ class _MemberReviewState extends State<MemberReview> {
     }
 
     final bool isCurryDish = rawCurries.isNotEmpty;
+
     String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
     if (isCurryDish) {
       displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
+    if (item.toJson()['isExtraPrice'] == true ||
+        item.toJson()['isextraphice'] == true) {
+      displayMenuName += " (พิเศษ)";
+    }
+
     List<Map<String, String>> curriesList = [];
     for (var e in rawCurries) {
-      if (e is Map<String, dynamic>) {
-        final menuMap = (e['menu'] is Map<String, dynamic>)
-            ? e['menu'] as Map<String, dynamic>
-            : e;
-        String name =
+      if (e is Map) {
+        final dynamic menuValue = e['menu'];
+        final Map menuMap = menuValue is Map ? menuValue : e;
+        final String name =
             (menuMap['menuname'] ??
                     menuMap['menuName'] ??
                     menuMap['name'] ??
-                    '')
+                    "")
                 .toString();
-        String img =
-            (menuMap['menuimage'] ??
-                    menuMap['menuImage'] ??
-                    menuMap['image'] ??
-                    '')
-                .toString();
-        if (name.isNotEmpty) curriesList.add({'name': name, 'image': img});
+        if (name.isNotEmpty) {
+          curriesList.add({'name': name});
+        }
+      } else {
+        try {
+          final String name = (e.menu?.menuName ?? e.menu?.menuname ?? "")
+              .toString();
+          if (name.isNotEmpty) {
+            curriesList.add({'name': name});
+          }
+        } catch (_) {}
       }
     }
 
@@ -175,220 +184,288 @@ class _MemberReviewState extends State<MemberReview> {
       rawAddons = item.toJson()['addons'];
     }
 
-    Map<String, int> addonCounts = {};
+    Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in rawAddons) {
       String name = '';
+      int qty = 1;
+      double unitPrice = 0;
+
       if (addon is Map) {
         name =
-            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
-            addon['addonMenu']?['addonName'] ??
-            addon['name'] ??
-            addon['addonName'] ??
-            '';
+            (addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
+                    addon['addonMenu']?['addonName'] ??
+                    addon['name'] ??
+                    addon['addonName'] ??
+                    '')
+                .toString();
+
+        qty = (addon['addonQty'] ?? addon['qty'] ?? 1) is num
+            ? (addon['addonQty'] ?? addon['qty'] ?? 1).toInt()
+            : 1;
+
+        unitPrice =
+            ((addon['priceAtOrder'] ??
+                        addon['priceatorder'] ??
+                        addon['menuAddonDetail']?['addonPrice'] ??
+                        0)
+                    as num)
+                .toDouble();
       } else {
         try {
-          name = addon.menuAddonDetail?.addonMenu?.addonName ?? '';
+          name = (addon.menuAddonDetail?.addonMenu?.addonName ?? '').toString();
         } catch (_) {}
         if (name.isEmpty) {
           try {
-            name = addon.addonName ?? '';
+            name = (addon.addonName ?? '').toString();
           } catch (_) {}
         }
+        try {
+          qty = (addon.addonQty ?? 1) as int;
+        } catch (_) {}
+        try {
+          unitPrice = ((addon.priceAtOrder ?? 0) as num).toDouble();
+        } catch (_) {}
       }
-      if (name.isNotEmpty) addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+
+      if (name.isNotEmpty) {
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + qty;
+          groupedAddons[name]!['canIncreaseQty'] = true;
+        } else {
+          groupedAddons[name] = {
+            'qty': qty,
+            'unitPrice': unitPrice,
+            'canIncreaseQty': qty > 1,
+          };
+        }
+      }
     }
 
-    int finalPricePerUnit = 0;
-    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+    int itemQty = item.qty ?? 1;
 
-    if (isCurryDish) {
+    int finalPricePerUnit =
+        item.priceAtOrder?.toInt() ?? item.menu?.price?.toInt() ?? 0;
+
+    if (finalPricePerUnit <= 0) {
+      int addonsSum = 0;
+      for (var addon in groupedAddons.values) {
+        addonsSum +=
+            ((addon['unitPrice'] ?? 0) as num).toInt() * (addon['qty'] as int);
+      }
+
       int curriesSum = 0;
       for (var curry in rawCurries) {
-        if (curry is Map<String, dynamic>) {
-          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
-          curriesSum += (price ?? 0).toInt();
-        }
-      }
-      int addonsSum = 0;
-      for (var addon in rawAddons) {
-        num? p = 0;
-        if (addon is Map) {
-          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
+        if (curry is Map) {
+          curriesSum +=
+              ((curry['priceAtOrder'] ?? curry['priceatorder'] ?? 0) as num)
+                  .toInt();
         } else {
           try {
-            p = addon.priceAtOrder;
+            curriesSum += ((curry.priceAtOrder ?? 0) as num).toInt();
           } catch (_) {}
-          if (p == null) {
-            try {
-              p = addon.menuAddonDetail?.addonPrice;
-            } catch (_) {}
-          }
         }
-        addonsSum += (p ?? 0).toInt();
       }
+
       finalPricePerUnit =
-          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
-    } else {
-      int addonsSum = 0;
-      for (var addon in rawAddons) {
-        num? p = 0;
-        if (addon is Map) {
-          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
-        } else {
-          try {
-            p = addon.priceAtOrder;
-          } catch (_) {}
-          if (p == null) {
-            try {
-              p = addon.menuAddonDetail?.addonPrice;
-            } catch (_) {}
-          }
-        }
-        addonsSum += (p ?? 0).toInt();
-      }
-      finalPricePerUnit = baseMenuPrice + addonsSum;
+          (item.menu?.price?.toInt() ?? 0) + addonsSum + curriesSum;
     }
 
+    final int itemTotalPrice = finalPricePerUnit * itemQty;
     final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
-    int qty = item.qty ?? 1;
+    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: isCurryDish || finalMenuUrl.isEmpty
-                ? _buildPlaceholderIcon()
-                : Image.network(
-                    Uri.encodeFull(finalMenuUrl),
-                    width: 65,
-                    height: 65,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildPlaceholderIcon(),
-                  ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayMenuName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "ราคา $finalPricePerUnit บาท",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-
-                if (curriesList.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6.0,
-                    runSpacing: 6.0,
-                    children: curriesList.map((curry) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.add_circle,
-                              size: 14,
-                              color: Colors.orange,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              curry['name'] ?? "ไม่มีชื่อ",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-
-                if (addonCounts.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6.0,
-                    runSpacing: 6.0,
-                    children: addonCounts.entries.map((entry) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.add_circle,
-                              size: 14,
-                              color: Colors.orange,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              entry.value > 1
-                                  ? "${entry.key} x${entry.value}"
-                                  : entry.key,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    "จำนวน $qty",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.5),
+            spreadRadius: 2,
+            blurRadius: 6,
+            offset: const Offset(0, 5),
           ),
         ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: isCurryDish || finalMenuUrl.isEmpty
+                  ? _buildPlaceholderIcon()
+                  : Image.network(
+                      Uri.encodeFull(finalMenuUrl),
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _buildPlaceholderIcon(),
+                    ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayMenuName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        "$itemTotalPrice บาท",
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF00B300),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Divider(height: 1, color: Color(0xFFE0E0E0)),
+                  const SizedBox(height: 8),
+                  if (hasAddons) ...[
+                    Text(
+                      isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 3.5,
+                            decoration: BoxDecoration(
+                              color: primaryGreen,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (var curry in curriesList)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            curry['name'] ?? "แกง",
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text(
+                                          "1 จำนวน",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                for (var entry in groupedAddons.entries)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            entry.key,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        if (entry.value['canIncreaseQty'] ==
+                                                true ||
+                                            (entry.value['qty'] as int) >
+                                                1) ...[
+                                          const SizedBox(width: 8),
+                                          RichText(
+                                            text: TextSpan(
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Color(0xFF00B300),
+                                              ),
+                                              children: [
+                                                TextSpan(
+                                                  text:
+                                                      "${entry.value['qty']} ",
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const TextSpan(text: "จำนวน"),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      "$itemQty จำนวน",
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF00B300),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -481,7 +558,7 @@ class _MemberReviewState extends State<MemberReview> {
               children: [
                 Icon(
                   icon,
-                  color: isActive ? const Color(0xFF64F02D) : Colors.grey,
+                  color: isActive ? const Color(0xFF00B300) : Colors.grey,
                 ),
                 if (badgeCount > 0)
                   Positioned(
@@ -518,7 +595,7 @@ class _MemberReviewState extends State<MemberReview> {
             Text(
               label,
               style: menuTextStyle.copyWith(
-                color: isActive ? const Color(0xFF64F02D) : Colors.grey,
+                color: isActive ? const Color(0xFF00B300) : Colors.grey,
               ),
             ),
           ],
@@ -543,7 +620,7 @@ class _MemberReviewState extends State<MemberReview> {
         ? "ไม่ระบุชื่อผู้จัดส่ง"
         : "$riderFirstName $riderLastName".trim();
     String finalRiderImage = _getFinalImageUrl(
-      widget.order.rider?.studentCardImage,
+      widget.order.rider?.profileImage,
     );
 
     final int cartItemCount = CartManager().items.length;
@@ -562,7 +639,7 @@ class _MemberReviewState extends State<MemberReview> {
           onPressed: () => Navigator.pop(context),
         ),
         title: const Text(
-          "ประเมินความพึงพอใจ",
+          "ให้ความพึงพอใจ",
           style: TextStyle(
             color: Colors.orange,
             fontSize: 20,
@@ -1029,7 +1106,7 @@ class _MemberReviewState extends State<MemberReview> {
                     : const Text(
                         "รีวิว",
                         style: TextStyle(
-                          color: Colors.black87,
+                          color: Color.fromARGB(255, 255, 255, 255),
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),

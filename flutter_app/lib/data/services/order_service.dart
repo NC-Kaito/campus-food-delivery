@@ -136,6 +136,21 @@ class OrderService {
     }
   }
 
+  Future<void> updateOrderSuccess(int orderId, String newStatus) async {
+    try {
+      await DioClient.dio.post(
+        "/v1/order/updateOrderSuccess",
+        data: {"orderId": orderId, "status": newStatus},
+      );
+    } on DioException catch (e) {
+      final errorMessage =
+          e.response?.data?["message"] ?? "ไม่สามารถอัปเดตสถานะได้";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> updateOrderStatus(int orderId, String newStatus) async {
     try {
       await DioClient.dio.post(
@@ -161,6 +176,27 @@ class OrderService {
         return response.data as List<dynamic>;
       } else {
         throw "เกิดข้อผิดพลาดในการดึงข้อมูลออเดอร์: ${response.statusCode}";
+      }
+    } on DioException catch (e) {
+      final errorMessage =
+          e.response?.data?["message"] ??
+          "ไม่สามารถดึงข้อมูลคำสั่งซื้อได้ หรือเซิร์ฟเวอร์ไม่ได้เปิดอยู่";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> getCancelOrdersByRider(String username) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/order/rider/$username/cancel",
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as List;
+      } else {
+        throw "เกิดข้อผิดพลาดในการดึงข้อมูลออเดอร์ยกเลิก: ${response.statusCode}";
       }
     } on DioException catch (e) {
       final errorMessage =
@@ -248,6 +284,28 @@ class OrderService {
       throw errorMessage;
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<List<dynamic>> getSuccessOrdersByRestaurant(
+    String restaurantUsername,
+  ) async {
+    try {
+      final response = await DioClient.dio.get(
+        "/v1/order/restaurant/$restaurantUsername/success", // ✅ แก้ orders -> order
+      );
+
+      if (response.statusCode == 200) {
+        List jsonResponse = response.data;
+        return jsonResponse.map((data) => OrderModel.fromJson(data)).toList();
+      } else {
+        throw "ไม่สามารถโหลดรายการออเดอร์สำเร็จได้";
+      }
+    } on DioException catch (e) {
+      throw e.response?.data?['message'] ??
+          "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์";
+    } catch (e) {
+      throw "เกิดข้อผิดพลาด: $e";
     }
   }
 

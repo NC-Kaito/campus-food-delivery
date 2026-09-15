@@ -49,5 +49,5 @@ public interface MenuaddongroupRepository extends JpaRepository<Menuaddongroup, 
     @Query(value = "DELETE FROM menu_addongroups WHERE addongroup_id = :groupId", nativeQuery = true)
     void removeAllMenuLinks(@Param("groupId") Integer groupId);
 
-    List<Menuaddongroup> findByUsername_UsernameAndIsglobalTrue(String username);
+    List<Menuaddongroup> findByUsername_Username(String username);
 }

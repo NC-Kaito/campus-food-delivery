@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/models/review_model.dart';
-import 'package:flutter_app/data/services/member/order_status_monitor.dart';
+import 'package:flutter_app/data/services/order_status_monitor.dart';
 import 'package:flutter_app/features/member/account_management_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/list_active_order_member.dart';
@@ -44,7 +44,6 @@ class _HomeMemberState extends State<HomeMember> {
   List<TypeRestaurantModel> typeList = [];
   Map<String, List<MenuModel>> _restaurantMenusIndex = {};
 
-  // 🎯 เก็บค่าคะแนนรีวิวเฉลี่ยของแต่ละร้านค้า (null = ไม่มีรีวิว)
   final Map<String, double?> _restaurantRatings = {};
 
   bool _isLoading = true;
@@ -102,11 +101,14 @@ class _HomeMemberState extends State<HomeMember> {
 
       int count = 0;
       for (var order in history) {
-        final status = (order.orderStatus ?? '').toLowerCase();
+        final status = (order.orderStatus ?? '').toLowerCase().trim();
+        // 🎯 กรองสถานะให้ตรงกับ ListActiveOrderMember (ตัด success, completed, reviewsuccess, cancel, cancelled, issue_reported)
         if (status != 'success' &&
             status != 'completed' &&
+            status != 'reviewsuccess' &&
             status != 'cancel' &&
-            status != 'cancelled') {
+            status != 'cancelled' &&
+            status != 'issue_reported') {
           count++;
         }
       }
@@ -130,7 +132,6 @@ class _HomeMemberState extends State<HomeMember> {
     }
   }
 
-  // 🎯 ดึงและคำนวณคะแนนรีวิวเฉลี่ยของร้านค้าตาม logic เดียวกับ ReviewRestaurant
   Future<void> _fetchRatingForRestaurant(String username) async {
     try {
       final rawOrders = await _orderService.getReviewSuccessOrdersByRestaurant(
@@ -189,7 +190,6 @@ class _HomeMemberState extends State<HomeMember> {
           .toList();
     }
 
-    // โหลดเมนูและคะแนนรีวิวของแต่ละร้านพร้อมกัน
     await Future.wait(
       data.map((rest) async {
         if (rest.username != null) {
@@ -533,22 +533,31 @@ class _HomeMemberState extends State<HomeMember> {
           ),
 
           Padding(
-            padding: const EdgeInsets.only(left: 16.0, bottom: 8.0, top: 4.0),
+            padding: const EdgeInsets.only(left: 26.0, bottom: 6.0, top: 4.0),
             child: Text(
               "ประเภทร้านค้า",
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey.shade800,
               ),
             ),
           ),
+
+          // ─── 🎯 ล็อก 2 แถว กว้างพอดีหน้าจอ ไม่ล้น และลดขนาดลง ───
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: List.generate(typeList.length + 1, (index) {
+            padding: const EdgeInsets.symmetric(horizontal: 14.0),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                childAspectRatio: 3,
+              ),
+              itemCount: (typeList.length + 1).clamp(0, 8),
+              itemBuilder: (context, index) {
                 final bool isAllTab = index == 0;
                 final int? typeId = isAllTab ? null : typeList[index - 1].id;
                 final String? typeName = isAllTab
@@ -563,33 +572,35 @@ class _HomeMemberState extends State<HomeMember> {
                   showCheckmark: false,
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 0,
-                  ),
+                  padding: EdgeInsets.zero,
                   avatar: Icon(
                     isAllTab
                         ? Icons.all_inclusive_rounded
                         : Icons.local_dining_rounded,
-                    size: 15,
+                    size: 13,
                     color: isSelected ? Colors.black : const Color(0xFF00B300),
                   ),
-                  label: Text(isAllTab ? "ทั้งหมด" : typeName ?? ""),
+                  label: Text(
+                    isAllTab ? "ทั้งหมด" : (typeName ?? ""),
+                    style: TextStyle(
+                      color: isSelected ? Colors.black : Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   selected: isSelected,
                   selectedColor: const Color(0xFFFFE600),
                   backgroundColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.black : Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   side: BorderSide(
                     color: isSelected
                         ? Colors.transparent
                         : const Color(0xFF00B300).withOpacity(0.3),
+                    width: 0.8,
                   ),
                   onSelected: (bool selected) {
                     setState(() {
@@ -604,7 +615,7 @@ class _HomeMemberState extends State<HomeMember> {
                     _loadResults(searchController.text);
                   },
                 );
-              }),
+              },
             ),
           ),
 
@@ -615,11 +626,11 @@ class _HomeMemberState extends State<HomeMember> {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
               child: Text(
                 searchController.text.trim().isEmpty && _selectedTypeIds.isEmpty
-                    ? "🏪 ร้านอาหารพร้อมเสิร์ฟทั้งหมด (${_results.length} ร้าน)"
+                    ? "ร้านค้าทั้งหมด (${_results.length} ร้าน)"
                     : "🔍 พบร้านค้าเด็ดตรงตามเงื่อนไข ${_results.length} ร้าน",
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
-                  color: Colors.black54,
+                  color: Colors.black,
                   fontSize: 13,
                 ),
               ),
@@ -804,10 +815,11 @@ class _HomeMemberState extends State<HomeMember> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
+          // สีการ์ดร้านค้า
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            spreadRadius: 0,
+            color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.5),
+            blurRadius: 6,
+            spreadRadius: 2,
             offset: const Offset(0, 6),
           ),
         ],
@@ -878,7 +890,6 @@ class _HomeMemberState extends State<HomeMember> {
                   ),
                 ),
 
-                // ── ป้ายประเภทอาหาร (มุมซ้ายบนของรูป) ──
                 if (item.typerestaurantName != null &&
                     item.typerestaurantName!.isNotEmpty)
                   Positioned(
@@ -890,7 +901,12 @@ class _HomeMemberState extends State<HomeMember> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65),
+                        color: const Color.fromARGB(
+                          255,
+                          0,
+                          0,
+                          0,
+                        ).withOpacity(0.65),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -915,7 +931,6 @@ class _HomeMemberState extends State<HomeMember> {
                     ),
                   ),
 
-                // ── 🎯 ป้ายคะแนนรีวิวเฉลี่ย (มุมขวาบนของรูปภาพจุดเดียว) ──
                 Positioned(
                   top: 12,
                   right: 12,

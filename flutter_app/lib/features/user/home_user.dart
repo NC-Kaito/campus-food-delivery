@@ -375,22 +375,30 @@ class _HomeUserState extends State<HomeUser> {
           ),
 
           Padding(
-            padding: const EdgeInsets.only(left: 16.0, bottom: 8.0, top: 4.0),
+            padding: const EdgeInsets.only(left: 26.0, bottom: 2.0, top: 4.0),
             child: Text(
               "ประเภทร้านค้า",
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: Colors.grey.shade800,
               ),
             ),
           ),
+
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: List.generate(typeList.length + 1, (index) {
+            padding: const EdgeInsets.symmetric(horizontal: 14.0),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                childAspectRatio: 3,
+              ),
+              itemCount: (typeList.length + 1).clamp(0, 8),
+              itemBuilder: (context, index) {
                 final bool isAllTab = index == 0;
                 final int? typeId = isAllTab ? null : typeList[index - 1].id;
                 final String? typeName = isAllTab
@@ -405,33 +413,35 @@ class _HomeUserState extends State<HomeUser> {
                   showCheckmark: false,
                   visualDensity: VisualDensity.compact,
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 0,
-                  ),
+                  padding: EdgeInsets.zero,
                   avatar: Icon(
                     isAllTab
                         ? Icons.all_inclusive_rounded
                         : Icons.local_dining_rounded,
-                    size: 15,
-                    color: isSelected ? Colors.white : const Color(0xFF00B300),
+                    size: 13,
+                    color: isSelected ? Colors.black : const Color(0xFF00B300),
                   ),
-                  label: Text(isAllTab ? "ทั้งหมด" : typeName ?? ""),
+                  label: Text(
+                    isAllTab ? "ทั้งหมด" : (typeName ?? ""),
+                    style: TextStyle(
+                      color: isSelected ? Colors.black : Colors.black87,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   selected: isSelected,
-                  selectedColor: const Color(0xFF00B300),
+                  selectedColor: const Color(0xFFFFE600),
                   backgroundColor: Colors.white,
-                  labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : Colors.black87,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   side: BorderSide(
                     color: isSelected
                         ? Colors.transparent
                         : const Color(0xFF00B300).withOpacity(0.3),
+                    width: 0.8,
                   ),
                   onSelected: (bool selected) {
                     setState(() {
@@ -446,7 +456,7 @@ class _HomeUserState extends State<HomeUser> {
                     _loadResults(searchController.text);
                   },
                 );
-              }),
+              },
             ),
           ),
           const SizedBox(height: 10),
@@ -594,9 +604,9 @@ class _HomeUserState extends State<HomeUser> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            spreadRadius: 0,
+            color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.5),
+            blurRadius: 6,
+            spreadRadius: 2,
             offset: const Offset(0, 6),
           ),
         ],

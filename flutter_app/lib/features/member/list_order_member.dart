@@ -45,13 +45,12 @@ class _ListOrderMemberState extends State<ListOrderMember> {
 
     final String baseUrl = DioClient.dio.options.baseUrl;
     if (rawPath.startsWith('/')) {
-      return "$baseUrl$rawPath";
+      return baseUrl + rawPath;
     } else {
-      return "$baseUrl/$rawPath";
+      return baseUrl + "/" + rawPath;
     }
   }
 
-  // 🎯 ฟังก์ชันดึงจำนวน "คำสั่งซื้อที่กำลังดำเนินการ"
   Future<void> _fetchActiveOrderCount() async {
     try {
       String username = GlobalData.usernameMember.trim();
@@ -61,12 +60,14 @@ class _ListOrderMemberState extends State<ListOrderMember> {
 
       int count = 0;
       for (var order in history) {
-        final status = (order.orderStatus ?? '').toLowerCase();
-        // คัดกรองเฉพาะออเดอร์ที่ยังไม่เสร็จสิ้น หรือ ยังไม่ถูกยกเลิก
+        final status = (order.orderStatus ?? '').toLowerCase().trim();
+        // 🎯 กรองสถานะให้ตรงกับ ListActiveOrderMember (ตัด success, completed, reviewsuccess, cancel, cancelled, issue_reported)
         if (status != 'success' &&
             status != 'completed' &&
+            status != 'reviewsuccess' &&
             status != 'cancel' &&
-            status != 'cancelled') {
+            status != 'cancelled' &&
+            status != 'issue_reported') {
           count++;
         }
       }
@@ -77,7 +78,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
         });
       }
     } catch (e) {
-      debugPrint("เกิดข้อผิดพลาดในการโหลดจำนวนออเดอร์หน้าตะกร้า: $e");
+      debugPrint("เกิดข้อผิดพลาดในการโหลดจำนวนออเดอร์: " + e.toString());
     }
   }
 
@@ -198,7 +199,10 @@ class _ListOrderMemberState extends State<ListOrderMember> {
             Stack(
               clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: isActive ? Color(0xFF00B300) : Colors.grey),
+                Icon(
+                  icon,
+                  color: isActive ? const Color(0xFF00B300) : Colors.grey,
+                ),
                 if (badgeCount > 0)
                   Positioned(
                     right: -6,
@@ -218,7 +222,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
                       child: Text(
-                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        badgeCount > 99 ? '99+' : badgeCount.toString(),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
@@ -234,7 +238,7 @@ class _ListOrderMemberState extends State<ListOrderMember> {
             Text(
               label,
               style: menuTextStyle.copyWith(
-                color: isActive ? Color(0xFF00B300) : Colors.grey,
+                color: isActive ? const Color(0xFF00B300) : Colors.grey,
               ),
             ),
           ],
@@ -261,123 +265,137 @@ class _ListOrderMemberState extends State<ListOrderMember> {
     return Container(
       margin: const EdgeInsets.only(bottom: 20.0),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8FCD0), // สีพื้นหลังการ์ด
+        // 🎯 1. นำ color ออกจาก BoxDecoration เพื่อไม่ให้สีบังเอฟเฟคคลื่นน้ำ
         borderRadius: BorderRadius.circular(16.0),
         boxShadow: [
+          // สีการ์ดออเดอร์
           BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
-            spreadRadius: 1,
+            color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.5),
+            spreadRadius: 2,
             blurRadius: 6,
-            offset: const Offset(0, 3),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: InkWell(
+      // 🎯 2. ใช้ Material ครอบแทน เพื่อกำหนดสีพื้นหลังและแสดง Splash Effect
+      child: Material(
+        color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(16.0),
-        onTap: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ViewOrderMember(
-                storeUsername: storeUsername,
-                storeName: storeName,
-                storeItems: storeItems,
-              ),
-            ),
-          );
+        clipBehavior: Clip.antiAlias, // ลบมุมแหลมไม่ให้โผล่พ้นกรอบ
+        child: InkWell(
+          splashColor: Colors.green.withOpacity(0.15),
+          highlightColor: Colors.green.withOpacity(0.05),
+          onTap: () async {
+            // 🎯 3. หน่วงเวลา 600 มิลลิวินาที ให้เอฟเฟคแสดงเสร็จก่อนเปลี่ยนหน้า
+            await Future.delayed(const Duration(milliseconds: 600));
 
-          setState(() {
-            _groupedCart = CartManager().getGroupedByStore();
-          });
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              // 1. รูปภาพร้านค้า
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12.0),
-                child: finalImageUrl.isNotEmpty
-                    ? Image.network(
-                        Uri.encodeFull(finalImageUrl),
-                        width: 75,
-                        height: 75,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            _buildPlaceholderIcon(),
-                      )
-                    : _buildPlaceholderIcon(),
-              ),
-              const SizedBox(width: 16),
+            // ป้องกันแอปพังถ้าปิดหน้าจอก่อนเวลาหมด
+            if (!mounted) return;
 
-              // 2. ข้อมูลชื่อร้านและจำนวนรายการ
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      storeName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ViewOrderMember(
+                  storeUsername: storeUsername,
+                  storeName: storeName,
+                  storeItems: storeItems,
+                ),
+              ),
+            );
+
+            setState(() {
+              _groupedCart = CartManager().getGroupedByStore();
+            });
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                // 1. รูปภาพร้านค้า
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12.0),
+                  child: finalImageUrl.isNotEmpty
+                      ? Image.network(
+                          Uri.encodeFull(finalImageUrl),
+                          width: 75,
+                          height: 75,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _buildPlaceholderIcon(),
+                        )
+                      : _buildPlaceholderIcon(),
+                ),
+                const SizedBox(width: 16),
+
+                // 2. ข้อมูลชื่อร้านและจำนวนรายการ
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        storeName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      "จำนวน $totalItemsInStore รายการ",
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[700],
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 6),
+                      Text(
+                        "จำนวน " + totalItemsInStore.toString() + " รายการ",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[700],
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 8),
+                const SizedBox(width: 8),
 
-              // 🌟 3. ปุ่ม/ไอคอน นำทางบอกให้รู้ว่ากดสั่งอาหารได้
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade600,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      "สั่งอาหาร",
-                      style: TextStyle(
+                // 🌟 3. ปุ่ม/ไอคอน นำทางบอกให้รู้ว่ากดสั่งอาหารได้
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade600,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.3),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        "สั่งอาหาร",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
                         color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        size: 14,
                       ),
-                    ),
-                    SizedBox(width: 4),
-                    Icon(
-                      Icons.arrow_forward_ios_rounded,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

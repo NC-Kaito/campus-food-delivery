@@ -37,9 +37,6 @@ public class Menuaddongroup {
     @Column
     private boolean status;
 
-    @Column
-    private Boolean isglobal;
-
 
     @ManyToMany(mappedBy = "menuAddonGroups")
     @JsonIgnore

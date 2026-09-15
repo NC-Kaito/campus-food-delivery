@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
-import 'package:flutter_app/features/member/login_member.dart';
+// import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
+import 'package:flutter_app/main_login.dart';
 
 class ListMenuUser extends StatefulWidget {
   final RestaurantModel restaurantModel;
@@ -137,7 +139,7 @@ class _ListMenuUserState extends State<ListMenuUser>
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
                   context,
-                  MaterialPageRoute(builder: (context) => const LoginMember()),
+                  MaterialPageRoute(builder: (context) => const MainLogin()),
                   (route) => false,
                 );
               },
@@ -199,9 +201,11 @@ class _ListMenuUserState extends State<ListMenuUser>
     );
   }
 
+  // 🎨 UI ถูกปรับให้มีโครงสร้างและสไตล์เดียวกับหน้า Member
+  // โดยคงพฤติกรรมของ User เดิม: การกดเพิ่มเมนู/เพิ่มลงตะกร้าจะเรียก Login Warning
   @override
   Widget build(BuildContext context) {
-    final bool shouldScroll = _typeMenus.length > 3;
+    final bool isRestaurantOpen = widget.restaurantModel.statusOpen ?? true;
 
     if (_isLoading || _tabController == null) {
       return const Scaffold(
@@ -214,18 +218,16 @@ class _ListMenuUserState extends State<ListMenuUser>
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
-        leading: CircleAvatar(
-          backgroundColor: Colors.black38,
-          child: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              color: Colors.white,
-              size: 20,
-            ),
-            onPressed: () => Navigator.pop(context),
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF4CAF50),
+            size: 24,
           ),
+          onPressed: () => Navigator.pop(context),
         ),
       ),
       body: Column(
@@ -249,23 +251,18 @@ class _ListMenuUserState extends State<ListMenuUser>
                                   ? Image.network(
                                       Uri.encodeFull(restaurantimage!),
                                       fit: BoxFit.cover,
-                                      errorBuilder:
-                                          (
-                                            context,
-                                            error,
-                                            stackTrace,
-                                          ) => Image.asset(
-                                            'assets/images/default_restaurant.png',
-                                            fit: BoxFit.cover,
-                                          ),
+                                      errorBuilder: (_, __, ___) => Image.asset(
+                                        'assets/images/default_restaurant.png',
+                                        fit: BoxFit.cover,
+                                      ),
                                     )
                                   : Container(
-                                      color: const Color(0xFFD92D2D),
+                                      color: const Color(0xFFF2F2F2),
                                       child: const Center(
                                         child: Icon(
                                           Icons.image_outlined,
                                           size: 80,
-                                          color: Colors.white,
+                                          color: Colors.grey,
                                         ),
                                       ),
                                     ),
@@ -275,7 +272,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                               left: 0,
                               right: 0,
                               child: Container(
-                                height: 30,
+                                height: 35,
                                 decoration: const BoxDecoration(
                                   color: Colors.white,
                                   borderRadius: BorderRadius.only(
@@ -290,72 +287,203 @@ class _ListMenuUserState extends State<ListMenuUser>
                         Container(
                           width: double.infinity,
                           color: Colors.white,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                                child: Text(
-                                  restaurantname ?? "-",
-                                  style: const TextStyle(
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              Container(
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFFFFFFC8),
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: Color(0xFFE0E0E0),
-                                      width: 1,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(24, 12, 24, 10),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        restaurantname ?? '-',
+                                        style: const TextStyle(
+                                          fontSize: 22,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: isRestaurantOpen
+                                            ? Colors.green.shade100
+                                            : Colors.red.shade100,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 8,
+                                            height: 8,
+                                            decoration: BoxDecoration(
+                                              color: isRestaurantOpen
+                                                  ? Colors.green.shade700
+                                                  : Colors.red.shade700,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            isRestaurantOpen
+                                                ? 'เปิดอยู่'
+                                                : 'ปิดชั่วคราว',
+                                            style: TextStyle(
+                                              color: isRestaurantOpen
+                                                  ? Colors.green.shade700
+                                                  : Colors.red.shade700,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                child: TabBar(
-                                  controller: _tabController!,
-                                  isScrollable: shouldScroll,
-                                  tabAlignment: shouldScroll
-                                      ? TabAlignment.start
-                                      : TabAlignment.fill,
-                                  labelColor: Colors.black,
-                                  unselectedLabelColor: Colors.black54,
-                                  indicatorColor: Colors.black,
-                                  indicatorWeight: 3,
-                                  indicatorSize: TabBarIndicatorSize.tab,
-                                  dividerColor: Colors.transparent,
-                                  labelStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
+                                const SizedBox(height: 14),
+                                if ((widget.restaurantModel.openingHours ?? [])
+                                    .isNotEmpty)
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.calendar_today_outlined,
+                                        size: 18,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          _getGroupedOpeningHoursText(
+                                            widget.restaurantModel.openingHours,
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.grey.shade700,
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  unselectedLabelStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  labelPadding: shouldScroll
-                                      ? const EdgeInsets.symmetric(
-                                          horizontal: 16,
-                                        )
-                                      : EdgeInsets.zero,
-                                  tabs: _typeMenus.isEmpty
-                                      ? [const Tab(text: "ไม่มีประเภท")]
-                                      : _typeMenus
-                                            .map(
-                                              (type) =>
-                                                  Tab(text: type.typemenuName),
-                                            )
-                                            .toList(),
+                                if ((widget.restaurantModel.openingHours ?? [])
+                                    .isNotEmpty)
+                                  const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.phone_in_talk_outlined,
+                                      size: 18,
+                                      color: Colors.orange.shade700,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      widget.restaurantModel.phone ?? '-',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.grey.shade800,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _StickyTabBarDelegate(
+                      height: 50.0,
+                      child: Container(
+                        color: Colors.white,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(
+                                      top: 6,
+                                      bottom: 6,
+                                      right: 8,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF4CAF50),
+                                      borderRadius: BorderRadius.only(
+                                        topRight: Radius.circular(12),
+                                        bottomRight: Radius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'รายการอาหาร',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: TabBar(
+                                      controller: _tabController!,
+                                      isScrollable: true,
+                                      tabAlignment: TabAlignment.start,
+                                      labelColor: Colors.orange.shade700,
+                                      unselectedLabelColor:
+                                          Colors.grey.shade500,
+                                      indicatorColor: Colors.orange.shade700,
+                                      indicatorWeight: 3,
+                                      indicatorSize: TabBarIndicatorSize.tab,
+                                      dividerColor: Colors.transparent,
+                                      labelPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                      ),
+                                      labelStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      unselectedLabelStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      tabs: _typeMenus.isEmpty
+                                          ? [const Tab(text: 'ไม่มีประเภท')]
+                                          : _typeMenus
+                                                .map(
+                                                  (type) => Tab(
+                                                    text: type.typemenuName,
+                                                  ),
+                                                )
+                                                .toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(height: 1, color: Colors.grey.shade200),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                 ];
@@ -363,21 +491,20 @@ class _ListMenuUserState extends State<ListMenuUser>
               body: TabBarView(
                 controller: _tabController!,
                 children: _typeMenus.isEmpty
-                    ? [const Center(child: Text("ไม่มีข้อมูลเมนู"))]
+                    ? [const Center(child: Text('ไม่มีข้อมูลเมนู'))]
                     : _typeMenus.map((type) {
                         final typeId = type.typemenuId!;
                         final currentMenus = _categoryMenus[typeId] ?? [];
 
-                        // 🎯 เช็กเงื่อนไข: หากชื่อแท็บหมวดหมู่มีคำว่า "ข้าวราดแกง" ให้เปิดใช้โครงสร้างแบบร้านข้าวแกงทันที
                         if (type.typemenuName != null &&
-                            type.typemenuName!.contains("ข้าวราดแกง")) {
+                            type.typemenuName!.contains('ข้าวราดแกง')) {
                           return _buildCurrySpecialLayout(currentMenus);
                         }
 
                         if (currentMenus.isEmpty) {
                           return const Center(
                             child: Text(
-                              "ไม่มีเมนูพร้อมจำหน่ายในหมวดหมู่นี้",
+                              'ไม่มีเมนูพร้อมจำหน่ายในหมวดหมู่นี้',
                               style: TextStyle(
                                 fontSize: 15,
                                 color: Colors.grey,
@@ -386,7 +513,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                           );
                         }
 
-                        // 🍜 โหมดวาดข้อมูลแท็บแบบรายการอาหารปกติทั่วไป
                         return ListView.builder(
                           itemCount: currentMenus.length,
                           padding: const EdgeInsets.symmetric(
@@ -400,16 +526,47 @@ class _ListMenuUserState extends State<ListMenuUser>
                             final finalMenuUrl = _getFinalImageUrl(
                               rawMenuImage,
                             );
-
                             final isAvailable = menu.status ?? true;
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12),
                               decoration: BoxDecoration(
                                 color: isAvailable
-                                    ? const Color(0xFFF0F4E8)
+                                    ? Colors.white
                                     : Colors.grey.shade200,
                                 borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: isAvailable
+                                      ? const Color.fromARGB(
+                                          255,
+                                          17,
+                                          156,
+                                          70,
+                                        ).withOpacity(0.28)
+                                      : Colors.grey.shade300,
+                                  width: 1,
+                                ),
+                                boxShadow: isAvailable
+                                    ? [
+                                        BoxShadow(
+                                          color: const Color.fromARGB(
+                                            255,
+                                            0,
+                                            0,
+                                            0,
+                                          ).withOpacity(0.5),
+                                          spreadRadius: 1,
+                                          blurRadius: 0,
+                                          offset: const Offset(0, 1),
+                                        ),
+                                      ]
+                                    : [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.04),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(12),
@@ -454,7 +611,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                                                           ),
                                                     ),
                                                     child: const Text(
-                                                      "หมด",
+                                                      'หมด',
                                                       style: TextStyle(
                                                         color: Colors.white,
                                                         fontSize: 16,
@@ -465,18 +622,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                                                   ),
                                                 ),
                                               ),
-                                            IgnorePointer(
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
-                                                  border: Border.all(
-                                                    color: Colors.grey,
-                                                    width: 1,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
                                           ],
                                         ),
                                       ),
@@ -488,7 +633,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            menu.menuName ?? "ไม่มีชื่อเมนู",
+                                            menu.menuName ?? 'ไม่มีชื่อเมนู',
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
                                               fontSize: 16,
@@ -499,7 +644,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                                           ),
                                           const SizedBox(height: 8),
                                           Text(
-                                            "ราคา ${menu.price?.toStringAsFixed(0) ?? '0'} บาท",
+                                            'ราคา ${menu.price?.toStringAsFixed(0) ?? '0'} บาท',
                                             style: TextStyle(
                                               color: isAvailable
                                                   ? Colors.green
@@ -538,21 +683,18 @@ class _ListMenuUserState extends State<ListMenuUser>
     );
   }
 
-  // ─── 🍲 LAYOUT พิเศษ: แท็บข้าวราดแกง คำนวณราคา 1 อย่าง 20 | 2 อย่าง 25 | 3 อย่าง 30 ───
-  // ─── 🍲 LAYOUT พิเศษ: แท็บข้าวราดแกง เวอร์ชันดีไซน์สวยงามระดับพรีเมียม ───
   Widget _buildCurrySpecialLayout(List<MenuModel> curryItems) {
     if (curryItems.isEmpty) {
       return const Center(
         child: Text(
-          "ไม่มีเมนูกับข้าวพร้อมจำหน่ายในขณะนี้",
+          'ไม่มีเมนูกับข้าวพร้อมจำหน่ายในขณะนี้',
           style: TextStyle(color: Colors.grey, fontSize: 15),
         ),
       );
     }
 
+    // ===== คง Logic เดิมทั้งหมด =====
     final int selectCount = _selectedCurries.length;
-
-    // ตอนเริ่มต้นไม่มีการจิ้มกับข้าว ให้ตั้งราคารวมฐานเป็น 0 บาทก่อน
     double basePrice = 0;
     if (selectCount == 1) {
       basePrice = 25;
@@ -562,15 +704,11 @@ class _ListMenuUserState extends State<ListMenuUser>
       basePrice = 35;
     }
 
-    // คำนวณราคาส่วนต่างบวกเพิ่มสะสมของเมนูไข่
     final double totalSurchargePrice = _selectedCurries.fold(
       0.0,
       (sum, curry) => sum + (curry.price ?? 0.0),
     );
-
-    // ตัวเลือกเสริมจะคิดเงินต่อเมื่อมีการเลือกกับข้าวหลักแล้วเท่านั้น ป้องกันราคาบัคกรณีจานเปล่า
     final double optionPrice = (selectCount > 0 && _isExtraRice) ? 5.0 : 0.0;
-
     final double unitPrice = basePrice + totalSurchargePrice + optionPrice;
     final double totalPrice = unitPrice * _curryQty;
 
@@ -591,7 +729,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                     ),
                     SizedBox(width: 8),
                     Text(
-                      "เลือกกับข้าวที่ต้องการราดหน้า",
+                      'เลือกกับข้าวที่ต้องการราดหน้า',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -600,9 +738,10 @@ class _ListMenuUserState extends State<ListMenuUser>
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
                 ListView.builder(
                   shrinkWrap: true,
-                  padding: const EdgeInsets.only(top: 8),
+                  padding: EdgeInsets.zero,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: curryItems.length,
                   itemBuilder: (context, index) {
@@ -614,7 +753,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                     final imgUrl = _getFinalImageUrl(
                       curry.menuImage ?? (curry as dynamic).imageUrl,
                     );
-
                     final double storedPrice = curry.price ?? 0.0;
                     final bool isSpecialItem = storedPrice > 0.0;
                     final double displayItemPrice = storedPrice + 5.0;
@@ -623,9 +761,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                       duration: const Duration(milliseconds: 200),
                       margin: const EdgeInsets.only(bottom: 10),
                       decoration: BoxDecoration(
-                        color: !isAvailable
-                            ? Colors.grey.shade50
-                            : Colors.white,
+                        color: isAvailable ? Colors.white : Colors.grey.shade50,
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: isSelected
@@ -673,7 +809,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                                     color: Colors.black.withOpacity(0.4),
                                     child: const Center(
                                       child: Text(
-                                        "หมด",
+                                        'หมด',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
@@ -687,7 +823,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                           ),
                         ),
                         title: Text(
-                          curry.menuName ?? "ไม่มีชื่อกับข้าว",
+                          curry.menuName ?? 'ไม่มีชื่อกับข้าว',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 15,
@@ -698,8 +834,8 @@ class _ListMenuUserState extends State<ListMenuUser>
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             isSpecialItem
-                                ? "เมนูพิเศษ +${displayItemPrice.toStringAsFixed(0)} บาท"
-                                : "รวมในราคาฐานแล้ว",
+                                ? 'เมนูพิเศษ +${displayItemPrice.toStringAsFixed(0)} บาท'
+                                : 'รวมในราคาฐานแล้ว',
                             style: TextStyle(
                               color: isSpecialItem
                                   ? Colors.orange.shade800
@@ -738,17 +874,11 @@ class _ListMenuUserState extends State<ListMenuUser>
             ),
           ),
         ),
-
-        // ═══════════════════════════════════════════════
-        // 🎯 Bottom bar
-        // ═══════════════════════════════════════════════
         Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           decoration: BoxDecoration(
             color: Colors.white,
-            border: Border(
-              top: BorderSide(color: Colors.grey.shade200, width: 1),
-            ),
+            border: Border(top: BorderSide(color: Colors.grey.shade200)),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.06),
@@ -773,11 +903,11 @@ class _ListMenuUserState extends State<ListMenuUser>
                     borderRadius: BorderRadius.circular(4),
                   ),
                   title: const Text(
-                    "เพิ่มปริมาณข้าวสวย",
+                    'เพิ่มปริมาณข้าวสวย',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                   ),
                   subtitle: const Text(
-                    "+5 บาท",
+                    '+5 บาท',
                     style: TextStyle(fontSize: 12),
                   ),
                   value: _isExtraRice,
@@ -793,7 +923,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        "จำนวนที่สั่ง",
+                        'จำนวนที่สั่ง',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -824,7 +954,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                             SizedBox(
                               width: 28,
                               child: Text(
-                                "$_curryQty",
+                                '$_curryQty',
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(
                                   fontSize: 18,
@@ -837,7 +967,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                               icon: const Icon(
                                 Icons.add_circle_outline,
                                 size: 24,
-                                color: Colors.black87,
+                                color: Color(0xFF4CAF50),
                               ),
                               onPressed: () => setState(() => _curryQty++),
                             ),
@@ -851,7 +981,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        "จำนวน $_curryQty จาน",
+                        'จำนวน $_curryQty จาน',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -863,7 +993,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                         text: TextSpan(
                           children: [
                             const TextSpan(
-                              text: "ราคารวม  ",
+                              text: 'ราคารวม  ',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
@@ -871,7 +1001,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                               ),
                             ),
                             TextSpan(
-                              text: "฿${totalPrice.toStringAsFixed(0)}",
+                              text: '฿${totalPrice.toStringAsFixed(0)}',
                               style: const TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -886,8 +1016,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                 ],
               ),
               const SizedBox(height: 16),
-
-              // ── ปุ่ม — สำหรับ User ยังไม่ login ให้เด้งเตือนแทนการเพิ่มลงตะกร้า ──
               SizedBox(
                 width: double.infinity,
                 height: 50,
@@ -903,11 +1031,9 @@ class _ListMenuUserState extends State<ListMenuUser>
                   ),
                   onPressed: _selectedCurries.isEmpty
                       ? null
-                      : () {
-                          _showLoginWarningDialog(); // 🎯 User ยังไม่ login ให้เตือนแทนการเพิ่มลงตะกร้าจริง
-                        },
+                      : _showLoginWarningDialog,
                   child: const Text(
-                    "เพิ่มลงตะกร้า",
+                    'เพิ่มลงตะกร้า',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -919,10 +1045,84 @@ class _ListMenuUserState extends State<ListMenuUser>
     );
   }
 
+  String _formatTime(TimeOfDay t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
+    if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
+      return 'ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ';
+    }
+
+    const shortDayNames = {
+      RestaurantDayOfWeek.monday: 'จ.',
+      RestaurantDayOfWeek.tuesday: 'อ.',
+      RestaurantDayOfWeek.wednesday: 'พ.',
+      RestaurantDayOfWeek.thursday: 'พฤ.',
+      RestaurantDayOfWeek.friday: 'ศ.',
+      RestaurantDayOfWeek.saturday: 'ส.',
+      RestaurantDayOfWeek.sunday: 'อา.',
+    };
+
+    final Map<String, List<String>> timeGroups = {};
+
+    for (final day in RestaurantDayOfWeek.values) {
+      final hour = hours.firstWhere(
+        (h) => h.dayOfWeek == day,
+        orElse: () => RestaurantOpeningHourModel(
+          dayOfWeek: day,
+          opentime: const TimeOfDay(hour: 0, minute: 0),
+          closetime: const TimeOfDay(hour: 0, minute: 0),
+          open: false,
+        ),
+      );
+
+      if (hour.open) {
+        final timeString =
+            '${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.';
+        timeGroups.putIfAbsent(timeString, () => []).add(shortDayNames[day]!);
+      }
+    }
+
+    if (timeGroups.isEmpty) return 'ปิดทำการทุกวัน';
+
+    final resultLines = <String>[];
+    timeGroups.forEach((time, days) {
+      resultLines.add('${days.join(', ')} ($time)');
+    });
+    return resultLines.join(' | ');
+  }
+
   Widget _buildPlaceholderIcon() {
     return Container(
       color: Colors.grey[200],
       child: const Icon(Icons.fastfood, color: Colors.grey, size: 36),
     );
+  }
+}
+
+class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _StickyTabBarDelegate({required this.child, required this.height});
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox(height: height, child: child);
+  }
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return true;
   }
 }

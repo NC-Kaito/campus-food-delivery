@@ -4,11 +4,12 @@ import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/models/order_detail_addon_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/models/order_model.dart';
+import 'package:flutter_app/data/services/in_app_notification_service.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/data/services/order_status_monitor.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/edit_order_member.dart';
-import 'package:flutter_app/features/member/edit_location_member.dart'; // 🎯 เปลี่ยนไปเรียกหน้า EditLocationMember
 import 'package:flutter_app/features/member/edit_curry_order_member.dart';
 import 'package:flutter_app/features/member/location_order_member.dart';
 import 'package:flutter_app/global_data.dart';
@@ -19,7 +20,6 @@ class ViewOrderMember extends StatefulWidget {
   final String storeName;
   final String storeUsername;
   final List<CartItem> storeItems;
-
   final bool isFromAddOrder;
 
   const ViewOrderMember({
@@ -59,14 +59,11 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-    if (rawPath.startsWith('/')) {
-      return "$baseUrl$rawPath";
-    } else {
-      return "$baseUrl/$rawPath";
-    }
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
-  // 🎯 ดึงตำแหน่งและรายละเอียดเริ่มต้นที่เคยบันทึกไว้ใน DB มาแสดงผล
   Future<void> _loadCurrentMemberProfile() async {
     try {
       String username = GlobalData.usernameMember;
@@ -75,14 +72,13 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
       if (mounted) {
         setState(() {
           _loggedInMemberName =
-              "${mModel.firstname ?? ''} ${mModel.lastname ?? ''}".trim();
+              ((mModel.firstname ?? '') + " " + (mModel.lastname ?? '')).trim();
 
           if (_loggedInMemberName.isEmpty) {
             _loggedInMemberName = mModel.username ?? "ไม่ระบุชื่อ";
           }
           _loggedInMemberPhone = mModel.phone ?? "ไม่ระบุเบอร์โทร";
 
-          // 🎯 ดึงตำแหน่งพิกัดและข้อความสถานที่จัดส่งเริ่มต้น
           if (mModel.latitude != null && mModel.longitude != null) {
             _selectedUserLocation = LatLng(mModel.latitude!, mModel.longitude!);
           }
@@ -92,7 +88,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
           }
         });
 
-        // เลื่อนมุมกล้องไปที่ตำแหน่งเริ่มต้น
         if (_selectedUserLocation != null && _miniMapController != null) {
           _miniMapController!.animateCamera(
             CameraUpdate.newLatLngZoom(_selectedUserLocation!, 16.0),
@@ -100,7 +95,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
         }
       }
     } catch (e) {
-      debugPrint("Error loading member profile: $e");
+      debugPrint("Error loading member profile: " + e.toString());
       if (mounted) {
         setState(() {
           _loggedInMemberName = "ไม่สามารถดึงข้อมูลได้";
@@ -121,8 +116,12 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     return Container(
       width: 70,
       height: 70,
-      color: Colors.orange.shade50,
-      child: const Icon(Icons.fastfood_rounded, color: Colors.orange, size: 30),
+      color: const Color(0xFFF3F8F4),
+      child: const Icon(
+        Icons.fastfood_rounded,
+        color: Color.fromARGB(255, 217, 131, 11),
+        size: 30,
+      ),
     );
   }
 
@@ -130,7 +129,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     final bool isCurryDish = item.selectedCurries.isNotEmpty;
 
     String displayMenuName = isCurryDish
-        ? "ข้าวราดแกง (${item.selectedCurries.length} อย่าง)"
+        ? "ข้าวราดแกง (" + item.selectedCurries.length.toString() + " อย่าง)"
         : (item.menu.menuName ?? "ไม่มีชื่อเมนู");
 
     if (item.isExtraPrice) {
@@ -175,14 +174,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             canIncreaseQty = (menu.maxQuantity as num) > 1;
           } else if (menu.maxQty != null) {
             canIncreaseQty = (menu.maxQty as num) > 1;
-          } else if (menu.addonType != null) {
-            final typeStr = menu.addonType.toString().toLowerCase();
-            canIncreaseQty =
-                !typeStr.contains('radio') && !typeStr.contains('single');
-          } else if (menu.type != null) {
-            final typeStr = menu.type.toString().toLowerCase();
-            canIncreaseQty =
-                !typeStr.contains('radio') && !typeStr.contains('single');
           }
         }
 
@@ -210,6 +201,12 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
 
     final bool hasAddons =
         groupedAddons.isNotEmpty || item.selectedCurries.isNotEmpty;
+
+    // 🎯 กรองข้อความ "ราดแกง: [...]" ออกจากหมายเหตุ ไม่ให้แสดงซ้ำ
+    String cleanNote = item.note.trim();
+    cleanNote = cleanNote
+        .replaceAll(RegExp(r'ราดแกง:\s*\[.*?\]\s*'), '')
+        .trim();
 
     return InkWell(
       onTap: () async {
@@ -255,8 +252,16 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F5F5),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.5),
+              spreadRadius: 2,
+              blurRadius: 6,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -298,11 +303,11 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          "$itemTotalPrice บาท",
+                          itemTotalPrice.toString() + " บาท",
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                            color: Color(0xFF00B300),
                           ),
                         ),
                       ],
@@ -312,12 +317,13 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     const SizedBox(height: 8),
 
                     if (hasAddons) ...[
-                      const Text(
-                        "รายการเพิ่มเติม",
-                        style: TextStyle(
+                      // 🎯 ถ้าเป็นข้าวราดแกง เปลี่ยนชื่อหัวข้อเป็น "รายการ"
+                      Text(
+                        isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF007AFF),
+                          color: Color(0xFF333333),
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -343,10 +349,9 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                         vertical: 2,
                                       ),
                                       child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Expanded(
+                                          Flexible(
                                             child: Text(
                                               curry.menuName ?? "แกง",
                                               style: const TextStyle(
@@ -356,12 +361,18 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                               ),
                                             ),
                                           ),
+                                          const SizedBox(width: 8),
                                           const Text(
                                             "1 จำนวน",
                                             style: TextStyle(
-                                              fontSize: 13,
+                                              fontSize: 12,
                                               fontWeight: FontWeight.bold,
-                                              color: Colors.black87,
+                                              color: Color.fromARGB(
+                                                255,
+                                                0,
+                                                0,
+                                                0,
+                                              ),
                                             ),
                                           ),
                                         ],
@@ -373,10 +384,9 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                         vertical: 2,
                                       ),
                                       child: Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
+                                        mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Expanded(
+                                          Flexible(
                                             child: Text(
                                               entry.key,
                                               style: const TextStyle(
@@ -388,17 +398,27 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                           ),
                                           if (entry.value['canIncreaseQty'] ==
                                                   true ||
-                                              (entry.value['qty'] as int) > 1)
+                                              (entry.value['qty'] as int) >
+                                                  1) ...[
+                                            const SizedBox(width: 8),
                                             RichText(
                                               text: TextSpan(
                                                 style: const TextStyle(
-                                                  fontSize: 13,
-                                                  color: Colors.black87,
+                                                  fontSize: 12,
+                                                  color: Color.fromARGB(
+                                                    255,
+                                                    217,
+                                                    131,
+                                                    11,
+                                                  ),
                                                 ),
                                                 children: [
                                                   TextSpan(
                                                     text:
-                                                        "${entry.value['qty']} ",
+                                                        (entry.value['qty']
+                                                                as int)
+                                                            .toString() +
+                                                        " ",
                                                     style: const TextStyle(
                                                       fontWeight:
                                                           FontWeight.bold,
@@ -408,6 +428,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                                 ],
                                               ),
                                             ),
+                                          ],
                                         ],
                                       ),
                                     ),
@@ -420,9 +441,10 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       const SizedBox(height: 8),
                     ],
 
-                    if (item.note.isNotEmpty) ...[
+                    // 🎯 แสดงเฉพาะข้อความที่ไม่มีคำว่า "ราดแกง: [...]"
+                    if (cleanNote.isNotEmpty) ...[
                       Text(
-                        "หมายเหตุ: ${item.note}",
+                        "หมายเหตุ: " + cleanNote,
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade600,
@@ -440,15 +462,15 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                            color: Color.fromARGB(255, 217, 131, 11),
                           ),
                         ),
                         Text(
-                          "${item.quantity} จำนวน",
+                          item.quantity.toString() + " จำนวน",
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange,
+                            color: Color(0xFF00B300),
                           ),
                         ),
                       ],
@@ -466,7 +488,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   @override
   Widget build(BuildContext context) {
     int subtotalPrice = 0;
-
     for (var item in widget.storeItems) {
       int addonsSum = 0;
       for (var addon in item.selectedAddons) {
@@ -480,7 +501,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
       subtotalPrice += (actualMenuPrice * item.quantity);
     }
 
-    int deliveryFee = 15;
+    int deliveryFee = 10;
     int totalPrice = subtotalPrice + deliveryFee;
 
     return Scaffold(
@@ -498,25 +519,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(
-              Icons.shopping_cart_outlined,
-              color: primaryGreen,
-              size: 26,
-            ),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: Icon(
-              Icons.account_circle_outlined,
-              color: primaryGreen,
-              size: 26,
-            ),
-            onPressed: () {},
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20.0),
@@ -614,7 +616,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             ),
             const SizedBox(height: 12),
 
-            // 🎯 แผนที่และปุ่มกดแก้ไขจุดจัดส่ง
             InkWell(
               onTap: () async {
                 final dynamic result = await Navigator.push(
@@ -714,7 +715,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
               "ข้อมูลที่อยู่เพิ่มเติม ถ้ามี (เลขห้อง / จุดสังเกต)",
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.grey[700],
+                color: const Color.fromARGB(255, 0, 0, 0),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -741,7 +742,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             const SizedBox(height: 16),
 
             Text(
-              "รายการอาหาร : ${widget.storeName}",
+              "รายการอาหาร : " + widget.storeName,
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -769,7 +770,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   ),
                 ),
                 Text(
-                  "$subtotalPrice บาท",
+                  subtotalPrice.toString() + " บาท",
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -790,7 +791,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                   ),
                 ),
                 Text(
-                  "$deliveryFee บาท",
+                  deliveryFee.toString() + " บาท",
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.bold,
@@ -813,7 +814,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                 ),
                 const Spacer(),
                 Text(
-                  "$totalPrice",
+                  totalPrice.toString(),
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w900,
@@ -842,7 +843,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
-                          "⚠️ กรุณาแตะแผ่นแผนที่เพื่อระบุตำแหน่งจัดส่งสินค้าก่อนครับ",
+                          "กรุณาแตะแผ่นแผนที่เพื่อระบุตำแหน่งจัดส่งสินค้าก่อน",
                         ),
                         backgroundColor: Colors.amber,
                         behavior: SnackBarBehavior.fixed,
@@ -863,13 +864,24 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     List<OrderDetailModel> orderItems = widget.storeItems.map((
                       cartItem,
                     ) {
-                      int currentAddonsSum = 0;
+                      final bool isCurryDishItem =
+                          cartItem.selectedCurries.isNotEmpty;
+                      String itemMenuName = isCurryDishItem
+                          ? "ข้าวราดแกง (" +
+                                cartItem.selectedCurries.length.toString() +
+                                " อย่าง)"
+                          : (cartItem.menu.menuName ?? "ไม่มีชื่อเมนู");
+                      if (cartItem.isExtraPrice) {
+                        itemMenuName += " (พิเศษ)";
+                      }
 
+                      int currentAddonsSum = 0;
                       Map<int, Map<String, dynamic>> groupedAddonsForApi = {};
 
                       for (var addon in cartItem.selectedAddons) {
                         int id = addon.addonDetailId ?? 0;
                         double price = (addon.addonPrice ?? 0).toDouble();
+                        String addonName = addon.addonMenu?.addonName ?? '';
                         currentAddonsSum += price.toInt();
 
                         if (groupedAddonsForApi.containsKey(id)) {
@@ -878,6 +890,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                           groupedAddonsForApi[id] = {
                             'priceAtOrder': price,
                             'qty': 1,
+                            'name': addonName,
                           };
                         }
                       }
@@ -897,16 +910,25 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                           groupedAddonsForApi.entries.map((e) {
                             return OrderDetailAddonModel(
                               addonDetailId: e.key,
+                              addonNameAtOrder: e.value['name'] ?? '',
                               priceAtOrder: e.value['priceAtOrder'],
                               addonQty: e.value['qty'],
                             );
                           }).toList();
 
+                      // 🎯 บันทึก note โดยตัด string ราดแกง ออก
+                      String rawNote = cartItem.note.trim();
+                      String finalCleanNote = rawNote
+                          .replaceAll(RegExp(r'ราดแกง:\s*\[.*?\]\s*'), '')
+                          .trim();
+
                       return OrderDetailModel(
                         menuId: cartItem.menu.menuId ?? 0,
+                        menuNameAtOrder: itemMenuName,
+                        priceAtOrder: cartItem.unitPrice.toDouble(),
                         qty: cartItem.quantity,
                         subTotal: actualSubTotal,
-                        note: cartItem.note,
+                        note: finalCleanNote,
                         addons: finalAddons,
                         orderDetailCurries: cartItem.selectedCurries.map((
                           curry,
@@ -932,13 +954,25 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
 
                     await OrderService().memberConfirmOrder(finalOrder);
 
+                    // เริ่มติดตามสถานะออเดอร์หลังสั่งซื้อสำเร็จ
+                    // เพื่อให้ Notify ทำงานเมื่อสถานะเปลี่ยน เช่น ร้านรับออเดอร์ / ไรเดอร์รับงาน
+                    OrderStatusMonitor().startMonitoring();
+
+                    // แจ้งเตือนทันทีหลังสร้างออเดอร์สำเร็จ
+                    InAppNotificationService.showTopBanner(
+                      title: 'สั่งซื้อสำเร็จ ',
+                      message: 'ระบบกำลังตามหาไรเดอร์ให้คุณ',
+                      icon: Icons.check_circle_rounded,
+                      color: Colors.blue,
+                    );
+
                     if (!mounted) return;
                     Navigator.pop(context);
 
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
-                          "🎉 สั่งซื้ออาหารสำเร็จ! ระบบกำลังตามหาไรเดอร์ให้คุณครับ",
+                          "สั่งซื้ออาหารสำเร็จ! ระบบกำลังตามหาไรเดอร์ให้คุณ",
                         ),
                         backgroundColor: Colors.green,
                         behavior: SnackBarBehavior.fixed,
@@ -952,7 +986,9 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text("❌ สั่งซื้อไม่สำเร็จ: $error"),
+                        content: Text(
+                          "❌ สั่งซื้อไม่สำเร็จ: " + error.toString(),
+                        ),
                         backgroundColor: Colors.redAccent,
                         behavior: SnackBarBehavior.fixed,
                       ),

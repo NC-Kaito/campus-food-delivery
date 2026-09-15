@@ -1,13 +1,13 @@
 // features/rider/profile_rider.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/rider/rider_service.dart';
 import 'package:flutter_app/features/rider/navbar_rider.dart';
 import 'package:flutter_app/global_data.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:dio/dio.dart' as dio_package;
 
 class ProfileRider extends StatefulWidget {
   const ProfileRider({super.key});
@@ -17,10 +17,9 @@ class ProfileRider extends StatefulWidget {
 }
 
 class _ProfileRiderState extends State<ProfileRider> {
-  // ── ธีมสีหลัก (Theme) ปรับให้แมตช์กับ ProfileRestaurant ──
-  static const Color _primary = Color(0xFF16A34A); // เขียวหลัก
-  static const Color _primaryDark = Color(0xFF0F7A38);
-  static const Color _accent = Color(0xFFEA7C1E); // ส้มสำหรับหัวข้อ Section
+  static const Color _primary = Color(0xFF00B300);
+  static const Color _primaryDark = Color(0xFF008F00);
+  static const Color _accent = Color(0xFFEA7C1E);
   static const Color _bg = Color(0xFFF5F6F8);
   static const Color _textDark = Color(0xFF1E1E24);
   static const Color _textMuted = Color(0xFF8A8D93);
@@ -33,10 +32,13 @@ class _ProfileRiderState extends State<ProfileRider> {
   RiderModel? _rider;
   bool _isLoading = true;
   bool _isLoadingAction = false;
-  bool _isEditable = false; // 🎯 ตัวแปรสถานะเปิด/ปิด โหมดแก้ไข
+  bool _isEditable = false;
+  bool _hasUpdated = false; // 🎯 ติดตามว่ามีการแก้ไขสำเร็จหรือไม่
 
   File? _selectedImage;
+  File? _selectedVehicleImage;
   String? _profileImageUrl;
+  String? _vehicleImageUrl;
 
   // Controllers
   late final TextEditingController _studentIdController;
@@ -92,23 +94,26 @@ class _ProfileRiderState extends State<ProfileRider> {
       final rider = await _riderService.getRiderByStudentId(
         GlobalData.usernameRider,
       );
-      setState(() {
-        _rider = rider;
-        _studentIdController.text = rider.studentid ?? "-";
-        _firstNameController.text = rider.firstName ?? "-";
-        _lastNameController.text = rider.lastName ?? "-";
-        _emailController.text = rider.email ?? "";
-        _phoneController.text = rider.phone ?? "";
-        _birthdayController.text = rider.birthday ?? "-";
-        _facultyController.text = rider.facultyName ?? "-";
-        _majorController.text = rider.majorName ?? "-";
-        _vehiclePlateController.text = rider.vehiclePlate ?? "-";
-        _profileImageUrl = rider.studentCardImage; // หรือฟิลด์รูปโปรไฟล์
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() {
+          _rider = rider;
+          _studentIdController.text = rider.studentid ?? "-";
+          _firstNameController.text = rider.firstName ?? "-";
+          _lastNameController.text = rider.lastName ?? "-";
+          _emailController.text = rider.email ?? "";
+          _phoneController.text = rider.phone ?? "";
+          _birthdayController.text = rider.birthday ?? "-";
+          _facultyController.text = rider.facultyName ?? "-";
+          _majorController.text = rider.majorName ?? "-";
+          _vehiclePlateController.text = rider.vehiclePlate ?? "-";
+          _profileImageUrl = rider.profileImage;
+          _vehicleImageUrl = rider.vehicleImage;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("โหลดข้อมูลโปรไฟล์ไม่สำเร็จ: $e"),
@@ -200,11 +205,91 @@ class _ProfileRiderState extends State<ProfileRider> {
     );
   }
 
+  Future<void> _pickVehicleImage() async {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => SafeArea(
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.camera_alt, color: _primary),
+                title: const Text("ถ่ายรูปยานพาหนะ"),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final image = await _picker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 80,
+                  );
+                  if (image != null) {
+                    setState(() => _selectedVehicleImage = File(image.path));
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: _primary),
+                title: const Text("เลือกรูปจากคลัง"),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final image = await _picker.pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 80,
+                  );
+                  if (image != null) {
+                    setState(() => _selectedVehicleImage = File(image.path));
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _saveProfile() async {
     if (_rider == null) return;
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoadingAction = true);
       try {
+        String? newUploadedImageUrl = _profileImageUrl;
+        String? newUploadedVehicleImageUrl = _vehicleImageUrl;
+
+        // 🎯 1. อัปโหลดรูปขึ้น Cloudinary ก่อน (ถ้ามีการเลือกรูปใหม่)
+        if (_selectedImage != null) {
+          final uploadedUrl = await _riderService.uploadRiderProfileImage(
+            _selectedImage!,
+          );
+          if (uploadedUrl != null && uploadedUrl.isNotEmpty) {
+            newUploadedImageUrl = uploadedUrl;
+          }
+        }
+
+        if (_selectedVehicleImage != null) {
+          final fileName = _selectedVehicleImage!.path.split('/').last;
+          final formData = FormData.fromMap({
+            "image": await MultipartFile.fromFile(
+              _selectedVehicleImage!.path,
+              filename: fileName,
+            ),
+          });
+          final response = await DioClient.dio.post(
+            '/v1/rider/uploadVehicleImage',
+            data: formData,
+          );
+          if (response.statusCode == 200) {
+            newUploadedVehicleImageUrl = response.data['url']?.toString();
+          }
+        }
+
+        // 🎯 2. ประกอบข้อมูลส่งไปอัปเดต
         final updated = RiderModel(
           studentid: _rider!.studentid,
           email: _emailController.text.trim(),
@@ -214,12 +299,17 @@ class _ProfileRiderState extends State<ProfileRider> {
           birthday: _rider!.birthday,
           facultyName: _rider!.facultyName,
           majorName: _rider!.majorName,
-          vehiclePlate: _rider!.vehiclePlate,
+          vehiclePlate: _vehiclePlateController.text.trim(),
+          profileImage: newUploadedImageUrl,
+          studentCardImage: _rider!.studentCardImage,
+          drivingLicenseImg: _rider!.drivingLicenseImg,
+          vehicleImage: newUploadedVehicleImageUrl,
         );
 
-        await _riderService.updateProfileMember(updated);
+        await _riderService.updateProfileRider(updated);
 
         if (mounted) {
+          _hasUpdated = true; // มาร์คว่าบันทึกสำเร็จ
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text("บันทึกข้อมูลเรียบร้อยแล้ว"),
@@ -234,6 +324,7 @@ class _ProfileRiderState extends State<ProfileRider> {
           setState(() {
             _isEditable = false;
             _selectedImage = null;
+            _selectedVehicleImage = null;
           });
 
           await _loadRiderProfile();
@@ -256,8 +347,6 @@ class _ProfileRiderState extends State<ProfileRider> {
       }
     }
   }
-
-  // ── UI Components Builders ──
 
   Widget _buildLabel(String text) {
     return Padding(
@@ -362,413 +451,542 @@ class _ProfileRiderState extends State<ProfileRider> {
   Widget build(BuildContext context) {
     final String finalAvatarUrl = _getFinalImageUrl(_profileImageUrl);
 
-    return Scaffold(
-      backgroundColor: _bg,
-      appBar: const NavbarRider(title: "โปรไฟล์"),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: _primary))
-          : SafeArea(
-              child: Form(
-                key: _formKey,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 30),
-                  child: Column(
-                    children: [
-                      // ── รูปโปรไฟล์ Rider ────────────────────────────
-                      Center(
-                        child: Stack(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(color: _primary, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.08),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        Navigator.pop(context, _hasUpdated); // ส่งผลลัพธ์กลับไปยังหน้าก่อนหน้า
+      },
+      child: Scaffold(
+        backgroundColor: _bg,
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          title: const Text(
+            "แก้ไขโปรไฟล์",
+            style: TextStyle(
+              color: Colors.black,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          automaticallyImplyLeading: false,
+          leading: IconButton(
+            icon: const Icon(
+              Icons.arrow_back_ios_new_rounded,
+              color: Color(0xFF00B300),
+              size: 24,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: _primary))
+            : SafeArea(
+                child: Form(
+                  key: _formKey,
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 30),
+                    child: Column(
+                      children: [
+                        // ── รูปโปรไฟล์ Rider ────────────────────────────
+                        Center(
+                          child: Stack(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: _primary, width: 3),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.08),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: CircleAvatar(
+                                  radius: 52,
+                                  backgroundColor: Colors.grey.shade200,
+                                  backgroundImage: _selectedImage != null
+                                      ? FileImage(_selectedImage!)
+                                            as ImageProvider
+                                      : (finalAvatarUrl.isNotEmpty
+                                            ? NetworkImage(finalAvatarUrl)
+                                            : null),
+                                  child:
+                                      (_selectedImage == null &&
+                                          finalAvatarUrl.isEmpty)
+                                      ? const Icon(
+                                          Icons.person,
+                                          size: 58,
+                                          color: Colors.grey,
+                                        )
+                                      : null,
+                                ),
+                              ),
+                              if (_isEditable)
+                                Positioned(
+                                  bottom: 2,
+                                  right: 2,
+                                  child: GestureDetector(
+                                    onTap: _pickImage,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: const BoxDecoration(
+                                        color: _primary,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.camera_alt,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "${_firstNameController.text} ${_lastNameController.text}",
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: _textDark,
+                          ),
+                        ),
+                        Text(
+                          "รหัสนักศึกษา: ${_studentIdController.text}",
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            color: _textMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // ══ Section 1: ข้อมูลติดต่อ ════════════════════════
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _buildSectionHeader(
+                            icon: Icons.contact_mail_outlined,
+                            title: "ข้อมูลติดต่อ",
+                          ),
+                        ),
+                        _sectionCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel("อีเมล (Email)"),
+                              TextFormField(
+                                controller: _emailController,
+                                enabled: _isEditable,
+                                keyboardType: TextInputType.emailAddress,
+                                validator: _isEditable
+                                    ? (v) {
+                                        if (v == null || v.trim().isEmpty) {
+                                          return "กรุณากรอกอีเมล";
+                                        }
+                                        if (!RegExp(
+                                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
+                                        ).hasMatch(v)) {
+                                          return "รูปแบบอีเมลไม่ถูกต้อง";
+                                        }
+                                        return null;
+                                      }
+                                    : null,
+                                decoration: _inputDecoration(
+                                  enabled: _isEditable,
+                                  suffixIcon: Icon(
+                                    Icons.email_outlined,
+                                    color: Colors.grey[400],
+                                  ),
+                                ),
+                              ),
+                              _buildLabel("เบอร์โทรศัพท์ (Phone)"),
+                              TextFormField(
+                                controller: _phoneController,
+                                enabled: _isEditable,
+                                keyboardType: TextInputType.phone,
+                                validator: _isEditable
+                                    ? (v) {
+                                        if (v == null || v.trim().isEmpty) {
+                                          return "กรุณากรอกเบอร์โทรศัพท์";
+                                        }
+                                        if (!RegExp(r'^[0-9]+$').hasMatch(v)) {
+                                          return "ต้องเป็นตัวเลขเท่านั้น";
+                                        }
+                                        if (v.length < 10 || v.length > 15) {
+                                          return "ความยาว 10-15 หลัก";
+                                        }
+                                        return null;
+                                      }
+                                    : null,
+                                decoration: _inputDecoration(
+                                  enabled: _isEditable,
+                                  suffixIcon: Icon(
+                                    Icons.phone_in_talk_outlined,
+                                    color: Colors.grey[400],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // ══ Section 2: ข้อมูลส่วนตัว ════════════════════════
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _buildSectionHeader(
+                            icon: Icons.person_outline_rounded,
+                            title: "ข้อมูลส่วนตัว",
+                          ),
+                        ),
+                        _sectionCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel("รหัสนักศึกษา"),
+                              TextFormField(
+                                controller: _studentIdController,
+                                enabled: false,
+                                decoration: _inputDecoration(enabled: false),
+                              ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("ชื่อจริง"),
+                                        TextFormField(
+                                          controller: _firstNameController,
+                                          enabled: false,
+                                          decoration: _inputDecoration(
+                                            enabled: false,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        _buildLabel("นามสกุล"),
+                                        TextFormField(
+                                          controller: _lastNameController,
+                                          enabled: false,
+                                          decoration: _inputDecoration(
+                                            enabled: false,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
-                              child: CircleAvatar(
-                                radius: 52,
-                                backgroundColor: Colors.grey.shade200,
-                                backgroundImage: _selectedImage != null
-                                    ? FileImage(_selectedImage!)
-                                          as ImageProvider
-                                    : (finalAvatarUrl.isNotEmpty
-                                          ? NetworkImage(finalAvatarUrl)
-                                          : null),
-                                child:
-                                    (_selectedImage == null &&
-                                        finalAvatarUrl.isEmpty)
-                                    ? const Icon(
-                                        Icons.person,
-                                        size: 58,
-                                        color: Colors.grey,
-                                      )
-                                    : null,
-                              ),
-                            ),
-                            if (_isEditable)
-                              Positioned(
-                                bottom: 2,
-                                right: 2,
-                                child: GestureDetector(
-                                  onTap: _pickImage,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: const BoxDecoration(
-                                      color: _primary,
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.camera_alt,
-                                      color: Colors.white,
-                                      size: 18,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        "${_firstNameController.text} ${_lastNameController.text}",
-                        style: const TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: _textDark,
-                        ),
-                      ),
-                      Text(
-                        "รหัสนักศึกษา: ${_studentIdController.text}",
-                        style: const TextStyle(
-                          fontSize: 13.5,
-                          color: _textMuted,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ══ Section 1: ข้อมูลติดต่อ ════════════════════════
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _buildSectionHeader(
-                          icon: Icons.contact_mail_outlined,
-                          title: "ข้อมูลติดต่อ",
-                        ),
-                      ),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel("อีเมล (Email)"),
-                            TextFormField(
-                              controller: _emailController,
-                              enabled: _isEditable,
-                              keyboardType: TextInputType.emailAddress,
-                              validator: _isEditable
-                                  ? (v) {
-                                      if (v == null || v.trim().isEmpty)
-                                        return "กรุณากรอกอีเมล";
-                                      if (!RegExp(
-                                        r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                      ).hasMatch(v)) {
-                                        return "รูปแบบอีเมลไม่ถูกต้อง";
-                                      }
-                                      return null;
-                                    }
-                                  : null,
-                              decoration: _inputDecoration(
-                                enabled: _isEditable,
-                                suffixIcon: Icon(
-                                  Icons.email_outlined,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
-                            ),
-                            _buildLabel("เบอร์โทรศัพท์ (Phone)"),
-                            TextFormField(
-                              controller: _phoneController,
-                              enabled: _isEditable,
-                              keyboardType: TextInputType.phone,
-                              validator: _isEditable
-                                  ? (v) {
-                                      if (v == null || v.trim().isEmpty)
-                                        return "กรุณากรอกเบอร์โทรศัพท์";
-                                      if (!RegExp(r'^[0-9]+$').hasMatch(v))
-                                        return "ต้องเป็นตัวเลขเท่านั้น";
-                                      if (v.length < 10 || v.length > 15)
-                                        return "ความยาว 10-15 หลัก";
-                                      return null;
-                                    }
-                                  : null,
-                              decoration: _inputDecoration(
-                                enabled: _isEditable,
-                                suffixIcon: Icon(
-                                  Icons.phone_in_talk_outlined,
-                                  color: Colors.grey[400],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ══ Section 2: ข้อมูลส่วนตัว ════════════════════════
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _buildSectionHeader(
-                          icon: Icons.person_outline_rounded,
-                          title: "ข้อมูลส่วนตัว",
-                        ),
-                      ),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel("รหัสนักศึกษา"),
-                            TextFormField(
-                              controller: _studentIdController,
-                              enabled: false,
-                              decoration: _inputDecoration(enabled: false),
-                            ),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLabel("ชื่อจริง"),
-                                      TextFormField(
-                                        controller: _firstNameController,
-                                        enabled: false,
-                                        decoration: _inputDecoration(
-                                          enabled: false,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      _buildLabel("นามสกุล"),
-                                      TextFormField(
-                                        controller: _lastNameController,
-                                        enabled: false,
-                                        decoration: _inputDecoration(
-                                          enabled: false,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            _buildLabel("วันเดือนปีเกิด"),
-                            TextFormField(
-                              controller: _birthdayController,
-                              enabled: false,
-                              decoration: _inputDecoration(enabled: false),
-                            ),
-                            _buildLabel("คณะ"),
-                            TextFormField(
-                              controller: _facultyController,
-                              enabled: false,
-                              decoration: _inputDecoration(enabled: false),
-                            ),
-                            _buildLabel("สาขาวิชา"),
-                            TextFormField(
-                              controller: _majorController,
-                              enabled: false,
-                              decoration: _inputDecoration(enabled: false),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-
-                      // ══ Section 3: ยานพาหนะ ════════════════════════
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: _buildSectionHeader(
-                          icon: Icons.two_wheeler_outlined,
-                          title: "ข้อมูลยานพาหนะ",
-                        ),
-                      ),
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildLabel("ทะเบียนรถ"),
-                            TextFormField(
-                              controller: _vehiclePlateController,
-                              enabled: false,
-                              decoration: _inputDecoration(
+                              _buildLabel("วันเดือนปีเกิด"),
+                              TextFormField(
+                                controller: _birthdayController,
                                 enabled: false,
-                                suffixIcon: Icon(
-                                  Icons.pin_outlined,
-                                  color: Colors.grey[400],
+                                decoration: _inputDecoration(enabled: false),
+                              ),
+                              _buildLabel("คณะ"),
+                              TextFormField(
+                                controller: _facultyController,
+                                enabled: false,
+                                decoration: _inputDecoration(enabled: false),
+                              ),
+                              _buildLabel("สาขาวิชา"),
+                              TextFormField(
+                                controller: _majorController,
+                                enabled: false,
+                                decoration: _inputDecoration(enabled: false),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+
+                        // ══ Section 3: ยานพาหนะ ════════════════════════
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: _buildSectionHeader(
+                            icon: Icons.two_wheeler_outlined,
+                            title: "ข้อมูลยานพาหนะ",
+                          ),
+                        ),
+                        _sectionCard(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _buildLabel("ทะเบียนรถ"),
+                              TextFormField(
+                                controller: _vehiclePlateController,
+                                enabled: false,
+                                decoration: _inputDecoration(
+                                  enabled: false,
+                                  suffixIcon: Icon(
+                                    Icons.pin_outlined,
+                                    color: Colors.grey[400],
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // ── ปุ่มควบคุมการทำงานด้านล่าง ────────────────────────
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: _isEditable
-                            ? Row(
-                                children: [
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 52,
-                                      child: OutlinedButton(
-                                        onPressed: () {
-                                          setState(() {
-                                            _isEditable = false;
-                                            _selectedImage = null;
-                                          });
-                                          _loadRiderProfile();
-                                        },
-                                        style: OutlinedButton.styleFrom(
-                                          foregroundColor: _textMuted,
-                                          side: BorderSide(
-                                            color: Colors.grey.shade300,
-                                          ),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              30,
-                                            ),
-                                          ),
-                                        ),
-                                        child: const Text(
-                                          "ยกเลิก",
-                                          style: TextStyle(
-                                            fontSize: 15.5,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
+                              const SizedBox(height: 8),
+                              _buildLabel("รูปรถ / ยานพาหนะ"),
+                              GestureDetector(
+                                onTap: _isEditable ? _pickVehicleImage : null,
+                                child: Container(
+                                  width: double.infinity,
+                                  height: 190,
+                                  decoration: BoxDecoration(
+                                    color: _isEditable
+                                        ? const Color(0xFFF2FFF2)
+                                        : const Color(0xFFEEEEEE),
+                                    borderRadius: BorderRadius.circular(14),
+                                    border: Border.all(
+                                      color: _isEditable
+                                          ? const Color(0xFF00B300)
+                                          : Colors.grey.shade300,
+                                      width: _isEditable ? 1.6 : 1.0,
                                     ),
                                   ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: SizedBox(
-                                      height: 52,
-                                      child: DecoratedBox(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            30,
+                                  clipBehavior: Clip.antiAlias,
+                                  child: Stack(
+                                    fit: StackFit.expand,
+                                    children: [
+                                      if (_selectedVehicleImage != null)
+                                        Image.file(
+                                          _selectedVehicleImage!,
+                                          fit: BoxFit.cover,
+                                        )
+                                      else if (_getFinalImageUrl(
+                                        _vehicleImageUrl,
+                                      ).isNotEmpty)
+                                        Image.network(
+                                          Uri.encodeFull(
+                                            _getFinalImageUrl(_vehicleImageUrl),
                                           ),
-                                          gradient: const LinearGradient(
-                                            colors: [_primary, _primaryDark],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Center(
+                                                child: Icon(
+                                                  Icons.two_wheeler_outlined,
+                                                  size: 56,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                        )
+                                      else
+                                        const Center(
+                                          child: Icon(
+                                            Icons.two_wheeler_outlined,
+                                            size: 56,
+                                            color: Colors.grey,
                                           ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: _primary.withOpacity(0.35),
-                                              blurRadius: 14,
-                                              offset: const Offset(0, 6),
-                                            ),
-                                          ],
                                         ),
-                                        child: ElevatedButton(
-                                          onPressed: _isLoadingAction
-                                              ? null
-                                              : _saveProfile,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.transparent,
-                                            shadowColor: Colors.transparent,
-                                            foregroundColor: Colors.white,
-                                            elevation: 0,
+                                      if (_isEditable)
+                                        Positioned(
+                                          right: 12,
+                                          bottom: 12,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 8,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFF00B300),
+                                              borderRadius:
+                                                  BorderRadius.circular(20),
+                                            ),
+                                            child: const Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.camera_alt_rounded,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                                SizedBox(width: 6),
+                                                Text(
+                                                  "เปลี่ยนรูป",
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // ── ปุ่มควบคุมการทำงานด้านล่าง ────────────────────────
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 24),
+                          child: _isEditable
+                              ? Row(
+                                  children: [
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 52,
+                                        child: OutlinedButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _isEditable = false;
+                                              _selectedImage = null;
+                                            });
+                                            _loadRiderProfile();
+                                          },
+                                          style: OutlinedButton.styleFrom(
+                                            foregroundColor: _textMuted,
+                                            side: BorderSide(
+                                              color: Colors.grey.shade300,
+                                            ),
                                             shape: RoundedRectangleBorder(
                                               borderRadius:
                                                   BorderRadius.circular(30),
                                             ),
                                           ),
-                                          child: _isLoadingAction
-                                              ? const SizedBox(
-                                                  height: 20,
-                                                  width: 20,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        color: Colors.white,
-                                                        strokeWidth: 2,
-                                                      ),
-                                                )
-                                              : const Text(
-                                                  "บันทึกข้อมูล",
-                                                  style: TextStyle(
-                                                    fontSize: 15.5,
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
+                                          child: const Text(
+                                            "ยกเลิก",
+                                            style: TextStyle(
+                                              fontSize: 15.5,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 52,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(
+                                              30,
+                                            ),
+                                            gradient: const LinearGradient(
+                                              colors: [_primary, _primaryDark],
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: _primary.withOpacity(
+                                                  0.35,
                                                 ),
+                                                blurRadius: 14,
+                                                offset: const Offset(0, 6),
+                                              ),
+                                            ],
+                                          ),
+                                          child: ElevatedButton(
+                                            onPressed: _isLoadingAction
+                                                ? null
+                                                : _saveProfile,
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              shadowColor: Colors.transparent,
+                                              foregroundColor: Colors.white,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(30),
+                                              ),
+                                            ),
+                                            child: _isLoadingAction
+                                                ? const SizedBox(
+                                                    height: 20,
+                                                    width: 20,
+                                                    child:
+                                                        CircularProgressIndicator(
+                                                          color: Colors.white,
+                                                          strokeWidth: 2,
+                                                        ),
+                                                  )
+                                                : const Text(
+                                                    "บันทึกข้อมูล",
+                                                    style: TextStyle(
+                                                      fontSize: 15.5,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                )
+                              : SizedBox(
+                                  width: double.infinity,
+                                  height: 54,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(30),
+                                      gradient: const LinearGradient(
+                                        colors: [_primary, _primaryDark],
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: _primary.withOpacity(0.35),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ElevatedButton.icon(
+                                      onPressed: () =>
+                                          setState(() => _isEditable = true),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.transparent,
+                                        shadowColor: Colors.transparent,
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            30,
+                                          ),
+                                        ),
+                                      ),
+                                      icon: const Icon(
+                                        Icons.edit_outlined,
+                                        size: 20,
+                                      ),
+                                      label: const Text(
+                                        "แก้ไขข้อมูล",
+                                        style: TextStyle(
+                                          fontSize: 16.5,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
                                     ),
                                   ),
-                                ],
-                              )
-                            : SizedBox(
-                                width: double.infinity,
-                                height: 54,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(30),
-                                    gradient: const LinearGradient(
-                                      colors: [_primary, _primaryDark],
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: _primary.withOpacity(0.35),
-                                        blurRadius: 16,
-                                        offset: const Offset(0, 6),
-                                      ),
-                                    ],
-                                  ),
-                                  child: ElevatedButton.icon(
-                                    onPressed: () =>
-                                        setState(() => _isEditable = true),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.transparent,
-                                      shadowColor: Colors.transparent,
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                    ),
-                                    icon: const Icon(
-                                      Icons.edit_outlined,
-                                      size: 20,
-                                    ),
-                                    label: const Text(
-                                      "แก้ไขข้อมูล",
-                                      style: TextStyle(
-                                        fontSize: 16.5,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                  ),
                                 ),
-                              ),
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }

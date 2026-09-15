@@ -1,8 +1,10 @@
+// features/member/account_management_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
-import 'package:flutter_app/data/services/member/order_status_monitor.dart';
+import 'package:flutter_app/data/services/order_status_monitor.dart';
+import 'package:flutter_app/data/services/order_service.dart'; // 🎯 Import OrderService
 import 'package:flutter_app/features/member/edit_location_member.dart';
 import 'package:flutter_app/features/member/list_active_order_member.dart';
 import 'package:flutter_app/global_data.dart';
@@ -16,7 +18,7 @@ import 'package:flutter_app/features/restaurant/view_agrees.dart';
 import 'package:flutter_app/main_login.dart';
 
 // ============================================================
-// 🎨 Design tokens — โทนสีเขียวสำหรับฝั่งลูกคัา (Member)
+// 🎨 Design tokens — โทนสีเขียวสำหรับฝั่งลูกค้า (Member)
 // ============================================================
 class _AccountTheme {
   static const Color primary = Color(0xFF00B300); // สีเขียวหลัก
@@ -40,9 +42,12 @@ class AccountManagementMember extends StatefulWidget {
 
 class _AccountManagementMemberState extends State<AccountManagementMember> {
   final MemberService memberService = MemberService();
+  final OrderService _orderService =
+      OrderService(); // 🎯 สร้าง instance OrderService
   MemberModel? memberModel;
   String? memberImage;
   bool _isLoadingProfile = true;
+  int _activeOrderCount = 0; // 🎯 ตัวแปรเก็บจำนวนออเดอร์ Active
 
   // 🎯 กำหนด TextStyle สำหรับเมนูด้านล่าง
   final menuTextStyle = TextStyle(
@@ -55,6 +60,7 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
   void initState() {
     super.initState();
     _loadMemberData();
+    _fetchActiveOrderCount(); // 🎯 โหลดจำนวนออเดอร์ตอนเปิดหน้า
   }
 
   Future<void> _loadMemberData() async {
@@ -66,13 +72,43 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
       setState(() {
         if (mem != null) {
           memberModel = mem;
-
           memberImage = mem.profileimg;
         }
         _isLoadingProfile = false;
       });
     } catch (_) {
       if (mounted) setState(() => _isLoadingProfile = false);
+    }
+  }
+
+  // 🎯 ฟังก์ชันนับจำนวนออเดอร์ Active ให้ตรงกับ ListActiveOrderMember
+  Future<void> _fetchActiveOrderCount() async {
+    try {
+      String username = GlobalData.usernameMember.trim();
+      if (username.isEmpty) return;
+
+      final history = await _orderService.getConfirmOrdersByMember(username);
+
+      int count = 0;
+      for (var order in history) {
+        final status = (order.orderStatus ?? '').toLowerCase().trim();
+        if (status != 'success' &&
+            status != 'completed' &&
+            status != 'reviewsuccess' &&
+            status != 'cancel' &&
+            status != 'cancelled' &&
+            status != 'issue_reported') {
+          count++;
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _activeOrderCount = count;
+        });
+      }
+    } catch (e) {
+      debugPrint("เกิดข้อผิดพลาดในการโหลดจำนวนออเดอร์: $e");
     }
   }
 
@@ -203,7 +239,6 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
     }
   }
 
-  // 🎯 เพิ่มฟังก์ชันสำหรับปุ่ม Navbar
   Widget _buildNavItem(
     IconData icon,
     String label,
@@ -269,7 +304,6 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
 
   @override
   Widget build(BuildContext context) {
-    // ดึงจำนวนของในตะกร้ามาโชว์ที่ปุ่มตะกร้าอาหาร
     final int cartItemCount = CartManager().items.length;
 
     return Scaffold(
@@ -316,7 +350,6 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
                             ),
                             child: CircleAvatar(
                               backgroundColor: Colors.white,
-                              // 🎯 แสดงรูปโปรไฟล์ ถ้าดึงมาแล้วไม่ว่างเปล่า
                               backgroundImage:
                                   _getFinalImageUrl(memberImage).isNotEmpty
                                   ? NetworkImage(_getFinalImageUrl(memberImage))
@@ -360,8 +393,8 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
                         builder: (context) => const ProfileMember(),
                       ),
                     ).then((_) {
-                      // รีเฟรชข้อมูลเผื่อมีการเปลี่ยนชื่อหรือเปลี่ยนรูปภาพ
                       _loadMemberData();
+                      _fetchActiveOrderCount();
                     }),
               ),
               const _MenuDivider(),
@@ -377,7 +410,6 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
                         builder: (context) => const EditLocationMember(),
                       ),
                     ).then((_) {
-                      // รีเฟรชข้อมูลเผื่อมีการเปลี่ยนชื่อหรือเปลี่ยนรูปภาพ
                       _loadMemberData();
                     }),
               ),
@@ -411,7 +443,6 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
         ),
       ),
 
-      // 🎯 เพิ่มแถบเมนูด้านล่าง (Navbar)
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Card(
@@ -435,6 +466,7 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
                     ),
                   );
                 }, badgeCount: cartItemCount),
+                // 🎯 แสดงจำนวนออเดอร์แจ้งเตือนแบบ Badge ตรงปุ่มคำสั่งซื้อ
                 _buildNavItem(Icons.list_alt, "คำสั่งซื้อ", () {
                   Navigator.pushReplacement(
                     context,
@@ -442,8 +474,7 @@ class _AccountManagementMemberState extends State<AccountManagementMember> {
                       builder: (context) => const ListActiveOrderMember(),
                     ),
                   );
-                }),
-                // 🎯 ให้ไอคอน "โปรไฟล์" ทำงานเป็นโหมด Active (สีเขียว)
+                }, badgeCount: _activeOrderCount),
                 _buildNavItem(Icons.settings, "ตั้งค่า", () {}, isActive: true),
               ],
             ),

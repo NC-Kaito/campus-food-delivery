@@ -21,4 +21,8 @@ public interface MenuaddondetailRepository extends JpaRepository<Menuaddondetail
     List<Menuaddondetail> findAddonsByMenuId(@Param("menuId") Long menuId);
 
     List<Menuaddondetail> findByMenuaddongroup(Menuaddongroup menuaddongroup);
+
+    void deleteByMenuaddongroup(Menuaddongroup menuaddongroup);
+
+
 }

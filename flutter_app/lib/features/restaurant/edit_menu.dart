@@ -148,7 +148,7 @@ class _EditMenuState extends State<EditMenu> {
             typeName.contains("ข้าวแกง") || typeName.contains("ข้าวราดแกง");
       });
     } catch (e) {
-      debugPrint("ตรวจสอบประเภทร้านค้าผิดพลาด: $e");
+      debugPrint("ตรวจสอบประเภทร้านค้าผิดพลาด: " + e.toString());
     }
   }
 
@@ -221,7 +221,7 @@ class _EditMenuState extends State<EditMenu> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isInitialLoading = false);
-      debugPrint("EditMenu _loadAllData error: $e");
+      debugPrint("EditMenu _loadAllData error: " + e.toString());
     }
   }
 
@@ -320,7 +320,7 @@ class _EditMenuState extends State<EditMenu> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  "$itemCount ตัวเลือกย่อย",
+                                  itemCount.toString() + " ตัวเลือกย่อย",
                                   style: const TextStyle(
                                     fontSize: 12,
                                     color: _MenuTheme.textSecondary,
@@ -447,7 +447,9 @@ class _EditMenuState extends State<EditMenu> {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
     final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
   Future<void> _doSaveMenu() async {
@@ -528,16 +530,66 @@ class _EditMenuState extends State<EditMenu> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("เกิดข้อผิดพลาด: $e"),
-            backgroundColor: _MenuTheme.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        String errorMsg = e.toString().replaceAll("Exception: ", "");
+
+        // 🎯 ดักจับ Error จาก Backend ถ้าร้านมีออเดอร์ค้างอยู่ ให้โชว์ AlertDialog
+        if (errorMsg.contains("กำลังดำเนินการอยู่")) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_rounded,
+                    color: _MenuTheme.danger,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      "ไม่สามารถแก้ไขได้",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                errorMsg,
+                style: const TextStyle(fontSize: 14.5, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _MenuTheme.danger,
+                  ),
+                  child: const Text(
+                    "ตกลง",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        );
+          );
+        } else {
+          // ถ้าเป็น Error ทั่วไป ให้โชว์ SnackBar ปกติ
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("เกิดข้อผิดพลาด: " + errorMsg),
+              backgroundColor: _MenuTheme.danger,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -562,11 +614,11 @@ class _EditMenuState extends State<EditMenu> {
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: Colors.black, width: 0), // 🎯 ขอบดำ
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(color: Colors.black, width: 0), // 🎯 ขอบดำ
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -574,15 +626,24 @@ class _EditMenuState extends State<EditMenu> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _MenuTheme.primary, width: 1.6),
+        borderSide: const BorderSide(
+          color: Color(0xFF00B300),
+          width: 1.6,
+        ), // 🎯 ขอบเขียว
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.2),
+        borderSide: const BorderSide(
+          color: Color(0xFF00B300),
+          width: 1.2,
+        ), // 🎯 ขอบเขียว
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.6),
+        borderSide: const BorderSide(
+          color: Color(0xFF00B300),
+          width: 1.6,
+        ), // 🎯 ขอบเขียว
       ),
     );
   }
@@ -618,10 +679,19 @@ class _EditMenuState extends State<EditMenu> {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: _MenuTheme.primary.withOpacity(0.12),
+            color: const Color.fromARGB(
+              255,
+              196,
+              196,
+              196,
+            ).withOpacity(0.12), // 🎯 สีพื้นหลัง
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Icon(icon, size: 17, color: _MenuTheme.primary),
+          child: Icon(
+            icon,
+            size: 17,
+            color: const Color(0xFF00B300),
+          ), // 🎯 เปลี่ยนเป็นสีเขียว
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -676,7 +746,8 @@ class _EditMenuState extends State<EditMenu> {
                           height: 46,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [_MenuTheme.primary, Color(0xFFFFB13D)],
+                              colors: [Color(0xFF00B300), Color(0xFF00B300)],
+
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
@@ -824,6 +895,10 @@ class _EditMenuState extends State<EditMenu> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF0F1F3),
                                 borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 0,
+                                ), // 🎯 เพิ่มขอบดำ
                               ),
                               child: Row(
                                 children: [
@@ -1147,7 +1222,7 @@ class _EditMenuState extends State<EditMenu> {
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                                 child: Text(
-                                  "$linkedCount กลุ่มที่ผูก",
+                                  linkedCount.toString() + " กลุ่มที่ผูก",
                                   style: const TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
@@ -1217,7 +1292,17 @@ class _EditMenuState extends State<EditMenu> {
                                         : null,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide.none,
+                                      borderSide: const BorderSide(
+                                        color: Colors.black,
+                                        width: 0,
+                                      ), // 🎯 เพิ่มขอบดำ
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                      borderSide: const BorderSide(
+                                        color: Colors.black,
+                                        width: 0,
+                                      ), // 🎯 เพิ่มขอบดำ
                                     ),
                                     filled: true,
                                     fillColor: _isEditable
@@ -1391,7 +1476,7 @@ class _EditMenuState extends State<EditMenu> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(30),
                             gradient: const LinearGradient(
-                              colors: [_MenuTheme.primary, Color(0xFFFFB13D)],
+                              colors: [Color(0xFF00B300), Color(0xFF00B300)],
                             ),
                             boxShadow: [
                               BoxShadow(
@@ -1483,6 +1568,7 @@ class _EditMenuState extends State<EditMenu> {
       decoration: BoxDecoration(
         color: _isEditable ? _MenuTheme.fieldBg : const Color(0xFFF0F1F3),
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black, width: 0.3), // 🎯 เพิ่มขอบดำ
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -1646,7 +1732,7 @@ class _EditMenuState extends State<EditMenu> {
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          "${items.length} ตัวเลือกย่อย",
+                          items.length.toString() + " ตัวเลือกย่อย",
                           style: const TextStyle(
                             fontSize: 12,
                             color: _MenuTheme.textSecondary,
@@ -1669,7 +1755,6 @@ class _EditMenuState extends State<EditMenu> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // 🎯 จัดปุ่มลบ ปุ่มขยาย ไว้ในคอลัมน์ (คุณสามารถกดค้างที่การ์ดเพื่อลากเปลี่ยนตำแหน่งได้เลยครับ)
                   Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1772,7 +1857,7 @@ class _EditMenuState extends State<EditMenu> {
           ),
         ),
         Text(
-          "+${detail.addonPrice?.toInt() ?? 0} บาท",
+          "+" + (detail.addonPrice?.toInt() ?? 0).toString() + " บาท",
           style: const TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,

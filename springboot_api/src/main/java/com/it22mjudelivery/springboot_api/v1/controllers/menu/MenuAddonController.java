@@ -97,17 +97,6 @@ public class MenuAddonController {
         }
     }
 
-    // ดึง addon groups รวมของร้าน (เฉพาะคลังกลาง)
-    @GetMapping("/groups")
-    public ResponseEntity<?> getAddonGroupsByRestaurant(
-            @RequestParam("username") String username) {
-
-        // 🎯 เปลี่ยนมาใช้เมธอดที่กรองเฉพาะ isglobal = true
-        List<Menuaddongroup> groups =
-                menuaddongroupRepository.findByUsername_UsernameAndIsglobalTrue(username);
-
-        return ResponseEntity.ok(groups);
-    }
     @Autowired
     private MenuaddondetailRepository menuaddondetailRepository;
 
@@ -174,17 +163,32 @@ public class MenuAddonController {
     }
 
     @PostMapping("/groups/{groupId}")
-    public ResponseEntity<?> deleteAddonGroup(@PathVariable Integer groupId) {
+    public ResponseEntity deleteAddonGroup(@PathVariable Integer groupId) {
+        Map response = new HashMap<>(); // สร้าง Map สำหรับเป็น JSON
         try {
             boolean isSuccess = addonService.deleteAddonGroup(groupId);
             if (isSuccess) {
-                return ResponseEntity.ok("ลบตัวเลือกเสริมสำเร็จ");
+                response.put("message", "ลบตัวเลือกเสริมสำเร็จ");
+                return ResponseEntity.ok(response);
             }
-            return ResponseEntity.badRequest().body("ไม่สามารถลบตัวเลือกเสริมได้");
+            response.put("message", "ไม่สามารถลบตัวเลือกเสริมได้");
+            return ResponseEntity.badRequest().body(response);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response); // ส่ง JSON กลับไป
         } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบส่วนกลาง");
+            response.put("message", "เกิดข้อผิดพลาดที่ระบบ");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    @GetMapping("/groups")
+    public ResponseEntity<?> getGroupsByUsername(@RequestParam("username") String username) {
+        try {
+            List<Menuaddongroup> groups = menuaddongroupRepository.findByUsername_Username(username);
+            return ResponseEntity.ok(groups);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาด: " + e.getMessage());
         }
     }
 

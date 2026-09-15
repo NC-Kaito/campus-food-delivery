@@ -85,13 +85,25 @@ public class OrderServiceImpl implements OrderService {
             Order savedOrder = orderRepo.save(order);
 
             // 2. วนลูปแกะรายการอาหาร (OrderDetail) จากก้อนรายการใน addOrderDto
+            // 2. วนลูปแกะรายการอาหาร (OrderDetail) จากก้อนรายการใน addOrderDto
             if (addOrderDto.getItems() != null) {
                 for (AddOrderDetailDto detailDto : addOrderDto.getItems()) {
 
                     Menu menu = menuRepo.findById(detailDto.getMenuId())
                             .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัสMenu"));
 
+                    // 🎯 จัดการชื่อเมนูและราคา Snapshot (ถ้า DTO ว่าง ให้ดึงจาก Entity Menu)
+                    String resolvedMenuName = (detailDto.getMenuNameAtOrder() != null && !detailDto.getMenuNameAtOrder().trim().isEmpty())
+                            ? detailDto.getMenuNameAtOrder()
+                            : menu.getMenuname();
+
+                    double resolvedPrice = detailDto.getPriceAtOrder() > 0
+                            ? detailDto.getPriceAtOrder()
+                            : menu.getPrice();
+
                     OrderDetail orderDetail = OrderDetail.builder()
+                            .menuNameAtOrder(resolvedMenuName) // 🎯 บันทึก Snapshot ชื่อเมนู
+                            .priceAtOrder(resolvedPrice)       // 🎯 บันทึก Snapshot ราคาเมนู
                             .qty(detailDto.getQty())
                             .subtotal(detailDto.getSubTotal())
                             .note(detailDto.getNote())
@@ -101,26 +113,35 @@ public class OrderServiceImpl implements OrderService {
 
                     OrderDetail savdOrderDetail = orderDetailRepo.save(orderDetail);
 
-                    // 3. วนลูปแกะรายการท็อปปิ้งเสริม (Orderdetailaddon) ที่ผูกอยู่กับจานอาหารรอบนั้นๆ
+                    // 3. วนลูปแกะรายการท็อปปิ้งเสริม (Orderdetailaddon)
                     if (detailDto.getAddons() != null) {
                         for (AddOrderDetailAddOnDto addOnDto : detailDto.getAddons()) {
 
                             Menuaddondetail menuaddondetail = menuaddondetailRepo.findById(addOnDto.getAddondetailid())
                                     .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัสAddOn"));
 
+                            // 🎯 จัดการชื่อ Add-on และราคา Snapshot
+                            String resolvedAddonName = (addOnDto.getAddonNameAtOrder() != null && !addOnDto.getAddonNameAtOrder().trim().isEmpty())
+                                    ? addOnDto.getAddonNameAtOrder()
+                                    : (menuaddondetail.getAddonmenu() != null ? menuaddondetail.getAddonmenu().getAddonname() : "ตัวเลือกเสริม");
+
+                            double resolvedAddonPrice = addOnDto.getPriceAtOrder() > 0
+                                    ? addOnDto.getPriceAtOrder()
+                                    : menuaddondetail.getAddonprice();
+
                             Orderdetailaddon orderdetailaddon = Orderdetailaddon.builder()
                                     .orderDetail(savdOrderDetail)
                                     .menuaddondetail(menuaddondetail)
-                                    .priceAtOrder(menuaddondetail.getAddonprice())
-                                    .addon_qty(addOnDto.getAddon_qty())
+                                    .addonNameAtOrder(resolvedAddonName) // 🎯 บันทึก Snapshot ชื่อ Add-on
+                                    .priceAtOrder(resolvedAddonPrice)     // 🎯 บันทึก Snapshot ราคา Add-on
+                                    .addon_qty(addOnDto.getAddon_qty() > 0 ? addOnDto.getAddon_qty() : 1)
                                     .build();
 
                             orderDetailAddonRepo.save(orderdetailaddon);
                         }
                     }
 
-                    // 🎯 4. (เพิ่มใหม่) วนลูปแกะรายการกับข้าวราดแกง (Orderdetailcurry)
-                    //    เมนูทั่วไปที่ไม่มีกับข้าว list นี้จะเป็น null/ว่าง โค้ดจะข้ามไปเฉยๆ ไม่กระทบ
+                    // 4. วนลูปแกะรายการกับข้าวราดแกง (Orderdetailcurry)
                     if (detailDto.getOrderDetailCurries() != null) {
                         for (AddOrderDetailCurryDto curryDto : detailDto.getOrderDetailCurries()) {
 
@@ -137,8 +158,7 @@ public class OrderServiceImpl implements OrderService {
                         }
                     }
                 }
-            }
-            return true; // บันทึกสำเร็จทุกตาราง ส่งค่ากลับไปบอก Controller
+            } return true; // บันทึกสำเร็จทุกตาราง ส่งค่ากลับไปบอก Controller
 
         } catch (Exception e) {
             System.out.println("🚨 เกิดข้อผิดพลาดในระบบ Service: " + e.getMessage());
@@ -322,27 +342,62 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public List<Order> getCancelOrdersByRestaurant(String username) {
         try {
-            List<String> cancelOrderStatus = Arrays.asList("issue_reported");
+            List<String> cancelOrderStatus = Arrays.asList("issue_reported", "reject");
             return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, cancelOrderStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่ต้องทำได้: " + e.getMessage());
         }
     }
 
+    @Override
+    public List getSuccessOrdersByRestaurant(String username) {
+        try {
+            // 🎯 ดึงสถานะที่ถือว่าสำเร็จแล้วทั้งหมด (รองรับทั้งตัวพิมพ์เล็กและตัวพิมพ์ใหญ่)
+            List successStatus = Arrays.asList("delivered", "Success", "success", "completed");
+            return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, successStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่สำเร็จแล้วของร้านค้าได้: " + e.getMessage());
+        }
+    }
+
+
+    @Override
+    @Transactional
+    public boolean updateOrderSuccess(int orderId, String newStatus) {
+        try {
+            Order order = orderRepo.findById(orderId)
+                    .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อรหัส: " + orderId));
+
+            if(newStatus.equalsIgnoreCase("success")){
+                order.setSuccesstime(LocalTime.now());
+                order.setOrderstatus("success");
+            } else {
+                order.setOrderstatus(newStatus);
+            }
+            orderRepo.save(order);
+
+            return true;
+        } catch (Exception e) {
+            System.err.println("🚨 อัปเดตสถานะไม่สำเร็จ: " + e.getMessage());
+            return false;
+        }
+    }
+
+
 
     @Override
     @Transactional
     public boolean updateOrderStatus(int orderId, String newStatus) {
         try {
-            // ค้นหาออเดอร์จาก Database
             Order order = orderRepo.findById(orderId)
                     .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบคำสั่งซื้อรหัส: " + orderId));
 
-            // อัปเดตสถานะใหม่
-            if(newStatus.equalsIgnoreCase("Success")){
+            if(newStatus.equalsIgnoreCase("success")){
                 order.setSuccesstime(LocalTime.now());
+                order.setOrderstatus("success"); // 🎯 บันทึกเป็นตัวพิมพ์เล็กให้เป็นมาตรฐานเดียวกัน
+            } else {
+                order.setOrderstatus(newStatus);
             }
-            order.setOrderstatus(newStatus);
             orderRepo.save(order);
 
             return true;
@@ -356,10 +411,21 @@ public class OrderServiceImpl implements OrderService {
     public List<Order> getSuccessOrdersByRider(String username) {
         try {
             // ดึงเฉพาะออเดอร์ที่สถานะเป็น Success หรือ Completed
-            List<String> successStatus = Arrays.asList("delivered", "Success");
+            List<String> successStatus = Arrays.asList("delivered", "Success", "success", "reviewSuccess");
             return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, successStatus);
         } catch (Exception e) {
             throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่สำเร็จแล้วได้: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public List getCancelOrdersByRider(String username) {
+        try {
+            // 🎯 กำหนดกลุ่มสถานะที่ถือว่าออเดอร์นี้ถูกยกเลิก/มีปัญหา
+            List cancelStatus = Arrays.asList("cancel", "cancelled", "issue_reported", "reject");
+            return orderRepo.findByRider_StudentidAndOrderstatusInOrderByOrderidDesc(username, cancelStatus);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่ถูกยกเลิกของไรเดอร์ได้: " + e.getMessage());
         }
     }
 

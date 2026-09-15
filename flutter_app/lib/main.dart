@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/services/member/in_app_notification_service.dart';
+import 'package:flutter_app/data/services/in_app_notification_service.dart';
 import 'package:flutter_app/main_login.dart';
 import 'package:google_fonts/google_fonts.dart';
 

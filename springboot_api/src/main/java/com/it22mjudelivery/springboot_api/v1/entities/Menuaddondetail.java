@@ -36,7 +36,7 @@
 
         @JsonIgnore
         @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "addongroupid", nullable = false)
+        @JoinColumn(name = "addongroupid", nullable = true)
         private Menuaddongroup menuaddongroup;
 
         @ManyToOne(fetch = FetchType.LAZY)

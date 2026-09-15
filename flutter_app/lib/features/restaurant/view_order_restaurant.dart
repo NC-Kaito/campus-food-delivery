@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
+import 'package:flutter_app/data/services/in_app_notification_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -35,7 +36,9 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
     final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
   String _formatDateTime(dynamic rawDate) {
@@ -49,10 +52,10 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       }
       final d = dt.day.toString().padLeft(2, '0');
       final m = dt.month.toString().padLeft(2, '0');
-      final y = dt.year + 543;
+      final y = (dt.year + 543).toString();
       final hr = dt.hour.toString().padLeft(2, '0');
       final min = dt.minute.toString().padLeft(2, '0');
-      return "$d/$m/$y $hr:$min น.";
+      return d + "/" + m + "/" + y + " " + hr + ":" + min + " น.";
     } catch (e) {
       return rawDate.toString();
     }
@@ -132,6 +135,16 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
         ),
       );
 
+      // แจ้งเตือนภายในฝั่งร้านค้าทันทีเมื่อกด "รับออเดอร์" สำเร็จ
+      if (newStatus.toLowerCase() == 'goingtorestaurant') {
+        InAppNotificationService.showTopBanner(
+          title: 'รับออเดอร์สำเร็จ 👨‍🍳',
+          message: 'ออเดอร์ #${orderId} ถูกยืนยันแล้ว และเริ่มเตรียมอาหาร',
+          icon: Icons.restaurant_rounded,
+          color: primaryGreen,
+        );
+      }
+
       Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
@@ -140,7 +153,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text("🚨 ไม่สามารถอัปเดตสถานะได้: $e"),
+          content: Text("🚨 ไม่สามารถอัปเดตสถานะได้: " + e.toString()),
           backgroundColor: _danger,
         ),
       );
@@ -222,32 +235,26 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
     );
   }
 
+  // 🎯 ดึงข้อมูลรายการอาหารจาก Snapshot
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    List<dynamic> rawCurries = [];
-    if (item.orderDetailCurries != null &&
-        item.orderDetailCurries!.isNotEmpty) {
-      rawCurries = item.orderDetailCurries!;
-    } else {
-      try {
-        final jsonItem = (item as dynamic).toJson();
-        rawCurries =
-            jsonItem['orderDetailCurries'] ??
-            jsonItem['orderdetailcurries'] ??
-            [];
-      } catch (_) {}
-    }
-
+    List<dynamic> rawCurries = item.orderDetailCurries ?? [];
     final bool isCurryDish = rawCurries.isNotEmpty;
-    String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
-    if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
+
+    // 🎯 ดึงชื่อเมนูจาก Snapshot
+    String displayMenuName = item.menuNameAtOrder.isNotEmpty
+        ? item.menuNameAtOrder
+        : (item.menu?.menuName ?? "รายการเมนู");
+
+    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
+      displayMenuName =
+          "ข้าวราดแกง (" + rawCurries.length.toString() + " อย่าง)";
     }
 
     List<Map<String, dynamic>> curriesList = [];
     for (var e in rawCurries) {
       String name = '';
       String img = '';
-      int price = 0;
+      double price = 0.0;
 
       if (e is Map) {
         final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
@@ -264,22 +271,20 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     menuMap['menuImage'] ??
                     '')
                 .toString();
-        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0).toInt();
+        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0.0).toDouble();
       } else {
         try {
           name =
               ((e as dynamic).menu?.menuName ??
                       (e as dynamic).menu?.menuname ??
-                      (e as dynamic).name ??
                       '')
                   .toString();
           img =
               ((e as dynamic).menu?.menuImage ??
                       (e as dynamic).menu?.imageurl ??
-                      (e as dynamic).image ??
                       '')
                   .toString();
-          price = ((e as dynamic).priceAtOrder ?? 0).toInt();
+          price = ((e as dynamic).priceAtOrder ?? 0.0).toDouble();
         } catch (_) {}
       }
 
@@ -288,72 +293,15 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       }
     }
 
-    List<dynamic> rawAddons = [];
-    if (item.addons.isNotEmpty) {
-      rawAddons = item.addons;
-    } else {
-      try {
-        rawAddons = (item as dynamic).toJson()['addons'] ?? [];
-      } catch (_) {}
-    }
-
+    // 🎯 ดึงชื่อและราคา Add-on จาก Snapshot
     Map<String, Map<String, dynamic>> groupedAddons = {};
-    for (var addon in rawAddons) {
-      String name = '';
-      int price = 0;
-      int qty = 1;
-      bool canIncreaseQty = false;
+    for (var addon in item.addons) {
+      String name = addon.addonNameAtOrder.isNotEmpty
+          ? addon.addonNameAtOrder
+          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
 
-      if (addon is Map) {
-        name =
-            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
-            addon['addonMenu']?['addonName'] ??
-            addon['name'] ??
-            '';
-        price =
-            (addon['priceAtOrder'] ??
-                    addon['menuAddonDetail']?['addonPrice'] ??
-                    0)
-                .toInt();
-        qty = (addon['addonQty'] ?? addon['addon_qty'] ?? 1).toInt();
-
-        final dynamic menu =
-            addon['menuAddonDetail']?['addonMenu'] ??
-            addon['addonMenu'] ??
-            addon['menuAddon'];
-        if (menu != null) {
-          if (menu['canIncreaseQuantity'] != null) {
-            canIncreaseQty = menu['canIncreaseQuantity'] == true;
-          } else if (menu['allowQuantity'] != null) {
-            canIncreaseQty = menu['allowQuantity'] == true;
-          } else if (menu['isMultiple'] != null) {
-            canIncreaseQty = menu['isMultiple'] == true;
-          }
-        }
-      } else {
-        try {
-          name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
-          price =
-              ((addon as dynamic).priceAtOrder ??
-                      (addon as dynamic).menuAddonDetail?.addonPrice ??
-                      0)
-                  .toInt();
-          qty = ((addon as dynamic).addonQty ?? 1).toInt();
-
-          final dynamic menu =
-              (addon as dynamic).menuAddonDetail?.addonMenu ??
-              (addon as dynamic).addonMenu;
-          if (menu != null) {
-            if (menu.canIncreaseQuantity != null) {
-              canIncreaseQty = menu.canIncreaseQuantity == true;
-            } else if (menu.allowQuantity != null) {
-              canIncreaseQty = menu.allowQuantity == true;
-            } else if (menu.isMultiple != null) {
-              canIncreaseQty = menu.isMultiple == true;
-            }
-          }
-        } catch (_) {}
-      }
+      double price = addon.priceAtOrder;
+      int qty = addon.addonQty ?? 1;
 
       if (name.isNotEmpty) {
         if (groupedAddons.containsKey(name)) {
@@ -364,40 +312,27 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           groupedAddons[name] = {
             'qty': qty,
             'unitPrice': price,
-            'canIncreaseQty': canIncreaseQty,
+            'canIncreaseQty': qty > 1,
           };
         }
       }
     }
 
-    int totalItemPrice = 0;
-    int addonsSum = 0;
-    for (var addon in groupedAddons.values) {
-      addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
-    }
-
-    try {
-      final jsonItem = (item as dynamic).toJson();
-      var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
-      if (rawSubtotal != null) {
-        totalItemPrice = (rawSubtotal as num).toInt();
+    // 🎯 ราคารวมของรายการนี้ (subtotal)
+    double totalItemPrice = item.subTotal;
+    if (totalItemPrice <= 0) {
+      double addonsSum = 0.0;
+      for (var addon in groupedAddons.values) {
+        addonsSum += (addon['unitPrice'] as double) * (addon['qty'] as int);
       }
-    } catch (_) {}
-
-    if (totalItemPrice == 0) {
-      int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
-      if (baseMenuPrice == 0) {
-        try {
-          final jsonItem = (item as dynamic).toJson();
-          baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
-        } catch (_) {}
-      }
-      int curriesSum = 0;
+      double curriesSum = 0.0;
       for (var curry in curriesList) {
-        curriesSum += curry['price'] as int;
+        curriesSum += (curry['price'] as double);
       }
-      int baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
-      totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
+      double basePrice = item.priceAtOrder > 0
+          ? item.priceAtOrder
+          : (item.menu?.price ?? 0.0);
+      totalItemPrice = (basePrice + curriesSum + addonsSum) * item.qty;
     }
 
     String rawMenuUrl = item.menu?.menuImage ?? '';
@@ -453,7 +388,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        "$totalItemPrice บาท",
+                        totalItemPrice.toStringAsFixed(0) + " บาท",
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -553,7 +488,10 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                                               children: [
                                                 TextSpan(
                                                   text:
-                                                      "${entry.value['qty']} ",
+                                                      (entry.value['qty']
+                                                              as int)
+                                                          .toString() +
+                                                      " ",
                                                   style: const TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -576,7 +514,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
                   if (item.note.isNotEmpty) ...[
                     Text(
-                      "หมายเหตุ: ${item.note}",
+                      "หมายเหตุ: " + item.note,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey.shade600,
@@ -589,7 +527,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: Text(
-                      "${item.qty} จำนวน",
+                      item.qty.toString() + " จำนวน",
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -616,7 +554,9 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
     final bool isIssueReported = currentStatus == "issue_reported";
     final bool isCanceled =
-        currentStatus == "cancel" || currentStatus == "cancelled";
+        currentStatus == "cancel" ||
+        currentStatus == "cancelled" ||
+        currentStatus == "reject";
 
     int currentStep = 1;
     if (currentStatus == "waitingrestaurant" || currentStatus == "pending") {
@@ -648,33 +588,23 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       final String fn = order.member?.firstname ?? "";
       final String ln = order.member?.lastname ?? "";
       if (fn.isNotEmpty || ln.isNotEmpty) {
-        customerName = "$fn $ln".trim();
+        customerName = (fn + " " + ln).trim();
       }
     }
 
     final bool hasRider = order.rider != null;
     String riderName = hasRider
-        ? "${order.rider?.firstName ?? ''} ${order.rider?.lastName ?? ''}"
+        ? ((order.rider?.firstName ?? '') + " " + (order.rider?.lastName ?? ''))
               .trim()
         : "กำลังค้นหาไรเดอร์...";
     String riderPhone = hasRider ? (order.rider?.phone ?? "-") : "-";
     String vehiclePlate = hasRider ? (order.rider?.vehiclePlate ?? "-") : "-";
     String riderImgUrl = _getFinalImageUrl(order.rider?.studentCardImage);
 
-    // 🎯 ดึงรูปภาพหลักฐานผ่าน JSON ป้องกัน NoSuchMethodError
     String cancelImageUrl = "";
-    try {
-      final jsonOrder = (order as dynamic).toJson();
-      dynamic rawCancelImg =
-          jsonOrder['cancelImage'] ??
-          jsonOrder['cancel_image'] ??
-          jsonOrder['evidenceImage'] ??
-          jsonOrder['evidence_image'] ??
-          jsonOrder['cancelImg'] ??
-          jsonOrder['cancel_img'] ??
-          jsonOrder['image'];
-      cancelImageUrl = _getFinalImageUrl(rawCancelImg?.toString());
-    } catch (_) {}
+    if (order.cancelimage != null && order.cancelimage!.isNotEmpty) {
+      cancelImageUrl = _getFinalImageUrl(order.cancelimage);
+    }
 
     final String formattedDate = _formatDateTime(order.orderdate);
 
@@ -721,7 +651,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                       style: TextStyle(color: Colors.black87),
                     ),
                     TextSpan(
-                      text: "K$orderId",
+                      text: "K" + orderId,
                       style: TextStyle(color: primaryGreen),
                     ),
                   ],
@@ -740,7 +670,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    "สั่งซื้อเมื่อ: $formattedDate",
+                    "สั่งซื้อเมื่อ: " + formattedDate,
                     style: TextStyle(
                       fontSize: 13,
                       color: Colors.grey.shade700,
@@ -758,9 +688,11 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: Colors.red.shade50, // 🎯 เปลี่ยนจาก orange เป็น red
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(
+                    color: Colors.red.shade200,
+                  ), // 🎯 เปลี่ยนเป็น red
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,7 +701,8 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                       children: [
                         Icon(
                           Icons.support_agent_rounded,
-                          color: Colors.orange.shade700,
+                          color:
+                              Colors.red.shade700, // 🎯 เปลี่ยนไอคอนเป็นสีแดง
                           size: 28,
                         ),
                         const SizedBox(width: 12),
@@ -779,7 +712,9 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Colors.orange.shade800,
+                              color: Colors
+                                  .red
+                                  .shade800, // 🎯 เปลี่ยนข้อความแจ้งเตือนเป็นสีแดง
                               height: 1.3,
                             ),
                           ),
@@ -800,7 +735,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                             style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                           TextSpan(
-                            text: "${order.cancelDetail ?? 'ไม่มีข้อมูลระบุ'}",
+                            text: order.cancelDetail ?? 'ไม่มีข้อมูลระบุ',
                           ),
                         ],
                       ),
@@ -879,98 +814,11 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     ],
 
                     const SizedBox(height: 16),
-                    const Divider(height: 1, color: Colors.black12),
-                    const SizedBox(height: 12),
-                    const Text(
-                      "ข้อมูลติดต่อลูกค้าและผู้จัดส่ง:",
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.person_rounded,
-                          size: 20,
-                          color: Colors.orange.shade700,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "ลูกค้า: $customerName",
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.phone_in_talk_rounded,
-                          size: 20,
-                          color: Colors.blue.shade700,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          customerPhone,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.two_wheeler_rounded,
-                          size: 20,
-                          color: primaryGreen,
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            "ไรเดอร์: $riderName",
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.phone_in_talk_rounded,
-                          size: 20,
-                          color: Colors.blue.shade700,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          riderPhone,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
             ],
-
             // ── 2. กล่องยกเลิกคำสั่งซื้อ ──
             if (isCanceled) ...[
               Container(
@@ -1019,7 +867,10 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                           ),
                           TextSpan(
                             text:
-                                "${order.cancelDetail ?? 'ไม่มีผู้จัดส่งรับงานภายในเวลาที่กำหนด'}",
+                                order.cancelDetail ??
+                                (currentStatus == 'reject'
+                                    ? 'ร้านค้าปฏิเสธการรับคำสั่งซื้อ'
+                                    : 'ไม่มีผู้จัดส่งรับงานภายในเวลาที่กำหนด'),
                           ),
                         ],
                       ),
@@ -1211,7 +1062,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          "เบอร์โทร: $customerPhone",
+                          "เบอร์โทร: " + customerPhone,
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[700],
@@ -1226,6 +1077,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
             const SizedBox(height: 20),
 
+            // ── 5. ผู้จัดส่ง ──
             // ── 5. ผู้จัดส่ง ──
             const Text(
               "ผู้จัดส่ง",
@@ -1245,17 +1097,42 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
               ),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: primaryGreen.withOpacity(0.15),
-                    backgroundImage: riderImgUrl.isNotEmpty
-                        ? NetworkImage(riderImgUrl)
-                        : null,
-                    child: riderImgUrl.isEmpty
-                        ? Icon(Icons.two_wheeler, color: primaryGreen)
-                        : null,
+                  // 🎯 แก้ไขส่วนนี้ให้แสดงรูปภาพโปรไฟล์ไรเดอร์ถ้ามี
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(50),
+                    child:
+                        hasRider &&
+                            order.rider!.profileImage != null &&
+                            order.rider!.profileImage!.isNotEmpty
+                        ? Image.network(
+                            _getFinalImageUrl(order.rider!.profileImage),
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                                  width: 50,
+                                  height: 50,
+                                  color: primaryGreen.withOpacity(0.15),
+                                  child: Icon(
+                                    Icons.two_wheeler,
+                                    color: primaryGreen,
+                                    size: 26,
+                                  ),
+                                ),
+                          )
+                        : Container(
+                            width: 50,
+                            height: 50,
+                            color: primaryGreen.withOpacity(0.15),
+                            child: Icon(
+                              Icons.two_wheeler,
+                              color: primaryGreen,
+                              size: 26,
+                            ),
+                          ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1270,9 +1147,12 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                                 : Colors.grey.shade600,
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Text(
-                          "เบอร์โทร: $riderPhone  |  ทะเบียนรถ: $vehiclePlate",
+                          "เบอร์โทร: " +
+                              riderPhone +
+                              "  |  ทะเบียนรถ: " +
+                              vehiclePlate,
                           style: TextStyle(
                             fontSize: 13,
                             color: Colors.grey[700],
@@ -1330,7 +1210,9 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                       icon: BitmapDescriptor.defaultMarkerWithHue(
                         BitmapDescriptor.hueRed,
                       ),
-                      infoWindow: InfoWindow(title: "จุดจัดส่ง: $customerName"),
+                      infoWindow: InfoWindow(
+                        title: "จุดจัดส่ง: " + customerName,
+                      ),
                     ),
                   },
                 ),
@@ -1404,7 +1286,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                   ),
                 ),
                 Text(
-                  "${foodSubtotal.toStringAsFixed(0)} บาท",
+                  foodSubtotal.toStringAsFixed(0) + " บาท",
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -1446,8 +1328,8 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
               onPressed: _isUpdating
                   ? null
                   : () => _updateOrderStatus(
-                      "Reject",
-                      "ปฏิเสธออเดอร์เรียบร้อยแล้วครับ",
+                      "reject",
+                      "ปฏิเสธออเดอร์เรียบร้อย",
                       isDangerMessage: true,
                     ),
               style: OutlinedButton.styleFrom(

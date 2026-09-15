@@ -54,9 +54,11 @@ public class MemberServiceImpl implements MemberService{
         return member;
     }
 
-    public boolean doUpdateProfileMember(String username, String phone, String profileImg){
+    public boolean doUpdateProfileMember(String username, String firstName, String lastName, String phone, String profileImg){
         Member member = memberRepository.findByUsername(username).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
 
+        member.setFirstname(firstName);
+        member.setLastname(lastName);
         member.setProfileimg(profileImg);
         member.setPhone(phone);
         memberRepository.save(member);

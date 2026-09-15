@@ -81,6 +81,42 @@ public class RiderController {
         }
     }
 
+    @PostMapping("/updateProfileRider")
+    public ResponseEntity<?> updateProfileRider(@RequestBody RiderDto riderDto) {
+        try {
+            boolean isResult = riderService.updateProfileRider(
+                    riderDto.getStudentid(),
+                    riderDto.getPhone(),
+                    riderDto.getProfileRiderImage()
+            );
+
+            if (isResult) {
+                return ResponseEntity.ok("แก้ไขโปรไฟล์สำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("แก้ไขไม่สำเร็จ ข้อมูลไม่ถูกต้อง");
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    @PostMapping(value = "/uploadProfileImage", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> uploadProfileImage(@RequestPart("file") MultipartFile file) {
+        try {
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "ไม่พบไฟล์รูปภาพ"));
+            }
+            String imageUrl = saveFile(file, "profileImage");
+            return ResponseEntity.ok(Map.of("url", imageUrl));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", "อัปโหลดไม่สำเร็จ: " + e.getMessage()));
+        }
+    }
+
+
+
     // 🎯 เปลี่ยนไส้ในฟังก์ชันนี้ให้ยิงไฟล์ขึ้น Cloudinary แทน
     private String saveFile(MultipartFile file, String subFolder) {
         if (file == null || file.isEmpty()) return null;
@@ -109,6 +145,8 @@ public class RiderController {
             ));
         }
     }
+
+
 
     @PostMapping("/updateIsActive")
     public ResponseEntity<?> updateRiderStatus(@RequestBody Map<String, Object> payload) {

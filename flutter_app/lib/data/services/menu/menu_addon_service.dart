@@ -83,9 +83,14 @@ class MenuAddonService {
       }
       return false;
     } on DioException catch (e) {
-      throw Exception('Error: $e');
+      // 🎯 ดึง Message แท้ๆ จาก JSON ที่ Spring Boot ส่งมา
+      final data = e.response?.data;
+      if (data != null && data is Map && data['message'] != null) {
+        throw Exception(data['message']);
+      }
+      throw Exception("Error: " + e.toString());
     } catch (e) {
-      throw Exception('Error: $e');
+      throw Exception("Error: " + e.toString());
     }
   }
 

@@ -31,6 +31,10 @@ public class Orderdetailaddon {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Menuaddondetail menuaddondetail;
 
+    @Column(nullable = false)
+    private String addonNameAtOrder;
+
+    @Column(nullable = false)
     private double priceAtOrder;
 
     @Column(nullable = true)

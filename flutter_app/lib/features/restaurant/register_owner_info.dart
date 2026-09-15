@@ -1,7 +1,7 @@
 // features/restaurant/register_owner_info.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
-import 'package:flutter_app/features/restaurant/login_restaurant.dart';
+import 'package:flutter_app/main_login.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:dio/dio.dart';
@@ -385,7 +385,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
             ),
           );
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const LoginRestaurant()),
+            MaterialPageRoute(builder: (context) => const MainLogin()),
             (route) => false,
           );
         }

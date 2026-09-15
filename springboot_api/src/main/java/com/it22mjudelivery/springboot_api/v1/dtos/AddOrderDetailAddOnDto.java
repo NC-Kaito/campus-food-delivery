@@ -9,6 +9,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class AddOrderDetailAddOnDto {
     private int addondetailid;
-
+    private String addonNameAtOrder; // 🎯 เพิ่มฟิลด์ชื่อ Add-on Snapshot
+    private double priceAtOrder;     // 🎯 เพิ่มฟิลด์ราคา Add-on Snapshot
     private int addon_qty;
 }

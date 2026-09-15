@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/review_model.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
@@ -49,8 +51,8 @@ class RiderService {
         ),
 
         "drivingLicenseImg": await MultipartFile.fromFile(
-          vehicleImagePath,
-          filename: 'vehicle_${rider.studentid}.jpg',
+          drivingLicensePath,
+          filename: 'license_${rider.studentid}.jpg',
         ),
       });
 
@@ -83,7 +85,7 @@ class RiderService {
     }
   }
 
-  Future<void> updateProfileMember(RiderModel rider) async {
+  Future<void> updateProfileRider(RiderModel rider) async {
     try {
       await DioClient.dio.post(
         "/v1/rider/updateProfileRider",
@@ -94,6 +96,29 @@ class RiderService {
       throw errorMessage;
     } catch (e) {
       rethrow;
+    }
+  }
+
+  // 🎯 ฟังก์ชันอัปโหลดรูปโปรไฟล์ไรเดอร์ขึ้น Cloudinary
+  Future<String?> uploadRiderProfileImage(File file) async {
+    try {
+      String fileName = file.path.split('/').last;
+      FormData formData = FormData.fromMap({
+        "file": await MultipartFile.fromFile(file.path, filename: fileName),
+      });
+
+      final response = await DioClient.dio.post(
+        "/v1/rider/uploadProfileImage", // 👈 ปรับ Endpoint ให้ตรงกับ Controller
+        data: formData,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        return response.data["url"];
+      }
+      return null;
+    } catch (e) {
+      debugPrint("Error uploading image: $e");
+      return null;
     }
   }
 

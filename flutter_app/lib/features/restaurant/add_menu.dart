@@ -563,23 +563,29 @@ class _AddMenuState extends State<AddMenu> {
       suffixIcon: suffixIcon,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(
+          color: Colors.black,
+          width: 0,
+        ), // 🎯 เพิ่มขอบดำ
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(
+          color: Colors.black,
+          width: 0,
+        ), // 🎯 เพิ่มขอบดำ
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _MenuTheme.primary, width: 1.6),
+        borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.6),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.2),
+        borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.2),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.6),
+        borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.6),
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -619,10 +625,10 @@ class _AddMenuState extends State<AddMenu> {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: _MenuTheme.primary.withOpacity(0.12),
+            color: const Color.fromARGB(255, 196, 196, 196).withOpacity(0.12),
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Icon(icon, size: 17, color: _MenuTheme.primary),
+          child: Icon(icon, size: 17, color: Color(0xFF00B300)),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -744,7 +750,7 @@ class _AddMenuState extends State<AddMenu> {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            color: _MenuTheme.textSecondary,
+                            color: Color.fromARGB(255, 0, 0, 0),
                           ),
                         ),
                         if (!_isRiceCurryRestaurant)
@@ -826,7 +832,10 @@ class _AddMenuState extends State<AddMenu> {
                         decoration: BoxDecoration(
                           color: _MenuTheme.fieldBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: _MenuTheme.border),
+                          border: Border.all(
+                            color: Colors.black,
+                            width: 0,
+                          ), // 🎯 เปลี่ยนขอบเป็นสีดำ
                         ),
                         child: Row(
                           children: [
@@ -967,16 +976,24 @@ class _AddMenuState extends State<AddMenu> {
                                         Icon(
                                           Icons.add_photo_alternate_rounded,
                                           size: 40,
-                                          color: _MenuTheme.textSecondary
-                                              .withOpacity(0.6),
+                                          color: const Color.fromARGB(
+                                            255,
+                                            0,
+                                            0,
+                                            0,
+                                          ).withOpacity(0.6),
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
                                           "แตะเพื่อเลือกรูป",
                                           style: TextStyle(
                                             fontSize: 12.5,
-                                            color: _MenuTheme.textSecondary
-                                                .withOpacity(0.8),
+                                            color: const Color.fromARGB(
+                                              255,
+                                              0,
+                                              0,
+                                              0,
+                                            ).withOpacity(0.8),
                                           ),
                                         ),
                                       ],
@@ -1035,7 +1052,7 @@ class _AddMenuState extends State<AddMenu> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: _MenuTheme.textSecondary,
+                        color: Color.fromARGB(255, 0, 0, 0),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1060,7 +1077,7 @@ class _AddMenuState extends State<AddMenu> {
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: _MenuTheme.textSecondary,
+                          color: Color.fromARGB(255, 0, 0, 0),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -1080,7 +1097,7 @@ class _AddMenuState extends State<AddMenu> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: _MenuTheme.textSecondary,
+                        color: Color.fromARGB(255, 0, 0, 0),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -1224,7 +1241,7 @@ class _AddMenuState extends State<AddMenu> {
                               ),
                               prefixIcon: const Icon(
                                 Icons.search_rounded,
-                                color: _MenuTheme.textSecondary,
+                                color: Color.fromARGB(255, 0, 0, 0),
                                 size: 22,
                               ),
                               suffixIcon: _addonSearchController.text.isNotEmpty
@@ -1243,7 +1260,17 @@ class _AddMenuState extends State<AddMenu> {
                                   : null,
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide.none,
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 0,
+                                ), // 🎯 เพิ่มขอบดำ
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(16),
+                                borderSide: const BorderSide(
+                                  color: Colors.black,
+                                  width: 0,
+                                ), // 🎯 เพิ่มขอบดำ
                               ),
                               filled: true,
                               fillColor: Colors.white,
@@ -1648,6 +1675,7 @@ class _AddMenuState extends State<AddMenu> {
       decoration: BoxDecoration(
         color: _MenuTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black, width: 0.3),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(

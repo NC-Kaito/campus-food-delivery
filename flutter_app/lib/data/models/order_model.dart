@@ -57,7 +57,12 @@ class OrderModel {
       cancelDetail: json['canceldetail'] ?? json['cancelDetail'],
 
       // 🎯 3. ดักจับฟิลด์รูปภาพจาก Spring Boot (ทั้ง camelCase และ lowercase)
-      cancelimage: json['cancelimage'] ?? json['cancelImage'],
+      cancelimage:
+          json['cancelimage'] ??
+          json['cancelImage'] ??
+          json['cancel_image'] ??
+          json['cancelImg'] ??
+          json['cancel_img'],
 
       successtime:
           json['successtime']?.toString() ?? json['successTime']?.toString(),

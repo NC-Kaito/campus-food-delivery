@@ -40,6 +40,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
   final ImagePicker _picker = ImagePicker();
 
   String? restaurantimage;
+  String? imagecardid; // 🎯 ตัวแปรเก็บ URL รูปบัตรประชาชน
   LatLng? _restaurantLatLng;
 
   bool _obscurePassword = true;
@@ -114,6 +115,7 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
       setState(() {
         restaurantModel = result;
         restaurantimage = result.restaurantImage;
+        imagecardid = result.imagecardid; // 🎯 เก็บค่า URL รูปบัตรประชาชน
 
         if (result.latitude != null && result.longitude != null) {
           _restaurantLatLng = LatLng(result.latitude!, result.longitude!);
@@ -341,6 +343,66 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
     }
   }
 
+  // 🎯 ฟังก์ชันสำหรับกดดูรูปบัตรประชาชนขนาดเต็ม
+  void _showFullScreenImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Image.network(
+                Uri.encodeFull(imageUrl),
+                fit: BoxFit.contain,
+                loadingBuilder: (context, child, progress) {
+                  if (progress == null) return child;
+                  return Container(
+                    height: 250,
+                    color: Colors.white,
+                    child: const Center(
+                      child: CircularProgressIndicator(color: _primary),
+                    ),
+                  );
+                },
+                errorBuilder: (context, error, stackTrace) => Container(
+                  padding: const EdgeInsets.all(24),
+                  color: Colors.white,
+                  child: const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.broken_image_rounded,
+                        size: 48,
+                        color: Colors.grey,
+                      ),
+                      SizedBox(height: 8),
+                      Text("ไม่สามารถโหลดรูปภาพได้"),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            IconButton(
+              icon: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 20),
+              ),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildLabel(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, top: 12),
@@ -481,6 +543,9 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
   @override
   Widget build(BuildContext context) {
     final String finalProfileUrl = _getFinalImageUrl(restaurantimage);
+    final String finalCardUrl = _getFinalImageUrl(
+      imagecardid,
+    ); // 🎯 URL บัตรประชาชน
 
     return Scaffold(
       backgroundColor: _bg,
@@ -496,7 +561,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Column(
                       children: [
-                        // 🎯 เพิ่มส่วนหัวแบบมีไอคอนกล่องสีส้มพร้อมเงา ตามแบบในรูปครับ
                         Row(
                           children: [
                             Container(
@@ -873,25 +937,14 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                               _buildLabel("อีเมล (Email)"),
                               TextFormField(
                                 controller: emailController,
-                                enabled: _isEditable,
-                                keyboardType: TextInputType.emailAddress,
-                                validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.trim().isEmpty)
-                                          return "กรุณากรอกอีเมล";
-                                        if (v.contains(' '))
-                                          return "ต้องไม่มีช่องว่าง";
-                                        if (!RegExp(
-                                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                        ).hasMatch(v))
-                                          return "รูปแบบอีเมลไม่ถูกต้อง";
-                                        return null;
-                                      }
-                                    : null,
+                                enabled:
+                                    false, // 🎯 ล็อกไม่ให้แก้ไข (false เสมอ)
                                 decoration: _inputDecoration(
-                                  enabled: _isEditable,
+                                  enabled:
+                                      false, // 🎯 แสดงพื้นหลังสีเทา เพื่อบอกว่าช่องนี้แก้ไขไม่ได้
                                   suffixIcon: Icon(
-                                    Icons.email_outlined,
+                                    Icons
+                                        .lock_outline_rounded, // 🎯 เปลี่ยนไอคอนเป็นรูปแม่กุญแจให้ดูชัดเจนขึ้น
                                     color: Colors.grey[400],
                                   ),
                                 ),
@@ -919,6 +972,145 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                     color: Colors.grey[400],
                                   ),
                                 ),
+                              ),
+
+                              // ─── 🎯 ส่วนแสดงรูปภาพบัตรประชาชน ───
+                              _buildLabel("รูปถ่ายบัตรประชาชน (ID Card)"),
+                              Container(
+                                width: double.infinity,
+                                height: 160,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF0F1F3),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                    width: 1.2,
+                                  ),
+                                ),
+                                child: finalCardUrl.isNotEmpty
+                                    ? InkWell(
+                                        borderRadius: BorderRadius.circular(16),
+                                        onTap: () =>
+                                            _showFullScreenImage(finalCardUrl),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            15,
+                                          ),
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Image.network(
+                                                Uri.encodeFull(finalCardUrl),
+                                                fit: BoxFit.cover,
+                                                loadingBuilder:
+                                                    (
+                                                      context,
+                                                      child,
+                                                      loadingProgress,
+                                                    ) {
+                                                      if (loadingProgress ==
+                                                          null)
+                                                        return child;
+                                                      return const Center(
+                                                        child:
+                                                            CircularProgressIndicator(
+                                                              color: _primary,
+                                                            ),
+                                                      );
+                                                    },
+                                                errorBuilder:
+                                                    (
+                                                      context,
+                                                      error,
+                                                      stackTrace,
+                                                    ) => const Center(
+                                                      child: Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                            Icons
+                                                                .broken_image_rounded,
+                                                            size: 36,
+                                                            color: Colors.grey,
+                                                          ),
+                                                          SizedBox(height: 4),
+                                                          Text(
+                                                            "ไม่สามารถโหลดรูปบัตรได้",
+                                                            style: TextStyle(
+                                                              color:
+                                                                  Colors.grey,
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ),
+                                              ),
+                                              Positioned(
+                                                right: 8,
+                                                bottom: 8,
+                                                child: Container(
+                                                  padding:
+                                                      const EdgeInsets.symmetric(
+                                                        horizontal: 8,
+                                                        vertical: 4,
+                                                      ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.black
+                                                        .withOpacity(0.6),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
+                                                  ),
+                                                  child: const Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(
+                                                        Icons.zoom_in,
+                                                        color: Colors.white,
+                                                        size: 14,
+                                                      ),
+                                                      SizedBox(width: 4),
+                                                      Text(
+                                                        "แตะเพื่อดูขนาดเต็ม",
+                                                        style: TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 11,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    : const Center(
+                                        child: Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.badge_outlined,
+                                              size: 40,
+                                              color: Colors.grey,
+                                            ),
+                                            SizedBox(height: 6),
+                                            Text(
+                                              "ยังไม่มีรูปภาพบัตรประชาชน",
+                                              style: TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                               ),
                             ],
                           ),

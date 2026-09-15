@@ -1,36 +1,21 @@
 // features/restaurant/restaurant_navbar.dart
-import 'dart:async'; // 🎯 นำเข้า Timer สำหรับดึงออเดอร์ Real-time
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
-import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
 import 'package:flutter_app/features/restaurant/account_management.dart';
-import 'package:flutter_app/features/restaurant/profile_restaurant.dart';
-// TODO: แก้ path นี้ให้ตรงกับตำแหน่งไฟล์ LoginRestaurant จริงในโปรเจกต์ของคุณ
-import 'package:flutter_app/features/restaurant/login_restaurant.dart';
-import 'package:flutter_app/features/restaurant/list_order_restaurant.dart'; // 🎯 นำเข้าหน้า List Order
 import 'package:flutter_app/global_data.dart';
-import 'package:flutter_app/main_login.dart';
 
 class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
   final String title;
-  final int cartCount;
-  final int notificationCount;
 
-  const RestaurantNavbar({
-    super.key,
-    required this.title,
-    this.cartCount = 0,
-    this.notificationCount = 0,
-  });
+  const RestaurantNavbar({super.key, required this.title});
 
-  static const Color orange = Color(0xFFFF8C00);
-  static const Color orangeSoft = Color(0xFFFFF1DE);
+  // 🎯 เปลี่ยนธีมสีเป็นสีเขียว
+  static const Color primaryGreen = Color(0xFF00B300);
+  static const Color greenSoft = Color(0xFFE8F5E9);
 
-  // ระยะห่างมาตรฐานเดียวกันทุกจุดในแถบเมนู เพื่อความสม่ำเสมอ
   static const double gap = 10;
-  static const double radius = 12;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
@@ -41,56 +26,17 @@ class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
 
 class _RestaurantNavbarState extends State<RestaurantNavbar> {
   final RestaurantService restaurantService = RestaurantService();
-  final OrderService _orderService =
-      OrderService(); // 🎯 สแตนด์บาย OrderService
   RestaurantModel? restaurantModel;
   String? restaurantImage;
   bool _isLoadingProfile = true;
-
-  // 🎯 ตัวแปรจัดการ Real-time สำหรับจำนวนออเดอร์ใหม่ (Navbar ดึงเอง ไม่ต้องรับจากหน้าอื่น)
-  Timer? _autoRefreshTimer;
-  int _newOrderCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadRestaurantData();
-    _fetchNewOrderCount(); // 🎯 ดึงจำนวนออเดอร์ตอนเปิด Navbar
-    _startAutoRefresh(); // 🎯 รีเฟรชทุกๆ 10 วิ
   }
 
-  @override
-  void dispose() {
-    _autoRefreshTimer?.cancel();
-    super.dispose();
-  }
-
-  void _startAutoRefresh() {
-    _autoRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
-      if (mounted) _fetchNewOrderCount();
-    });
-  }
-
-  // 🎯 ดึงจำนวนออเดอร์ที่ยังรอดำเนินการ (waiting) ของร้าน มาโชว์เป็น badge
-  Future<void> _fetchNewOrderCount() async {
-    try {
-      final waitingOrders = await _orderService.getWaitingOrdersByRestaurant(
-        GlobalData.usernameRestaurant,
-      );
-
-      final int count = waitingOrders.length;
-
-      if (mounted && _newOrderCount != count) {
-        setState(() {
-          _newOrderCount = count;
-        });
-      }
-    } catch (e) {
-      debugPrint("Navbar order fetch error: $e");
-    }
-  }
-
-  Future<void> _loadRestaurantData() async {
+  Future _loadRestaurantData() async {
     try {
       final rest = await restaurantService.getRestaurantByUsername(
         GlobalData.usernameRestaurant,
@@ -112,102 +58,9 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
     final baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
-  }
-
-  Future<void> _handleLogout(BuildContext context) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.45),
-      builder: (context) => Dialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFEBEE),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.logout_rounded,
-                  color: Color(0xFFE53935),
-                  size: 30,
-                ),
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'ออกจากระบบ',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF1F1F1F),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'คุณต้องการออกจากระบบใช่หรือไม่?',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13.5, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 26),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF555555),
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        side: const BorderSide(color: Color(0xFFE0E0E0)),
-                      ),
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text(
-                        'ยกเลิก',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE53935),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 13),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text(
-                        'ออกจากระบบ',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (confirm == true) {
-      if (!context.mounted) return;
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const MainLogin()),
-        (route) => false,
-      );
-    }
+    return rawPath.startsWith('/')
+        ? "\(baseUrl\)rawPath"
+        : "\(baseUrl/\)rawPath";
   }
 
   @override
@@ -267,32 +120,6 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
                   ),
                 ),
                 const SizedBox(width: gap),
-
-                // 🎯 Navbar ดึงจำนวนออเดอร์ใหม่เอง (_newOrderCount) ไม่ต้องพึ่ง prop จากหน้าที่เรียกใช้
-                _IconAction(
-                  icon: Icons.notifications_outlined,
-                  badgeCount: _newOrderCount,
-                  tooltip: 'การแจ้งเตือน',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const ListOrderRestaurant(),
-                      ),
-                    ).then((_) => _fetchNewOrderCount()); // กลับมาแล้วรีเฟรชเลข
-                  },
-                ),
-                const SizedBox(width: gap),
-                _IconAction(
-                  icon: Icons.logout_rounded,
-                  color: const Color(0xFFE53935),
-                  background: const Color(0xFFFFEBEE),
-                  tooltip: 'ออกจากระบบ',
-                  onTap: () => _handleLogout(context),
-                ),
-                const SizedBox(width: gap),
-                Container(height: 26, width: 1, color: const Color(0xFFEDEDED)),
-                const SizedBox(width: gap),
                 GestureDetector(
                   onTap: () => Navigator.push(
                     context,
@@ -321,112 +148,26 @@ class _HomeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: RestaurantNavbar.orangeSoft,
-      borderRadius: BorderRadius.circular(RestaurantNavbar.radius),
+      color: RestaurantNavbar.greenSoft,
+      // 🎯 เปลี่ยนเป็นทรงกลมและเอากรอบสี่เหลี่ยมออก
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(RestaurantNavbar.radius),
-        splashColor: RestaurantNavbar.orange.withOpacity(0.18),
-        highlightColor: RestaurantNavbar.orange.withOpacity(0.08),
+        splashColor: RestaurantNavbar.primaryGreen.withOpacity(0.18),
+        highlightColor: RestaurantNavbar.primaryGreen.withOpacity(0.08),
         onTap: onTap,
         child: Container(
           width: 40,
           height: 40,
           alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(RestaurantNavbar.radius),
-            border: Border.all(
-              color: RestaurantNavbar.orange.withOpacity(0.22),
-              width: 1,
-            ),
-          ),
           child: const Icon(
             Icons.home_rounded,
-            color: RestaurantNavbar.orange,
+            color: RestaurantNavbar.primaryGreen,
             size: 22,
           ),
         ),
       ),
     );
-  }
-}
-
-class _IconAction extends StatelessWidget {
-  final IconData icon;
-  final int badgeCount;
-  final VoidCallback onTap;
-  final Color? color;
-  final Color? background;
-  final String? tooltip;
-
-  const _IconAction({
-    required this.icon,
-    required this.onTap,
-    this.badgeCount = 0,
-    this.color,
-    this.background,
-    this.tooltip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final button = Material(
-      color: background ?? const Color(0xFFF6F6F6),
-      borderRadius: BorderRadius.circular(RestaurantNavbar.radius),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(RestaurantNavbar.radius),
-        splashColor: RestaurantNavbar.orange.withOpacity(0.18),
-        highlightColor: RestaurantNavbar.orange.withOpacity(0.08),
-        onTap: onTap,
-        child: SizedBox(
-          width: 40,
-          height: 40,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              Icon(icon, color: color ?? const Color(0xFF555555), size: 21),
-              if (badgeCount > 0)
-                Positioned(
-                  right: 2,
-                  top: 4,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 5,
-                      vertical: 1.5,
-                    ),
-                    constraints: const BoxConstraints(minWidth: 16),
-                    decoration: BoxDecoration(
-                      color: RestaurantNavbar.orange,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white, width: 1.5),
-                      boxShadow: [
-                        BoxShadow(
-                          color: RestaurantNavbar.orange.withOpacity(0.35),
-                          blurRadius: 4,
-                          offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      badgeCount > 99 ? '99+' : '$badgeCount',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
-                        height: 1.2,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (tooltip == null) return button;
-    return Tooltip(message: tooltip!, child: button);
   }
 }
 
@@ -447,7 +188,7 @@ class _ProfileAvatar extends StatelessWidget {
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2.2,
-              color: RestaurantNavbar.orange,
+              color: RestaurantNavbar.primaryGreen,
             ),
           ),
         ),
@@ -461,15 +202,15 @@ class _ProfileAvatar extends StatelessWidget {
         shape: BoxShape.circle,
         gradient: LinearGradient(
           colors: [
-            RestaurantNavbar.orange,
-            RestaurantNavbar.orange.withOpacity(0.6),
+            RestaurantNavbar.primaryGreen,
+            RestaurantNavbar.primaryGreen.withOpacity(0.6),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: RestaurantNavbar.orange.withOpacity(0.28),
+            color: RestaurantNavbar.primaryGreen.withOpacity(0.28),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -477,14 +218,14 @@ class _ProfileAvatar extends StatelessWidget {
       ),
       child: ClipOval(
         child: Container(
-          color: RestaurantNavbar.orangeSoft,
+          color: RestaurantNavbar.greenSoft,
           child: imageUrl.isNotEmpty
               ? Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => const Icon(
                     Icons.person_outline_rounded,
-                    color: RestaurantNavbar.orange,
+                    color: RestaurantNavbar.primaryGreen,
                     size: 18,
                   ),
                   loadingBuilder: (context, child, progress) {
@@ -495,7 +236,7 @@ class _ProfileAvatar extends StatelessWidget {
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 1.8,
-                          color: RestaurantNavbar.orange,
+                          color: RestaurantNavbar.primaryGreen,
                         ),
                       ),
                     );
@@ -503,7 +244,7 @@ class _ProfileAvatar extends StatelessWidget {
                 )
               : const Icon(
                   Icons.person_outline_rounded,
-                  color: RestaurantNavbar.orange,
+                  color: RestaurantNavbar.primaryGreen,
                   size: 18,
                 ),
         ),

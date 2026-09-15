@@ -83,75 +83,8 @@ class _NavbarMemberState extends State<NavbarMember> with RouteAware {
       ),
       centerTitle: true,
 
-      leading: IconButton(
-        icon: const Icon(
-          Icons.home_outlined,
-          color: NavbarMember._orange,
-          size: 35,
-        ),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const HomeMember()),
-          );
-        },
-      ),
-
       actions: [
         // 🎯 ห่อไอคอนตะกร้าด้วย Stack เพื่อวาง badge ตัวเลขมุมขวาบน
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            IconButton(
-              icon: const Icon(
-                Icons.notifications,
-                color: NavbarMember._orange,
-                size: 32,
-              ),
-              onPressed: () async {
-                // ใช้ await + then แบบง่ายด้วย setState หลังกลับมา
-                // เผื่อผู้ใช้ลบของออกจากตะกร้าแล้วเลขต้องอัปเดต
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const NotifyMember()),
-                );
-                if (mounted) setState(() {});
-              },
-            ),
-            if (cartItemCount > 0)
-              Positioned(
-                right: 4,
-                top: 4,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 5,
-                    vertical: 1,
-                  ),
-                  constraints: const BoxConstraints(
-                    minWidth: 18,
-                    minHeight: 18,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.redAccent,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white, width: 1.5),
-                  ),
-                  child: Text(
-                    cartItemCount > 99 ? '99+' : '$cartItemCount',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(width: 12),
-
         Padding(
           padding: const EdgeInsets.only(right: 20),
           child: GestureDetector(

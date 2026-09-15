@@ -11,11 +11,11 @@ import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/global_data.dart';
 
 // ============================================================
-// 🎨 Design tokens — สีและระยะห่างที่ใช้ทั้งหน้า
+// 🎨 Design tokens — ปรับโทนสีให้เป็นสีเขียวเหมือนหน้า Add Menu
 // ============================================================
 class _AddonTheme {
-  static const Color primary = Color(0xFFFF8A00); // ส้ม — โทนหลักของแบรนด์
-  static const Color accent = Color(0xFF2FB86A); // เขียว — ปุ่มยืนยัน/สถานะ on
+  static const Color primary = Color(0xFF00B300); // 🎯 สีเขียวหลัก
+  static const Color accent = Color(0xFF00B300); // 🎯 สีเขียว
   static const Color danger = Color(0xFFE5484D);
   static const Color surface = Colors.white;
   static const Color pageBg = Color(0xFFF6F7F9);
@@ -189,7 +189,6 @@ class _AddAddonState extends State<AddAddon> {
     _nameFocusNodes[addon]?.unfocus();
   }
 
-  // ─── ฟังก์ชันตัวช่วยสำหรับแจ้งเตือนข้อผิดพลาด ───
   void _showErrorSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -201,7 +200,7 @@ class _AddAddonState extends State<AddAddon> {
     );
   }
 
-  Future<void> _doSaveAddonGroup() async {
+  Future _doSaveAddonGroup() async {
     final isFormValid = formKey.currentState!.validate();
     if (!isFormValid) return;
 
@@ -211,7 +210,6 @@ class _AddAddonState extends State<AddAddon> {
       return;
     }
 
-    // 1. ตรวจสอบชื่อตัวเลือกย่อยซ้ำกันเองในฟอร์ม
     final names = selectedAddons
         .map((a) => a.nameController.text.trim().toLowerCase())
         .toList();
@@ -223,7 +221,6 @@ class _AddAddonState extends State<AddAddon> {
     setState(() => _isLoading = true);
 
     try {
-      // 2. 🛡️ ดักป้องกัน: ดึงกลุ่มตัวเลือกทั้งหมดของร้านมาเช็คชื่อซ้ำก่อนบันทึก
       final restaurantUsername = GlobalData.usernameRestaurant ?? "";
       final existingGroups = await _addonService.getAddonGroupsByRestaurant(
         restaurantUsername,
@@ -245,7 +242,6 @@ class _AddAddonState extends State<AddAddon> {
         return;
       }
 
-      // 3. ส่งข้อมูลไปบันทึกผ่าน API
       final request = AddonGroupRequestModel(
         restaurantUsername: restaurantUsername,
         addongroupname: groupName,
@@ -311,11 +307,17 @@ class _AddAddonState extends State<AddAddon> {
       fillColor: _AddonTheme.fieldBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(
+          color: Colors.black,
+          width: 0.3,
+        ), // 🎯 ขอบดำ
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: const BorderSide(
+          color: Colors.black,
+          width: 0.3,
+        ), // 🎯 ขอบดำ
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -363,10 +365,19 @@ class _AddAddonState extends State<AddAddon> {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: _AddonTheme.primary.withOpacity(0.12),
+            color: const Color.fromARGB(
+              255,
+              196,
+              196,
+              196,
+            ).withOpacity(0.12), // 🎯 พื้นหลังไอคอนสีเทา
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Icon(icon, size: 17, color: _AddonTheme.primary),
+          child: Icon(
+            icon,
+            size: 17,
+            color: const Color.fromARGB(255, 244, 150, 0),
+          ), // 🎯 ไอคอนสีเขียว
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -399,7 +410,7 @@ class _AddAddonState extends State<AddAddon> {
   }
 
   // ============================================================
-  // Toggle สวิตช์: เลือกได้หลายอย่าง (is_multiple_choice)
+  // Toggle สวิตช์: เลือกได้หลายอย่าง
   // ============================================================
   Widget _buildMultipleChoiceSwitch() {
     return Container(
@@ -407,6 +418,7 @@ class _AddAddonState extends State<AddAddon> {
       decoration: BoxDecoration(
         color: _AddonTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black, width: 0.3), // 🎯 ขอบดำ
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -448,9 +460,7 @@ class _AddAddonState extends State<AddAddon> {
     final bool canDelete = selectedAddons.length > 1;
 
     return Container(
-      key: ValueKey(
-        addon,
-      ), // เพิ่ม Key เพื่อให้ ReorderableListView ทำงานได้สมบูรณ์
+      key: ValueKey(addon),
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -506,11 +516,17 @@ class _AddAddonState extends State<AddAddon> {
                   fillColor: _AddonTheme.surface,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
+                    borderSide: const BorderSide(
+                      color: Colors.black,
+                      width: 0.3,
+                    ), // 🎯 ขอบดำ
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
+                    borderSide: const BorderSide(
+                      color: Colors.black,
+                      width: 0.3,
+                    ), // 🎯 ขอบดำ
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -572,11 +588,17 @@ class _AddAddonState extends State<AddAddon> {
                 fillColor: _AddonTheme.surface,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(
+                    color: Colors.black,
+                    width: 0.3,
+                  ), // 🎯 ขอบดำ
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+                  borderSide: const BorderSide(
+                    color: Colors.black,
+                    width: 0.3,
+                  ), // 🎯 ขอบดำ
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -673,7 +695,10 @@ class _AddAddonState extends State<AddAddon> {
                     height: 46,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [_AddonTheme.primary, Color(0xFFFFB13D)],
+                        colors: [
+                          _AddonTheme.primary,
+                          Color(0xFF64F02D),
+                        ], // 🎯 โทนสีเขียว
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -845,10 +870,10 @@ class _AddAddonState extends State<AddAddon> {
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: _AddonTheme.accent.withOpacity(0.4),
-                              width: 1.3,
+                              color: Colors.black, // 🎯 เพิ่มขอบดำ
+                              width: 0.3,
                             ),
-                            color: _AddonTheme.accent.withOpacity(0.06),
+                            color: Colors.white,
                           ),
                           child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -856,7 +881,7 @@ class _AddAddonState extends State<AddAddon> {
                               Icon(
                                 Icons.add_rounded,
                                 size: 18,
-                                color: _AddonTheme.accent,
+                                color: _AddonTheme.textPrimary,
                               ),
                               SizedBox(width: 6),
                               Text(
@@ -864,7 +889,7 @@ class _AddAddonState extends State<AddAddon> {
                                 style: TextStyle(
                                   fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
-                                  color: _AddonTheme.accent,
+                                  color: _AddonTheme.textPrimary,
                                 ),
                               ),
                             ],

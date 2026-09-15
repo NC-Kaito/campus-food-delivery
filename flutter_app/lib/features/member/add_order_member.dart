@@ -24,9 +24,12 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   List<MenuAddonDetailModel> _allAddons = [];
   bool _isLoading = true;
 
+  // 🎯 สีเขียวหลักของระบบ
+  static const Color _primaryGreen = Color(0xFF00B300);
+
   // 🎯 เก็บจำนวนที่เลือกของแต่ละ Add-on (Key: addonDetailId, Value: จำนวนชิ้น)
   final Map<int, int> _addonQuantities = {};
-  // 🎯 เก็บวัตถุข้อมูล Add-on ตัวจริงไว้ใช้อ้างอิงราคาและชื่อ
+  // 🎯 เก็บข้อมูล Add-on ตัวจริงไว้อ้างอิงราคาและชื่อ
   final Map<int, MenuAddonDetailModel> _addonModelsIndex = {};
 
   @override
@@ -40,7 +43,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
   Future<void> _loadMenuAddons() async {
@@ -59,7 +64,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     setState(() {
       _allAddons = addons;
 
-      // จัดกลุ่มชั่วคราวเพื่อค้นหาตัวเลือกแรกของแต่ละกลุ่ม
       final Map<int, List<MenuAddonDetailModel>> groupedByGroupId = {};
 
       for (var addon in addons) {
@@ -74,7 +78,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         }
       }
 
-      // 🎯 ตรวจสอบและเลือก Default: ติ๊กเฉพาะตัวเลือกแรกของกลุ่มที่เป็นราคาปกติ (0 บาท)
+      // 🎯 เลือก Default เฉพาะตัวเลือกแรกของกลุ่มที่เป็นราคาปกติ (0 บาท)
       groupedByGroupId.forEach((groupId, items) {
         if (items.isNotEmpty) {
           final firstItem = items.first;
@@ -128,6 +132,10 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         ? widget.menuModel.description
         : null;
 
+    final bool isCurryDish = (widget.menuModel.menuName ?? '').contains(
+      "ข้าวราดแกง",
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       extendBodyBehindAppBar: true,
@@ -148,37 +156,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
             ),
           ),
         ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: IconButton(
-                icon: const Icon(
-                  Icons.shopping_cart_outlined,
-                  color: Colors.orange,
-                  size: 22,
-                ),
-                onPressed: () {},
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 4.0),
-            child: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: IconButton(
-                icon: const Icon(
-                  Icons.account_circle_outlined,
-                  color: Colors.orange,
-                  size: 22,
-                ),
-                onPressed: () {},
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
+        actions: const [],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.orange))
@@ -230,7 +208,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                   ),
                                 ),
                                 Text(
-                                  basePrice == 0 ? "ราคาปกติ" : "฿$basePrice",
+                                  basePrice == 0
+                                      ? "ราคาปกติ"
+                                      : "฿" + basePrice.toString(),
                                   style: const TextStyle(
                                     fontSize: 30,
                                     fontWeight: FontWeight.bold,
@@ -252,76 +232,81 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                             ],
                             const SizedBox(height: 24),
                             if (groupedAddons.isNotEmpty) ...[
-                              ...groupedAddons.entries
-                                  .toList()
-                                  .asMap()
-                                  .entries
-                                  .map((mapEntry) {
-                                    final isFirstGroup = mapEntry.key == 0;
-                                    final entry = mapEntry.value;
+                              ...groupedAddons.entries.toList().asMap().entries.map((
+                                mapEntry,
+                              ) {
+                                final isFirstGroup = mapEntry.key == 0;
+                                final entry = mapEntry.value;
 
-                                    String groupName = entry.key;
-                                    List<MenuAddonDetailModel> items =
-                                        entry.value;
+                                String groupName = entry.key;
+                                List<MenuAddonDetailModel> items = entry.value;
 
-                                    bool isMultipleChoice =
-                                        items
-                                            .first
-                                            .menuAddonGroup
-                                            ?.is_multiple_choice ??
-                                        false;
+                                bool isMultipleChoice =
+                                    items
+                                        .first
+                                        .menuAddonGroup
+                                        ?.is_multiple_choice ??
+                                    false;
 
-                                    return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (!isFirstGroup)
-                                          Divider(
-                                            height: 24,
-                                            thickness: 1,
-                                            color: Colors.grey[300],
-                                          )
-                                        else
-                                          const SizedBox(height: 8),
+                                // 🎯 สำหรับข้าวราดแกง เปลี่ยนชื่อกลุ่ม "รายการเพิ่มเติม" หรือ "ตัวเลือกเสริม" เป็น "รายการ"
+                                String displayGroupName = groupName;
+                                if (isCurryDish &&
+                                    (groupName == "รายการเพิ่มเติม" ||
+                                        groupName == "ตัวเลือกเสริม" ||
+                                        groupName.contains("เพิ่มเติม"))) {
+                                  displayGroupName = "รายการ";
+                                }
 
-                                        Text(
-                                          groupName,
-                                          style: const TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
+                                return Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!isFirstGroup)
+                                      Divider(
+                                        height: 24,
+                                        thickness: 1,
+                                        color: Colors.grey[300],
+                                      )
+                                    else
+                                      const SizedBox(height: 8),
+
+                                    Text(
+                                      displayGroupName,
+                                      style: const TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    IntrinsicHeight(
+                                      child: Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.stretch,
+                                        children: [
+                                          Container(
+                                            width: 2,
+                                            color: _primaryGreen,
                                           ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        IntrinsicHeight(
-                                          child: Row(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.stretch,
-                                            children: [
-                                              Container(
-                                                width: 2,
-                                                color: const Color(0xFF76FF03),
-                                              ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  children: items
-                                                      .map(
-                                                        (addonDetail) =>
-                                                            _buildAddonItemOption(
-                                                              addonDetail,
-                                                              isMultipleChoice,
-                                                            ),
-                                                      )
-                                                      .toList(),
-                                                ),
-                                              ),
-                                            ],
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              children: items
+                                                  .map(
+                                                    (addonDetail) =>
+                                                        _buildAddonItemOption(
+                                                          addonDetail,
+                                                          isMultipleChoice,
+                                                        ),
+                                                  )
+                                                  .toList(),
+                                            ),
                                           ),
-                                        ),
-                                        const SizedBox(height: 10),
-                                      ],
-                                    );
-                                  }),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                );
+                              }),
                             ],
                             const SizedBox(height: 10),
                             const Text(
@@ -425,7 +410,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                           SizedBox(
                             width: 28,
                             child: Text(
-                              "$_quantity",
+                              _quantity.toString(),
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 fontSize: 18,
@@ -452,7 +437,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      "จำนวน $_quantity รายการ",
+                      "จำนวน " + _quantity.toString() + " รายการ",
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -472,7 +457,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                             ),
                           ),
                           TextSpan(
-                            text: "฿$totalPrice",
+                            text: "฿" + totalPrice.toString(),
                             style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
@@ -502,11 +487,12 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     }
                   });
 
+                  // 🎯 บันทึกเฉพาะข้อความจากผู้ใช้ ไม่มีการเอาชื่อเมนู/กับข้าวมาต่อท้ายซ้ำ
                   final cartItem = CartItem(
                     menu: widget.menuModel,
                     selectedAddons: finalSelectedAddonsList,
                     quantity: _quantity,
-                    note: _noteController.text,
+                    note: _noteController.text.trim(),
                     addonPrice: addonTotalPrice.toInt(),
                     totalPrice: totalPrice,
                     unitPrice: basePrice,
@@ -540,8 +526,8 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                   );
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF76FF03),
-                  foregroundColor: Colors.black,
+                  backgroundColor: _primaryGreen,
+                  foregroundColor: Colors.white,
                   elevation: 2,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
@@ -649,7 +635,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
               ),
               const SizedBox(width: 10),
               Text(
-                price == 0 ? "(ราคาปกติ)" : "(+$price)",
+                price == 0 ? "(ราคาปกติ)" : "(+" + price.toString() + ")",
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.grey,
@@ -697,7 +683,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     alignment: Alignment.center,
                     width: 20,
                     child: Text(
-                      "$currentQty",
+                      currentQty.toString(),
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,

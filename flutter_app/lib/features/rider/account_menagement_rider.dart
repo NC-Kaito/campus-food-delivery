@@ -3,13 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
 import 'package:flutter_app/data/services/rider/rider_service.dart';
-import 'package:flutter_app/data/services/order_service.dart'; // 🎯 นำเข้า OrderService
+import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/rider/navbar_rider.dart';
 import 'package:flutter_app/global_data.dart';
 
-// TODO: ตรวจสอบและแก้ไข Path ไฟล์เหล่านี้ให้ตรงกับโปรเจกต์ของคุณ
 import 'package:flutter_app/features/rider/profile_rider.dart';
-import 'package:flutter_app/features/rider/login_rider.dart';
 import 'package:flutter_app/features/restaurant/view_agrees.dart';
 import 'package:flutter_app/features/rider/list_waiting_pickup_order.dart';
 import 'package:flutter_app/main_login.dart';
@@ -18,7 +16,7 @@ import 'package:flutter_app/main_login.dart';
 // 🎨 Design tokens
 // ============================================================
 class _AccountTheme {
-  static const Color primary = Color(0xFF2E7D32); // สีเขียวหลัก
+  static const Color primary = Color(0xFF00B300); // 🎯 ปรับเป็นเขียวหลัก
   static const Color primarySoft = Color(0xFFE8FCD0); // เขียวอ่อน
   static const Color danger = Color(0xFFE53935);
   static const Color dangerSoft = Color(0xFFFFEBEE);
@@ -38,21 +36,21 @@ class AccountManagementRider extends StatefulWidget {
 
 class _AccountManagementRiderState extends State<AccountManagementRider> {
   final RiderService riderService = RiderService();
-  final OrderService _orderService = OrderService(); // 🎯 เรียกใช้ OrderService
+  final OrderService _orderService = OrderService();
   RiderModel? riderModel;
   String? riderImage;
   bool _isLoadingProfile = true;
 
-  // 🎯 ตัวแปรเก็บจำนวนแจ้งเตือนรับงาน
   int _activeOrderCount = 0;
 
-  final Color _primaryOrange = const Color(0xFFF97316);
+  // 🎯 ปรับสีปุ่ม Navigation Bar เป็นสีเขียว
+  final Color _primaryGreen = const Color(0xFF00B300);
 
   @override
   void initState() {
     super.initState();
     _loadRiderData();
-    _fetchActiveOrderBadgeCount(); // 🎯 โหลดจำนวนออเดอร์แจ้งเตือน
+    _fetchActiveOrderBadgeCount();
   }
 
   Future<void> _loadRiderData() async {
@@ -72,7 +70,6 @@ class _AccountManagementRiderState extends State<AccountManagementRider> {
     }
   }
 
-  // 🎯 ฟังก์ชันโหลดจำนวนแจ้งเตือน (งานใหม่ + งานที่รับมาแล้ว)
   Future<void> _fetchActiveOrderBadgeCount() async {
     try {
       String studentId = GlobalData.usernameRider;
@@ -352,7 +349,7 @@ class _AccountManagementRiderState extends State<AccountManagementRider> {
         ),
       ),
 
-      // 🎯 แถบ Navbar ด้านล่าง
+      // 🎯 แถบ Navbar ด้านล่าง (เปลี่ยนสีปุ่มที่เลือกเป็นสีเขียว)
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -364,10 +361,10 @@ class _AccountManagementRiderState extends State<AccountManagementRider> {
           ],
         ),
         child: BottomNavigationBar(
-          selectedItemColor: _primaryOrange,
+          selectedItemColor: _primaryGreen, // 🎯 สีเขียวหลัก
           unselectedItemColor: Colors.blueGrey.shade300,
           backgroundColor: Colors.white,
-          currentIndex: 2, // ชี้ไปที่แท็บตั้งค่า
+          currentIndex: 2,
           type: BottomNavigationBarType.fixed,
           elevation: 0,
           onTap: (index) {
@@ -387,7 +384,6 @@ class _AccountManagementRiderState extends State<AccountManagementRider> {
               icon: Icon(Icons.home_rounded),
               label: "หน้าหลัก",
             ),
-            // 🎯 ซ้อน Stack ใส่ Badge แดงตรงปุ่มรับงาน
             BottomNavigationBarItem(
               icon: Stack(
                 clipBehavior: Clip.none,

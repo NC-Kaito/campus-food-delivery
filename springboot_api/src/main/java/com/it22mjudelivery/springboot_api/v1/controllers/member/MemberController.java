@@ -74,7 +74,7 @@ public class MemberController {
     @PostMapping("/updateProfileMember")
     public ResponseEntity<?> updateProfileMember(@RequestBody MemberDto memberDto){
         try{
-            boolean isResult = memberService.doUpdateProfileMember(memberDto.getUsername(), memberDto.getPhone(), memberDto.getProfileimg());
+            boolean isResult = memberService.doUpdateProfileMember(memberDto.getUsername(), memberDto.getFirstname(), memberDto.getLastname(), memberDto.getPhone(), memberDto.getProfileimg());
 
             if (isResult){
                 return ResponseEntity.ok("แก้ไขโปรไฟล์สำเร็จ");

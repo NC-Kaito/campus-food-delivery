@@ -161,7 +161,9 @@ class _ProfileMemberState extends State<ProfileMember> {
 
         MemberModel member = MemberModel(
           username: usernameController.text,
-          phone: phoneController.text,
+          firstname: firstnameController.text.trim(),
+          lastname: lastnameController.text.trim(),
+          phone: phoneController.text.trim(),
           profileimg: imageUrl ?? memberModel.profileimg,
         );
 
@@ -223,8 +225,30 @@ class _ProfileMemberState extends State<ProfileMember> {
       backgroundColor: const Color(
         0xFFF9FBF7,
       ), // คุมโทนสีเบสเขียวอ่อนสบายตาแมตช์กันทั้งระบบ
-      // 🌟 1. สวมใส่ AppBar ตัวเก่งเหมือนหน้า HomeMember ครบถ้วนตามระเบียบ
-      appBar: const NavbarMember(title: ""),
+
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          "แก้ไขโปรไฟล์",
+          style: TextStyle(
+            color: Colors.black,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF00B300),
+            size: 24,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+
       body: isLooding
           ? const Center(
               child: CircularProgressIndicator(color: Color(0xFF00B300)),
@@ -326,7 +350,7 @@ class _ProfileMemberState extends State<ProfileMember> {
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: _isEditable
-                                    ? const Color(0xFF2E7D32)
+                                    ? const Color(0xFF00B300)
                                     : Colors.black87,
                               ),
                             ),
@@ -343,11 +367,14 @@ class _ProfileMemberState extends State<ProfileMember> {
                       _buildInputLabel("ชื่อจริง (Firstname)"),
                       _buildCustomTextField(
                         firstnameController,
-                        enabled: false,
+                        enabled: _isEditable,
                       ),
 
                       _buildInputLabel("นามสกุล (Lastname)"),
-                      _buildCustomTextField(lastnameController, enabled: false),
+                      _buildCustomTextField(
+                        lastnameController,
+                        enabled: _isEditable,
+                      ),
 
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 16.0),
@@ -365,10 +392,10 @@ class _ProfileMemberState extends State<ProfileMember> {
                         ),
                       ),
 
-                      _buildInputLabel("อีเมลสถาบัน (Email)"),
+                      _buildInputLabel("อีเมล (Email)"),
                       _buildCustomTextField(emailController, enabled: false),
 
-                      _buildInputLabel("เบอร์โทรศัพท์จัดส่งสินค้า (Phone)"),
+                      _buildInputLabel("เบอร์โทรศัพท์ติดต่อ (Phone)"),
                       _buildCustomTextField(
                         phoneController,
                         enabled: _isEditable,
@@ -556,15 +583,26 @@ class _ProfileMemberState extends State<ProfileMember> {
     TextEditingController controller, {
     bool enabled = true,
   }) {
+    const Color editGreen = Color(0xFF00B300);
+
     return Container(
       decoration: BoxDecoration(
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: editGreen.withOpacity(0.12),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.02),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: TextFormField(
         controller: controller,
@@ -576,7 +614,9 @@ class _ProfileMemberState extends State<ProfileMember> {
         ),
         decoration: InputDecoration(
           filled: true,
-          fillColor: enabled ? Colors.white : const Color(0xFFEEEEEE),
+          fillColor: enabled
+              ? const Color(0xFFF2FFF2)
+              : const Color(0xFFEEEEEE),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
             vertical: 14,
@@ -587,7 +627,10 @@ class _ProfileMemberState extends State<ProfileMember> {
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: Colors.grey.shade200, width: 1.0),
+            borderSide: BorderSide(
+              color: editGreen.withOpacity(0.45),
+              width: 1.2,
+            ),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
@@ -595,7 +638,7 @@ class _ProfileMemberState extends State<ProfileMember> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.5),
+            borderSide: const BorderSide(color: editGreen, width: 1.8),
           ),
         ),
       ),

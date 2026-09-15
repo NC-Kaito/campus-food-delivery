@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/order_model.dart';
-import 'package:flutter_app/data/services/member/in_app_notification_service.dart';
+import 'package:flutter_app/data/services/in_app_notification_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/view_active_order_member.dart';
 import 'package:flutter_app/global_data.dart';
@@ -20,6 +20,10 @@ class OrderStatusMonitor {
 
   void startMonitoring() {
     _timer?.cancel();
+
+    // เช็กครั้งแรกทันที ไม่ต้องรอ 5 วินาที
+    _checkOrderUpdates();
+
     _timer = Timer.periodic(
       const Duration(seconds: 5),
       (_) => _checkOrderUpdates(),
@@ -74,41 +78,41 @@ class OrderStatusMonitor {
       case 'waitingrestaurant':
       case 'preparing':
       case 'cooking':
-        title = "ร้านค้ารับออเดอร์แล้ว 👨‍🍳";
+        title = "ร้านค้ารับออเดอร์แล้ว ";
         message = "ร้าน $storeName กำลังปรุงอาหารของคุณ";
         icon = Icons.soup_kitchen_rounded;
         color = Colors.deepOrange;
         break;
       case 'goingtorestaurant':
       case 'rideraccepted':
-        title = "ไรเดอร์รับงานแล้ว 🏍️";
+        title = "ไรเดอร์รับงานแล้ว ";
         message = "ผู้จัดส่งกำลังเดินทางไปรับอาหารที่ร้าน $storeName";
         icon = Icons.two_wheeler_rounded;
         color = Colors.orange;
         break;
       case 'delivery':
       case 'delivering':
-        title = "อาหารกำลังนำส่ง 🚀";
+        title = "อาหารกำลังนำส่ง ";
         message =
             "ผู้จัดส่งรับอาหารจากร้าน $storeName แล้ว กำลังมุ่งหน้าไปหาคุณ";
         icon = Icons.delivery_dining_rounded;
         color = Colors.indigo;
         break;
       case 'arrived':
-        title = "ไรเดอร์ถึงจุดส่งแล้ว 📍";
+        title = "ไรเดอร์ถึงจุดส่งแล้ว ";
         message = "ผู้จัดส่งเดินทางมาถึงแล้ว กรุณาออกมารับอาหารครับ";
         icon = Icons.location_on_rounded;
         color = Colors.pink;
         break;
       case 'delivered':
-        title = "ส่งมอบอาหารแล้ว 🍱";
+        title = "ส่งมอบอาหารแล้ว ";
         message = "อาหารจัดส่งถึงที่หมายแล้ว กรุณาตรวจสอบและกดยืนยันการรับ";
         icon = Icons.assignment_turned_in_rounded;
         color = Colors.purple;
         break;
       case 'cancel':
       case 'cancelled':
-        title = "คำสั่งซื้อถูกยกเลิก ❌";
+        title = "คำสั่งซื้อถูกยกเลิก ";
         message =
             "ออเดอร์ร้าน $storeName ถูกยกเลิก: ${order.cancelDetail ?? ''}";
         icon = Icons.cancel_rounded;

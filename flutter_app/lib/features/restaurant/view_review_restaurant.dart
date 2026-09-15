@@ -1,11 +1,10 @@
 // features/restaurant/view_review_restaurant.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/models/review_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
-
-// 🎯 นำเข้า RestaurantNavbar มาใช้งานครับ
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 
 class ViewReviewRestaurant extends StatefulWidget {
@@ -22,6 +21,8 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
   ReviewSubmitModel? _reviewData;
   bool _isLoading = true;
   bool _isItemsExpanded = false;
+
+  final Color primaryGreen = const Color(0xFF00B300);
 
   @override
   void initState() {
@@ -45,7 +46,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
         });
       }
     } catch (e) {
-      debugPrint("โหลดข้อมูลรีวิวไม่สำเร็จ: $e");
+      debugPrint("โหลดข้อมูลรีวิวไม่สำเร็จ: " + e.toString());
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -54,7 +55,9 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
     final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
   Widget _buildPlaceholderIcon({
@@ -64,8 +67,8 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
     return Container(
       width: size,
       height: size,
-      color: Colors.orange.shade50,
-      child: Icon(icon, color: Colors.orange, size: size * 0.5),
+      color: Colors.green.shade50, // 🎯 ปรับให้เข้ากับธีมร้านค้า
+      child: Icon(icon, color: primaryGreen, size: size * 0.5),
     );
   }
 
@@ -85,264 +88,308 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
     );
   }
 
-  Widget _buildProOrderItemCard(dynamic item) {
-    List<dynamic> rawCurries = [];
-    if (item.orderDetailCurries != null &&
-        item.orderDetailCurries!.isNotEmpty) {
-      rawCurries = item.orderDetailCurries!;
-    } else if (item.toJson()['orderDetailCurries'] != null) {
-      rawCurries = item.toJson()['orderDetailCurries'];
-    } else if (item.toJson()['orderdetailcurries'] != null) {
-      rawCurries = item.toJson()['orderdetailcurries'];
-    }
-
+  // 🎯 ใช้ฟังก์ชันการ์ดอาหารที่มีโครงสร้างเหมือนฝั่ง Rider และ Member
+  Widget _buildOrderItemCard(OrderDetailModel item) {
+    List<dynamic> rawCurries = item.orderDetailCurries ?? [];
     final bool isCurryDish = rawCurries.isNotEmpty;
-    String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
-    if (isCurryDish) {
-      displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
+
+    String displayMenuName = item.menuNameAtOrder.isNotEmpty
+        ? item.menuNameAtOrder
+        : (item.menu?.menuName ?? "รายการเมนู");
+
+    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
+      displayMenuName =
+          "ข้าวราดแกง (" + rawCurries.length.toString() + " อย่าง)";
     }
 
-    List<Map<String, String>> curriesList = [];
+    List<Map<String, dynamic>> curriesList = [];
     for (var e in rawCurries) {
-      if (e is Map<String, dynamic>) {
-        final menuMap = (e['menu'] is Map<String, dynamic>)
-            ? e['menu'] as Map<String, dynamic>
-            : e;
-        String name =
+      String name = '';
+      String img = '';
+      double price = 0.0;
+
+      if (e is Map) {
+        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
+        name =
             (menuMap['menuname'] ??
                     menuMap['menuName'] ??
                     menuMap['name'] ??
                     '')
                 .toString();
-        String img =
-            (menuMap['menuimage'] ??
+        img =
+            (menuMap['imageurl'] ??
+                    menuMap['imageUrl'] ??
+                    menuMap['menuimage'] ??
                     menuMap['menuImage'] ??
-                    menuMap['image'] ??
                     '')
                 .toString();
-        if (name.isNotEmpty) curriesList.add({'name': name, 'image': img});
-      }
-    }
-
-    List<dynamic> rawAddons = [];
-    if (item.addons != null && item.addons.isNotEmpty) {
-      rawAddons = item.addons;
-    } else if (item.toJson()['addons'] != null) {
-      rawAddons = item.toJson()['addons'];
-    }
-
-    Map<String, int> addonCounts = {};
-    for (var addon in rawAddons) {
-      String name = '';
-      if (addon is Map) {
-        name =
-            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
-            addon['addonMenu']?['addonName'] ??
-            addon['name'] ??
-            addon['addonName'] ??
-            '';
+        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0.0).toDouble();
       } else {
         try {
-          name = addon.menuAddonDetail?.addonMenu?.addonName ?? '';
+          name =
+              ((e as dynamic).menu?.menuName ??
+                      (e as dynamic).menu?.menuname ??
+                      '')
+                  .toString();
+          img =
+              ((e as dynamic).menu?.menuImage ??
+                      (e as dynamic).menu?.imageurl ??
+                      '')
+                  .toString();
+          price = ((e as dynamic).priceAtOrder ?? 0.0).toDouble();
         } catch (_) {}
-        if (name.isEmpty) {
-          try {
-            name = addon.addonName ?? '';
-          } catch (_) {}
-        }
       }
-      if (name.isNotEmpty) addonCounts[name] = (addonCounts[name] ?? 0) + 1;
+
+      if (name.isNotEmpty) {
+        curriesList.add({'name': name, 'image': img, 'price': price});
+      }
     }
 
-    int finalPricePerUnit = 0;
-    final int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+    Map<String, Map<String, dynamic>> groupedAddons = {};
+    for (var addon in item.addons) {
+      String name = addon.addonNameAtOrder.isNotEmpty
+          ? addon.addonNameAtOrder
+          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
 
-    if (isCurryDish) {
-      int curriesSum = 0;
-      for (var curry in rawCurries) {
-        if (curry is Map<String, dynamic>) {
-          final num? price = curry['priceAtOrder'] ?? curry['priceatorder'];
-          curriesSum += (price ?? 0).toInt();
-        }
-      }
-      int addonsSum = 0;
-      for (var addon in rawAddons) {
-        num? p = 0;
-        if (addon is Map) {
-          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
+      double price = addon.priceAtOrder;
+      int qty = addon.addonQty ?? 1;
+
+      if (name.isNotEmpty) {
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + qty;
+          groupedAddons[name]!['canIncreaseQty'] = true;
         } else {
-          try {
-            p = addon.priceAtOrder;
-          } catch (_) {}
-          if (p == null) {
-            try {
-              p = addon.menuAddonDetail?.addonPrice;
-            } catch (_) {}
-          }
+          groupedAddons[name] = {
+            'qty': qty,
+            'unitPrice': price,
+            'canIncreaseQty': qty > 1,
+          };
         }
-        addonsSum += (p ?? 0).toInt();
       }
-      finalPricePerUnit =
-          (baseMenuPrice > 0 ? baseMenuPrice : 0) + curriesSum + addonsSum;
-    } else {
-      int addonsSum = 0;
-      for (var addon in rawAddons) {
-        num? p = 0;
-        if (addon is Map) {
-          p = addon['priceAtOrder'] ?? addon['menuAddonDetail']?['addonPrice'];
-        } else {
-          try {
-            p = addon.priceAtOrder;
-          } catch (_) {}
-          if (p == null) {
-            try {
-              p = addon.menuAddonDetail?.addonPrice;
-            } catch (_) {}
-          }
-        }
-        addonsSum += (p ?? 0).toInt();
-      }
-      finalPricePerUnit = baseMenuPrice + addonsSum;
     }
 
-    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage);
-    int qty = item.qty ?? 1;
+    double totalItemPrice = item.subTotal;
+    if (totalItemPrice <= 0) {
+      double addonsSum = 0.0;
+      for (var addon in groupedAddons.values) {
+        addonsSum += (addon['unitPrice'] as double) * (addon['qty'] as int);
+      }
+      double curriesSum = 0.0;
+      for (var curry in curriesList) {
+        curriesSum += (curry['price'] as double);
+      }
+      double basePrice = item.priceAtOrder > 0
+          ? item.priceAtOrder
+          : (item.menu?.price ?? 0.0);
+      totalItemPrice = (basePrice + curriesSum + addonsSum) * item.qty;
+    }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: isCurryDish || finalMenuUrl.isEmpty
-                ? _buildPlaceholderIcon()
-                : Image.network(
-                    Uri.encodeFull(finalMenuUrl),
-                    width: 65,
-                    height: 65,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        _buildPlaceholderIcon(),
+    String rawMenuUrl = item.menu?.menuImage ?? '';
+    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
+      rawMenuUrl = curriesList.first['image'] as String;
+    }
+    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
+    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F5F5), // 🎯 พื้นเทาอ่อนแบบ Rider
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: isCurryDish || finalMenuUrl.isEmpty
+                  ? _buildPlaceholderIcon(size: 70)
+                  : Image.network(
+                      Uri.encodeFull(finalMenuUrl),
+                      width: 70,
+                      height: 70,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) =>
+                          _buildPlaceholderIcon(size: 70),
+                    ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayMenuName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
+                            height: 1.2,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        totalItemPrice.toStringAsFixed(0) + " บาท",
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                          color: primaryGreen, // 🎯 ปรับให้เข้ากับร้านค้า
+                        ),
+                      ),
+                    ],
                   ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  displayMenuName,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  "ราคา $finalPricePerUnit บาท",
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (curriesList.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  const Divider(height: 1, color: Color(0xFFE0E0E0)),
                   const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6.0,
-                    runSpacing: 6.0,
-                    children: curriesList.map((curry) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.add_circle,
-                              size: 14,
-                              color: Colors.orange,
+
+                  if (hasAddons) ...[
+                    Text(
+                      isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 3.5,
+                            decoration: BoxDecoration(
+                              color: primaryGreen, // 🎯 เส้นขีดแนวตั้ง
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            const SizedBox(width: 4),
-                            Text(
-                              curry['name'] ?? "ไม่มีชื่อ",
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                for (var curry in curriesList)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            curry['name'] as String,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        const Text(
+                                          "1 จำนวน",
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                for (var entry in groupedAddons.entries)
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 2,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            entry.key,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        if (entry.value['canIncreaseQty'] ==
+                                                true ||
+                                            (entry.value['qty'] as int) > 1)
+                                          RichText(
+                                            text: TextSpan(
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                color: Colors.black87,
+                                              ),
+                                              children: [
+                                                TextSpan(
+                                                  text:
+                                                      (entry.value['qty']
+                                                              as int)
+                                                          .toString() +
+                                                      " ",
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const TextSpan(text: "จำนวน"),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
                             ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-                if (addonCounts.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6.0,
-                    runSpacing: 6.0,
-                    children: addonCounts.entries.map((entry) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.orange.shade200),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.add_circle,
-                              size: 14,
-                              color: Colors.orange,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              entry.value > 1
-                                  ? "${entry.key} x${entry.value}"
-                                  : entry.key,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.orange.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    "จำนวน $qty",
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  if (item.note.isNotEmpty) ...[
+                    Text(
+                      "หมายเหตุ: " + item.note,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey.shade600,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      item.qty.toString() + " จำนวน",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: primaryGreen, // 🎯 ปรับให้เข้ากับร้านค้า
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -356,7 +403,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
       final String firstName = widget.orderModel.member?.firstname ?? "";
       final String lastName = widget.orderModel.member?.lastname ?? "";
       if (firstName.isNotEmpty || lastName.isNotEmpty) {
-        memberFullName = "$firstName $lastName".trim();
+        memberFullName = firstName + " " + lastName.trim();
       }
       final String? rawImgPath = widget.orderModel.member?.profileimg ?? "";
       finalImgUrl = _getFinalImageUrl(rawImgPath);
@@ -458,7 +505,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    "ออเดอร์: K$orderIdStr",
+                                    "ออเดอร์: K" + orderIdStr,
                                     style: TextStyle(
                                       fontSize: 13,
                                       color: Colors.grey.shade600,
@@ -474,8 +521,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                         Divider(color: Colors.grey.shade200, thickness: 1.5),
                         const SizedBox(height: 12),
 
-                        if (widget.orderModel.items != null &&
-                            widget.orderModel.items!.isNotEmpty)
+                        if (widget.orderModel.items.isNotEmpty)
                           Container(
                             decoration: BoxDecoration(
                               color: Colors.grey.shade50,
@@ -490,7 +536,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                               child: Material(
                                 color: Colors.transparent,
                                 child: InkWell(
-                                  onTap: widget.orderModel.items!.length > 1
+                                  onTap: widget.orderModel.items.length > 1
                                       ? () {
                                           setState(() {
                                             _isItemsExpanded =
@@ -507,12 +553,12 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                                         if (!_isItemsExpanded) ...[
                                           Stack(
                                             children: [
-                                              _buildProOrderItemCard(
-                                                widget.orderModel.items!.first,
+                                              _buildOrderItemCard(
+                                                widget.orderModel.items.first,
                                               ),
                                               if (widget
                                                       .orderModel
-                                                      .items!
+                                                      .items
                                                       .length >
                                                   1)
                                                 Positioned(
@@ -575,19 +621,19 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                                             ],
                                           ),
                                         ] else ...[
-                                          ...widget.orderModel.items!
+                                          ...widget.orderModel.items
                                               .asMap()
                                               .entries
                                               .map((entry) {
                                                 return Column(
                                                   children: [
-                                                    _buildProOrderItemCard(
+                                                    _buildOrderItemCard(
                                                       entry.value,
                                                     ),
                                                     if (entry.key <
                                                         widget
                                                                 .orderModel
-                                                                .items!
+                                                                .items
                                                                 .length -
                                                             1)
                                                       Divider(
@@ -602,7 +648,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                                                   ],
                                                 );
                                               }),
-                                          if (widget.orderModel.items!.length >
+                                          if (widget.orderModel.items.length >
                                               1)
                                             Container(
                                               width: double.infinity,
@@ -718,7 +764,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                           decoration: BoxDecoration(
                             color: Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey.shade300!),
+                            border: Border.all(color: Colors.grey.shade300),
                           ),
                           child: Text(
                             displayComment,

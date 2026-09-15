@@ -14,7 +14,6 @@ class NavbarRider extends StatefulWidget implements PreferredSizeWidget {
 
   const NavbarRider({super.key, required this.title});
 
-  // 🎯 ปรับให้ใช้โทนสีเดียวกับ Member
   static const Color _orange = Color(0xFFFF8C00);
 
   @override
@@ -30,7 +29,6 @@ class _NavbarRiderState extends State<NavbarRider> {
   RiderModel? riderModel;
   String? riderImage;
 
-  // 🎯 ตัวแปรเก็บจำนวนออเดอร์แจ้งเตือน
   int _activeOrderCount = 0;
 
   @override
@@ -58,7 +56,7 @@ class _NavbarRiderState extends State<NavbarRider> {
         setState(() {
           if (rider != null) {
             riderModel = rider;
-            riderImage = _getFinalImageUrl(rider.studentCardImage);
+            riderImage = _getFinalImageUrl(rider.profileImage);
           }
         });
       }
@@ -67,7 +65,6 @@ class _NavbarRiderState extends State<NavbarRider> {
     }
   }
 
-  // 🎯 ฟังก์ชันโหลดจำนวนแจ้งเตือน (งานใหม่ + งานที่รับมาแล้ว)
   Future<void> _fetchActiveOrderBadgeCount() async {
     try {
       String studentId = GlobalData.usernameRider;
@@ -87,14 +84,14 @@ class _NavbarRiderState extends State<NavbarRider> {
   @override
   Widget build(BuildContext context) {
     return AppBar(
-      backgroundColor: Colors.white, // 🎯 เปลี่ยนพื้นหลังเป็นสีขาวแบบ Member
-      elevation: 4, // 🎯 เพิ่มเงาแบบ Member
+      backgroundColor: Colors.white,
+      elevation: 4,
       shadowColor: Colors.black.withOpacity(0.25),
       automaticallyImplyLeading: false,
       title: Text(
         widget.title,
         style: const TextStyle(
-          color: Colors.black87, // 🎯 ข้อความสีดำ/เทาเข้มแบบ Member
+          color: Colors.black87,
           fontSize: 20,
           fontWeight: FontWeight.bold,
           letterSpacing: 0.5,
@@ -102,46 +99,13 @@ class _NavbarRiderState extends State<NavbarRider> {
       ),
       centerTitle: true,
 
-      // ─── ปุ่ม Home (ด้านซ้าย) ───
-      leading: IconButton(
-        icon: const Icon(
-          Icons.home_outlined,
-          color: NavbarRider._orange, // 🎯 เปลี่ยนไอคอนเป็นสีส้มแบบ Member
-          size: 35, // 🎯 ขนาดไอคอนเท่ากับ Member
-        ),
-        onPressed: () {
-          Navigator.popUntil(context, (route) => route.isFirst);
-        },
-      ),
-
       actions: [
-        // ─── 🎯 ปุ่มการแจ้งเตือนพร้อม Badge สีแดง ───
         Stack(
           clipBehavior: Clip.none,
           children: [
-            IconButton(
-              icon: const Icon(
-                Icons.notifications_active_outlined,
-                color:
-                    NavbarRider._orange, // 🎯 เปลี่ยนไอคอนเป็นสีส้มแบบ Member
-                size: 32, // 🎯 ขนาดไอคอนใกล้เคียงกับตะกร้าของ Member
-              ),
-              onPressed: () {
-                // 🎯 เมื่อคลิกให้เปิดหน้า ListWaitingPickupOrder
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const ListWaitingPickupOrder(),
-                  ),
-                ).then((_) {
-                  // รีเฟรชแจ้งเตือนเมื่อกลับมาที่หน้าเดิม
-                  _fetchActiveOrderBadgeCount();
-                });
-              },
-            ),
             if (_activeOrderCount > 0)
               Positioned(
-                right: 4, // 🎯 ปรับตำแหน่งให้เหมือน Member
+                right: 4,
                 top: 4,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
@@ -149,16 +113,13 @@ class _NavbarRiderState extends State<NavbarRider> {
                     vertical: 1,
                   ),
                   constraints: const BoxConstraints(
-                    minWidth: 18, // 🎯 ขนาด badge แบบ Member
+                    minWidth: 18,
                     minHeight: 18,
                   ),
                   decoration: BoxDecoration(
                     color: Colors.redAccent,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Colors.white, // 🎯 ขอบสีขาวให้เหมือน Member
-                      width: 1.5,
-                    ),
+                    border: Border.all(color: Colors.white, width: 1.5),
                   ),
                   child: Text(
                     _activeOrderCount > 99 ? '99+' : '$_activeOrderCount',
@@ -175,8 +136,6 @@ class _NavbarRiderState extends State<NavbarRider> {
           ],
         ),
         const SizedBox(width: 12),
-
-        // ─── รูปโปรไฟล์ (มุมขวาบน) ───
         Padding(
           padding: const EdgeInsets.only(right: 20),
           child: GestureDetector(
@@ -185,14 +144,13 @@ class _NavbarRiderState extends State<NavbarRider> {
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileRider()),
               ).then((_) {
+                // 🎯 เมื่อผู้ใช้กดปุ่ม Home กลับมาจาก Profile ให้โหลดข้อมูล Navbar ใหม่ทันที
                 loadRiderData();
               });
             },
             child: CircleAvatar(
-              radius: 18, // 🎯 ขนาดวงกลมโปรไฟล์เท่า Member
-              backgroundColor: const Color(
-                0xFFFFEBCC,
-              ), // 🎯 พื้นหลังสีส้มอ่อนแบบ Member
+              radius: 18,
+              backgroundColor: const Color(0xFFFFEBCC),
               backgroundImage: (riderImage != null && riderImage!.isNotEmpty)
                   ? NetworkImage(Uri.encodeFull(riderImage!))
                   : null,
@@ -203,7 +161,7 @@ class _NavbarRiderState extends State<NavbarRider> {
               child: (riderImage == null || riderImage!.isEmpty)
                   ? const Icon(
                       Icons.sports_motorsports_rounded,
-                      color: NavbarRider._orange, // 🎯 ไอคอนข้างในสีส้ม
+                      color: NavbarRider._orange,
                       size: 20,
                     )
                   : null,

@@ -137,6 +137,19 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/rider/{username}/cancel")
+    public ResponseEntity getCancelOrdersByRider(@PathVariable String username) {
+        try {
+            List cancelOrders = orderService.getCancelOrdersByRider(username);
+            return ResponseEntity.ok(cancelOrders);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "status", "error",
+                    "message", e.getMessage()
+            ));
+        }
+    }
+
     @GetMapping("/rider/{studentId}/income")
     public ResponseEntity<?> getRiderIncome(
             @PathVariable String studentId,
@@ -212,6 +225,46 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/restaurant/{username}/success")
+    public ResponseEntity<?> getSuccessOrdersByRestaurant(@PathVariable String username) {
+        try {
+            List orders = orderService.getSuccessOrdersByRestaurant(username);
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/updateOrderSuccess")
+    public ResponseEntity<?> updateOrderSuccess(@RequestBody Map<String, Object> requestData) {
+        try {
+            // รับค่า orderId และ status ที่ส่งมาจาก Flutter
+            int orderId = Integer.parseInt(requestData.get("orderId").toString());
+            String status = requestData.get("status").toString();
+
+            // เรียกใช้ Service
+            boolean isSuccess = orderService.updateOrderSuccess(orderId, status);
+
+            if (isSuccess) {
+                return ResponseEntity.ok(Map.of(
+                        "status", "success",
+                        "message", "อัปเดตสถานะเป็น " + status + " สำเร็จ"
+                ));
+            } else {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                        "status", "error",
+                        "message", "ไม่สามารถอัปเดตสถานะได้"
+                ));
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error",
+                    "message", "เกิดข้อผิดพลาดที่ระบบส่วนกลาง: " + e.getMessage()
+            ));
+        }
+    }
 
 
     @PostMapping("/updateStatus")

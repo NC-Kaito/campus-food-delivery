@@ -23,6 +23,12 @@ public class OrderDetail {
     private Integer orderdetailid;
 
     @Column(nullable = false)
+    private String menuNameAtOrder;
+
+    @Column(nullable = false)
+    private double priceAtOrder;
+
+    @Column(nullable = false)
     private int qty;
 
     @Column(nullable = false)
@@ -37,7 +43,7 @@ public class OrderDetail {
     private Order order;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "menu_id", nullable = false)
+    @JoinColumn(name = "menu_id", nullable = true)
     @JsonIgnoreProperties({"restaurant", "hibernateLazyInitializer", "handler"})
     private Menu menu;
 

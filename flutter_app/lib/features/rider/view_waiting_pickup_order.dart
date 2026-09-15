@@ -26,7 +26,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
 
   // 🎯 ปรับโทนสีหลักให้เป็นสีเขียวทิศทางเดียวกับของ Member
   final Color primaryGreen = const Color(0xFF00B300);
-  final Color accentGreen = const Color(0xFF64F02D);
+  final Color accentGreen = const Color(0xFF00B300);
 
   Set<Polyline> _polylines = {};
   String _drivingDistance = "กำลังคำนวณ...";
@@ -203,8 +203,12 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     }
 
     final bool isCurryDish = rawCurries.isNotEmpty;
-    String displayMenuName = item.menu?.menuName ?? "รายการเมนู";
-    if (isCurryDish) {
+
+    String displayMenuName = item.menuNameAtOrder.isNotEmpty
+        ? item.menuNameAtOrder
+        : (item.menu?.menuName ?? "รายการเมนู");
+
+    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
       displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
     }
 
@@ -274,9 +278,11 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
             addon['addonMenu']?['addonName'] ??
             addon['name'] ??
+            addon['addonName'] ??
             '';
         price =
             (addon['priceAtOrder'] ??
+                    addon['priceatorder'] ??
                     addon['menuAddonDetail']?['addonPrice'] ??
                     0)
                 .toInt();
@@ -286,13 +292,19 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
             addon['menuAddonDetail']?['addonMenu'] ??
             addon['addonMenu'] ??
             addon['menuAddon'];
-        if (menu != null) {
+        if (menu is Map) {
           if (menu['canIncreaseQuantity'] != null) {
             canIncreaseQty = menu['canIncreaseQuantity'] == true;
           } else if (menu['allowQuantity'] != null) {
             canIncreaseQty = menu['allowQuantity'] == true;
           } else if (menu['isMultiple'] != null) {
             canIncreaseQty = menu['isMultiple'] == true;
+          } else if (menu['isQuantity'] != null) {
+            canIncreaseQty = menu['isQuantity'] == true;
+          } else if (menu['maxQuantity'] != null) {
+            canIncreaseQty = (menu['maxQuantity'] as num) > 1;
+          } else if (menu['maxQty'] != null) {
+            canIncreaseQty = (menu['maxQty'] as num) > 1;
           }
         }
       } else {
@@ -323,47 +335,60 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
     }
 
     int totalItemPrice = 0;
-    int addonsSum = 0;
-    for (var addon in groupedAddons.values) {
-      addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
-    }
 
     try {
       final jsonItem = (item as dynamic).toJson();
-      var rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
+      final rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
       if (rawSubtotal != null) {
         totalItemPrice = (rawSubtotal as num).toInt();
       }
     } catch (_) {}
 
     if (totalItemPrice == 0) {
-      int baseMenuPrice = item.menu?.price?.toInt() ?? 0;
+      int addonsSum = 0;
+      for (var addon in groupedAddons.values) {
+        addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
+      }
+
+      int baseMenuPrice =
+          item.priceAtOrder?.toInt() ?? item.menu?.price?.toInt() ?? 0;
+
       if (baseMenuPrice == 0) {
         try {
           final jsonItem = (item as dynamic).toJson();
           baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
         } catch (_) {}
       }
+
       int curriesSum = 0;
       for (var curry in curriesList) {
         curriesSum += curry['price'] as int;
       }
-      int baseUnitNoAddonPrice = baseMenuPrice + curriesSum;
-      totalItemPrice = (baseUnitNoAddonPrice + addonsSum) * item.qty;
+
+      totalItemPrice = (baseMenuPrice + curriesSum + addonsSum) * item.qty;
     }
 
     String rawMenuUrl = item.menu?.menuImage ?? '';
     if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
       rawMenuUrl = curriesList.first['image'] as String;
     }
+
     final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
     final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.5),
+            spreadRadius: 2,
+            blurRadius: 6,
+            offset: const Offset(0, 5),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(12.0),
@@ -409,7 +434,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange,
+                          color: Color(0xFF00B300),
                         ),
                       ),
                     ],
@@ -419,12 +444,12 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                   const SizedBox(height: 8),
 
                   if (hasAddons) ...[
-                    const Text(
-                      "รายการเพิ่มเติม",
-                      style: TextStyle(
+                    Text(
+                      isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
+                      style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF007AFF),
+                        color: Color(0xFF333333),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -450,10 +475,9 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                                       vertical: 2,
                                     ),
                                     child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Expanded(
+                                        Flexible(
                                           child: Text(
                                             curry['name'] as String,
                                             style: const TextStyle(
@@ -463,12 +487,13 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                                             ),
                                           ),
                                         ),
+                                        const SizedBox(width: 8),
                                         const Text(
                                           "1 จำนวน",
                                           style: TextStyle(
-                                            fontSize: 13,
+                                            fontSize: 12,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
+                                            color: Colors.black,
                                           ),
                                         ),
                                       ],
@@ -480,10 +505,9 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                                       vertical: 2,
                                     ),
                                     child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
+                                      mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Expanded(
+                                        Flexible(
                                           child: Text(
                                             entry.key,
                                             style: const TextStyle(
@@ -495,12 +519,14 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                                         ),
                                         if (entry.value['canIncreaseQty'] ==
                                                 true ||
-                                            (entry.value['qty'] as int) > 1)
+                                            (entry.value['qty'] as int) >
+                                                1) ...[
+                                          const SizedBox(width: 8),
                                           RichText(
                                             text: TextSpan(
                                               style: const TextStyle(
-                                                fontSize: 13,
-                                                color: Colors.black87,
+                                                fontSize: 12,
+                                                color: Color(0xFF00B300),
                                               ),
                                               children: [
                                                 TextSpan(
@@ -514,6 +540,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                                               ],
                                             ),
                                           ),
+                                        ],
                                       ],
                                     ),
                                   ),
@@ -545,7 +572,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange,
+                        color: Color(0xFF00B300),
                       ),
                     ),
                   ),
@@ -581,7 +608,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text("รับคำสั่งซื้อสำเร็จ! กำลังไปรับอาหารที่ร้านค้า 🏍️💨"),
+          content: Text("รับคำสั่งซื้อสำเร็จ! กำลังไปรับอาหารที่ร้านค้า"),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
@@ -990,7 +1017,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                   : const Text(
                       "รับคำสั่งซื้อ",
                       style: TextStyle(
-                        color: Colors.black,
+                        color: Colors.white,
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),

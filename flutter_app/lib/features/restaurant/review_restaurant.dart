@@ -355,13 +355,6 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
 
   // ------------------- แถบปุ่มกรองตามดาว -------------------
   Widget _buildFilterChips() {
-    final availableStars = <int>[];
-    for (int star = 5; star >= 1; star--) {
-      if (_countForStar(star) > 0) {
-        availableStars.add(star);
-      }
-    }
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -373,10 +366,10 @@ class _ReviewRestaurantState extends State<ReviewRestaurant> {
             baseColor: Colors.black87,
             onTap: () => _onFilterTapped(null),
           ),
-          for (int star in availableStars) ...[
+          for (int star = 5; star >= 1; star--) ...[
             const SizedBox(width: 8),
             _buildChip(
-              label: "$star (${_countForStar(star)})",
+              label: "$star ดาว (${_countForStar(star)})",
               icon: Icons.star_rounded,
               isSelected: _selectedStar == star,
               baseColor: _colorForStar(star),

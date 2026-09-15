@@ -38,10 +38,17 @@ public interface OrderService {
 
     List<Order> getCancelOrdersByRestaurant(String username);
 
+    List getSuccessOrdersByRestaurant(String username);
+
     // เพิ่มไว้ตรงไหนก็ได้ใน interface (เช่น ต่อจาก getActiveOrdersByRider)
     boolean updateOrderStatus(int orderId, String newStatus);
 
+    boolean updateOrderSuccess(int orderId, String newStatus);
+
+
     List<Order> getSuccessOrdersByRider(String username);
+
+    List getCancelOrdersByRider(String username);
 
     // 🎯 เพิ่มการประกาศฟังก์ชันสำหรับดึงออเดอร์ที่รีวิวแล้ว
     List<Order> getReviewSuccessOrders(String studentId);

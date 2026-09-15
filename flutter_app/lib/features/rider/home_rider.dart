@@ -23,7 +23,6 @@ class _HomeRiderState extends State<HomeRider>
     with SingleTickerProviderStateMixin {
   bool _isOnline = true;
 
-  // 🎯 ตัวแปรเก็บ Filter ที่เลือก (ค่าเริ่มต้นคือ "7 วันย้อนหลัง")
   String _selectedFilter = '7days';
   String _previousFilter = '7days';
   DateTimeRange? _selectedDateRange;
@@ -31,10 +30,13 @@ class _HomeRiderState extends State<HomeRider>
   List<Map<String, dynamic>> _incomeData = [];
   bool _isLoadingIncome = true;
 
-  // 🎯 ตัวแปรเก็บจำนวนออเดอร์แจ้งเตือนที่ปุ่ม "รับงาน"
+  // ยอดที่ลูกค้าจ่ายทั้งหมด และรายได้ไรเดอร์หลังหักค่าสินค้าให้ร้าน
+  double _customerPaidTotal = 0.0;
+  double _riderEarnedTotal = 0.0;
+  int _successfulDeliveryRounds = 0;
+
   int _activeOrderCount = 0;
 
-  // 🎯 ตัวแปรเก็บคะแนนรีวิวเฉลี่ยของไรเดอร์ (null = ยังไม่มีรีวิว)
   double? _riderRating;
   bool _isLoadingRating = true;
 
@@ -55,26 +57,25 @@ class _HomeRiderState extends State<HomeRider>
     _loadRiderProfile();
     _loadIncomeData();
     _fetchActiveOrderCount();
-    _fetchRiderRating(); // 🎯 ดึงและคำนวณคะแนนรีวิว
+    _fetchRiderRating();
   }
 
-  Future<void> _loadRiderProfile() async {
+  Future _loadRiderProfile() async {
     try {
       final rider = await _riderService.getRiderByStudentId(
         GlobalData.usernameRider,
       );
       if (mounted) {
         setState(() {
-          _profileImageUrl = rider.studentCardImage;
+          _profileImageUrl = rider.profileImage;
         });
       }
     } catch (e) {
-      debugPrint("โหลดข้อมูลโปรไฟล์หน้า Home ไม่สำเร็จ: $e");
+      debugPrint("โหลดข้อมูลโปรไฟล์หน้า Home ไม่สำเร็จ: " + e.toString());
     }
   }
 
-  // 🎯 ดึงและคำนวณคะแนนรีวิวเฉลี่ยของไรเดอร์ (เต็ม 5 คะแนน)
-  Future<void> _fetchRiderRating() async {
+  Future _fetchRiderRating() async {
     try {
       String studentId = GlobalData.usernameRider.trim();
       if (studentId.isEmpty) {
@@ -82,10 +83,12 @@ class _HomeRiderState extends State<HomeRider>
         return;
       }
 
-      // ดึงออเดอร์ที่มีการรีวิวเสร็จสิ้นของไรเดอร์
-      final rawOrders = await _orderService.getReviewSuccessOrders(studentId);
-      final List<OrderModel> orders = rawOrders
-          .map((o) => OrderModel.fromJson(o))
+      // 🎯 กำหนด Type ให้รับข้อมูลจาก API และ Map เข้า List อย่างปลอดภัย
+      final List rawOrders = await _orderService.getReviewSuccessOrders(
+        studentId,
+      );
+      final List orders = rawOrders
+          .map((o) => OrderModel.fromJson(Map<String, dynamic>.from(o as Map)))
           .where((o) => o.orderId != null)
           .toList();
 
@@ -129,7 +132,7 @@ class _HomeRiderState extends State<HomeRider>
         });
       }
     } catch (e) {
-      debugPrint("เกิดข้อผิดพลาดในการโหลดคะแนนรีวิวไรเดอร์: $e");
+      debugPrint("เกิดข้อผิดพลาดในการโหลดคะแนนรีวิวไรเดอร์: " + e.toString());
       if (mounted) {
         setState(() {
           _riderRating = null;
@@ -139,7 +142,7 @@ class _HomeRiderState extends State<HomeRider>
     }
   }
 
-  Future<void> _fetchActiveOrderCount() async {
+  Future _fetchActiveOrderCount() async {
     try {
       String studentId = GlobalData.usernameRider;
 
@@ -152,7 +155,7 @@ class _HomeRiderState extends State<HomeRider>
         });
       }
     } catch (e) {
-      debugPrint("เกิดข้อผิดพลาดในการนับออเดอร์แจ้งเตือน: $e");
+      debugPrint("เกิดข้อผิดพลาดในการนับออเดอร์แจ้งเตือน: " + e.toString());
     }
   }
 
@@ -168,7 +171,7 @@ class _HomeRiderState extends State<HomeRider>
     ];
   }
 
-  Future<void> _pickDateRange() async {
+  Future _pickDateRange() async {
     final pickedRange = await showDateRangePicker(
       context: context,
       initialDateRange:
@@ -207,14 +210,21 @@ class _HomeRiderState extends State<HomeRider>
     }
   }
 
-  Future<void> _loadIncomeData() async {
+  Future _loadIncomeData() async {
     setState(() => _isLoadingIncome = true);
 
     DateTime start;
     DateTime end;
-    DateTime now = DateTime.now();
-    DateTime todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
-    DateTime todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+    final DateTime now = DateTime.now();
+    final DateTime todayStart = DateTime(now.year, now.month, now.day, 0, 0, 0);
+    final DateTime todayEnd = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      23,
+      59,
+      59,
+    );
 
     if (_selectedFilter == 'today') {
       start = todayStart;
@@ -250,25 +260,80 @@ class _HomeRiderState extends State<HomeRider>
     }
 
     try {
-      final data = await _orderService.getRiderIncomeByDateRange(
+      final List rawOrders = await _orderService.getSuccessOrdersByRider(
         GlobalData.usernameRider,
-        start,
-        end,
       );
+
+      // 🎯 ระบุ Generic Type ให้ครบเพื่อป้องกัน Error ตอนแปลงข้อมูล
+      final List orders = rawOrders
+          .map((o) => OrderModel.fromJson(Map<String, dynamic>.from(o as Map)))
+          .where((o) => o.orderId != null && o.orderdate != null)
+          .where((o) {
+            final d = o.orderdate!;
+            return !d.isBefore(start) && !d.isAfter(end);
+          })
+          .toList();
+
+      double customerPaidTotal = 0.0;
+      double riderEarnedTotal = 0.0;
+      int successfulRounds = orders.length;
+
+      Map<String, Map<String, dynamic>> dailySummary = {};
+
+      for (final order in orders) {
+        final double customerPaid = order.totalPrice.toDouble();
+        final double riderEarned = order.deliveryFee.toDouble();
+
+        customerPaidTotal += customerPaid;
+        riderEarnedTotal += riderEarned;
+
+        final d = order.orderdate!;
+        final String dateKey =
+            d.day.toString().padLeft(2, '0') +
+            "/" +
+            d.month.toString().padLeft(2, '0') +
+            "/" +
+            (d.year + 543).toString();
+
+        if (!dailySummary.containsKey(dateKey)) {
+          dailySummary[dateKey] = {"date": dateKey, "rounds": 0, "amount": 0.0};
+        }
+
+        dailySummary[dateKey]!["rounds"] =
+            (dailySummary[dateKey]!["rounds"] as int) + 1;
+        dailySummary[dateKey]!["amount"] =
+            (dailySummary[dateKey]!["amount"] as double) + riderEarned;
+      }
 
       if (mounted) {
         setState(() {
-          _incomeData = data;
+          _incomeData = dailySummary.values.toList();
+          _customerPaidTotal = customerPaidTotal;
+          _riderEarnedTotal = riderEarnedTotal;
+          _successfulDeliveryRounds = successfulRounds;
           _isLoadingIncome = false;
         });
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoadingIncome = false);
+      if (mounted) {
+        setState(() {
+          _incomeData = [];
+          _customerPaidTotal = 0.0;
+          _riderEarnedTotal = 0.0;
+          _successfulDeliveryRounds = 0;
+          _isLoadingIncome = false;
+        });
+      }
+      debugPrint("โหลดสรุปรายได้ไรเดอร์ไม่สำเร็จ: " + e.toString());
     }
   }
 
   String _formatDate(DateTime date) {
-    return "${date.day}/${date.month}/${date.year + 543}";
+    return date.day.toString() +
+        "/" +
+        date.month.toString() +
+        "/" +
+        (date.year + 543).toString();
   }
 
   String _getMonthNameThai(String monthStr) {
@@ -294,7 +359,9 @@ class _HomeRiderState extends State<HomeRider>
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
     final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
   @override
@@ -344,6 +411,7 @@ class _HomeRiderState extends State<HomeRider>
                 ),
               ).then((_) {
                 _fetchActiveOrderCount();
+                _loadRiderProfile();
               });
             } else if (index == 2) {
               Navigator.push(
@@ -351,7 +419,10 @@ class _HomeRiderState extends State<HomeRider>
                 MaterialPageRoute(
                   builder: (context) => const AccountManagementRider(),
                 ),
-              );
+              ).then((_) {
+                _loadRiderProfile();
+                _fetchActiveOrderCount();
+              });
             }
           },
           items: [
@@ -383,7 +454,9 @@ class _HomeRiderState extends State<HomeRider>
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
                         child: Text(
-                          _activeOrderCount > 99 ? '99+' : '$_activeOrderCount',
+                          _activeOrderCount > 99
+                              ? '99+'
+                              : _activeOrderCount.toString(),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
@@ -529,11 +602,11 @@ class _HomeRiderState extends State<HomeRider>
       Map<String, Map<String, dynamic>> monthlyMap = {};
       for (var item in _incomeData) {
         try {
-          List<String> parts = item['date'].toString().split('/');
+          List parts = item['date'].toString().split('/');
           if (parts.length == 3) {
             String monthName = _getMonthNameThai(parts[1]);
             int yearTH = int.parse(parts[2]);
-            String monthYear = "$monthName $yearTH";
+            String monthYear = monthName + " " + yearTH.toString();
 
             if (!monthlyMap.containsKey(monthYear)) {
               monthlyMap[monthYear] = {
@@ -542,25 +615,23 @@ class _HomeRiderState extends State<HomeRider>
                 "amount": 0.0,
               };
             }
-            monthlyMap[monthYear]!["rounds"] += (item['rounds'] as num).toInt();
-            monthlyMap[monthYear]!["amount"] += (item['amount'] as num)
-                .toDouble();
+            monthlyMap[monthYear]!["rounds"] =
+                (monthlyMap[monthYear]!["rounds"] as int) +
+                (item['rounds'] as int);
+            monthlyMap[monthYear]!["amount"] =
+                (monthlyMap[monthYear]!["amount"] as double) +
+                (item['amount'] as double);
           }
         } catch (_) {}
       }
       displayTableData = monthlyMap.values.toList();
     } else {
-      displayTableData = List.from(_incomeData);
+      displayTableData = List<Map<String, dynamic>>.from(_incomeData);
     }
 
-    final double totalAmount = _incomeData.fold<double>(
-      0.0,
-      (sum, item) => sum + (item['amount'] as num).toDouble(),
-    );
-    final int totalRounds = _incomeData.fold<int>(
-      0,
-      (sum, item) => sum + (item['rounds'] as num).toInt(),
-    );
+    final double totalCustomerPaid = _customerPaidTotal;
+    final double totalRiderEarned = _riderEarnedTotal;
+    final int totalRounds = _successfulDeliveryRounds;
 
     String dateRangeText = "";
     if ((_selectedFilter == 'custom' || _selectedFilter == 'custom_month') &&
@@ -569,7 +640,9 @@ class _HomeRiderState extends State<HomeRider>
         dateRangeText = _formatDate(_selectedDateRange!.start);
       } else {
         dateRangeText =
-            "${_formatDate(_selectedDateRange!.start)} - ${_formatDate(_selectedDateRange!.end)}";
+            _formatDate(_selectedDateRange!.start) +
+            " - " +
+            _formatDate(_selectedDateRange!.end);
       }
     }
 
@@ -629,7 +702,7 @@ class _HomeRiderState extends State<HomeRider>
                     border: Border.all(color: Colors.blue.shade100),
                   ),
                   child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
+                    child: DropdownButton(
                       value: _selectedFilter == 'custom_month'
                           ? 'custom'
                           : _selectedFilter,
@@ -646,7 +719,7 @@ class _HomeRiderState extends State<HomeRider>
                         color: Colors.blue,
                       ),
                       items: _buildFilterOptions(),
-                      onChanged: (val) {
+                      onChanged: (String? val) {
                         if (val != null) {
                           if (val == 'custom') {
                             _previousFilter = _selectedFilter == 'custom_month'
@@ -669,9 +742,10 @@ class _HomeRiderState extends State<HomeRider>
           ),
 
           _buildIncomeSideBySideContent(
-            title: "ยอดรวมทั้งหมด",
-            amount: "฿ ${totalAmount.toStringAsFixed(0)}",
-            rounds: totalRounds.toString(),
+            leftTitle: "ยอดรวมที่ลูกค้าจ่าย",
+            leftAmount: "฿ " + totalCustomerPaid.toStringAsFixed(0),
+            rightTitle: "ยอดจัดส่งที่ได้รับ",
+            rightAmount: "฿ " + totalRiderEarned.toStringAsFixed(0),
           ),
 
           Container(
@@ -752,6 +826,7 @@ class _HomeRiderState extends State<HomeRider>
                             ],
                           ),
                         ),
+                        // 🎯 เติม  ให้ .map() เพื่อ Type ที่ถูกต้อง
                         ...displayTableData.map((data) {
                           final double amount = (data['amount'] as num)
                               .toDouble();
@@ -798,6 +873,61 @@ class _HomeRiderState extends State<HomeRider>
                             ),
                           );
                         }).toList(),
+
+                        // สรุปรอบจัดส่งสำเร็จไว้ท้ายตาราง
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _primaryGreen.withOpacity(0.06),
+                            border: Border(
+                              top: BorderSide(
+                                color: _primaryGreen.withOpacity(0.15),
+                              ),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Expanded(
+                                flex: 3,
+                                child: Text(
+                                  "รวมรอบจัดส่งสำเร็จ",
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  totalRounds.toString() + " รอบ",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: _primaryGreen,
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                flex: 2,
+                                child: Text(
+                                  totalRiderEarned.toStringAsFixed(0),
+                                  textAlign: TextAlign.right,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
             ),
@@ -808,12 +938,13 @@ class _HomeRiderState extends State<HomeRider>
   }
 
   Widget _buildIncomeSideBySideContent({
-    required String title,
-    required String amount,
-    required String rounds,
+    required String leftTitle,
+    required String leftAmount,
+    required String rightTitle,
+    required String rightAmount,
   }) {
     return Padding(
-      key: ValueKey(title),
+      key: ValueKey(leftTitle + "-" + rightTitle),
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -825,26 +956,30 @@ class _HomeRiderState extends State<HomeRider>
                 Row(
                   children: [
                     Icon(
-                      Icons.account_balance_wallet_rounded,
+                      Icons.payments_rounded,
                       size: 16,
                       color: Colors.green.shade400,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      title,
-                      style: TextStyle(
-                        color: _textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        leftTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _textMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  amount,
+                  leftAmount,
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: 25,
                     fontWeight: FontWeight.bold,
                     color: _textDark,
                     letterSpacing: -0.5,
@@ -853,8 +988,8 @@ class _HomeRiderState extends State<HomeRider>
               ],
             ),
           ),
-          Container(height: 50, width: 1.5, color: Colors.blue.shade50),
-          const SizedBox(width: 24),
+          Container(height: 56, width: 1.5, color: Colors.blue.shade50),
+          const SizedBox(width: 20),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -867,39 +1002,29 @@ class _HomeRiderState extends State<HomeRider>
                       color: _primaryGreen,
                     ),
                     const SizedBox(width: 6),
-                    Text(
-                      "รอบจัดส่งสำเร็จ",
-                      style: TextStyle(
-                        color: _textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        rightTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _textMuted,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text(
-                      rounds,
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: _textDark,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "รอบ",
-                      style: TextStyle(
-                        color: _textMuted,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                Text(
+                  rightAmount,
+                  style: TextStyle(
+                    fontSize: 25,
+                    fontWeight: FontWeight.bold,
+                    color: _textDark,
+                    letterSpacing: -0.5,
+                  ),
                 ),
               ],
             ),
@@ -909,7 +1034,6 @@ class _HomeRiderState extends State<HomeRider>
     );
   }
 
-  // 🎯 ปรับปรุงส่วนแสดงคะแนนรีวิว: ดึงคะแนนจริง / แสดง "ไม่มีรีวิว" / กดเปิด ListReviewRider
   Widget _buildPerformanceSection(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),

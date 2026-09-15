@@ -126,15 +126,15 @@ class _ListReviewRiderState extends State<ListReviewRider> {
   Color _colorForStar(int star) {
     switch (star) {
       case 5:
-        return const Color(0xFF16A34A);
+        return const Color(0xFF16A34A); // เขียวเข้ม
       case 4:
-        return const Color(0xFFEA7C1E);
+        return const Color(0xFF84CC16); // เขียวอ่อน
       case 3:
-        return const Color(0xFFF5A623);
+        return const Color.fromARGB(255, 211, 165, 0); // เหลือง
       case 2:
-        return const Color(0xFFEF6C4D);
+        return const Color(0xFFF97316); // ส้ม
       default:
-        return const Color(0xFFE53935);
+        return const Color(0xFFDC2626); // แดง
     }
   }
 
@@ -166,7 +166,26 @@ class _ListReviewRiderState extends State<ListReviewRider> {
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
-      appBar: const NavbarRider(title: "รีวิวการจัดส่งของคุณ"),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF00B300),
+          ),
+          onPressed: () => Navigator.pop(context, true),
+        ),
+        title: const Text(
+          "รีวิวการจัดส่งของคุณ",
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: _primary))
           : _errorMessage != null
@@ -336,13 +355,6 @@ class _ListReviewRiderState extends State<ListReviewRider> {
   }
 
   Widget _buildFilterChips() {
-    final availableStars = <int>[];
-    for (int star = 5; star >= 1; star--) {
-      if (_countForStar(star) > 0) {
-        availableStars.add(star);
-      }
-    }
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -354,10 +366,10 @@ class _ListReviewRiderState extends State<ListReviewRider> {
             baseColor: Colors.black87,
             onTap: () => _onFilterTapped(null),
           ),
-          for (int star in availableStars) ...[
+          for (int star = 5; star >= 1; star--) ...[
             const SizedBox(width: 8),
             _buildChip(
-              label: "$star (${_countForStar(star)})",
+              label: "$star ดาว (${_countForStar(star)})",
               icon: Icons.star_rounded,
               isSelected: _selectedStar == star,
               baseColor: _colorForStar(star),

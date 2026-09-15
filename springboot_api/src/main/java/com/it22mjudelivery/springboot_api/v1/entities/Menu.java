@@ -18,11 +18,11 @@ import java.util.Set;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@EqualsAndHashCode(onlyExplicitlyIncluded = true) // ← เปลี่ยนจาก @Data กัน equals/hashCode วนลูปกับความสัมพันธ์
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class Menu {
 
     @Id
-    @EqualsAndHashCode.Include // ← ใช้แค่ id ในการเทียบ equals/hashCode
+    @EqualsAndHashCode.Include
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private int menuid;
 
@@ -55,6 +55,6 @@ public class Menu {
             joinColumns = @JoinColumn(name = "menu_id"),
             inverseJoinColumns = @JoinColumn(name = "addongroup_id")
     )
-    @JsonIgnore // 🛑 ป้องกันไม่ให้ JSON ดึงค่าวนลูปกลับไปมา
+    @JsonIgnore
     private Set<Menuaddongroup> menuAddonGroups;
 }

@@ -25,9 +25,10 @@ class CustomAddonItem {
   });
 }
 
+// 🎯 ปรับเป็นโทนสีเขียว
 class _AddonTheme {
-  static const Color primary = Color(0xFFFF8A00);
-  static const Color accent = Color(0xFF2FB86A);
+  static const Color primary = Color(0xFF00B300);
+  static const Color accent = Color(0xFF00B300);
   static const Color danger = Color(0xFFE5484D);
   static const Color surface = Colors.white;
   static const Color pageBg = Color(0xFFF6F7F9);
@@ -109,7 +110,7 @@ class _EditAddonState extends State<EditAddon> {
     if (widget.details.isEmpty) {
       _addNewCustomAddonRow();
     } else {
-      selectedAddons = widget.details.map<CustomAddonItem>((d) {
+      selectedAddons = widget.details.map((d) {
         final priceVal = (d.addonPrice ?? 0).toInt().toString();
         return CustomAddonItem(
           nameController: TextEditingController(
@@ -232,10 +233,7 @@ class _EditAddonState extends State<EditAddon> {
     });
   }
 
-  Future<void> _toggleAddonDetailStatus(
-    CustomAddonItem addon,
-    bool value,
-  ) async {
+  Future _toggleAddonDetailStatus(CustomAddonItem addon, bool value) async {
     final previousDetailStatus = addon.status;
 
     setState(() {
@@ -272,7 +270,7 @@ class _EditAddonState extends State<EditAddon> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("อัปเดตสถานะตัวเลือกไม่สำเร็จ: $e"),
+            content: Text("อัปเดตสถานะตัวเลือกไม่สำเร็จ: " + e.toString()),
             backgroundColor: _AddonTheme.danger,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -366,11 +364,11 @@ class _EditAddonState extends State<EditAddon> {
     _nameFocusNodes[addon]?.unfocus();
   }
 
-  Future<void> _doUpdateAddonGroup() async {
+  Future _doUpdateAddonGroup() async {
     final isFormValid = formKey.currentState!.validate();
     if (!isFormValid) return;
 
-    final names = selectedAddons
+    final List<String> names = selectedAddons
         .map((a) => a.nameController.text.trim().toLowerCase())
         .toList();
     if (names.toSet().length != names.length) {
@@ -441,22 +439,71 @@ class _EditAddonState extends State<EditAddon> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text("เกิดข้อผิดพลาด: $e"),
-            backgroundColor: _AddonTheme.danger,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        String errorMsg = e.toString().replaceAll("Exception: ", "");
+
+        if (errorMsg.contains("กำลังดำเนินการอยู่")) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  const Icon(
+                    Icons.warning_rounded,
+                    color: _AddonTheme.danger,
+                    size: 28,
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      "ไม่สามารถแก้ไขได้",
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                errorMsg,
+                style: const TextStyle(fontSize: 14.5, height: 1.4),
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _AddonTheme.danger,
+                  ),
+                  child: const Text(
+                    "ตกลง",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        );
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text("เกิดข้อผิดพลาด: " + errorMsg),
+              backgroundColor: _AddonTheme.danger,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  // 🎯 ปรับกรอบช่องข้อมูลเป็นสีดำขนาด 0.3
   InputDecoration _fieldDecoration({String hint = "", Widget? prefixIcon}) {
     return InputDecoration(
       hintText: hint,
@@ -471,15 +518,11 @@ class _EditAddonState extends State<EditAddon> {
       fillColor: _isEditMode ? _AddonTheme.surface : _AddonTheme.fieldBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: _isEditMode
-            ? BorderSide(color: Colors.grey.shade300, width: 1.2)
-            : BorderSide.none,
+        borderSide: const BorderSide(color: Colors.black, width: 0.3),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: _isEditMode
-            ? BorderSide(color: Colors.grey.shade300, width: 1.2)
-            : BorderSide.none,
+        borderSide: const BorderSide(color: Colors.black, width: 0.3),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -523,14 +566,19 @@ class _EditAddonState extends State<EditAddon> {
   }) {
     return Row(
       children: [
+        // 🎯 พื้นหลังไอคอนสีเทา ไอคอนสีเขียว
         Container(
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: _AddonTheme.primary.withOpacity(0.12),
+            color: const Color.fromARGB(255, 196, 196, 196).withOpacity(0.12),
             borderRadius: BorderRadius.circular(9),
           ),
-          child: Icon(icon, size: 17, color: _AddonTheme.primary),
+          child: Icon(
+            icon,
+            size: 17,
+            color: const Color.fromARGB(255, 244, 150, 0),
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -568,7 +616,7 @@ class _EditAddonState extends State<EditAddon> {
       decoration: BoxDecoration(
         color: _isEditMode ? _AddonTheme.surface : _AddonTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
-        border: _isEditMode ? Border.all(color: Colors.grey.shade300) : null,
+        border: Border.all(color: Colors.black, width: 0.3), // 🎯 กรอบดำ
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -665,7 +713,7 @@ class _EditAddonState extends State<EditAddon> {
         shape: BoxShape.circle,
       ),
       child: Text(
-        "${index + 1}",
+        (index + 1).toString(),
         style: const TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
@@ -721,7 +769,15 @@ class _EditAddonState extends State<EditAddon> {
                       : Colors.transparent,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
-                    borderSide: BorderSide.none,
+                    borderSide: _isEditMode
+                        ? const BorderSide(color: Colors.black, width: 0.3)
+                        : BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    borderSide: _isEditMode
+                        ? const BorderSide(color: Colors.black, width: 0.3)
+                        : BorderSide.none,
                   ),
                 ),
               ),
@@ -771,7 +827,15 @@ class _EditAddonState extends State<EditAddon> {
                     : Colors.transparent,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+                  borderSide: _isEditMode
+                      ? const BorderSide(color: Colors.black, width: 0.3)
+                      : BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: _isEditMode
+                      ? const BorderSide(color: Colors.black, width: 0.3)
+                      : BorderSide.none,
                 ),
               ),
             ),
@@ -854,7 +918,10 @@ class _EditAddonState extends State<EditAddon> {
                     height: 46,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [_AddonTheme.primary, Color(0xFFFFB13D)],
+                        colors: [
+                          _AddonTheme.primary,
+                          Color(0xFF64F02D),
+                        ], // 🎯 โทนสีเขียว
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -952,7 +1019,7 @@ class _EditAddonState extends State<EditAddon> {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          "${selectedAddons.length} รายการ",
+                          selectedAddons.length.toString() + " รายการ",
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -1049,10 +1116,10 @@ class _EditAddonState extends State<EditAddon> {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: _AddonTheme.accent.withOpacity(0.4),
-                                width: 1.3,
+                                color: Colors.black, // 🎯 กรอบดำ
+                                width: 0.3,
                               ),
-                              color: _AddonTheme.accent.withOpacity(0.06),
+                              color: Colors.white,
                             ),
                             child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -1060,7 +1127,7 @@ class _EditAddonState extends State<EditAddon> {
                                 Icon(
                                   Icons.add_rounded,
                                   size: 18,
-                                  color: _AddonTheme.accent,
+                                  color: _AddonTheme.textPrimary,
                                 ),
                                 SizedBox(width: 6),
                                 Text(
@@ -1068,7 +1135,7 @@ class _EditAddonState extends State<EditAddon> {
                                   style: TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
-                                    color: _AddonTheme.accent,
+                                    color: _AddonTheme.textPrimary,
                                   ),
                                 ),
                               ],

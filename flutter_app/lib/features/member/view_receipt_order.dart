@@ -222,10 +222,15 @@ class _ViewReceiptOrderState extends State<ViewReceiptOrder> {
                                   ),
                                 ),
                                 Container(
-                                  width: 80,
-                                  height: 80,
+                                  width: 200,
+                                  height: 200,
                                   decoration: const BoxDecoration(
-                                    color: Color(0xFFFF7A45),
+                                    color: ui.Color.fromARGB(
+                                      255,
+                                      255,
+                                      255,
+                                      255,
+                                    ),
                                     shape: BoxShape.circle,
                                   ),
                                   child: ClipOval(
@@ -255,7 +260,7 @@ class _ViewReceiptOrderState extends State<ViewReceiptOrder> {
                             ),
                             const SizedBox(height: 10),
                             const Text(
-                              "Campus Food Delivery",
+                              "ใบเสร็จคำสั่งซื้อ",
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 18,

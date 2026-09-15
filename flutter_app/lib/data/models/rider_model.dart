@@ -6,6 +6,7 @@ class RiderModel {
   String? birthday;
   String? email;
   String? phone;
+  String? profileImage;
   String? studentCardImage;
   String? drivingLicenseImg;
   String? vehiclePlate;
@@ -16,7 +17,7 @@ class RiderModel {
   String? notApproveDetail;
   int? majorId;
   String? majorName;
-  String? facultyName; // 👈 1. เพิ่มตัวแปรเก็บชื่อคณะตรงนี้
+  String? facultyName;
 
   RiderModel({
     this.studentid,
@@ -26,6 +27,7 @@ class RiderModel {
     this.birthday,
     this.email,
     this.phone,
+    this.profileImage,
     this.studentCardImage,
     this.drivingLicenseImg,
     this.vehiclePlate,
@@ -36,7 +38,7 @@ class RiderModel {
     this.notApproveDetail,
     this.majorId,
     this.majorName,
-    this.facultyName, // 👈 2. เพิ่มใน Constructor
+    this.facultyName,
   });
 
   Map<String, dynamic> toJson() {
@@ -48,6 +50,8 @@ class RiderModel {
       'birthday': birthday,
       'email': email,
       'phone': phone,
+      // 🎯 แมปชื่อคีย์ให้ตรงกับ Entity (profileRiderImage)
+      'profileRiderImage': profileImage,
       'studentCard_Image': studentCardImage,
       'drivingLicenseImg': drivingLicenseImg,
       'vehiclePlate': vehiclePlate,
@@ -57,7 +61,6 @@ class RiderModel {
       'registerDate': registerDate,
       'notApproveDetail': notApproveDetail,
       'majorId': majorId,
-      // ถ้าส่งกลับไป Server ให้ใส่เพิ่ม (ถ้ามี)
     };
   }
 
@@ -65,21 +68,41 @@ class RiderModel {
     return RiderModel(
       studentid: json['studentid']?.toString(),
       password: json['password'],
-      firstName: json['firstName'],
-      lastName: json['lastName'],
+      firstName: json['firstName'] ?? json['firstname'],
+      lastName: json['lastName'] ?? json['lastname'],
       birthday: json['birthday'],
       email: json['email'],
       phone: json['phone'],
-      studentCardImage: json['studentCard_Image'],
-      drivingLicenseImg: json['drivingLicenseImg'],
-      vehicleImage: json['vehicle_Image'],
-      vehiclePlate: json['vehiclePlate'],
-      isActive: json['isActive'] as bool?,
-      verificationStatus: json['verificationStatus'],
-      registerDate: json['registerDate'],
-      notApproveDetail: json['notApproveDetail'],
 
-      // ✅ รองรับทั้ง DTO (flat) และ Entity (nested)
+      // 🎯 ดักจับ profileRiderImage จาก Entity / DTO
+      profileImage:
+          json['profileRiderImage'] ??
+          json['profile_rider_image'] ??
+          json['profileImage'] ??
+          json['profileimage'] ??
+          "",
+
+      studentCardImage:
+          json['studentCard_Image'] ??
+          json['studentCardImage'] ??
+          json['studentcard_image'] ??
+          json['studentcardimage'] ??
+          "",
+
+      drivingLicenseImg:
+          json['drivingLicenseImg'] ??
+          json['drivinglicenseimg'] ??
+          json['driving_license_img'],
+      vehicleImage:
+          json['vehicle_Image'] ?? json['vehicleImage'] ?? json['vehicleimage'],
+      vehiclePlate:
+          json['vehiclePlate'] ?? json['vehicleplate'] ?? json['vehicle_plate'],
+      isActive: json['isActive'] ?? json['isactive'],
+      verificationStatus:
+          json['verificationStatus'] ?? json['verificationstatus'],
+      registerDate: json['registerDate'] ?? json['registerdate'],
+      notApproveDetail: json['notApproveDetail'] ?? json['notapprovedetail'],
+
       majorId: json['majorId'] ?? json['major']?['majorid'],
       majorName: json['majorName'] ?? json['major']?['majorname'],
       facultyName:

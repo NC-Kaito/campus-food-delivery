@@ -14,7 +14,7 @@ public interface MemberService {
 
     boolean updateLocationMember(String username, double latitude, double longitude, String location);
 
-    boolean doUpdateProfileMember(String username, String phone, String profileImg);
+    boolean doUpdateProfileMember(String username, String firstName, String lastName, String phone, String profileImg);
 
     Review addReview(ReviewDto reviewDto);
 

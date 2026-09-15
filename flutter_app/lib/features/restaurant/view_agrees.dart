@@ -13,7 +13,20 @@ class _ViewAgreesState extends State<ViewAgrees> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: const RestaurantNavbar(title: ""),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Color(0xFF00B300),
+            size: 24,
+          ),
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+
       body: SafeArea(
         child: Column(
           children: [

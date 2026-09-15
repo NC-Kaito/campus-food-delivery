@@ -15,7 +15,6 @@ import 'package:flutter_app/global_data.dart';
 
 import 'dart:async';
 
-// 🎯 นำเข้าหน้า ViewReviewRestaurant
 import 'package:flutter_app/features/restaurant/view_review_restaurant.dart'
     as review;
 
@@ -80,7 +79,9 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
         });
       }
     } catch (e) {
-      debugPrint("เกิดข้อผิดพลาดในการโหลดประวัติคำสั่งซื้อหน้า UI: $e");
+      debugPrint(
+        "เกิดข้อผิดพลาดในการโหลดประวัติคำสั่งซื้อหน้า UI: " + e.toString(),
+      );
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -102,7 +103,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
         });
       }
     } catch (e) {
-      debugPrint("เกิดข้อผิดพลาดในการดึงข้อมูลแบบ Background: $e");
+      debugPrint("เกิดข้อผิดพลาดในการดึงข้อมูลแบบ Background: " + e.toString());
     }
   }
 
@@ -111,7 +112,9 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
   String _formatDateTime(dynamic rawDate) {
@@ -125,10 +128,10 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
       }
       final d = dt.day.toString().padLeft(2, '0');
       final m = dt.month.toString().padLeft(2, '0');
-      final y = dt.year + 543;
+      final y = (dt.year + 543).toString();
       final hr = dt.hour.toString().padLeft(2, '0');
       final min = dt.minute.toString().padLeft(2, '0');
-      return "$d/$m/$y $hr:$min น.";
+      return d + "/" + m + "/" + y + " " + hr + ":" + min + " น.";
     } catch (e) {
       return rawDate.toString();
     }
@@ -138,7 +141,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
     final status = (rawStatus ?? '').trim().toLowerCase();
 
     switch (status) {
-      // 🎯 1. สถานะค้นหาผู้จัดส่ง (ตอนพึ่งกดสั่งซื้อใหม่ๆ)
       case 'waitingrider':
       case 'findrider':
       case 'searching':
@@ -149,7 +151,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'icon': Icons.hourglass_empty_rounded,
         };
 
-      // 🎯 2. สถานะร้านรับออเดอร์ / กำลังปรุงอาหาร
       case 'waitingrestaurant':
       case 'pending':
       case 'preparing':
@@ -162,7 +163,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'icon': Icons.soup_kitchen_rounded,
         };
 
-      // 🎯 3. ไรเดอร์รับงานแล้ว กำลังเดินทางไปที่ร้าน
       case 'rideraccepted':
       case 'goingtorestaurant':
       case 'going':
@@ -174,7 +174,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'icon': Icons.directions_bike_rounded,
         };
 
-      // 🎯 4. ไรเดอร์รับอาหารจากร้านแล้ว กำลังมาส่งให้ลูกค้า
       case 'delivery':
       case 'delivering':
       case 'ontheway':
@@ -186,7 +185,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'icon': Icons.local_shipping_rounded,
         };
 
-      // 🎯 5. ไรเดอร์เดินทางมาถึงจุดส่งแล้ว
       case 'arrived':
       case 'reached':
         return {
@@ -196,7 +194,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'icon': Icons.location_on_rounded,
         };
 
-      // 🎯 6. ส่งมอบอาหารแล้ว รอลูกค้ากดยืนยัน
       case 'delivered':
         return {
           'text': 'รอยืนยันรับอาหาร',
@@ -205,7 +202,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
           'icon': Icons.assignment_turned_in_rounded,
         };
 
-      // 🎯 7. ลูกค้ายืนยันแล้ว (รอรีวิว)
       case 'success':
       case 'completed':
         return {
@@ -225,6 +221,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
 
       case 'cancel':
       case 'cancelled':
+      case 'reject':
         return {
           'text': 'ยกเลิกคำสั่งซื้อแล้ว',
           'color': Colors.red[800]!,
@@ -250,6 +247,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
     }
   }
 
+  // 🎯 เติม  ตรงนี้เพื่อระบุ Type ให้ชัดเจน
   List<OrderModel> _filterOrders(String type) {
     return _orderHistoryList.where((order) {
       final status = (order.orderStatus ?? '').toLowerCase();
@@ -262,6 +260,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
             status != 'reviewsuccess' &&
             status != 'cancel' &&
             status != 'cancelled' &&
+            status != 'reject' && // 🎯 ซ่อนจากหน้ากำลังดำเนินการ
             status != 'issue_reported';
       } else if (type == 'waiting_confirm') {
         return status == 'arrived' || status == 'delivered';
@@ -270,8 +269,10 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
       } else if (type == 'history') {
         return status == 'reviewsuccess';
       } else if (type == 'cancel') {
+        // 🎯 ดึงมาแสดงที่หน้ายกเลิก
         return status == 'cancel' ||
             status == 'cancelled' ||
+            status == 'reject' ||
             status == 'issue_reported';
       }
       return true;
@@ -296,7 +297,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
               color: Colors.white,
               child: TabBar(
                 controller: _tabController,
-                indicatorColor: const Color(0xFF00B300),
+                indicatorColor: const Color(0xFF2E7D32),
                 indicatorWeight: 3,
                 labelColor: const Color(0xFF2E7D32),
                 unselectedLabelColor: Colors.grey[600],
@@ -375,7 +376,6 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
             ),
           ],
         ),
-
         bottomNavigationBar: Padding(
           padding: const EdgeInsets.all(8.0),
           child: Card(
@@ -493,7 +493,7 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
                         border: Border.all(color: Colors.white, width: 1.5),
                       ),
                       child: Text(
-                        badgeCount > 99 ? '99+' : '$badgeCount',
+                        badgeCount > 99 ? '99+' : badgeCount.toString(),
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           color: Colors.white,
@@ -525,7 +525,10 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
     }
 
     String storeName =
-        order.restaurant?.restaurantName ?? order.restaurantUsername;
+        order.restaurant?.restaurantName ??
+        (order.restaurantUsername.isNotEmpty
+            ? order.restaurantUsername
+            : "ร้านค้า");
     String finalImageUrl = _getFinalImageUrl(order.restaurant?.restaurantImage);
 
     final statusInfo = _getDetailedStatusInfo(order.orderStatus);
@@ -545,283 +548,299 @@ class _ListConfirmOrderMemberState extends State<ListActiveOrderMember>
     return Container(
       margin: const EdgeInsets.only(bottom: 16.0),
       decoration: BoxDecoration(
-        color: const Color(0xFFE8FCD0),
         borderRadius: BorderRadius.circular(16.0),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.12),
-            spreadRadius: 1,
+            color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.4),
+            spreadRadius: 2,
             blurRadius: 6,
-            offset: const Offset(0, 3),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
-      child: InkWell(
+      child: Material(
+        color: const Color.fromARGB(255, 255, 255, 255),
         borderRadius: BorderRadius.circular(16.0),
-        onTap: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ViewActiveOrderMember(order: order),
-            ),
-          );
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          splashColor: Colors.green.withOpacity(0.15),
+          highlightColor: Colors.green.withOpacity(0.05),
+          onTap: () async {
+            // 🎯 หน่วงเวลา 0.5 วินาที เพื่อให้แสดงเอฟเฟคคลื่นน้ำ (Ripple) จนเสร็จ
+            await Future.delayed(const Duration(milliseconds: 500));
 
-          if (result == true) {
-            _tabController.animateTo(2);
-          }
-          _fetchOrderHistory();
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12.0),
-                child: finalImageUrl.isNotEmpty
-                    ? Image.network(
-                        Uri.encodeFull(finalImageUrl),
-                        width: 80,
-                        height: 80,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                            _buildPlaceholderIcon(),
-                      )
-                    : _buildPlaceholderIcon(),
+            // ป้องกัน Error หากผู้ใช้ออกจากหน้านี้ไปแล้วระหว่างที่กำลังหน่วงเวลา
+            if (!mounted) return;
+
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ViewActiveOrderMember(order: order),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Text(
-                      storeName,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
+            );
 
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusInfo['bgColor'],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: (statusInfo['color'] as Color).withOpacity(
-                            0.3,
-                          ),
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+            if (result == true) {
+              _tabController.animateTo(2);
+            }
+            _fetchOrderHistory();
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12.0),
+                  child: finalImageUrl.isNotEmpty
+                      ? Image.network(
+                          Uri.encodeFull(finalImageUrl),
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _buildPlaceholderIcon(),
+                        )
+                      : _buildPlaceholderIcon(),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Icon(
-                            statusInfo['icon'] as IconData,
-                            size: 13,
-                            color: statusInfo['color'],
+                          Expanded(
+                            child: Text(
+                              storeName,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                          const SizedBox(width: 4),
-                          Text(
-                            statusInfo['text'],
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: statusInfo['color'],
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusInfo['bgColor'],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: (statusInfo['color'] as Color)
+                                    .withOpacity(0.3),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  statusInfo['icon'] as IconData,
+                                  size: 13,
+                                  color: statusInfo['color'],
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  statusInfo['text'],
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusInfo['color'],
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
-                    ),
 
-                    const SizedBox(height: 6),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "รหัสบิล: #${order.orderId ?? '-'}",
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
+                      const SizedBox(height: 6),
+
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              "เลขที่ออเดอร์: #" +
+                                  (order.orderId?.toString() ?? "-"),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.access_time_rounded,
+                                size: 12,
+                                color: Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  formattedDate,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: Colors.grey[600],
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "จำนวน " + totalItems.toString() + " รายการ",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[800],
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Text(
+                            "฿" + order.totalPrice.toStringAsFixed(0),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      if (isWaitingConfirm) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      ViewActiveOrderMember(order: order),
+                                ),
+                              );
+
+                              if (result == true) {
+                                _tabController.animateTo(2);
+                              }
+                              _fetchOrderHistory();
+                            },
+                            icon: const Icon(
+                              Icons.assignment_turned_in_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              "ตรวจสอบและยืนยัน",
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF00B300),
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
                           ),
                         ),
+                      ],
+
+                      if (isCompleted) ...[
+                        const SizedBox(height: 12),
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            Icon(
-                              Icons.access_time_rounded,
-                              size: 12,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              formattedDate,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: Colors.grey[600],
-                                fontWeight: FontWeight.w600,
+                            OutlinedButton.icon(
+                              onPressed: () async {
+                                if (isReviewed) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          ViewReview(order: order),
+                                    ),
+                                  );
+                                } else {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          MemberReview(order: order),
+                                    ),
+                                  );
+                                  if (result == true) _fetchOrderHistory();
+                                }
+                              },
+                              icon: Icon(
+                                isReviewed
+                                    ? Icons.rate_review_rounded
+                                    : Icons.star_rounded,
+                                size: 16,
+                                color: isReviewed ? Colors.blue : Colors.orange,
+                              ),
+                              label: Text(
+                                isReviewed ? "ดูรีวิว" : "รีวิวออเดอร์",
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: isReviewed
+                                      ? Colors.blue[700]
+                                      : Colors.green[700],
+                                ),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(
+                                  color: isReviewed
+                                      ? Colors.blue[400]!
+                                      : Colors.green[400]!,
+                                  width: 1.2,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                backgroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
                               ),
                             ),
                           ],
                         ),
                       ],
-                    ),
-
-                    const SizedBox(height: 4),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          "จำนวน $totalItems รายการ",
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Colors.grey[800],
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          "฿${order.totalPrice.toStringAsFixed(0)}",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // 🎯 1. ถ้ารอการยืนยันรับอาหาร ให้โชว์ปุ่ม "ตรวจสอบและยืนยัน" ปุ่มเดียว
-                    if (isWaitingConfirm) ...[
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            final result = await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    ViewActiveOrderMember(order: order),
-                              ),
-                            );
-
-                            if (result == true) {
-                              _tabController.animateTo(
-                                2,
-                              ); // สไลด์ไปแท็บ "รอรีวิว"
-                            }
-                            _fetchOrderHistory(); // โหลดข้อมูลใหม่
-                          },
-                          icon: const Icon(
-                            Icons.assignment_turned_in_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          label: const Text(
-                            "ตรวจสอบและยืนยัน",
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00B300),
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
-
-                    // 🎯 2. ถ้ายืนยันสำเร็จแล้ว จะเหลือแค่ปุ่ม "รีวิว" อย่างเดียว
-                    if (isCompleted) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              if (isReviewed) {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        ViewReview(order: order),
-                                  ),
-                                );
-                              } else {
-                                final result = await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        MemberReview(order: order),
-                                  ),
-                                );
-                                if (result == true) _fetchOrderHistory();
-                              }
-                            },
-                            icon: Icon(
-                              isReviewed
-                                  ? Icons.rate_review_rounded
-                                  : Icons.star_rounded,
-                              size: 16,
-                              color: isReviewed ? Colors.blue : Colors.orange,
-                            ),
-                            label: Text(
-                              isReviewed ? "ดูรีวิว" : "รีวิวออเดอร์",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: isReviewed
-                                    ? Colors.blue[700]
-                                    : Colors.green[700],
-                              ),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(
-                                color: isReviewed
-                                    ? Colors.blue[400]!
-                                    : Colors.green[400]!,
-                                width: 1.2,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              backgroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              const Align(
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 16,
-                  color: Colors.green,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

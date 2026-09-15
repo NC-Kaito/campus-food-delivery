@@ -24,7 +24,6 @@ public class RiderServiceImpl implements RiderService {
         Rider rider = riderRepository.findByStudentid(studentId)
                 .orElseThrow(() -> new RuntimeException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง"));
 
-        // ⚠️ ในอนาคตอย่าลืมใช้ PasswordEncoder นะเพื่อน ตอนนี้เอาแบบ equals ไปก่อน
         if (!rider.getPassword().equals(password)) {
             throw new RuntimeException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
         }
@@ -48,20 +47,21 @@ public class RiderServiceImpl implements RiderService {
         // 3. แปลงจาก DTO เป็น Entity (ใช้ Builder ของคลาส Rider)
         Rider toSaveRider = Rider.builder()
                 .studentid(riderDto.getStudentid())
-                .password(riderDto.getPassword()) // รับมาจาก DTO
+                .password(riderDto.getPassword())
                 .firstName(riderDto.getFirstName())
                 .lastName(riderDto.getLastName())
                 .birthday(riderDto.getBirthday())
                 .email(riderDto.getEmail())
                 .phone(riderDto.getPhone())
+                .profileRiderImage("") // 🎯 เริ่มต้นเป็นค่าว่าง
                 .studentCard_Image(riderDto.getStudentCard_Image())
                 .drivingLicenseImg(riderDto.getDrivingLicenseImg())
                 .vehiclePlate(riderDto.getVehiclePlate())
                 .vehicle_Image(riderDto.getVehicle_Image())
-                .major(major) // ผูกความสัมพันธ์กับ Major
-                .isActive(false) // เริ่มต้นให้เป็น false รอการตรวจสอบ
+                .major(major)
+                .isActive(false)
                 .verificationStatus("wait")
-                .registerDate(LocalDateTime.now()) // บันทึกวันที่สมัครทันที
+                .registerDate(LocalDateTime.now())
                 .build();
 
         // 4. บันทึกลงฐานข้อมูล
@@ -71,45 +71,67 @@ public class RiderServiceImpl implements RiderService {
 
     @Override
     @Transactional
-    public RiderDto getRiderByStudentId(String studentId) { // 🎯 1. เปลี่ยน Type เป็น RiderDto
+    public RiderDto getRiderByStudentId(String studentId) {
         Rider rider = riderRepository.findByStudentid(studentId)
                 .orElseThrow(() -> new RuntimeException("ไม่พบข้อมูลผู้จัดส่งรหัสนักศึกษา: " + studentId));
 
-        // 🔄 แปลง Entity -> DTO เพื่อส่งข้อมูลไปให้ Flutter วาดหน้าจอ
-        return RiderDto.builder() // 🎯 2. ต้องเรียกใช้ RiderDto.builder() ครับ!
+        return RiderDto.builder()
                 .studentid(rider.getStudentid())
                 .firstName(rider.getFirstName())
                 .lastName(rider.getLastName())
                 .birthday(rider.getBirthday())
                 .email(rider.getEmail())
                 .phone(rider.getPhone())
-                .studentCard_Image(rider.getStudentCard_Image())
+                .profileRiderImage(rider.getProfileRiderImage()) // 🎯 แมปรูปโปรไฟล์ส่งไปให้ Flutter
+                .studentCard_Image(rider.getStudentCard_Image()) // 🎯 รูปบัตรนักศึกษา
                 .drivingLicenseImg(rider.getDrivingLicenseImg())
                 .vehiclePlate(rider.getVehiclePlate())
                 .vehicle_Image(rider.getVehicle_Image())
                 .isActive(rider.getIsActive())
                 .verificationStatus(rider.getVerificationStatus())
-                // 🎯 ใน RiderDto เราเก็บ registerDate เป็น LocalDate เลยดึงมาใส่ได้ตรงๆ เลยครับ
                 .registerDate(LocalDate.from(rider.getRegisterDate()))
                 .notApproveDetail(rider.getNotApproveDetail())
                 .majorId(rider.getMajor() != null ? rider.getMajor().getMajorid() : null)
                 .majorName(rider.getMajor() != null ? rider.getMajor().getMajorname() : "ไม่ระบุสาขา")
                 .facultyName(rider.getMajor() != null && rider.getMajor().getFaculty() != null
                         ? rider.getMajor().getFaculty().getFacultyname()
-                        : "ไม่ระบุคณะ")  // ← เพิ่มบรรทัดนี้
+                        : "ไม่ระบุคณะ")
                 .build();
     }
 
     @Override
     public boolean updateRiderStatus(String studentId, boolean isActive) {
-        Rider rider = riderRepository.findByStudentid(studentId).orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
+        Rider rider = riderRepository.findByStudentid(studentId)
+                .orElseThrow(() -> new RuntimeException("ไม่พบชื่อผู้ใช้งาน"));
         rider.setIsActive(isActive);
-        try{
+        try {
             riderRepository.save(rider);
-        }catch (Exception e){
-            new RuntimeException("เกิดข้อพลาดไม่สามารถเปลี่ยนสถานะได้");
-            return false;
+        } catch (Exception e) {
+            throw new RuntimeException("เกิดข้อผิดพลาดไม่สามารถเปลี่ยนสถานะได้");
         }
         return true;
+    }
+
+    // 🎯 เมธอดแก้ไขโปรไฟล์ไรเดอร์ (อัปเดต Phone, Email, ProfileImage)
+    @Override
+    public boolean updateProfileRider(String studentId, String phone, String profileImage) {
+        Rider rider = riderRepository.findByStudentid(studentId)
+                .orElseThrow(() -> new RuntimeException("ไม่พบผู้ใช้งานรหัสนักศึกษา: " + studentId));
+
+        if (phone != null && !phone.trim().isEmpty()) {
+            rider.setPhone(phone.trim());
+        }
+
+        // 🎯 แก้ไขชื่อ setter ให้ตรงกับ entity
+        if (profileImage != null && !profileImage.trim().isEmpty()) {
+            rider.setProfileRiderImage(profileImage.trim());
+        }
+
+        try {
+            riderRepository.save(rider);
+            return true;
+        } catch (Exception e) {
+            throw new RuntimeException("เกิดข้อผิดพลาดในการบันทึกข้อมูลโปรไฟล์: " + e.getMessage());
+        }
     }
 }

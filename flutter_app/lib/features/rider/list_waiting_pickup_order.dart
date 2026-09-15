@@ -38,7 +38,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
   int _activeOrderCount = 0;
 
   late final TabController _tabController;
-  List<dynamic> _realOrders = [];
+  List _realOrders = [];
   Timer? _autoRefreshTimer;
 
   final Color _primaryOrange = const Color(0xFF00B300);
@@ -46,12 +46,12 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _fetchRiderStatus();
     _fetchActiveOrderBadgeCount();
   }
 
-  Future<void> _fetchActiveOrderBadgeCount() async {
+  Future _fetchActiveOrderBadgeCount() async {
     try {
       String studentId = GlobalData.usernameRider;
 
@@ -64,7 +64,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         });
       }
     } catch (e) {
-      debugPrint("เกิดข้อผิดพลาดในการนับออเดอร์แจ้งเตือน: $e");
+      debugPrint("เกิดข้อผิดพลาดในการนับออเดอร์แจ้งเตือน: " + e.toString());
     }
   }
 
@@ -78,10 +78,10 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     });
   }
 
-  Future<void> _fetchOrdersBackground() async {
+  Future _fetchOrdersBackground() async {
     if (!_isReady) return;
     try {
-      List<dynamic> orders = [];
+      List orders = [];
       String studentId = GlobalData.usernameRider;
 
       if (_selectedTabIndex == 0) {
@@ -92,6 +92,13 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         orders = await _orderService.getSuccessOrdersByRider(studentId);
       } else if (_selectedTabIndex == 3) {
         orders = await _orderService.getReviewSuccessOrders(studentId);
+      } else if (_selectedTabIndex == 4) {
+        try {
+          orders = await _orderService.getCancelOrdersByRider(studentId);
+        } catch (e) {
+          debugPrint("โหลดรายการที่ยกเลิกของไรเดอร์ไม่สำเร็จ: " + e.toString());
+          orders = [];
+        }
       }
 
       if (mounted) {
@@ -100,7 +107,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         });
       }
     } catch (e) {
-      debugPrint("Auto-refresh orders failure: $e");
+      debugPrint("Auto-refresh orders failure: " + e.toString());
     }
   }
 
@@ -111,7 +118,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     super.dispose();
   }
 
-  Future<void> _fetchRiderStatus() async {
+  Future _fetchRiderStatus() async {
     try {
       String studentId = GlobalData.usernameRider;
       final riderData = await _riderService.getRiderByStudentId(studentId);
@@ -134,7 +141,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("🚨 โหลดสถานะไรเดอร์ล้มเหลว: $e"),
+            content: Text("🚨 โหลดสถานะไรเดอร์ล้มเหลว: " + e.toString()),
             backgroundColor: Colors.red,
           ),
         );
@@ -142,7 +149,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
   }
 
-  Future<void> _fetchOrders() async {
+  Future _fetchOrders() async {
     if (!_isReady) return;
 
     setState(() {
@@ -150,7 +157,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     });
 
     try {
-      List<dynamic> orders = [];
+      List orders = [];
       String studentId = GlobalData.usernameRider;
 
       if (_selectedTabIndex == 0) {
@@ -161,6 +168,13 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         orders = await _orderService.getSuccessOrdersByRider(studentId);
       } else if (_selectedTabIndex == 3) {
         orders = await _orderService.getReviewSuccessOrders(studentId);
+      } else if (_selectedTabIndex == 4) {
+        try {
+          orders = await _orderService.getCancelOrdersByRider(studentId);
+        } catch (e) {
+          debugPrint("โหลดรายการที่ยกเลิกของไรเดอร์ไม่สำเร็จ: " + e.toString());
+          orders = [];
+        }
       }
 
       if (mounted) {
@@ -178,7 +192,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("🚨 โหลดรายการออเดอร์ล้มเหลว: $e"),
+            content: Text("🚨 โหลดรายการออเดอร์ล้มเหลว: " + e.toString()),
             backgroundColor: Colors.red,
           ),
         );
@@ -186,7 +200,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
   }
 
-  Future<void> _toggleActiveStatus(bool newStatus) async {
+  Future _toggleActiveStatus(bool newStatus) async {
     if (_isUpdating) return;
 
     setState(() {
@@ -232,7 +246,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("🚨 เปลี่ยนสถานะไม่สำเร็จ: $e"),
+            content: Text("🚨 เปลี่ยนสถานะไม่สำเร็จ: " + e.toString()),
             backgroundColor: Colors.red,
           ),
         );
@@ -240,7 +254,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
   }
 
-  Future<void> _openOrderDetail(
+  Future _openOrderDetail(
     OrderModel orderModel,
     dynamic rawOrder, {
     bool isReviewTab = false,
@@ -306,17 +320,23 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       );
     }
 
-    if (result == true || _selectedTabIndex == 1 || _selectedTabIndex == 2) {
+    if (result == true ||
+        _selectedTabIndex == 1 ||
+        _selectedTabIndex == 2 ||
+        _selectedTabIndex == 4) {
       _fetchOrders();
     }
   }
 
+  // 🎯 หลีกเลี่ยง String Interpolation ด้วยการใช้ + เชื่อมข้อความ
   String _getFinalProfileImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
-    return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
+    return rawPath.startsWith('/')
+        ? baseUrl + rawPath
+        : baseUrl + '/' + rawPath;
   }
 
   Widget _buildTabBar() {
@@ -340,6 +360,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
           Tab(text: "รายการจัดส่ง"),
           Tab(text: "จัดส่งสำเร็จ"),
           Tab(text: "ดูรีวิว"),
+          Tab(text: "ยกเลิก"),
         ],
       ),
     );
@@ -359,7 +380,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       final String firstName = orderModel.member?.firstname ?? "";
       final String lastName = orderModel.member?.lastname ?? "";
       if (firstName.isNotEmpty || lastName.isNotEmpty) {
-        memberFullName = "$firstName $lastName".trim();
+        memberFullName = firstName + " " + lastName;
       }
       final String? rawImgPath = orderModel.member?.profileimg ?? "";
       finalImgUrl = _getFinalProfileImageUrl(rawImgPath);
@@ -368,7 +389,11 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
 
     int totalItems = 0;
-    if (order["orderDetails"] != null && order["orderDetails"] is List) {
+    if (orderModel.items.isNotEmpty) {
+      for (var item in orderModel.items) {
+        totalItems += item.qty;
+      }
+    } else if (order["orderDetails"] != null && order["orderDetails"] is List) {
       totalItems = (order["orderDetails"] as List).length;
     } else if (order["items"] != null && order["items"] is List) {
       totalItems = (order["items"] as List).length;
@@ -378,262 +403,379 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     if (orderModel.orderdate != null) {
       final DateTime dateTime = orderModel.orderdate!;
       orderTimeText =
-          "${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')} น.";
+          dateTime.hour.toString().padLeft(2, '0') +
+          ":" +
+          dateTime.minute.toString().padLeft(2, '0') +
+          " น.";
     }
 
-    // 🎯 จัดการรูปแบบปุ่มให้ตรงตามสถานะการจัดส่ง
     String buttonText = "ดูรายละเอียด";
-    bool isReviewTab = _selectedTabIndex == 3;
-    Color buttonColor = const Color(0xFF64FF20);
-    Color textColor = Colors.black;
+    final bool isReviewTab = _selectedTabIndex == 3;
+    final bool isCancelTab = _selectedTabIndex == 4;
+    final bool isSuccessTab = _selectedTabIndex == 2;
+    Color buttonColor = const Color(0xFF00B300);
+    Color textColor = const Color.fromARGB(255, 255, 255, 255);
+
+    final String orderStatus = (orderModel.orderStatus ?? '')
+        .trim()
+        .toLowerCase();
 
     if (_selectedTabIndex == 0) {
       buttonText = "ดูรายละเอียดเพื่อรับงาน";
     } else if (_selectedTabIndex == 1) {
       buttonText = "ดูเส้นทาง / Status จัดส่ง";
-    } else if (_selectedTabIndex == 2) {
-      // 🎯 ถ้าออเดอร์ถูกตั้งเป็น delivered แล้ว (ไรเดอร์กดส่งแล้ว) แต่ลูกค้ายืนยันยังไม่เสร็จ
-      if ((orderModel.orderStatus ?? '').toLowerCase() == 'delivered') {
-        buttonText = "ส่งแล้ว (รอลูกค้ายืนยัน)";
-        buttonColor = Colors.orange.shade100;
-        textColor = Colors.orange.shade900;
-      } else {
-        // 🎯 ถ้าลูกค้ากดยืนยันแล้ว (Success)
-        buttonText = "จัดส่งสำเร็จเรียบร้อย";
-        buttonColor = Colors.green.shade100;
-        textColor = Colors.green.shade900;
-      }
     } else if (isReviewTab) {
       buttonText = "ดูรีวิวการจัดส่ง";
+    } else if (isCancelTab) {
+      buttonText = "ดูเหตุผลการยกเลิก";
+      buttonColor = Colors.red.shade600;
     }
+
+    final bool isDeliveredWaitingConfirm = orderStatus == 'delivered';
+    final bool isDeliverySuccess =
+        orderStatus == 'success' ||
+        orderStatus == 'completed' ||
+        orderStatus == 'reviewsuccess';
+
+    final String successStatusText = isDeliveredWaitingConfirm
+        ? "ส่งแล้ว (รอลูกค้ายืนยัน)"
+        : isDeliverySuccess
+        ? "จัดส่งสำเร็จเรียบร้อย"
+        : "จัดส่งสำเร็จเรียบร้อย";
+
+    final bool showSuccessStatus = isSuccessTab && !isCancelTab;
+
+    final String cancelDetail = orderModel.cancelDetail ?? "";
 
     final double cardRating =
         double.tryParse((order['reviewRating'] ?? 5.0).toString()) ?? 5.0;
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: () =>
-          _openOrderDetail(orderModel, order, isReviewTab: isReviewTab),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8F9FA),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.grey.shade300),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isCancelTab ? const Color(0xFFFFEBEE) : null,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isCancelTab ? Colors.red.shade200 : Colors.grey.shade300,
         ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 18,
-                          backgroundColor: Colors.orange.withOpacity(0.2),
-                          backgroundImage: finalImgUrl.isNotEmpty
-                              ? NetworkImage(finalImgUrl)
-                              : null,
-                          child: finalImgUrl.isEmpty
-                              ? const Icon(
-                                  Icons.person,
-                                  size: 20,
-                                  color: Colors.orange,
-                                )
-                              : null,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            memberFullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
+        boxShadow: [
+          BoxShadow(
+            color: const Color.fromARGB(255, 17, 156, 70).withOpacity(0.4),
+            spreadRadius: 2,
+            blurRadius: 6,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: isCancelTab
+            ? const Color(0xFFFFEBEE)
+            : const Color.fromARGB(255, 255, 255, 255),
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          splashColor: Colors.green.withOpacity(0.15),
+          highlightColor: Colors.green.withOpacity(0.05),
+          onTap: () async {
+            await Future.delayed(const Duration(milliseconds: 600));
+            if (!mounted) return;
+
+            // 🎯 อนุญาตให้กดที่การ์ดเพื่อดูรายละเอียดได้ทุกแท็บ (รวมถึงแท็บยกเลิก)
+            _openOrderDetail(orderModel, order, isReviewTab: isReviewTab);
+          },
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: isCancelTab
+                                ? Colors.red.withOpacity(0.15)
+                                : const Color(0xFF00B300).withOpacity(0.15),
+                            backgroundImage: finalImgUrl.isNotEmpty
+                                ? NetworkImage(finalImgUrl)
+                                : null,
+                            child: finalImgUrl.isEmpty
+                                ? Icon(
+                                    Icons.person,
+                                    size: 20,
+                                    color: isCancelTab
+                                        ? Colors.red
+                                        : const Color(0xFF00B300),
+                                  )
+                                : null,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              memberFullName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black87,
+                              ),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      const Text(
-                        "เลขที่ออเดอร์",
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      Text(
-                        "K$orderId",
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(
-                    children: [
-                      const SizedBox(height: 4),
-                      Container(
-                        width: 12,
-                        height: 12,
-                        decoration: const BoxDecoration(
-                          color: Colors.orange,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         const Text(
-                          "รับที่ (ร้านค้า)",
+                          "เลขที่ออเดอร์",
                           style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
                             color: Colors.grey,
                           ),
                         ),
-                        const SizedBox(height: 2),
                         Text(
-                          restaurantName,
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 15,
+                          "K" + orderId,
+                          style: TextStyle(
+                            fontSize: 14,
                             fontWeight: FontWeight.bold,
+                            color: isCancelTab
+                                ? Colors.red
+                                : const Color(0xFF00B300),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            if (isReviewTab) ...[
-              const SizedBox(height: 12),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(
-                      Icons.star_rounded,
-                      color: Colors.amber,
-                      size: 20,
+                    Column(
+                      children: [
+                        const SizedBox(height: 4),
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: isCancelTab
+                                ? Colors.red
+                                : const Color(0xFF00B300),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      "$cardRating คะแนน",
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
-                        fontSize: 14,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "รับที่ (ร้านค้า)",
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: Colors.grey,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            restaurantName,
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ],
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
+              if (isReviewTab) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.restaurant_menu,
-                        size: 16,
-                        color: Colors.grey.shade600,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        "ทั้งหมด $totalItems รายการ",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time_rounded,
-                        size: 16,
-                        color: Colors.grey.shade600,
+                      const Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber,
+                        size: 20,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        "เวลาสั่งซื้อ: $orderTimeText",
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.grey.shade700,
+                        cardRating.toString() + " คะแนน",
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87,
+                          fontSize: 14,
                         ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1, thickness: 1, color: Colors.black12),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _openOrderDetail(
-                    orderModel,
-                    order,
-                    isReviewTab: isReviewTab,
+                ),
+              ],
+              if (isCancelTab) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.cancel_rounded,
+                        size: 20,
+                        color: Colors.red.shade600,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          cancelDetail.isNotEmpty
+                              ? "ยกเลิก: " + cancelDetail
+                              : "ยกเลิก",
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: buttonColor,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                ),
+              ],
+              if (showSuccessStatus) ...[
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Row(
+                    children: [
+                      Icon(
+                        isDeliveredWaitingConfirm
+                            ? Icons.delivery_dining_rounded
+                            : Icons.check_circle_rounded,
+                        size: 20,
+                        color: isDeliveredWaitingConfirm
+                            ? Colors.orange.shade700
+                            : const Color(0xFF00B300),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        successStatusText,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: isDeliveredWaitingConfirm
+                              ? Colors.orange.shade800
+                              : const Color(0xFF00B300),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.restaurant_menu,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "ทั้งหมด " + totalItems.toString() + " รายการ",
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
                     ),
-                    elevation: 0,
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.access_time_rounded,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          "เวลาสั่งซื้อ: " + orderTimeText,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+
+              // 🎯 แสดงปุ่มเฉพาะเมื่อ "ไม่ใช่แท็บจัดส่งสำเร็จ" และ "ไม่ใช่แท็บยกเลิก"
+              if (!isSuccessTab && !isCancelTab) ...[
+                const SizedBox(height: 16),
+                const Divider(height: 1, thickness: 1, color: Colors.black12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24.0,
+                    vertical: 16.0,
                   ),
-                  child: Text(
-                    buttonText,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _openOrderDetail(
+                        orderModel,
+                        order,
+                        isReviewTab: isReviewTab,
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: buttonColor,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: Text(
+                        buttonText,
+                        style: TextStyle(
+                          color: textColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ],
+              ] else ...[
+                // 🎯 แท็บสำเร็จและแท็บยกเลิก จะไม่แสดงปุ่ม แต่เว้นระยะห่างด้านล่างไว้ให้การ์ดดูสมดุล
+                const SizedBox(height: 20),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -756,8 +898,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                 if (_isReady && !_isLoadingStatus)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                    // 🎯 ใช้ + แทน $
                     child: Text(
-                      "ทั้งหมด ${_realOrders.length} รายการ",
+                      "ทั้งหมด " + _realOrders.length.toString() + " รายการ",
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -852,7 +995,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
                           border: Border.all(color: Colors.white, width: 1.5),
                         ),
                         child: Text(
-                          _activeOrderCount > 99 ? '99+' : '$_activeOrderCount',
+                          _activeOrderCount > 99
+                              ? '99+'
+                              : _activeOrderCount.toString(),
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
@@ -904,7 +1049,9 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
         ? "ยังไม่มีรายการที่กำลังจัดส่ง"
         : _selectedTabIndex == 2
         ? "ยังไม่มีรายการที่จัดส่งสำเร็จ"
-        : "ยังไม่มีรายการที่ได้รับการรีวิว";
+        : _selectedTabIndex == 3
+        ? "ยังไม่มีรายการที่ได้รับการรีวิว"
+        : "ยังไม่มีรายการที่ถูกยกเลิก";
 
     return RefreshIndicator(
       onRefresh: _fetchOrders,
