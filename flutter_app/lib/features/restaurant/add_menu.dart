@@ -20,7 +20,7 @@ const String _riceCurryTypeName = "ข้าวราดแกง";
 class _MenuTheme {
   static const Color primary = Color(0xFFFF8A00);
   static const Color accent = Color(0xFF2FB86A);
-  static const Color danger = Color(0xFFE5484D);
+  static const Color danger = Color(0xFFE5484D); // สีแดงสำหรับแจ้งเตือน
   static const Color surface = Colors.white;
   static const Color pageBg = Color(0xFFF6F7F9);
   static const Color textPrimary = Color(0xFF1F2430);
@@ -403,7 +403,7 @@ class _AddMenuState extends State<AddMenu> {
                 if (image != null) {
                   setState(() {
                     _selectedImage = File(image.path);
-                    _imageError = null;
+                    _imageError = null; // เคลียร์ error ทันทีเมื่อเลือกรูป
                   });
                 }
               },
@@ -423,7 +423,7 @@ class _AddMenuState extends State<AddMenu> {
                 if (image != null) {
                   setState(() {
                     _selectedImage = File(image.path);
-                    _imageError = null;
+                    _imageError = null; // เคลียร์ error ทันทีเมื่อเลือกรูป
                   });
                 }
               },
@@ -436,6 +436,7 @@ class _AddMenuState extends State<AddMenu> {
   }
 
   Future<void> _doSaveMenu() async {
+    // 🎯 ตรวจสอบฟอร์มแบบแมนนวลอีกรอบตอนกดปุ่ม
     final isFormValid = formKey.currentState!.validate();
 
     setState(() {
@@ -561,31 +562,29 @@ class _AddMenuState extends State<AddMenu> {
       filled: true,
       fillColor: fillColor ?? _MenuTheme.fieldBg,
       suffixIcon: suffixIcon,
+      // 🎯 ตั้งค่าสีแจ้งเตือน error เป็นสีแดง (danger)
+      errorStyle: const TextStyle(color: _MenuTheme.danger, fontSize: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Colors.black,
-          width: 0,
-        ), // 🎯 เพิ่มขอบดำ
+        borderSide: const BorderSide(color: Colors.black, width: 0),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Colors.black,
-          width: 0,
-        ), // 🎯 เพิ่มขอบดำ
+        borderSide: const BorderSide(color: Colors.black, width: 0),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.6),
       ),
+      // 🎯 ขอบตอนแจ้งเตือนสีแดง
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.2),
+        borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.2),
       ),
+      // 🎯 ขอบตอนแจ้งเตือนสีแดงและถูกโฟกัส
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.6),
+        borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.6),
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -673,6 +672,8 @@ class _AddMenuState extends State<AddMenu> {
       appBar: const RestaurantNavbar(title: ""),
       body: Form(
         key: formKey,
+        // 🎯 เปิดใช้งาน Realtime Validation ตรงนี้นะครับ
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: Column(
@@ -768,6 +769,8 @@ class _AddMenuState extends State<AddMenu> {
                                     _selectedTypeMenuId = null;
                                     _selectedTypeMenuName = null;
                                   }
+                                  // รีเซ็ต error เมื่อสลับโหมด
+                                  _typeMenuError = null;
                                 });
                                 if (_isAddingNewType) {
                                   FocusScope.of(context).unfocus();
@@ -832,10 +835,7 @@ class _AddMenuState extends State<AddMenu> {
                         decoration: BoxDecoration(
                           color: _MenuTheme.fieldBg,
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.black,
-                            width: 0,
-                          ), // 🎯 เปลี่ยนขอบเป็นสีดำ
+                          border: Border.all(color: Colors.black, width: 0),
                         ),
                         child: Row(
                           children: [
@@ -899,7 +899,8 @@ class _AddMenuState extends State<AddMenu> {
                                   _selectedTypeMenuId = typeMenuList
                                       .firstWhere((e) => e.typemenuName == val)
                                       .typemenuId;
-                                  _typeMenuError = null;
+                                  _typeMenuError =
+                                      null; // 🎯 เคลียร์ error ทันที
                                   _newTypeName = null;
                                 });
                               },
@@ -908,6 +909,14 @@ class _AddMenuState extends State<AddMenu> {
                       TextFormField(
                         controller: _newTypeNameController,
                         focusNode: _newTypeFocusNode,
+                        // 🎯 เพิ่ม validator สำหรับช่องประเภทอาหารใหม่
+                        validator: (value) {
+                          if (_isAddingNewType &&
+                              (value == null || value.trim().isEmpty)) {
+                            return "กรุณากรอกชื่อประเภทอาหารใหม่";
+                          }
+                          return null;
+                        },
                         onChanged: (val) {
                           setState(() {
                             _newTypeName = val.trim().isEmpty
@@ -926,7 +935,7 @@ class _AddMenuState extends State<AddMenu> {
                     ],
                     if (_typeMenuError != null)
                       Padding(
-                        padding: const EdgeInsets.only(top: 6, left: 4),
+                        padding: const EdgeInsets.only(top: 6, left: 14),
                         child: Text(
                           _typeMenuError!,
                           style: const TextStyle(
@@ -959,7 +968,12 @@ class _AddMenuState extends State<AddMenu> {
                               decoration: BoxDecoration(
                                 color: _MenuTheme.fieldBg,
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: _MenuTheme.border),
+                                border: Border.all(
+                                  color: _imageError != null
+                                      ? _MenuTheme
+                                            .danger // 🎯 เปลี่ยนขอบเป็นสีแดงถ้าลืมใส่รูป
+                                      : _MenuTheme.border,
+                                ),
                               ),
                               child: _selectedImage != null
                                   ? ClipRRect(
@@ -976,24 +990,30 @@ class _AddMenuState extends State<AddMenu> {
                                         Icon(
                                           Icons.add_photo_alternate_rounded,
                                           size: 40,
-                                          color: const Color.fromARGB(
-                                            255,
-                                            0,
-                                            0,
-                                            0,
-                                          ).withOpacity(0.6),
+                                          color: _imageError != null
+                                              ? _MenuTheme.danger.withOpacity(
+                                                  0.6,
+                                                )
+                                              : const Color.fromARGB(
+                                                  255,
+                                                  0,
+                                                  0,
+                                                  0,
+                                                ).withOpacity(0.6),
                                         ),
                                         const SizedBox(height: 8),
                                         Text(
                                           "แตะเพื่อเลือกรูป",
                                           style: TextStyle(
                                             fontSize: 12.5,
-                                            color: const Color.fromARGB(
-                                              255,
-                                              0,
-                                              0,
-                                              0,
-                                            ).withOpacity(0.8),
+                                            color: _imageError != null
+                                                ? _MenuTheme.danger
+                                                : const Color.fromARGB(
+                                                    255,
+                                                    0,
+                                                    0,
+                                                    0,
+                                                  ).withOpacity(0.8),
                                           ),
                                         ),
                                       ],
@@ -1058,6 +1078,7 @@ class _AddMenuState extends State<AddMenu> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: menuNameController,
+                      // 🎯 ตรวจสอบชื่อเมนู
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
                           ? "กรุณากรอกชื่อเมนู"
@@ -1083,6 +1104,8 @@ class _AddMenuState extends State<AddMenu> {
                       const SizedBox(height: 8),
                       TextFormField(
                         controller: descriptionController,
+
+                        // 🎯 เพิ่ม validator ตรวจสอบรายละเอียด
                         maxLines: 2,
                         style: const TextStyle(fontSize: 14),
                         decoration: _inputDecoration(
@@ -1152,12 +1175,13 @@ class _AddMenuState extends State<AddMenu> {
                       TextFormField(
                         controller: priceController,
                         keyboardType: TextInputType.number,
+                        // 🎯 ตรวจสอบราคา
                         validator: (value) {
                           if (value == null || value.trim().isEmpty) {
                             return "กรุณากรอกราคาเมนู";
                           }
                           if (double.tryParse(value) == null) {
-                            return "ต้องเป็นตัวเลขเท่านั้น";
+                            return "กรุณากรอกเป็นตัวเลขเท่านั้นครับ";
                           }
                           return null;
                         },
@@ -1184,7 +1208,6 @@ class _AddMenuState extends State<AddMenu> {
                 ),
               ),
 
-              // 🎯 ส่วนผูกตัวเลือกเสริม (Add-on)
               if (!_isRiceCurryRestaurant)
                 _sectionCard(
                   child: Column(
@@ -1263,14 +1286,14 @@ class _AddMenuState extends State<AddMenu> {
                                 borderSide: const BorderSide(
                                   color: Colors.black,
                                   width: 0,
-                                ), // 🎯 เพิ่มขอบดำ
+                                ),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
                                 borderSide: const BorderSide(
                                   color: Colors.black,
                                   width: 0,
-                                ), // 🎯 เพิ่มขอบดำ
+                                ),
                               ),
                               filled: true,
                               fillColor: Colors.white,
@@ -1542,7 +1565,6 @@ class _AddMenuState extends State<AddMenu> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  // 🎯 จัดเลย์เอาต์ปุ่มขยายและปุ่มลบในแนวตั้ง ตามด้วยจุดลากด้านขวาสุด
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
@@ -1675,7 +1697,11 @@ class _AddMenuState extends State<AddMenu> {
       decoration: BoxDecoration(
         color: _MenuTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black, width: 0.3),
+        border: Border.all(
+          // 🎯 ถ้ามี error ให้ขอบเป็นสีแดง
+          color: _typeMenuError != null ? _MenuTheme.danger : Colors.black,
+          width: _typeMenuError != null ? 1.2 : 0.3,
+        ),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(

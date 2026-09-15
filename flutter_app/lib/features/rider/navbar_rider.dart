@@ -140,12 +140,23 @@ class _NavbarRiderState extends State<NavbarRider> {
           padding: const EdgeInsets.only(right: 20),
           child: GestureDetector(
             onTap: () {
-              Navigator.push(
+              Navigator.push<bool>(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileRider()),
-              ).then((_) {
-                // 🎯 เมื่อผู้ใช้กดปุ่ม Home กลับมาจาก Profile ให้โหลดข้อมูล Navbar ใหม่ทันที
-                loadRiderData();
+              ).then((updated) {
+                if (!mounted) return;
+
+                if (updated == true) {
+                  // รีเซ็ต Home + Navbar ใหม่ทั้งหมดหลังแก้ Profile สำเร็จ
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (context) => const HomeRider()),
+                    (route) => false,
+                  );
+                } else {
+                  // ถ้าไม่ได้แก้ไข แค่โหลดข้อมูล Navbar ใหม่
+                  loadRiderData();
+                }
               });
             },
             child: CircleAvatar(

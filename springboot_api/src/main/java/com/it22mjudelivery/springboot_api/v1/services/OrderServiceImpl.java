@@ -497,7 +497,7 @@ public class OrderServiceImpl implements OrderService {
     public void autoCancelExpiredOrders() {
 
         // 1. กำหนดจุดตัดเวลา (เวลาปัจจุบัน ถอยหลังไป 15 นาที)
-        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(15);
+        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(10);
 
         // 2. ไปดึงออเดอร์จาก DB (สมมติว่าสถานะรอไรเดอร์คือ "WAITING_RIDER")
         List<Order> expiredOrders = orderRepo.findExpiredOrders("WaitingRider", cutoffTime);
@@ -506,14 +506,41 @@ public class OrderServiceImpl implements OrderService {
         if (!expiredOrders.isEmpty()) {
             for (Order order : expiredOrders) {
                 order.setOrderstatus("cancel");
-                order.setCanceldetail("ไม่มีผู้จัดส่งรับงานภายใน 15 นาที");
+                order.setCanceldetail("ยกเลิกคำสั่งซื้อ เนื่องจากไม่มีผู้จัดส่งรับงานภายใน 10 นาที");
 
                 System.out.println("-- Auto-canceled Order ID: " + order.getOrderid());
             }
 
             // 4. บันทึกการเปลี่ยนแปลงทั้งหมดกลับลง Database ทีเดียว
             orderRepo.saveAll(expiredOrders);
-            System.out.println("✅ เคลียร์ออเดอร์หมดอายุอัตโนมัติจำนวน " + expiredOrders.size() + " รายการ");
+            System.out.println("เคลียร์ออเดอร์หมดอายุอัตโนมัติจำนวน " + expiredOrders.size() + " รายการ");
+        }
+    }
+
+    // cron = "0 * * * * *" ฟังก์ชันนี้ทำงานทุกๆ 1 นาที
+    @Scheduled(cron = "0 * * * * *")
+    @Transactional
+    public void autoRejectExpiredRestaurantOrders() {
+
+        // กำหนดจุดตัดเวลา (เวลาปัจจุบัน ถอยหลังไป 10 นาที)
+        LocalDateTime cutoffTime = LocalDateTime.now().minusMinutes(10);
+
+        // ไปดึงออเดอร์จาก DB ที่รอร้านค้ารับ ("WaitingRestaurant") และเวลาสั่งซื้อเกิน 10 นาที
+        List<Order> expiredOrders = orderRepo.findExpiredOrders("WaitingRestaurant", cutoffTime);
+
+        // 3. ถ้าเจอออเดอร์ที่หมดเวลา ให้วนลูปเปลี่ยนสถานะ
+        if (!expiredOrders.isEmpty()) {
+            for (Order order : expiredOrders) {
+                // เปลี่ยนสถานะเป็น reject (ร้านค้าปฏิเสธ/ไม่รับออเดอร์)
+                order.setOrderstatus("reject");
+                order.setCanceldetail("ยกเลิกอัตโนมัติ: ร้านค้าไม่ได้กดรับออเดอร์ภายใน 10 นาที");
+
+                System.out.println("-- Auto-rejected Order ID (Restaurant Timeout): " + order.getOrderid());
+            }
+
+            // 4. บันทึกการเปลี่ยนแปลงทั้งหมดกลับลง Database ทีเดียว
+            orderRepo.saveAll(expiredOrders);
+            System.out.println("เคลียร์ออเดอร์ร้านค้าไม่กดรับอัตโนมัติจำนวน " + expiredOrders.size() + " รายการ");
         }
     }
 }

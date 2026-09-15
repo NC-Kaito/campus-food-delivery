@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
-import 'package:flutter_app/features/member/cart_manager_member.dart'; // ← เพิ่ม import นี้
+import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/home_member.dart';
 import 'package:flutter_app/features/member/list_order_member.dart';
 import 'package:flutter_app/features/member/notify_member.dart';
@@ -24,7 +24,7 @@ class NavbarMember extends StatefulWidget implements PreferredSizeWidget {
   State<NavbarMember> createState() => _NavbarMemberState();
 }
 
-class _NavbarMemberState extends State<NavbarMember> with RouteAware {
+class _NavbarMemberState extends State<NavbarMember> {
   final MemberService memberService = MemberService();
   MemberModel? memberModel;
   String? memberImage;
@@ -64,8 +64,6 @@ class _NavbarMemberState extends State<NavbarMember> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    // 🎯 ดึงจำนวนรายการในตะกร้าตรงนี้ทุกครั้งที่ build ใหม่
-    // (rebuild เกิดขึ้นอัตโนมัติเมื่อ Navigator.push กลับมาที่หน้านี้พอดี)
     final int cartItemCount = CartManager().items.length;
 
     return AppBar(
@@ -84,15 +82,17 @@ class _NavbarMemberState extends State<NavbarMember> with RouteAware {
       centerTitle: true,
 
       actions: [
-        // 🎯 ห่อไอคอนตะกร้าด้วย Stack เพื่อวาง badge ตัวเลขมุมขวาบน
         Padding(
           padding: const EdgeInsets.only(right: 20),
           child: GestureDetector(
             onTap: () {
+              // 🎯 เพิ่ม .then() เพื่อโหลดข้อมูลใหม่เมื่อปิดหน้า ProfileMember กลับมา
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const ProfileMember()),
-              );
+              ).then((_) {
+                loadMemberData();
+              });
             },
             child: CircleAvatar(
               radius: 18,

@@ -684,8 +684,9 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: RichText(
-                text: TextSpan(
+              // 🎯 เปลี่ยนจาก RichText เป็น Text.rich เพื่อให้สืบทอดฟอนต์หลักของแอป
+              child: Text.rich(
+                TextSpan(
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -696,11 +697,14 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                       style: TextStyle(color: Colors.black87),
                     ),
                     TextSpan(
-                      text: "K$orderId",
-                      style: TextStyle(color: primaryGreen),
+                      text: "K" + orderId,
+                      style: TextStyle(
+                        color: primaryGreen,
+                      ), // 🎯 ใช้ primaryGreen ให้ดูเด่นเหมือนเดิม
                     ),
                   ],
                 ),
+                textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 6),

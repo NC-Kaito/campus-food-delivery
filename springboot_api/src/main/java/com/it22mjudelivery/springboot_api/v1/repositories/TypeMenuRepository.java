@@ -10,4 +10,6 @@ import java.util.Optional;
 @Repository
 public interface TypeMenuRepository extends JpaRepository<TypeMenu, Integer> {
     Optional<TypeMenu> findById(Integer typemenuId);
+
+    Optional<TypeMenu> findByTypemenuName(String typemenuName);
 }

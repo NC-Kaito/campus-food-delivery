@@ -148,7 +148,7 @@ class _ProfileMemberState extends State<ProfileMember> {
     }
   }
 
-  Future<void> doUpdateProfile() async {
+  Future doUpdateProfile() async {
     if (formKey.currentState!.validate()) {
       setState(() {
         isLoadingAction = true;
@@ -179,7 +179,7 @@ class _ProfileMemberState extends State<ProfileMember> {
 
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('🎉 บันทึกการแก้ไขข้อมูลโปรไฟล์เรียบร้อยแล้วครับ'),
+              content: Text(' บันทึกการแก้ไขข้อมูลโปรไฟล์เรียบร้อยแล้ว'),
               backgroundColor: Colors.green,
             ),
           );
@@ -191,15 +191,70 @@ class _ProfileMemberState extends State<ProfileMember> {
           setState(() {
             isLoadingAction = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(e.toString()),
-              backgroundColor: Colors.red,
-              behavior: SnackBarBehavior.floating,
+          // 🎯 แสดง Alert แจ้งเตือนเมื่อเกิด Error
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              icon: const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.red,
+                size: 80,
+              ),
+              title: const Text(
+                "เกิดข้อผิดพลาด",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              content: Text(
+                e.toString(),
+                style: const TextStyle(color: Colors.grey, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text(
+                    "ตกลง",
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
             ),
           );
         }
       }
+    } else {
+      // 🎯 แสดง Alert แจ้งเตือนเมื่อข้อมูล Validate ไม่ผ่าน
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          icon: const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange,
+            size: 80,
+          ),
+          title: const Text(
+            "ข้อมูลไม่ถูกต้อง",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          content: const Text(
+            "กรุณาตรวจสอบข้อมูลที่กรอกให้ถูกต้องตามรูปแบบที่กำหนด",
+            style: TextStyle(color: Colors.grey, fontSize: 14),
+            textAlign: TextAlign.center,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("ตกลง", style: TextStyle(color: Colors.orange)),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -359,21 +414,84 @@ class _ProfileMemberState extends State<ProfileMember> {
                       ),
 
                       const SizedBox(height: 25),
-
                       // ─── ฟอร์มกรอกข้อมูลสากล ───
                       _buildInputLabel("ชื่อผู้ใช้ (Username)"),
                       _buildCustomTextField(usernameController, enabled: false),
 
-                      _buildInputLabel("ชื่อจริง (Firstname)"),
+                      _buildInputLabel("ชื่อจริง (Firstname) *"),
                       _buildCustomTextField(
                         firstnameController,
                         enabled: _isEditable,
+                        validator: _isEditable
+                            ? (value) {
+                                if (value == null || value.isEmpty)
+                                  return "กรุณากรอกชื่อ";
+                                if (!RegExp(
+                                  r'^[a-zA-Z\u0E00-\u0E7F]+$',
+                                ).hasMatch(value)) {
+                                  return "ไทยหรืออังกฤษเท่านั้น";
+                                }
+                                final hasEng = RegExp(
+                                  r'[a-zA-Z]',
+                                ).hasMatch(value);
+                                final hasThai = RegExp(
+                                  r'[\u0E00-\u0E7F]',
+                                ).hasMatch(value);
+                                if (hasEng && hasThai)
+                                  return "ชื่อต้องเป็นภาษาใดภาษาหนึ่งเท่านั้น";
+                                if (value.length < 3 || value.length > 30)
+                                  return "ความยาว 3-30 ตัวอักษร";
+                                return null;
+                              }
+                            : null,
                       ),
 
-                      _buildInputLabel("นามสกุล (Lastname)"),
+                      _buildInputLabel("นามสกุล (Lastname) *"),
                       _buildCustomTextField(
                         lastnameController,
                         enabled: _isEditable,
+                        validator: _isEditable
+                            ? (value) {
+                                if (value == null || value.isEmpty)
+                                  return "กรุณากรอกนามสกุล";
+                                if (!RegExp(
+                                  r'^[a-zA-Z\u0E00-\u0E7F]+$',
+                                ).hasMatch(value)) {
+                                  return "ไทยหรืออังกฤษเท่านั้น";
+                                }
+                                final hasEng = RegExp(
+                                  r'[a-zA-Z]',
+                                ).hasMatch(value);
+                                final hasThai = RegExp(
+                                  r'[\u0E00-\u0E7F]',
+                                ).hasMatch(value);
+                                if (hasEng && hasThai)
+                                  return "ห้ามปนภาษาไทยและอังกฤษ";
+
+                                final firstName = firstnameController.text;
+                                if (firstName.isNotEmpty) {
+                                  final firstIsEng = RegExp(
+                                    r'^[a-zA-Z]+$',
+                                  ).hasMatch(firstName);
+                                  final firstIsThai = RegExp(
+                                    r'^[\u0E00-\u0E7F]+$',
+                                  ).hasMatch(firstName);
+                                  if (firstIsEng &&
+                                      !RegExp(r'^[a-zA-Z]+$').hasMatch(value)) {
+                                    return "นามสกุลต้องเป็นภาษาอังกฤษเหมือนชื่อ";
+                                  }
+                                  if (firstIsThai &&
+                                      !RegExp(
+                                        r'^[\u0E00-\u0E7F]+$',
+                                      ).hasMatch(value)) {
+                                    return "นามสกุลต้องเป็นภาษาไทยเหมือนชื่อ";
+                                  }
+                                }
+                                if (value.length < 3 || value.length > 30)
+                                  return "ความยาว 3-30 ตัวอักษร";
+                                return null;
+                              }
+                            : null,
                       ),
 
                       const Padding(
@@ -395,10 +513,23 @@ class _ProfileMemberState extends State<ProfileMember> {
                       _buildInputLabel("อีเมล (Email)"),
                       _buildCustomTextField(emailController, enabled: false),
 
-                      _buildInputLabel("เบอร์โทรศัพท์ติดต่อ (Phone)"),
+                      _buildInputLabel("เบอร์โทรศัพท์ติดต่อ (Phone) *"),
                       _buildCustomTextField(
                         phoneController,
                         enabled: _isEditable,
+                        keyboardType: TextInputType.phone,
+                        validator: _isEditable
+                            ? (value) {
+                                if (value == null || value.isEmpty)
+                                  return "กรุณากรอกเบอร์โทรศัพท์";
+                                if (!RegExp(r'^[0-9]+$').hasMatch(value))
+                                  return "กรุณากรอกเป็นตัวเลขเท่านั้น";
+                                if (value.length < 10 || value.length > 15) {
+                                  return "เบอร์โทรศัพท์ต้องมียาวตั้งแต่ 10 ถึง 15 หลัก";
+                                }
+                                return null;
+                              }
+                            : null,
                       ),
 
                       const SizedBox(height: 40),
@@ -582,8 +713,10 @@ class _ProfileMemberState extends State<ProfileMember> {
   Widget _buildCustomTextField(
     TextEditingController controller, {
     bool enabled = true,
+    String? Function(String?)? validator, // 🎯 เพิ่ม validator
+    TextInputType keyboardType = TextInputType.text, // 🎯 เพิ่มคีย์บอร์ด
   }) {
-    const Color editGreen = Color(0xFF00B300);
+    const Color editGreen = Color.fromARGB(255, 0, 0, 0);
 
     return Container(
       decoration: BoxDecoration(
@@ -607,6 +740,11 @@ class _ProfileMemberState extends State<ProfileMember> {
       child: TextFormField(
         controller: controller,
         enabled: enabled,
+        keyboardType: keyboardType, // 🎯 ดึงคีย์บอร์ดมาใช้
+        autovalidateMode: enabled
+            ? AutovalidateMode.onUserInteraction
+            : AutovalidateMode.disabled, // 🎯 เช็คแบบเรียลไทม์
+        validator: validator, // 🎯 นำ validator มาใช้งาน
         style: const TextStyle(
           color: Colors.black87,
           fontSize: 15,
@@ -615,7 +753,7 @@ class _ProfileMemberState extends State<ProfileMember> {
         decoration: InputDecoration(
           filled: true,
           fillColor: enabled
-              ? const Color(0xFFF2FFF2)
+              ? const Color.fromARGB(255, 255, 255, 255)
               : const Color(0xFFEEEEEE),
           contentPadding: const EdgeInsets.symmetric(
             horizontal: 16,
@@ -639,6 +777,15 @@ class _ProfileMemberState extends State<ProfileMember> {
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: const BorderSide(color: editGreen, width: 1.8),
+          ),
+          // 🎯 จัดการเส้นขอบสีแดงตอน Error
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 1.2),
+          ),
+          focusedErrorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.red, width: 1.8),
           ),
         ),
       ),

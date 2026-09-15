@@ -7,10 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -152,15 +149,27 @@ public class MenuServiceImpl implements MenuService {
 
             TypeMenu typeMenu;
             Integer typeMenuId = requestData.getTypeMenuId();
-            String typeMenuName = requestData.getTypeMenuName();
+            // แนะนำให้ .trim() เพื่อลบช่องว่างหน้า-หลังออกด้วยครับ ป้องกันกรณีลูกค้าเผลอพิมพ์เว้นวรรคติดมา
+            String typeMenuName = requestData.getTypeMenuName() != null ? requestData.getTypeMenuName().trim() : null;
 
             if (typeMenuId != null) {
                 typeMenu = typeMenuRepository.findById(typeMenuId)
                         .orElseThrow(() -> new RuntimeException("ไม่พบประเภทเมนู"));
             } else if (typeMenuName != null && !typeMenuName.isBlank()) {
-                TypeMenu newType = new TypeMenu();
-                newType.setTypemenuName(typeMenuName);
-                typeMenu = typeMenuRepository.save(newType);
+
+                // แวะตรวจสอบดูก่อนว่ามีชื่อหมวดหมู่นี้ในระบบแล้วหรือยัง
+                Optional<TypeMenu> existingType = typeMenuRepository.findByTypemenuName(typeMenuName);
+
+                if (existingType.isPresent()) {
+                    // ถ้ามีแล้ว ให้ดึงข้อมูลเดิมมาใช้ได้เลยครับ
+                    typeMenu = existingType.get();
+                } else {
+                    // ถ้ายังไม่มี ค่อยทำการ Insert ลงไปใหม่นะครับ
+                    TypeMenu newType = new TypeMenu();
+                    newType.setTypemenuName(typeMenuName);
+                    typeMenu = typeMenuRepository.save(newType);
+                }
+
             } else {
                 throw new RuntimeException("กรุณาระบุประเภทเมนู");
             }
@@ -179,7 +188,7 @@ public class MenuServiceImpl implements MenuService {
 
             menu = menuRepository.save(menu);
 
-            Set groupsForThisMenu = new HashSet<>();
+            Set<Menuaddongroup> groupsForThisMenu = new HashSet<>();
 
             if (requestData.getAddonGroupIds() != null && !requestData.getAddonGroupIds().isEmpty()) {
                 for (Integer groupId : requestData.getAddonGroupIds()) {
@@ -205,10 +214,9 @@ public class MenuServiceImpl implements MenuService {
             return true;
         } catch (Exception e) {
             System.out.println("เกิดข้อผิดพลาดในการบันทึกเมนู " + e);
-            throw new RuntimeException("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + e.getMessage());
+            throw new RuntimeException("เกิดข้อผิดพลาดในการบันทึกข้อมูล: ไม่สามารถเพิ่มประเภทร้านค้าซ้ำได้");
         }
     }
-
     @Transactional
     public boolean updateMenuByRestaurant(Map requestData) {
         try {

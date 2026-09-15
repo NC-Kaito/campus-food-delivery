@@ -12,6 +12,8 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
+import 'package:flutter_app/features/restaurant/home_restaurant.dart';
+
 import 'package:dio/dio.dart' as dio_package;
 
 class ProfileRestaurant extends StatefulWidget {
@@ -293,23 +295,18 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
         );
 
         if (response.statusCode == 200 && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('บันทึกข้อมูลเรียบร้อยแล้ว'),
-              backgroundColor: _primary,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-
+          // ปิดสถานะแก้ไขก่อน
           setState(() {
             _isEditable = false;
             _selectedImage = null;
           });
 
-          await _fetchRestaurantProfile();
+          // กลับหน้า Home ใหม่ทั้งหมด
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeRestaurant()),
+            (route) => false,
+          );
         }
       } catch (e) {
         debugPrint("Update Error: $e");
@@ -329,6 +326,67 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
         if (mounted) setState(() => isLoadingAction = false);
       }
     }
+  }
+
+  String? _validateRestaurantName(String? value) {
+    if (value == null || value.isEmpty) {
+      return "กรุณากรอกชื่อร้านค้า";
+    }
+    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$').hasMatch(value)) {
+      return "ต้องเป็นภาษาไทย อังกฤษ หรือตัวเลขเท่านั้น";
+    }
+    return null;
+  }
+
+  String? _validateFirstName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return "กรุณากรอกชื่อจริง";
+    }
+    if (value.contains(' ')) {
+      return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
+    }
+    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value)) {
+      return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
+    }
+    if (value.length < 3 || value.length > 30) {
+      return "ความยาวต้องระหว่าง 3 - 30 ตัวอักษร";
+    }
+    return null;
+  }
+
+  String? _validateLastName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return "กรุณากรอกนามสกุล";
+    }
+    if (value.contains(' ')) {
+      return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
+    }
+    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F]+$').hasMatch(value)) {
+      return "ต้องเป็นภาษาไทย หรือภาษาอังกฤษเท่านั้น";
+    }
+    if (value.length < 3 || value.length > 30) {
+      return "ความยาวต้องระหว่าง 3 - 30 ตัวอักษร";
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return "กรุณากรอกเบอร์โทรศัพท์";
+    }
+    if (value.contains(' ')) {
+      return "ต้องไม่มีเว้นวรรคหรือช่องว่าง";
+    }
+    if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+      return "ต้องเป็นตัวเลข (0-9) เท่านั้น";
+    }
+    if (value.length < 10 || value.length > 15) {
+      return "ความยาวต้องอยู่ระหว่าง 10 ถึง 15 หลัก";
+    }
+    if (!RegExp(r'^(06|08|09)').hasMatch(value)) {
+      return "เบอร์โทรศัพท์ต้องขึ้นต้นด้วย 06, 08 หรือ 09";
+    }
+    return null;
   }
 
   String _getFinalImageUrl(String? rawPath) {
@@ -750,14 +808,10 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 controller: restaurantnameController,
                                 enabled: _isEditable,
                                 validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.trim().isEmpty)
-                                          return "กรุณากรอกชื่อร้านค้า";
-                                        if (v.length < 8)
-                                          return "ความยาว 8 ตัวอักษรขึ้นไป";
-                                        return null;
-                                      }
+                                    ? _validateRestaurantName
                                     : null,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
                                 decoration: _inputDecoration(
                                   enabled: _isEditable,
                                 ),
@@ -893,20 +947,10 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 controller: ownerfirstnameController,
                                 enabled: _isEditable,
                                 validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.trim().isEmpty)
-                                          return "กรุณากรอกชื่อจริง";
-                                        if (v.contains(' '))
-                                          return "ต้องไม่มีเว้นวรรค";
-                                        if (!RegExp(
-                                          r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v))
-                                          return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
-                                        if (v.length < 3 || v.length > 30)
-                                          return "ความยาว 3-30 ตัวอักษร";
-                                        return null;
-                                      }
+                                    ? _validateFirstName
                                     : null,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
                                 decoration: _inputDecoration(
                                   enabled: _isEditable,
                                 ),
@@ -916,20 +960,10 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 controller: ownerlastnameController,
                                 enabled: _isEditable,
                                 validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.trim().isEmpty)
-                                          return "กรุณากรอกนามสกุล";
-                                        if (v.contains(' '))
-                                          return "ต้องไม่มีเว้นวรรค";
-                                        if (!RegExp(
-                                          r'^[a-zA-Z\u0E00-\u0E7F]+$',
-                                        ).hasMatch(v))
-                                          return "ต้องเป็นภาษาไทยหรืออังกฤษเท่านั้น";
-                                        if (v.length < 3 || v.length > 30)
-                                          return "ความยาว 3-30 ตัวอักษร";
-                                        return null;
-                                      }
+                                    ? _validateLastName
                                     : null,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
                                 decoration: _inputDecoration(
                                   enabled: _isEditable,
                                 ),
@@ -954,17 +988,9 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
                                 controller: phoneController,
                                 enabled: _isEditable,
                                 keyboardType: TextInputType.phone,
-                                validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.trim().isEmpty)
-                                          return "กรุณากรอกเบอร์โทรศัพท์";
-                                        if (!RegExp(r'^[0-9]+$').hasMatch(v))
-                                          return "ต้องเป็นตัวเลขเท่านั้น";
-                                        if (v.length < 10 || v.length > 15)
-                                          return "ความยาว 10-15 หลัก";
-                                        return null;
-                                      }
-                                    : null,
+                                validator: _isEditable ? _validatePhone : null,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
                                 decoration: _inputDecoration(
                                   enabled: _isEditable,
                                   suffixIcon: Icon(

@@ -24,6 +24,10 @@ class _EditLocationMemberState extends State<EditLocationMember> {
   final TextEditingController _addressDetailController =
       TextEditingController();
   final MemberService _memberService = MemberService();
+
+  // 🎯 เพิ่ม GlobalKey สำหรับใช้งาน Validation ของ Form
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -77,10 +81,205 @@ class _EditLocationMemberState extends State<EditLocationMember> {
       "name": "คณะวิศวกรรมและอุตสาหกรรมเกษตร",
       "pos": const LatLng(18.8980, 99.0125),
     },
+
+    {
+      "name": "อาคารเฉลิมพระเกียรติสมเด็จพระศรีนครินทร์",
+      "pos": const LatLng(18.894207, 99.011638),
+    },
+
+    {
+      "name": "อาคารเฉลิมพระเกียรติสมเด็จพระเทพฯ",
+      "pos": const LatLng(18.894126, 99.012421),
+    },
+
+    {"name": "สาขาพืชผัก", "pos": const LatLng(18.893987, 99.013371)},
+
+    {"name": "วิทยาลัยบริหารศาสตร์", "pos": const LatLng(18.894570, 99.013730)},
+
+    {"name": "ตึกดินและปุ๋ย", "pos": const LatLng(18.894139, 99.015252)},
+
     {"name": "สำนักหอสมุด", "pos": const LatLng(18.895297, 99.012338)},
-    {"name": "กาดโดม (โรงอาหาร)", "pos": const LatLng(18.8950, 99.0155)},
-    {"name": "หอพักหญิง 1", "pos": const LatLng(18.8990, 99.0180)},
-    {"name": "หอพักชาย 1", "pos": const LatLng(18.8985, 99.0190)},
+
+    {"name": "คณะผลิตกรรมการเกษตร", "pos": const LatLng(18.894961, 99.015048)},
+
+    {
+      "name": "คณะสถาปัตยกรรมและการออกแบบสิ่งแวดล้อม",
+      "pos": const LatLng(18.895702, 99.014504),
+    },
+
+    {
+      "name": "คณะสารสนเทศและการสื่อสาร",
+      "pos": const LatLng(18.896052, 99.014263),
+    },
+
+    {
+      "name": "อาคารจุฬาภรณ์ คณะวิทยาศาสตร์",
+      "pos": const LatLng(18.896387, 99.014000),
+    },
+
+    {
+      "name": "อาคารจุฬาภรณ์ คณะวิทยาศาสตร์",
+      "pos": const LatLng(18.896616, 99.014493),
+    },
+
+    {
+      "name": "ศูนย์กีฬาเฉลิมพระเกียรติ มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.897201, 99.013928),
+    },
+
+    {"name": "คณะสัตวแพทย์ศาสตร์", "pos": const LatLng(18.897464, 99.014584)},
+
+    {"name": "คณะเศรษฐศาสตร์", "pos": const LatLng(18.897075, 99.015364)},
+
+    {
+      "name": "ศูนย์อาหารเกษตรอินทรีย์",
+      "pos": const LatLng(18.896527, 99.015660),
+    },
+
+    {
+      "name": "สาขาวิชาเทคโนโลยียางและพอลิเมอร์",
+      "pos": const LatLng(18.896788, 99.016182),
+    },
+
+    {
+      "name": "อาคารพนม สมิตตานนท์ คณะวิศวกรรมและอุตสาหกรรมเกษตร",
+      "pos": const LatLng(18.895602, 99.017542),
+    },
+
+    {
+      "name": "อาคารคัดบรรจุผลิตผลการเกษตร มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.895394, 99.016856),
+    },
+
+    {
+      "name": "โรงงานนำร่อง คณะวิศวกรรมอุตสาหกรรมการเกษตร",
+      "pos": const LatLng(18.896246, 99.017260),
+    },
+
+    {
+      "name": "คณะเทคโนโลยีการประมงและทรัพยากรทางน้ำ",
+      "pos": const LatLng(18.897055, 99.018206),
+    },
+
+    {
+      "name": "Plant Science and Technology Building",
+      "pos": const LatLng(18.893972, 99.017090),
+    },
+
+    {"name": "ศูนย์ประชุมนานาชาติ", "pos": const LatLng(18.892956, 99.017902)},
+
+    {
+      "name": "อาคารมงคล ไชยสิทธิ์ มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.892890, 99.017318),
+    },
+
+    {"name": "อาคารธรรมศักดิ์มนตรี", "pos": const LatLng(18.892373, 99.016417)},
+
+    {"name": "คณะพยาบาลศาสตร์", "pos": const LatLng(18.892218, 99.019778)},
+
+    {
+      "name": "สถานีบำบัดน้ำเสีย มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.892786, 99.022212),
+    },
+
+    {
+      "name": "อาคารเรียนรู้สร้างสรรค์เทคโนโลยีและนวัตกรรม (SMATI)",
+      "pos": const LatLng(18.894225, 99.019879),
+    },
+
+    {
+      "name": "ศูนย์ปรับปรุงพันธุ์ข้าว มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.895180, 99.020956),
+    },
+
+    {
+      "name": "อาคารกำจรบุญแปงภาควิชาพืชไร่",
+      "pos": const LatLng(18.893408, 99.015704),
+    },
+
+    {
+      "name": "สนามกีฬาอินทนิล มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.898019, 99.013384),
+    },
+
+    {
+      "name": "สนามกีฬาอินทนิล มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.898567, 99.013129),
+    },
+
+    {
+      "name": "ศูนย์กีฬาทศมินทรบพิตร",
+      "pos": const LatLng(18.899471, 99.014070),
+    },
+
+    {
+      "name": "สระว่ายน้ำอุบลรัตนราชกัญญา มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.900254, 99.012756),
+    },
+
+    {
+      "name": "หอนาฬิกา มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.897085, 99.010866),
+    },
+
+    {"name": "อาคารช่วงเกษตรศิลป", "pos": const LatLng(18.896183, 99.009992)},
+
+    {"name": "อาคารช่วงเกษตรศิลป", "pos": const LatLng(18.896511, 99.009795)},
+
+    {
+      "name": "อาคารสำนักงานมหาวิทยาลัย ม.แม่โจ้",
+      "pos": const LatLng(18.896717, 99.009114),
+    },
+
+    {
+      "name": "แปลงสาธิตเกษตรทฤษฎีใหม่ตามแนวพระราชดำริ มหาวิทยาลัยแม่โจ้",
+      "pos": const LatLng(18.893260, 99.019157),
+    },
+
+    {"name": "โรงอาหารเถิดกสิกร", "pos": const LatLng(18.898482, 819.009700)},
+
+    {"name": "มิตรมิลค์@แม่โจ้", "pos": const LatLng(18.897874, 819.009961)},
+
+    {
+      "name": "ร้านขนมโตเกียว ม.แม่โจ้",
+      "pos": const LatLng(18.898149, 819.010341),
+    },
+
+    {"name": "ร้านคาวบอยทิกเก็ต", "pos": const LatLng(18.897956, 819.009815)},
+
+    {
+      "name": "สวนสุขภาพ บุญศรี เทิดพระเกียรติ",
+      "pos": const LatLng(18.899219, 819.011260),
+    },
+
+    {"name": "แฟลตชัยพฤกษ์", "pos": const LatLng(18.899712, 819.010725)},
+
+    {
+      "name": "ครัวอิ่มอุ่นพี่เพื่อน้องแม่โจ้",
+      "pos": const LatLng(18.899262, 819.009828),
+    },
+
+    {"name": "กาดน้อย @แม่โจ้", "pos": const LatLng(18.898892, 819.009447)},
+
+    {"name": "สวนเลิฟ", "pos": const LatLng(18.899162, 819.009335)},
+
+    {"name": "หอพักสุมิตร", "pos": const LatLng(18.899583, 819.009115)},
+
+    {
+      "name": "หอพักฝค.(ฝึกหัดครู) 9",
+      "pos": const LatLng(18.899659, 819.008568),
+    },
+
+    {"name": "หอพักอุดมศิลป์", "pos": const LatLng(18.900214, 819.008571)},
+
+    {"name": "หอพักหญิง 10", "pos": const LatLng(18.899905, 819.008052)},
+
+    {
+      "name": "เรือนพักสมาคมศิษย์เก่าแม่โจ้",
+      "pos": const LatLng(18.899663, 819.007190),
+    },
+
+    {"name": "โรงอาหารเถิดกสิกร", "pos": const LatLng(18.898482, 819.009700)},
   ];
 
   @override
@@ -97,7 +296,7 @@ class _EditLocationMemberState extends State<EditLocationMember> {
   }
 
   // 🎯 ดึงพิกัดและที่อยู่ที่เคยบันทึกไว้ และจำค่าเริ่มต้นไว้
-  Future<void> _loadSavedLocation() async {
+  Future _loadSavedLocation() async {
     try {
       MemberModel member = await _memberService.getMemberByUsername(
         GlobalData.usernameMember,
@@ -231,9 +430,10 @@ class _EditLocationMemberState extends State<EditLocationMember> {
     }
   }
 
-  Future<void> _saveLocation() async {
+  Future _saveLocation() async {
     FocusScope.of(context).unfocus();
 
+    // 1. ดักหมุด
     if (_deliveryPos == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -244,16 +444,12 @@ class _EditLocationMemberState extends State<EditLocationMember> {
       return;
     }
 
-    if (_addressDetailController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาระบุรายละเอียดที่อยู่ / จุดสังเกต'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-      return;
+    // 🎯 2. กดปุ่มแล้วให้ระบบรันการทำงาน Validator ของช่องกรอกข้อความ
+    if (!_formKey.currentState!.validate()) {
+      return; // 🛑 ถ้าไม่ผ่าน ให้หยุด ไม่บันทึกข้อมูล และขอบแดงจะขึ้นอัตโนมัติ
     }
 
+    // ผ่านการเช็กแล้วให้โหลดติ้วๆ และเริ่มบันทึกข้อมูล
     setState(() => _isSaving = true);
 
     try {
@@ -267,24 +463,26 @@ class _EditLocationMemberState extends State<EditLocationMember> {
       await _memberService.updateLocationMember(updateModel);
 
       if (!mounted) return;
+
+      // 🎯 อัปเดตค่าเริ่มต้นใหม่ เพื่อให้ปุ่ม "ค่าเดิม" จำค่าที่เพิ่งบันทึกล่าสุด
+      setState(() {
+        _initialDeliveryPos = _deliveryPos;
+        _initialAddressDetail = _addressDetailController.text.trim();
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ บันทึกจุดจัดส่งเรียบร้อยแล้ว'),
+          content: Text('บันทึกจุดจัดส่งเรียบร้อยแล้ว'),
           backgroundColor: Colors.green,
         ),
       );
 
-      Navigator.pop(context, {
-        'latitude': _deliveryPos!.latitude,
-        'longitude': _deliveryPos!.longitude,
-        'addressDetail': _addressDetailController.text.trim(),
-        'defaultlocation': _addressDetailController.text.trim(),
-      });
+      // 🎯 นำ Navigator.pop ออก เพื่อให้อยู่หน้าเดิมหลังจากบันทึกเสร็จ
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🚨 บันทึกไม่สำเร็จ: $e'),
+          content: Text('บันทึกไม่สำเร็จ: $e'),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -360,7 +558,7 @@ class _EditLocationMemberState extends State<EditLocationMember> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(30),
+                top: Radius.circular(40),
               ),
               boxShadow: [
                 BoxShadow(
@@ -371,147 +569,175 @@ class _EditLocationMemberState extends State<EditLocationMember> {
               ],
             ),
             child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: Color(0xFF64F02D),
-                        size: 28,
-                      ),
-                      const SizedBox(width: 8),
-                      const Text(
-                        "รายละเอียดที่จัดส่ง",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (_deliveryPos != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE8F5E9),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Text(
-                            "ปักหมุดแล้ว",
-                            style: TextStyle(
-                              color: const Color(0xFF00B300),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _addressDetailController,
-                    maxLines: 2,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      hintText:
-                          "กรุณาปักหมุด หรือ พิมพ์สถานที่\n(เช่น ตึก A ชั้น 2 ห้อง 201)",
-                      hintStyle: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 14,
-                      ),
-                      filled: true,
-                      fillColor: Colors.grey.shade100,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        borderSide: const BorderSide(
+              // 🎯 ใช้ Form ครอบส่วน UI ที่มีฟอร์มกรอกเพื่อเรียกใช้งาน Validator
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
                           color: Color(0xFF64F02D),
-                          width: 1.5,
+                          size: 28,
                         ),
-                      ),
-                      contentPadding: const EdgeInsets.all(16),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 🎯 แถวปุ่มกด "คืนค่าเดิม" (ซ้าย) และปุ่ม "ยืนยันและบันทึกข้อมูล" (ขวา)
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: SizedBox(
-                          height: 52,
-                          child: OutlinedButton.icon(
-                            onPressed: _isSaving
-                                ? null
-                                : _resetToDefaultLocation,
-                            icon: const Icon(Icons.restore_rounded, size: 20),
-                            label: const Text(
-                              "ค่าเดิม",
+                        const SizedBox(width: 8),
+                        const Text(
+                          "รายละเอียดที่จัดส่ง",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        if (_deliveryPos != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Text(
+                              "ปักหมุดแล้ว",
                               style: TextStyle(
-                                fontSize: 14,
+                                color: const Color(0xFF00B300),
+                                fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: Colors.grey.shade700,
-                              side: BorderSide(
-                                color: Colors.grey.shade400,
-                                width: 1.5,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 🎯 เปลี่ยนเป็น TextFormField เพื่อใช้ validator
+                    TextFormField(
+                      controller: _addressDetailController,
+                      maxLines: 2,
+                      textInputAction: TextInputAction.done,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'กรุณากระบุรายละเอียดที่อยู่จัดส่ง';
+                        }
+                        return null;
+                      },
+                      decoration: InputDecoration(
+                        hintText:
+                            "กรุณาปักหมุด หรือ พิมพ์สถานที่\n(เช่น ตึก A ชั้น 2 ห้อง 201)",
+                        hintStyle: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 14,
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(
+                            color: Color(0xFF64F02D),
+                            width: 1.5,
+                          ),
+                        ),
+                        // 🎯 จัดการเส้นขอบสีแดงตอน Error
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(
+                            color: Colors.redAccent,
+                            width: 1.2,
+                          ),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(15),
+                          borderSide: const BorderSide(
+                            color: Colors.redAccent,
+                            width: 1.5,
+                          ),
+                        ),
+                        contentPadding: const EdgeInsets.all(16),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // 🎯 แถวปุ่มกด "คืนค่าเดิม" (ซ้าย) และปุ่ม "ยืนยันและบันทึกข้อมูล" (ขวา)
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 1,
+                          child: SizedBox(
+                            height: 52,
+                            child: OutlinedButton.icon(
+                              onPressed: _isSaving
+                                  ? null
+                                  : _resetToDefaultLocation,
+                              icon: const Icon(Icons.restore_rounded, size: 20),
+                              label: const Text(
+                                "ค่าเดิม",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.grey.shade700,
+                                side: BorderSide(
+                                  color: Colors.grey.shade400,
+                                  width: 1.5,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                backgroundColor: Colors.white,
                               ),
-                              backgroundColor: Colors.white,
                             ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: SizedBox(
-                          height: 52,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _saveLocation,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00B300),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: SizedBox(
+                            height: 52,
+                            child: ElevatedButton(
+                              onPressed: _isSaving ? null : _saveLocation,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF00B300),
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
                               ),
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        color: Colors.white,
+                                        strokeWidth: 2.5,
+                                      ),
+                                    )
+                                  : const Text(
+                                      "ยืนยันและบันทึกข้อมูล",
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             ),
-                            child: _isSaving
-                                ? const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2.5,
-                                    ),
-                                  )
-                                : const Text(
-                                    "ยืนยันและบันทึกข้อมูล",
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

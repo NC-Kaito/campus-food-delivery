@@ -58,4 +58,6 @@ public interface OrderService {
     List<Map<String, Object>> getRestaurantIncomeByDateRange(String username, LocalDateTime startDate, LocalDateTime endDate);
 
     void autoCancelExpiredOrders();
+
+    void autoRejectExpiredRestaurantOrders();
 }

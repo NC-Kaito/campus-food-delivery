@@ -205,6 +205,46 @@ public class MenuAddonController {
         }
     }
 
+    @PatchMapping("/groups/{groupId}/status")
+    public ResponseEntity<?> toggleGroupStatus(
+            @PathVariable Integer groupId,
+            @RequestBody Map<String, Object> body) {
+
+        return menuaddongroupRepository.findById(groupId)
+                .map(group -> {
+
+                    Object statusValue = body.get("status");
+
+                    if (statusValue == null) {
+                        return ResponseEntity.badRequest()
+                                .body(Map.of("message", "กรุณาระบุ status"));
+                    }
+
+                    Boolean status;
+
+                    if (statusValue instanceof Boolean) {
+                        status = (Boolean) statusValue;
+                    } else if (statusValue instanceof String) {
+                        status = Boolean.parseBoolean((String) statusValue);
+                    } else if (statusValue instanceof Number) {
+                        status = ((Number) statusValue).intValue() == 1;
+                    } else {
+                        return ResponseEntity.badRequest()
+                                .body(Map.of("message", "ค่า status ไม่ถูกต้อง"));
+                    }
+
+                    group.setStatus(status);
+                    menuaddongroupRepository.save(group);
+
+                    return ResponseEntity.ok(
+                            Map.of("message", "อัปเดตสถานะกลุ่มตัวเลือกสำเร็จ")
+                    );
+                })
+                .orElseGet(() ->
+                        ResponseEntity.notFound().build()
+                );
+    }
+
     //================================================================================================
 
 }

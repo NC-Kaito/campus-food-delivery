@@ -19,10 +19,14 @@ class ViewActiveOrderMember extends StatefulWidget {
   const ViewActiveOrderMember({super.key, required this.order});
 
   @override
+  // 🎯 เพิ่ม Mixin สำหรับทำ Animation
   State<ViewActiveOrderMember> createState() => _ViewActiveOrderMemberState();
 }
 
-class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
+class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
+    with SingleTickerProviderStateMixin {
+  // 🎯 ใส่ SingleTickerProviderStateMixin ตรงนี้
+
   GoogleMapController? _miniMapController;
 
   String _loggedInMemberName = "กำลังโหลด...";
@@ -34,10 +38,27 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
 
   bool _isConfirming = false;
 
+  // 🎯 ประกาศตัวแปรสำหรับ Animation แว่นขยาย
+  late AnimationController _searchAnimationController;
+  late Animation<double> _searchAnimation;
+
   @override
   void initState() {
     super.initState();
     _loadCurrentMemberProfile();
+
+    // 🎯 ตั้งค่า Animation แว่นขยายให้ขยับซ้ายขวาไปมา
+    _searchAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    )..repeat(reverse: true); // เล่นวนซ้ำและย้อนกลับ
+
+    _searchAnimation = Tween<double>(begin: -4.0, end: 4.0).animate(
+      CurvedAnimation(
+        parent: _searchAnimationController,
+        curve: Curves.easeInOutSine,
+      ),
+    );
   }
 
   String _getFinalImageUrl(String? rawPath) {
@@ -50,7 +71,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
         : baseUrl + '/' + rawPath;
   }
 
-  Future<void> _loadCurrentMemberProfile() async {
+  Future _loadCurrentMemberProfile() async {
     try {
       String username = GlobalData.usernameMember;
       MemberModel mModel = await memberService.getMemberByUsername(username);
@@ -78,6 +99,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
 
   @override
   void dispose() {
+    _searchAnimationController.dispose(); // 🎯 อย่าลืมปิดการทำงานของ Animation
     _miniMapController?.dispose();
     super.dispose();
   }
@@ -149,7 +171,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
         " น.";
   }
 
-  Future<void> _confirmOrderReceived() async {
+  Future _confirmOrderReceived() async {
     if (_isConfirming) return;
     setState(() => _isConfirming = true);
 
@@ -194,8 +216,8 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
     );
   }
 
-  Future<void> _confirmReportIssue() async {
-    bool? confirm = await showDialog<bool>(
+  Future _confirmReportIssue() async {
+    bool? confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
@@ -325,7 +347,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    List<dynamic> rawCurries = item.orderDetailCurries ?? [];
+    List rawCurries = item.orderDetailCurries ?? [];
     final bool isCurryDish = rawCurries.isNotEmpty;
 
     String displayMenuName = item.menuNameAtOrder.isNotEmpty
@@ -747,7 +769,6 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
       currentStep = 6;
     }
 
-    // 🎯 เอา issue_reported ออกจาก isCanceled เพื่อไม่ให้ UI ทับซ้อนกัน
     final bool isCanceled = status.contains("cancel") || status == "reject";
     final bool isCompleted =
         status == 'success' ||
@@ -781,12 +802,9 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: RichText(
-                text: TextSpan(
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
+              // 🎯 เปลี่ยนจาก RichText เป็น Text.rich เพื่อให้ดึงฟอนต์หลักของแอปมาใช้
+              child: Text.rich(
+                TextSpan(
                   children: [
                     const TextSpan(
                       text: "เลขที่ออเดอร์ : ",
@@ -800,6 +818,10 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
                       style: TextStyle(color: primaryGreen),
                     ),
                   ],
+                ),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
@@ -966,8 +988,6 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
               const SizedBox(height: 20),
             ],
 
-            // 🎯 ซ่อนการแสดงผล "จัดส่งโดย" ถ้าออเดอร์นั้นถูก Cancel และไม่มีคนขับรับงาน
-            // 🎯 ซ่อนการแสดงผล "จัดส่งโดย" ถ้าออเดอร์นั้นถูก Cancel และไม่มีคนขับรับงาน
             if (!isCanceled || widget.order.rider != null) ...[
               const Text(
                 "จัดส่งโดย",
@@ -981,7 +1001,6 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
               if (widget.order.rider != null)
                 Row(
                   children: [
-                    // 🎯 แสดงรูปโปรไฟล์ Rider ถ้ามี หรือแสดง Icon ค่าเริ่มต้นถ้าไม่มีรูป
                     ClipRRect(
                       borderRadius: BorderRadius.circular(50),
                       child:
@@ -1017,9 +1036,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
                               ),
                             ),
                     ),
-                    const SizedBox(
-                      width: 16,
-                    ), // ขยับระยะห่างเพิ่มนิดหน่อยให้ดูสวยขึ้น
+                    const SizedBox(width: 16),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -1049,7 +1066,24 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember> {
               else
                 Row(
                   children: [
-                    Icon(Icons.hourglass_empty, size: 30, color: primaryGreen),
+                    // 🎯 ใช้ AnimatedBuilder ร่วมกับ Transform.translate ทำ Animation ดุ๊กดิ๊ก
+                    AnimatedBuilder(
+                      animation: _searchAnimation,
+                      builder: (context, child) {
+                        return Transform.translate(
+                          offset: Offset(
+                            _searchAnimation.value,
+                            0,
+                          ), // ขยับแค่แกน X ซ้าย-ขวา
+                          child: child,
+                        );
+                      },
+                      child: Icon(
+                        Icons.search_rounded,
+                        size: 30,
+                        color: Colors.deepOrange,
+                      ), // 🎯 เปลี่ยนเป็นแว่นขยาย
+                    ),
                     const SizedBox(width: 12),
                     Text(
                       "สถานะ: กำลังรอผู้จัดส่งรับงาน...",

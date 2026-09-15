@@ -309,25 +309,11 @@ class _ProfileRiderState extends State<ProfileRider> {
         await _riderService.updateProfileRider(updated);
 
         if (mounted) {
-          _hasUpdated = true; // มาร์คว่าบันทึกสำเร็จ
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text("บันทึกข้อมูลเรียบร้อยแล้ว"),
-              backgroundColor: _primary,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
+          _hasUpdated = true;
 
-          setState(() {
-            _isEditable = false;
-            _selectedImage = null;
-            _selectedVehicleImage = null;
-          });
-
-          await _loadRiderProfile();
+          // ส่งผลว่าบันทึกสำเร็จกลับไปให้ NavbarRider
+          // เพื่อสร้าง HomeRider + NavbarRider ใหม่ทั้งหมด
+          Navigator.pop(context, true);
         }
       } catch (e) {
         if (mounted) {
@@ -455,7 +441,10 @@ class _ProfileRiderState extends State<ProfileRider> {
       canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
-        Navigator.pop(context, _hasUpdated); // ส่งผลลัพธ์กลับไปยังหน้าก่อนหน้า
+        Navigator.pop(
+          context,
+          _hasUpdated,
+        ); // ส่งผลว่ามีการบันทึกหรือไม่กลับไปยัง NavbarRider
       },
       child: Scaffold(
         backgroundColor: _bg,
@@ -585,23 +574,10 @@ class _ProfileRiderState extends State<ProfileRider> {
                               _buildLabel("อีเมล (Email)"),
                               TextFormField(
                                 controller: _emailController,
-                                enabled: _isEditable,
+                                enabled: false,
                                 keyboardType: TextInputType.emailAddress,
-                                validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.trim().isEmpty) {
-                                          return "กรุณากรอกอีเมล";
-                                        }
-                                        if (!RegExp(
-                                          r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                                        ).hasMatch(v)) {
-                                          return "รูปแบบอีเมลไม่ถูกต้อง";
-                                        }
-                                        return null;
-                                      }
-                                    : null,
                                 decoration: _inputDecoration(
-                                  enabled: _isEditable,
+                                  enabled: false,
                                   suffixIcon: Icon(
                                     Icons.email_outlined,
                                     color: Colors.grey[400],
@@ -613,20 +589,24 @@ class _ProfileRiderState extends State<ProfileRider> {
                                 controller: _phoneController,
                                 enabled: _isEditable,
                                 keyboardType: TextInputType.phone,
-                                validator: _isEditable
-                                    ? (v) {
-                                        if (v == null || v.trim().isEmpty) {
-                                          return "กรุณากรอกเบอร์โทรศัพท์";
-                                        }
-                                        if (!RegExp(r'^[0-9]+$').hasMatch(v)) {
-                                          return "ต้องเป็นตัวเลขเท่านั้น";
-                                        }
-                                        if (v.length < 10 || v.length > 15) {
-                                          return "ความยาว 10-15 หลัก";
-                                        }
-                                        return null;
-                                      }
-                                    : null,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
+                                validator: (value) {
+                                  if (!_isEditable) return null;
+                                  if (value == null || value.isEmpty) {
+                                    return "กรุณากรอกเบอร์โทรศัพท์";
+                                  }
+                                  if (value.contains(' ')) {
+                                    return "ห้ามมีช่องว่าง";
+                                  }
+                                  if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+                                    return "ต้องเป็นตัวเลขเท่านั้น";
+                                  }
+                                  if (value.length < 10 || value.length > 15) {
+                                    return "ความยาว 10-15 หลัก";
+                                  }
+                                  return null;
+                                },
                                 decoration: _inputDecoration(
                                   enabled: _isEditable,
                                   suffixIcon: Icon(
@@ -733,14 +713,31 @@ class _ProfileRiderState extends State<ProfileRider> {
                               _buildLabel("ทะเบียนรถ"),
                               TextFormField(
                                 controller: _vehiclePlateController,
-                                enabled: false,
+                                enabled: _isEditable,
+                                autovalidateMode:
+                                    AutovalidateMode.onUserInteraction,
                                 decoration: _inputDecoration(
-                                  enabled: false,
+                                  enabled: _isEditable,
                                   suffixIcon: Icon(
                                     Icons.pin_outlined,
                                     color: Colors.grey[400],
                                   ),
                                 ),
+                                validator: (value) {
+                                  if (!_isEditable) return null;
+                                  if (value == null || value.trim().isEmpty) {
+                                    return "กรุณากรอกเลขทะเบียนรถ";
+                                  }
+                                  if (!RegExp(
+                                    r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$',
+                                  ).hasMatch(value)) {
+                                    return "ต้องเป็นภาษาไทย อังกฤษ หรือตัวเลขเท่านั้น";
+                                  }
+                                  if (value.length < 2 || value.length > 15) {
+                                    return "ความยาวทะเบียนรถไม่ถูกต้อง";
+                                  }
+                                  return null;
+                                },
                               ),
                               const SizedBox(height: 8),
                               _buildLabel("รูปรถ / ยานพาหนะ"),

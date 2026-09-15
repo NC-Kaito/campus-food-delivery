@@ -8,6 +8,7 @@ import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/features/member/add_order_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
+import 'package:flutter_app/features/member/view_order_member.dart';
 import 'package:flutter_app/features/member/navbar_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
@@ -269,6 +270,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
         ? _selectedCurries.first
         : MenuModel(menuName: "ข้าวเปล่า", price: 20.0);
 
+    // เพิ่มเมนูข้าวราดแกงลงตะกร้าก่อน
     CartManager().addToCart(
       CartItem(
         menu: mainCurryMenu,
@@ -283,43 +285,32 @@ class _ListMenuMemberState extends State<ListMenuMember>
       ),
     );
 
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
-          children: [
-            Icon(Icons.shopping_basket, color: Colors.green),
-            SizedBox(width: 8),
-            Text("เพิ่มลงตะกร้าแล้ว"),
-          ],
+    // ใช้ flow เดียวกับ AddOrderMember:
+    // กรองเฉพาะรายการของร้านนี้ แล้วเปิดหน้า ViewOrderMember ทันที
+    final String currentStoreUsername = widget.restaurantModel.username ?? '';
+
+    final List<CartItem> currentStoreItems = CartManager().items
+        .whereType<CartItem>()
+        .where((item) => item.menu.restaurant?.username == currentStoreUsername)
+        .toList();
+
+    // เคลียร์ state ของหน้าข้าวราดแกงก่อนออกจากหน้า
+    setState(() {
+      _selectedCurries.clear();
+      _curryAddonQuantities.clear();
+      _isExtraRice = false;
+      _curryQty = 1;
+    });
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ViewOrderMember(
+          storeUsername: currentStoreUsername,
+          storeName: widget.restaurantModel.restaurantName ?? 'ออเดอร์ของคุณ',
+          storeItems: currentStoreItems,
+          isFromAddOrder: true,
         ),
-        content: Text(
-          "💰 ราคารวม: ฿${total.toStringAsFixed(0)} บาท\n"
-          "🔢 จำนวน: $_curryQty จาน\n"
-          "📝 รายละเอียด:\n$note",
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() {
-                _selectedCurries.clear();
-                _curryAddonQuantities.clear();
-                _isExtraRice = false;
-                _curryQty = 1;
-              });
-              Navigator.pop(context);
-            },
-            child: const Text(
-              "ตกลง",
-              style: TextStyle(
-                color: Colors.green,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

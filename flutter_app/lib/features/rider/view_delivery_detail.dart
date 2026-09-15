@@ -5,10 +5,11 @@ import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/services/in_app_notification_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
-import 'package:flutter_app/global_data.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:dio/dio.dart';
 import 'dart:math' show min, max;
+
+// 🎯 อย่าลืมแก้ไข path นี้ให้ตรงกับที่อยู่ไฟล์ GoogleMapRider ของคุณนะครับ
+import 'google_map_rider.dart';
 
 class ViewDeliveryDetail extends StatefulWidget {
   final OrderModel orderModel;
@@ -29,17 +30,10 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
   final Color primaryGreen = const Color(0xFF00B300);
   final Color accentGreen = const Color(0xFF00B300);
 
-  Set _polylines = {};
-  String _drivingDistance = "กำลังคำนวณ...";
-  String _drivingDuration = "...";
-
-  final String googleMapsApiKey = "ใส่_API_KEY_ของคุณที่นี่";
-
   @override
   void initState() {
     super.initState();
     _currentStatus = widget.orderModel.orderStatus ?? "";
-    _calculateDrivingRoute();
   }
 
   @override
@@ -52,7 +46,7 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
     final status = _currentStatus.trim().toLowerCase();
 
     if (status.contains("cancel") || status.contains("issue_reported")) {
-      return -1; // 🎯 กำหนดให้เป็น -1 หากถูกยกเลิก
+      return -1;
     } else if (status.isEmpty ||
         status == "waitingrider" ||
         status == "waitingrestaurant" ||
@@ -82,102 +76,7 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
     return 1;
   }
 
-  Future _calculateDrivingRoute() async {
-    final order = widget.orderModel;
-    final double? restaurantLat = order.restaurant?.latitude;
-    final double? restaurantLng = order.restaurant?.longitude;
-
-    // ถ้าออเดอร์ถูกยกเลิกแล้ว ไม่ต้องคำนวณเส้นทาง
-    if (_getCurrentRiderStep() == -1) return;
-
-    if (restaurantLat == null || restaurantLng == null) {
-      setState(() => _drivingDistance = "ไม่พบพิกัดร้านค้า");
-      return;
-    }
-
-    final String origin =
-        restaurantLat.toString() + "," + restaurantLng.toString();
-    final String destination =
-        order.latitude.toString() + "," + order.longitude.toString();
-    final String url =
-        "https://maps.googleapis.com/maps/api/directions/json?origin=" +
-        origin +
-        "&destination=" +
-        destination +
-        "&key=" +
-        googleMapsApiKey +
-        "&language=th";
-
-    try {
-      Response response = await Dio().get(url);
-      final data = response.data;
-
-      if (data['status'] == 'OK') {
-        final route = data['routes'][0];
-        final leg = route['legs'][0];
-
-        final distanceText = leg['distance']['text'];
-        final durationText = leg['duration']['text'];
-
-        final encodedPolyline = route['overview_polyline']['points'];
-        List polylineCoordinates = _decodePolyline(encodedPolyline);
-
-        if (mounted) {
-          setState(() {
-            _drivingDistance = distanceText;
-            _drivingDuration = durationText;
-            _polylines.add(
-              Polyline(
-                polylineId: const PolylineId("driving_route"),
-                color: primaryGreen,
-                width: 5,
-                points: List.from(polylineCoordinates),
-                jointType: JointType.round,
-                startCap: Cap.roundCap,
-                endCap: Cap.roundCap,
-              ),
-            );
-          });
-        }
-      } else {
-        setState(() => _drivingDistance = "ไม่สามารถคำนวณเส้นทางได้");
-      }
-    } catch (e) {
-      setState(() => _drivingDistance = "ข้อผิดพลาดในการโหลดเส้นทาง");
-      debugPrint("Error fetching directions: " + e.toString());
-    }
-  }
-
-  List _decodePolyline(String encoded) {
-    List poly = [];
-    int index = 0, len = encoded.length;
-    int lat = 0, lng = 0;
-
-    while (index < len) {
-      int b, shift = 0, result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lat += dlat;
-
-      shift = 0;
-      result = 0;
-      do {
-        b = encoded.codeUnitAt(index++) - 63;
-        result |= (b & 0x1f) << shift;
-        shift += 5;
-      } while (b >= 0x20);
-      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
-      lng += dlng;
-
-      poly.add(LatLng((lat / 1E5).toDouble(), (lng / 1E5).toDouble()));
-    }
-    return poly;
-  }
-
+  // 🎯 ฟังก์ชันปรับมุมกล้องให้ครอบคลุมทั้ง 2 หมุด
   void _setMapBounds(LatLng pos1, LatLng pos2) {
     if (_mapController == null) return;
 
@@ -225,7 +124,6 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
     }
   }
 
-  // 🎯 ฟังก์ชันสำหรับเปิดดูรูปภาพหลักฐานการยกเลิกแบบเต็มจอ
   void _showImageDialog(String imageUrl) {
     showDialog(
       context: context,
@@ -828,7 +726,6 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
         _isUpdating = false;
       });
 
-      // แจ้งเตือนภายในแอปไรเดอร์ทันทีหลังอัปเดตสถานะสำเร็จ
       final String restaurantName =
           widget.orderModel.restaurant?.restaurantName ?? "ร้านอาหาร";
       String notifyTitle = "อัปเดตออเดอร์สำเร็จ";
@@ -903,20 +800,17 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
     String successMsg = "";
     String dialogTitle = "";
     String dialogContent = "";
-    IconData buttonIcon = Icons.hourglass_empty_rounded;
     bool isButtonEnabled = true;
 
     if (currentStep == 1) {
       buttonText = "รอร้านค้ายืนยันออเดอร์";
       isButtonEnabled = false;
-      buttonIcon = Icons.access_time_rounded;
     } else if (currentStep == 2) {
       buttonText = "กำลังไปรับออเดอร์";
       nextStatus = "goingtorestaurant";
       successMsg = "อัปเดตสถานะ: กำลังเดินทางไปร้านอาหาร";
       dialogTitle = "ยืนยันการเดินทาง";
       dialogContent = "คุณกำลังออกเดินทางไปรับอาหารที่ร้านค้าใช่หรือไม่?";
-      buttonIcon = Icons.directions_bike_rounded;
     } else if (currentStep == 3) {
       buttonText = "รับอาหารแล้ว (เริ่มจัดส่ง)";
       nextStatus = "delivery";
@@ -924,14 +818,12 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
       dialogTitle = "ยืนยันรับอาหาร";
       dialogContent =
           "คุณได้รับอาหารจากร้านค้าเรียบร้อยแล้ว และพร้อมออกเดินทางไปส่งให้ลูกค้าใช่หรือไม่?";
-      buttonIcon = Icons.delivery_dining_rounded;
     } else if (currentStep == 4) {
       buttonText = "ถึงที่หมายแล้ว";
       nextStatus = "arrived";
       successMsg = "อัปเดตสถานะ: ถึงที่หมายแล้ว";
       dialogTitle = "ยืนยันถึงที่หมาย";
       dialogContent = "คุณเดินทางมาถึงจุดส่งอาหารของลูกค้าแล้วใช่หรือไม่?";
-      buttonIcon = Icons.location_on_rounded;
     } else if (currentStep == 5) {
       buttonText = "จัดส่งสำเร็จ (รอลูกค้ายืนยัน)";
       nextStatus = "delivered";
@@ -939,7 +831,6 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
       dialogTitle = "ยืนยันการจัดส่งสำเร็จ";
       dialogContent =
           "คุณได้ส่งมอบอาหารให้ลูกค้าเรียบร้อยแล้วใช่หรือไม่?\n\n(เมื่อกดยืนยัน ระบบจะส่งแจ้งเตือนให้ลูกค้ายืนยันการรับในแอป)";
-      buttonIcon = Icons.check_circle_outline_rounded;
     }
 
     return SafeArea(
@@ -1017,7 +908,6 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
                     Icons.check_circle_outline_rounded,
                     color: Colors.white,
                   ),
-
                   label: Text(
                     buttonText,
                     style: const TextStyle(
@@ -1110,8 +1000,8 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: RichText(
-                text: TextSpan(
+              child: Text.rich(
+                TextSpan(
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -1127,6 +1017,7 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
                     ),
                   ],
                 ),
+                textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 6),
@@ -1153,7 +1044,6 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
             ),
             const SizedBox(height: 18),
 
-            // 🎯 กล่องแจ้งเตือนการยกเลิก หากเป็นสถานะ Canceled
             if (isCanceled) ...[
               Container(
                 width: double.infinity,
@@ -1285,85 +1175,103 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
             _buildCustomerCard(),
             const SizedBox(height: 20),
 
-            // 🎯 ซ่อนแผนที่และเส้นทางจัดส่งทั้งหมดหากออเดอร์ถูกยกเลิกแล้ว
             if (!isCanceled) ...[
-              Row(
+              const Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    "เส้นทางจัดส่ง",
+                  Text(
+                    // 🎯 เปลี่ยนชื่อเป็น "ตำแหน่งจัดส่ง" เพราะไม่ได้คำนวณเส้นทางแล้ว
+                    "ตำแหน่งจัดส่ง",
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  if (restaurantLocation != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: primaryGreen.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        _drivingDuration != "..."
-                            ? "≈ " +
-                                  _drivingDistance +
-                                  " (" +
-                                  _drivingDuration +
-                                  ")"
-                            : _drivingDistance,
-                        style: TextStyle(
-                          color: primaryGreen,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 12),
+
               if (restaurantLocation != null)
-                Container(
-                  height: 220,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade300, width: 1.5),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: GoogleMap(
-                      initialCameraPosition: CameraPosition(
-                        target: restaurantLocation,
-                        zoom: 14.0,
+                Stack(
+                  alignment: Alignment.bottomRight,
+                  children: [
+                    Container(
+                      height: 220,
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.grey.shade300,
+                          width: 1.5,
+                        ),
                       ),
-                      onMapCreated: (controller) {
-                        _mapController = controller;
-                        _setMapBounds(restaurantLocation, deliveryLocation);
-                      },
-                      zoomControlsEnabled: false,
-                      scrollGesturesEnabled: true,
-                      polylines: Set.from(_polylines),
-                      markers: {
-                        Marker(
-                          markerId: const MarkerId('restaurant_pos'),
-                          position: restaurantLocation,
-                          infoWindow: const InfoWindow(title: 'ร้านค้า'),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueOrange,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: GoogleMap(
+                          initialCameraPosition: CameraPosition(
+                            target: restaurantLocation,
+                            zoom: 14.0,
                           ),
+                          onMapCreated: (controller) {
+                            _mapController = controller;
+                            _setMapBounds(restaurantLocation, deliveryLocation);
+                          },
+                          zoomControlsEnabled: false,
+                          scrollGesturesEnabled: true,
+                          myLocationEnabled: true,
+                          myLocationButtonEnabled: false,
+                          markers: {
+                            Marker(
+                              markerId: const MarkerId('restaurant_pos'),
+                              position: restaurantLocation,
+                              infoWindow: const InfoWindow(title: 'ร้านค้า'),
+                              icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueOrange,
+                              ),
+                            ),
+                            Marker(
+                              markerId: const MarkerId('delivery_pos'),
+                              position: deliveryLocation,
+                              infoWindow: const InfoWindow(title: 'ลูกค้า'),
+                              icon: BitmapDescriptor.defaultMarkerWithHue(
+                                BitmapDescriptor.hueRed,
+                              ),
+                            ),
+                          },
                         ),
-                        Marker(
-                          markerId: const MarkerId('delivery_pos'),
-                          position: deliveryLocation,
-                          infoWindow: const InfoWindow(title: 'ลูกค้า'),
-                          icon: BitmapDescriptor.defaultMarkerWithHue(
-                            BitmapDescriptor.hueRed,
-                          ),
-                        ),
-                      },
+                      ),
                     ),
-                  ),
+                    Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: FloatingActionButton.extended(
+                        heroTag: 'expandMapBtn',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => GoogleMapRider(
+                                deliveryLocation: deliveryLocation,
+                                restaurantLocation: restaurantLocation,
+                                addressDetail: order.addressDetail,
+                                customerName: memberFullName,
+                                customerPhone: order.member?.phone ?? "-",
+                              ),
+                            ),
+                          );
+                        },
+                        backgroundColor: primaryGreen,
+                        icon: const Icon(
+                          Icons.fullscreen_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        label: const Text(
+                          "ขยายแผนที่",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 )
               else
                 Text(
@@ -1548,7 +1456,6 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
           ],
         ),
       ),
-      // 🎯 ถ้ายกเลิก ให้คืนค่าเป็น null เพื่อเอาแถบและปุ่มด้านล่างออก
       bottomNavigationBar: isCanceled ? null : _buildBottomPanel(currentStep),
     );
   }

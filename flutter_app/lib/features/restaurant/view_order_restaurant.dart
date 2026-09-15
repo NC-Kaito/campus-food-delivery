@@ -639,15 +639,16 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: RichText(
-                text: TextSpan(
+              // 🎯 เปลี่ยนจาก RichText เป็น Text.rich เพื่อดึงฟอนต์หลักมาใช้
+              child: Text.rich(
+                TextSpan(
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                   ),
                   children: [
                     const TextSpan(
-                      text: "หมายเลขคำสั่งซื้อ : ",
+                      text: "เลขที่ออเดอร์ : ",
                       style: TextStyle(color: Colors.black87),
                     ),
                     TextSpan(
@@ -656,6 +657,7 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                     ),
                   ],
                 ),
+                textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 6),

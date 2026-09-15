@@ -305,19 +305,15 @@ class _AddAddonState extends State<AddAddon> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       filled: true,
       fillColor: _AddonTheme.fieldBg,
+      // 🎯 เพิ่มสีแจ้งเตือน Error
+      errorStyle: const TextStyle(color: _AddonTheme.danger, fontSize: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Colors.black,
-          width: 0.3,
-        ), // 🎯 ขอบดำ
+        borderSide: const BorderSide(color: Colors.black, width: 0.3),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(
-          color: Colors.black,
-          width: 0.3,
-        ), // 🎯 ขอบดำ
+        borderSide: const BorderSide(color: Colors.black, width: 0.3),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -365,19 +361,14 @@ class _AddAddonState extends State<AddAddon> {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: const Color.fromARGB(
-              255,
-              196,
-              196,
-              196,
-            ).withOpacity(0.12), // 🎯 พื้นหลังไอคอนสีเทา
+            color: const Color.fromARGB(255, 196, 196, 196).withOpacity(0.12),
             borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(
             icon,
             size: 17,
             color: const Color.fromARGB(255, 244, 150, 0),
-          ), // 🎯 ไอคอนสีเขียว
+          ),
         ),
         const SizedBox(width: 10),
         Expanded(
@@ -418,7 +409,7 @@ class _AddAddonState extends State<AddAddon> {
       decoration: BoxDecoration(
         color: _AddonTheme.fieldBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.black, width: 0.3), // 🎯 ขอบดำ
+        border: Border.all(color: Colors.black, width: 0.3),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -468,22 +459,28 @@ class _AddAddonState extends State<AddAddon> {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        // 🎯 ใช้ CrossAxisAlignment.start เพื่อเวลาแจ้งเตือน Error แล้ว UI ไม่เบี้ยว
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: _AddonTheme.primary.withOpacity(0.14),
-              shape: BoxShape.circle,
-            ),
-            child: Text(
-              "${index + 1}",
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: _AddonTheme.primary,
+          Padding(
+            padding: const EdgeInsets.only(
+              top: 10,
+            ), // ขยับลงมาให้ตรงกับ Text Box
+            child: Container(
+              width: 26,
+              height: 26,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _AddonTheme.primary.withOpacity(0.14),
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                "${index + 1}",
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _AddonTheme.primary,
+                ),
               ),
             ),
           ),
@@ -498,8 +495,10 @@ class _AddAddonState extends State<AddAddon> {
                 controller: addon.nameController,
                 focusNode: _nameFocusNodes[addon],
                 onChanged: (value) => _onAddonNameChanged(addon, value),
-                validator: (value) =>
-                    (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
+                // 🎯 ดักห้ามว่าง
+                validator: (value) => (value == null || value.trim().isEmpty)
+                    ? "กรุณากรอกชื่อ"
+                    : null,
                 style: const TextStyle(fontSize: 14),
                 decoration: InputDecoration(
                   hintText: "ชื่อตัวเลือก",
@@ -514,19 +513,24 @@ class _AddAddonState extends State<AddAddon> {
                   ),
                   filled: true,
                   fillColor: _AddonTheme.surface,
+                  // 🎯 ตัวอักษรแจ้งเตือนสีแดง
+                  errorStyle: const TextStyle(
+                    color: _AddonTheme.danger,
+                    fontSize: 11,
+                  ),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(
                       color: Colors.black,
                       width: 0.3,
-                    ), // 🎯 ขอบดำ
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(
                       color: Colors.black,
                       width: 0.3,
-                    ), // 🎯 ขอบดำ
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
@@ -558,11 +562,13 @@ class _AddAddonState extends State<AddAddon> {
             child: TextFormField(
               controller: addon.priceController,
               keyboardType: TextInputType.number,
+              // 🎯 ดักห้ามว่าง และ ต้องเป็นตัวเลขเท่านั้น
               validator: (value) {
-                if (value != null && value.trim().isNotEmpty) {
-                  if (double.tryParse(value.trim()) == null) {
-                    return "ตัวเลขเท่านั้น";
-                  }
+                if (value == null || value.trim().isEmpty) {
+                  return "กรุณากรอกราคา";
+                }
+                if (double.tryParse(value.trim()) == null) {
+                  return "ตัวเลขเท่านั้น";
                 }
                 return null;
               },
@@ -586,19 +592,18 @@ class _AddAddonState extends State<AddAddon> {
                 ),
                 filled: true,
                 fillColor: _AddonTheme.surface,
+                // 🎯 ตัวอักษรแจ้งเตือนสีแดง
+                errorStyle: const TextStyle(
+                  color: _AddonTheme.danger,
+                  fontSize: 11,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Colors.black,
-                    width: 0.3,
-                  ), // 🎯 ขอบดำ
+                  borderSide: const BorderSide(color: Colors.black, width: 0.3),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(
-                    color: Colors.black,
-                    width: 0.3,
-                  ), // 🎯 ขอบดำ
+                  borderSide: const BorderSide(color: Colors.black, width: 0.3),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
@@ -623,49 +628,57 @@ class _AddAddonState extends State<AddAddon> {
           ),
           const SizedBox(width: 6),
 
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ─── ปุ่มลบ (รูปถังขยะ) ───
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(9),
-                  onTap: canDelete ? () => _removeAddonItemRow(index) : null,
-                  child: Container(
-                    width: 34,
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: canDelete
-                          ? _AddonTheme.danger.withOpacity(0.1)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(9),
+          Padding(
+            padding: const EdgeInsets.only(
+              top: 2,
+            ), // ขยับปุ่มลบลงมาให้ตรงกับกล่อง
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // ─── ปุ่มลบ (รูปถังขยะ) ───
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(9),
+                    onTap: canDelete ? () => _removeAddonItemRow(index) : null,
+                    child: Container(
+                      width: 34,
+                      height: 42,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: canDelete
+                            ? _AddonTheme.danger.withOpacity(0.1)
+                            : Colors.transparent,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Icon(
+                        Icons.delete_outline_rounded,
+                        size: 20,
+                        color: canDelete
+                            ? _AddonTheme.danger
+                            : _AddonTheme.textSecondary.withOpacity(0.35),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 2),
+                // ─── ไอคอนจุด 6 จุดสำหรับลาก ───
+                ReorderableDragStartListener(
+                  index: index,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 8,
                     ),
                     child: Icon(
-                      Icons.delete_outline_rounded,
-                      size: 20,
-                      color: canDelete
-                          ? _AddonTheme.danger
-                          : _AddonTheme.textSecondary.withOpacity(0.35),
+                      Icons.drag_indicator_rounded,
+                      size: 24,
+                      color: Colors.grey.shade400,
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 2),
-              // ─── ไอคอนจุด 6 จุดสำหรับลาก ───
-              ReorderableDragStartListener(
-                index: index,
-                child: Padding(
-                  padding: const EdgeInsets.all(4.0),
-                  child: Icon(
-                    Icons.drag_indicator_rounded,
-                    size: 24,
-                    color: Colors.grey.shade400,
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -680,6 +693,8 @@ class _AddAddonState extends State<AddAddon> {
       appBar: const RestaurantNavbar(title: ""),
       body: Form(
         key: formKey,
+        // 🎯 เปิดระบบเช็คข้อมูลแบบ Real-time เวลาพิมพ์ครับ
+        autovalidateMode: AutovalidateMode.onUserInteraction,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           child: Column(
@@ -695,10 +710,7 @@ class _AddAddonState extends State<AddAddon> {
                     height: 46,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
-                        colors: [
-                          _AddonTheme.primary,
-                          Color(0xFF64F02D),
-                        ], // 🎯 โทนสีเขียว
+                        colors: [_AddonTheme.primary, Color(0xFF64F02D)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
@@ -759,6 +771,7 @@ class _AddAddonState extends State<AddAddon> {
                     _fieldLabel("ชื่อกลุ่มตัวเลือก"),
                     TextFormField(
                       controller: groupNameController,
+                      // 🎯 ดักจับชื่อกลุ่มห้ามว่าง
                       validator: (value) =>
                           (value == null || value.trim().isEmpty)
                           ? "กรุณากรอกชื่อกลุ่มตัวเลือก"
@@ -832,9 +845,7 @@ class _AddAddonState extends State<AddAddon> {
                               ),
                             ),
                           ),
-                          SizedBox(
-                            width: 68,
-                          ), // ปรับระยะให้ตรงกับไอคอนลบ + จุดลาก
+                          SizedBox(width: 68),
                         ],
                       ),
                     ),
@@ -869,10 +880,7 @@ class _AddAddonState extends State<AddAddon> {
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.black, // 🎯 เพิ่มขอบดำ
-                              width: 0.3,
-                            ),
+                            border: Border.all(color: Colors.black, width: 0.3),
                             color: Colors.white,
                           ),
                           child: const Row(

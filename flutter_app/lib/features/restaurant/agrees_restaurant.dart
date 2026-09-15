@@ -119,7 +119,7 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
                             _isAccepted = value ?? false;
                           });
                         },
-                        activeColor: const Color.fromARGB(255, 47, 255, 0),
+                        activeColor: const Color(0xFF00B300),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(4),
                         ),
@@ -161,12 +161,7 @@ class _AgreesRestaurantState extends State<AgreesRestaurant> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: const Color.fromARGB(
-                            255,
-                            13,
-                            255,
-                            0,
-                          ),
+                          backgroundColor: const Color(0xFF00B300),
                           elevation: _isAccepted ? 3 : 0,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(30),

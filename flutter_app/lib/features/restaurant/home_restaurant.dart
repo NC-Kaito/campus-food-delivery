@@ -6,6 +6,7 @@ import 'package:flutter_app/data/models/menu_addon_group_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
@@ -67,6 +68,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   final Map<int, int> _menuAddonGroupCounts = {};
 
   Timer? _autoRefreshTimer;
+  Timer? _openingStatusTimer;
   int _newOrderCount = 0;
 
   bool _needsOpeningHoursSetup = false;
@@ -85,11 +87,13 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     loadRestaurantData();
     _fetchNewOrderCount();
     _startAutoRefresh();
+    _startOpeningStatusRefresh();
   }
 
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    _openingStatusTimer?.cancel();
     _tabController?.dispose();
     super.dispose();
   }
@@ -98,6 +102,46 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     _autoRefreshTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
       if (mounted) _fetchNewOrderCount();
     });
+  }
+
+  void _startOpeningStatusRefresh() {
+    _openingStatusTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  bool _isCurrentlyOpen() {
+    final restaurant = restaurantModel;
+    if (restaurant == null) return false;
+    if (restaurant.statusOpen == false) return false;
+
+    final hours = restaurant.openingHours;
+    if (hours == null || hours.isEmpty) return false;
+
+    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
+    final today = hours.firstWhere(
+      (h) => h.dayOfWeek == todayEnum,
+      orElse: () => RestaurantOpeningHourModel(
+        dayOfWeek: todayEnum,
+        opentime: const TimeOfDay(hour: 0, minute: 0),
+        closetime: const TimeOfDay(hour: 0, minute: 0),
+        open: false,
+      ),
+    );
+
+    if (!today.open) return false;
+
+    final now = TimeOfDay.now();
+    final nowMinutes = now.hour * 60 + now.minute;
+    final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
+    final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
+
+    if (openMinutes <= closeMinutes) {
+      return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
+    }
+
+    // ร้านเปิดข้ามเที่ยงคืน เช่น 18:00 - 02:00
+    return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
   }
 
   Future _fetchNewOrderCount() async {
@@ -590,6 +634,32 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
+  // 🎯 ฟังก์ชันสำหรับสลับสถานะเปิด/ปิดของ Addon Group
+  Future _toggleGroupStatusUI(int groupId, bool currentStatus) async {
+    final newStatus = !currentStatus;
+
+    // อัปเดต UI ทันทีเพื่อให้ดูเร็ว (Optimistic UI)
+    setState(() {
+      _groupEnabled[groupId] = newStatus;
+    });
+
+    try {
+      final success = await _addonService.toggleAddonGroupStatus(
+        groupId,
+        newStatus,
+      );
+      if (!success) throw Exception("อัปเดตไม่สำเร็จ");
+    } catch (e) {
+      // ถ้า Error คืนค่ากลับเป็นเหมือนเดิม
+      setState(() {
+        _groupEnabled[groupId] = currentStatus;
+      });
+      if (mounted) {
+        _showErrorSnackBar("ไม่สามารถอัปเดตสถานะได้");
+      }
+    }
+  }
+
   void _showSuccessSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -790,8 +860,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             _groupEnabled.putIfAbsent(gid, () => agg.group.status ?? true);
             _groupExpanded[gid] = false;
           }
-          for (final item in agg.items.values) {
-            final key =
+          for (final MenuAddonDetailModel item in agg.items.values) {
+            final int key =
                 item.addonMenu?.addonId ?? item.addonDetailId ?? item.hashCode;
             _itemChecked.putIfAbsent(key, () => item.status ?? true);
           }
@@ -1043,6 +1113,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                               child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   Expanded(
                                     child: Text(
@@ -1054,6 +1125,65 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                       ),
                                       overflow: TextOverflow.ellipsis,
                                     ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Builder(
+                                    builder: (context) {
+                                      final isOpen = _isCurrentlyOpen();
+                                      final statusColor = isOpen
+                                          ? _primaryDark
+                                          : const Color.fromARGB(
+                                              255,
+                                              181,
+                                              60,
+                                              0,
+                                            );
+                                      final statusBg = isOpen
+                                          ? _primary.withOpacity(0.12)
+                                          : Colors.grey.shade200;
+
+                                      return Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 10,
+                                          vertical: 6,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: statusBg,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                          border: Border.all(
+                                            color: isOpen
+                                                ? _primary.withOpacity(0.18)
+                                                : Colors.grey.shade300,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Container(
+                                              width: 7,
+                                              height: 7,
+                                              decoration: BoxDecoration(
+                                                color: statusColor,
+                                                shape: BoxShape.circle,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Text(
+                                              isOpen
+                                                  ? "ร้านเปิดอยู่"
+                                                  : "ร้านปิดอยู่",
+                                              style: TextStyle(
+                                                color: statusColor,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w800,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
@@ -1067,66 +1197,93 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                               child: _buildQuickActionsRow(),
                             ),
                             const SizedBox(height: 16),
-
-                            if (_mainTabIndex == 0)
-                              Container(
-                                decoration: const BoxDecoration(
-                                  color: Color.fromARGB(255, 255, 237, 196),
-                                  border: Border(
-                                    bottom: BorderSide(
-                                      color: Color(0xFFE0E0E0),
-                                      width: 1,
-                                    ),
-                                  ),
-                                ),
-                                child: TabBar(
-                                  controller: _tabController!,
-                                  isScrollable: true,
-                                  tabAlignment: TabAlignment.start,
-                                  labelColor: Colors.black,
-                                  unselectedLabelColor: Colors.black87,
-                                  indicator: BoxDecoration(
-                                    color: const Color.fromARGB(
-                                      255,
-                                      255,
-                                      179,
-                                      0,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  indicatorSize: TabBarIndicatorSize.tab,
-                                  dividerColor: Colors.transparent,
-                                  labelStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  unselectedLabelStyle: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                  labelPadding: const EdgeInsets.symmetric(
-                                    horizontal: 40,
-                                    vertical: 10,
-                                  ),
-                                  onTap: (index) {
-                                    setState(() {});
-                                  },
-                                  tabs: typeMenus.isEmpty
-                                      ? [const Tab(text: "ไม่มีประเภท")]
-                                      : typeMenus
-                                            .map(
-                                              (type) =>
-                                                  Tab(text: type.typemenuName),
-                                            )
-                                            .toList(),
-                                ),
-                              ),
                           ],
                         ),
                       ),
                     ],
                   ),
                 ),
+                if (_mainTabIndex == 0)
+                  SliverPersistentHeader(
+                    pinned: true,
+                    delegate: _StickyTabBarDelegate(
+                      height: 50.0,
+                      child: Container(
+                        color: Colors.white,
+                        child: Column(
+                          children: [
+                            Expanded(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    margin: const EdgeInsets.only(
+                                      top: 6,
+                                      bottom: 6,
+                                      right: 8,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                    ),
+                                    alignment: Alignment.center,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF4CAF50),
+                                      borderRadius: BorderRadius.only(
+                                        topRight: Radius.circular(12),
+                                        bottomRight: Radius.circular(12),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'รายการอาหาร',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: TabBar(
+                                      controller: _tabController!,
+                                      isScrollable: true,
+                                      tabAlignment: TabAlignment.start,
+                                      labelColor: Colors.orange.shade700,
+                                      unselectedLabelColor:
+                                          Colors.grey.shade500,
+                                      indicatorColor: Colors.orange.shade700,
+                                      indicatorWeight: 3,
+                                      indicatorSize: TabBarIndicatorSize.tab,
+                                      dividerColor: Colors.transparent,
+                                      labelPadding: const EdgeInsets.symmetric(
+                                        horizontal: 14,
+                                      ),
+                                      labelStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      unselectedLabelStyle: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      tabs: typeMenus.isEmpty
+                                          ? [const Tab(text: 'ไม่มีประเภท')]
+                                          : typeMenus
+                                                .map(
+                                                  (type) => Tab(
+                                                    text: type.typemenuName,
+                                                  ),
+                                                )
+                                                .toList(),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(height: 1, color: Colors.grey.shade200),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
               ];
             },
 
@@ -2201,9 +2358,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final bool enabled = _groupEnabled[groupId] ?? true;
     final bool expanded = _groupExpanded[groupId] ?? false;
     final bool isMultipleChoice = agg.group.is_multiple_choice ?? false;
-    final List<MenuAddonDetailModel> items = agg.items.values
-        .toList()
-        .cast<MenuAddonDetailModel>();
+    final List<MenuAddonDetailModel> items = agg.items.values.toList();
 
     return GestureDetector(
       onTap: () {
@@ -2262,6 +2417,14 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           ],
                         ),
                       ),
+
+                      // 🎯 แทรกปุ่มเปิด-ปิดตรงนี้ครับ!
+                      _buildInlineStatusButton(
+                        isAvailable: enabled,
+                        onTap: () => _toggleGroupStatusUI(groupId, enabled),
+                      ),
+                      const SizedBox(width: 12),
+
                       _buildCircleExpandButton(
                         expanded: expanded,
                         onTap: () {
@@ -2275,7 +2438,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                     ],
                   ),
                   const SizedBox(height: 12),
-
                   Row(
                     children: [
                       _buildAddonMetaBadge(
@@ -2427,7 +2589,34 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
 class _AddonGroupAggregate {
   final MenuAddonGroupModel group;
-  final Map items = {}; // 🎯 แก้ Map ให้ถูกต้อง
+  final Map<int, MenuAddonDetailModel> items = {};
 
   _AddonGroupAggregate(this.group);
+}
+
+class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
+  final Widget child;
+  final double height;
+
+  _StickyTabBarDelegate({required this.child, required this.height});
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return SizedBox(height: height, child: child);
+  }
+
+  @override
+  double get maxExtent => height;
+
+  @override
+  double get minExtent => height;
+
+  @override
+  bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
+    return true;
+  }
 }

@@ -48,7 +48,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         : baseUrl + '/' + rawPath;
   }
 
-  Future<void> _loadMenuAddons() async {
+  Future _loadMenuAddons() async {
     if (widget.menuModel.menuId == null) {
       setState(() => _isLoading = false);
       return;
@@ -62,19 +62,29 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     if (!mounted) return;
 
     setState(() {
-      _allAddons = addons;
-
-      final Map<int, List<MenuAddonDetailModel>> groupedByGroupId = {};
+      _allAddons = []; // 🎯 เตรียมตัวแปรใหม่เก็บเฉพาะอันที่ผ่านเกณฑ์
+      final Map<int, List<MenuAddonDetailModel>> groupedByGroupId =
+          {}; // 🎯 แก้ไข Syntax ของ Map ให้ถูกต้อง
 
       for (var addon in addons) {
         if (addon.addonDetailId != null) {
-          _addonModelsIndex[addon.addonDetailId!] = addon;
+          // 🎯 1. เช็กสถานะของกลุ่มตัวเลือกเสริมตัวแม่ (Menuaddongroup)
+          bool isGroupActive = addon.menuAddonGroup?.status ?? true;
 
-          int groupId = addon.menuAddonGroup?.addonGroupId ?? 0;
-          if (!groupedByGroupId.containsKey(groupId)) {
-            groupedByGroupId[groupId] = [];
+          // 🎯 2. เช็กสถานะของตัวเลือกย่อย (Menuaddondetail)
+          bool isDetailActive = addon.status ?? true;
+
+          // 🎯 ถ้ายกเลิก/ปิด (false) อย่างใดอย่างหนึ่ง จะข้ามไปเลย ไม่เอามาโชว์!
+          if (isGroupActive && isDetailActive) {
+            _allAddons.add(addon); // แอดเฉพาะตัวที่ใช้งานได้
+            _addonModelsIndex[addon.addonDetailId!] = addon;
+
+            int groupId = addon.menuAddonGroup?.addonGroupId ?? 0;
+            if (!groupedByGroupId.containsKey(groupId)) {
+              groupedByGroupId[groupId] = [];
+            }
+            groupedByGroupId[groupId]!.add(addon);
           }
-          groupedByGroupId[groupId]!.add(addon);
         }
       }
 
@@ -239,7 +249,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                 final entry = mapEntry.value;
 
                                 String groupName = entry.key;
-                                List<MenuAddonDetailModel> items = entry.value;
+                                List items = entry.value;
 
                                 bool isMultipleChoice =
                                     items
@@ -477,7 +487,55 @@ class _AddOrderMemberState extends State<AddOrderMember> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
+                  // 🎯 1. ดักการตรวจสอบ: บังคับเลือกตัวเลือกเสริมที่เป็นแบบ Radio (Single Choice)
                   final List<MenuAddonDetailModel> finalSelectedAddonsList = [];
+                  final groupedAddonsForCheck = _groupAddons();
+                  bool isValid = true;
+                  String missingGroupName = "";
+
+                  // เช็กทีละกลุ่ม
+                  for (var entry in groupedAddonsForCheck.entries) {
+                    final groupName = entry.key;
+                    final items = entry.value;
+                    final isMultipleChoice =
+                        items.first.menuAddonGroup?.is_multiple_choice ?? false;
+
+                    // ถ้ากลุ่มนี้เป็น Radio (ไม่ใช่แบบเลือกหลายอย่าง)
+                    if (!isMultipleChoice) {
+                      // ลองเช็กว่าในกลุ่มนี้ มีตัวไหนที่ผู้ใช้กดเลือกไว้ใน _addonQuantities หรือไม่
+                      bool hasSelectedInGroup = items.any(
+                        (addon) =>
+                            _addonQuantities.containsKey(addon.addonDetailId) &&
+                            (_addonQuantities[addon.addonDetailId] ?? 0) > 0,
+                      );
+
+                      // ถ้าไม่มีตัวเลือกใดถูกเลือกเลยในกลุ่ม Radio ให้แจ้งเตือนและหยุดการทำงาน
+                      if (!hasSelectedInGroup) {
+                        isValid = false;
+                        missingGroupName = groupName;
+                        break;
+                      }
+                    }
+                  }
+
+                  // 🎯 ถ้ายืนยันว่าไม่ผ่านการตรวจสอบ แจ้งเตือนแล้วหยุดทำงานทันที
+                  if (!isValid) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          "กรุณาเลือกในหมวดหมู่ '$missingGroupName' ",
+                        ),
+                        backgroundColor: Colors.redAccent,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    );
+                    return; // หยุดการทำงาน ไม่ให้ใส่ลงตะกร้า
+                  }
+
+                  // ถ้าผ่านแล้ว ค่อยจัดการยัดลงตะกร้าตามปกติ
                   _addonQuantities.forEach((id, qty) {
                     final model = _addonModelsIndex[id];
                     if (model != null && qty > 0) {
@@ -487,7 +545,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     }
                   });
 
-                  // 🎯 บันทึกเฉพาะข้อความจากผู้ใช้ ไม่มีการเอาชื่อเมนู/กับข้าวมาต่อท้ายซ้ำ
                   final cartItem = CartItem(
                     menu: widget.menuModel,
                     selectedAddons: finalSelectedAddonsList,
@@ -501,6 +558,16 @@ class _AddOrderMemberState extends State<AddOrderMember> {
 
                   CartManager().addToCart(cartItem);
 
+                  final String currentStoreUsername =
+                      widget.menuModel.restaurant?.username ?? '';
+                  final List<CartItem> currentStoreItems = CartManager().items
+                      .whereType<CartItem>()
+                      .where(
+                        (item) =>
+                            item.menu.restaurant?.username ==
+                            currentStoreUsername,
+                      )
+                      .toList();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text("เพิ่มลงในตะกร้าเรียบร้อยแล้ว"),
@@ -514,12 +581,12 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     context,
                     MaterialPageRoute(
                       builder: (context) => ViewOrderMember(
-                        storeUsername:
-                            widget.menuModel.restaurant?.username ?? '',
+                        storeUsername: currentStoreUsername,
                         storeName:
                             widget.menuModel.restaurant?.restaurantName ??
                             'ออเดอร์ของคุณ',
-                        storeItems: CartManager().items,
+                        storeItems:
+                            currentStoreItems, // 🎯 ส่งไปแค่ของร้านนี้ร้านเดียว!
                         isFromAddOrder: true,
                       ),
                     ),

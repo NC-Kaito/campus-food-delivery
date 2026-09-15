@@ -722,18 +722,27 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
             const SizedBox(height: 8),
             TextFormField(
               controller: _addressNoteController,
+              enabled: false,
+              style: const TextStyle(
+                color: Colors.black87,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
               decoration: InputDecoration(
                 hintText: "เช่น ใต้ตึก60ปี",
-                hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
-                fillColor: Colors.grey[100],
+                hintStyle: const TextStyle(color: Colors.black54, fontSize: 14),
+                fillColor: const Color.fromARGB(255, 192, 192, 192),
                 filled: true,
+                disabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: Colors.grey.shade300,
+                    width: 1.0,
+                  ),
+                ),
                 contentPadding: const EdgeInsets.symmetric(
                   horizontal: 16,
                   vertical: 12,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
                 ),
               ),
             ),
@@ -979,7 +988,11 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       ),
                     );
 
-                    CartManager().clearCart();
+                    CartManager().items.removeWhere(
+                      (item) =>
+                          item.menu.restaurant?.username ==
+                          widget.storeUsername,
+                    );
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   } catch (error) {
                     if (!mounted) return;

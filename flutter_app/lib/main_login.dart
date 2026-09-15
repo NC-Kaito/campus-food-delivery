@@ -296,7 +296,7 @@ class _MainLoginState extends State<MainLogin> {
         : 'สมัครเป็นไรเดอร์';
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color.fromARGB(255, 254, 254, 254),
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(

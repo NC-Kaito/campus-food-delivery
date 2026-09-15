@@ -4,6 +4,7 @@ import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/account_management.dart';
+import 'package:flutter_app/features/restaurant/home_restaurant.dart';
 import 'package:flutter_app/global_data.dart';
 
 class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
@@ -21,7 +22,7 @@ class RestaurantNavbar extends StatefulWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 8);
 
   @override
-  State<RestaurantNavbar> createState() => _RestaurantNavbarState();
+  State createState() => _RestaurantNavbarState();
 }
 
 class _RestaurantNavbarState extends State<RestaurantNavbar> {
@@ -54,6 +55,7 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
     }
   }
 
+  // 🎯 แก้ไข Syntax การต่อ String ให้ถูกต้องตามหลักภาษา Dart
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -102,7 +104,13 @@ class _RestaurantNavbarState extends State<RestaurantNavbar> {
                         );
                       }
                     } else {
-                      Navigator.popUntil(context, (route) => route.isFirst);
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HomeRestaurant(),
+                        ),
+                        (route) => false,
+                      );
                     }
                   },
                 ),
