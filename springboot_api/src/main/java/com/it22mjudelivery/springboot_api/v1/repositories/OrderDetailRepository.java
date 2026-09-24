@@ -1,6 +1,7 @@
 package com.it22mjudelivery.springboot_api.v1.repositories;
 
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
+import com.it22mjudelivery.springboot_api.v1.entities.Order;
 import com.it22mjudelivery.springboot_api.v1.entities.OrderDetail;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
@@ -9,5 +10,10 @@ import java.util.List;
 
 @Repository
 public interface OrderDetailRepository extends JpaRepository<OrderDetail, Integer> {
-    List< OrderDetail > findByMenu(Menu menu);
+
+    List findByMenu(Menu menu);
+
+    List findByOrder(Order order);
+
+    List findByOrder_Orderid(Integer orderId);
 }

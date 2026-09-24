@@ -13,7 +13,7 @@
     import java.util.Set;
 
     @Entity
-    @Table(name = "Menuoptiongroup")
+    @Table(name = "Optiongroup")
     @Getter
     @Setter
     @AllArgsConstructor
@@ -39,5 +39,5 @@
 
         @ManyToOne(fetch = FetchType.LAZY)
         @JoinColumn(name = "menuid", nullable = false)
-        private  Menu memuid;
+        private  Menu menu;
     }

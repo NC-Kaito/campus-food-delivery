@@ -11,5 +11,5 @@ import java.io.Serializable;
 @NoArgsConstructor
 public class OrderdetailoptionId implements Serializable {
     private int orderDetail;
-    private int menuaddondetail;
+    private int menuoptiondetail;
 }

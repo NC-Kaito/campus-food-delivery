@@ -15,7 +15,7 @@ import java.util.Objects;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@ToString(exclude = {"orderDetail", "menuaddondetail"})
+@ToString(exclude = {"orderDetail", "menuoptiondetail"})
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Orderdetailoption {
 
@@ -27,7 +27,7 @@ public class Orderdetailoption {
 
     @Id
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "optiondetailid", nullable = false)
+    @JoinColumn(name = "optionid", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Option menuoptiondetail;
 

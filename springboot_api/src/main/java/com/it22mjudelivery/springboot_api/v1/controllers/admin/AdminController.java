@@ -1,4 +1,4 @@
-package com.it22mjudelivery.springboot_api.v1.controllers.member;
+package com.it22mjudelivery.springboot_api.v1.controllers.admin;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.AdminDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Admin;

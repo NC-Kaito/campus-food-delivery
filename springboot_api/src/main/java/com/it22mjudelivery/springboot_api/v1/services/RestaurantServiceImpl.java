@@ -3,7 +3,7 @@ package com.it22mjudelivery.springboot_api.v1.services;
 import com.it22mjudelivery.springboot_api.v1.dtos.OpeningHourDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
-import com.it22mjudelivery.springboot_api.v1.entities.Restaurantopendate;
+
 import com.it22mjudelivery.springboot_api.v1.entities.TypeRestaurant;
 import com.it22mjudelivery.springboot_api.v1.repositories.RestaurantRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.TypeRestaurantRepository;
@@ -55,8 +55,6 @@ public class RestaurantServiceImpl implements RestaurantService {
                 .verificationstatus("wait")
                 .build();
 
-        List<Restaurantopendate> openingHours = toOpeningHourEntities(restaurantDto.getOpeningHours(), toSaveRestaurant);
-        toSaveRestaurant.setOpeningHours(openingHours);
 
         restaurantRepository.save(toSaveRestaurant); // cascade = ALL จะเซฟ opening hours ให้อัตโนมัติ
         return true;
@@ -101,9 +99,6 @@ public class RestaurantServiceImpl implements RestaurantService {
         restaurant.setNotapprovedetail(null);
         restaurant.setRegisterdate(LocalDateTime.now());
 
-        restaurant.getOpeningHours().clear();
-        restaurant.getOpeningHours().addAll(toOpeningHourEntities(openingHourDtos, restaurant));
-
         restaurantRepository.save(restaurant);
         return true;
     }
@@ -135,10 +130,6 @@ public class RestaurantServiceImpl implements RestaurantService {
         restaurant.setNotapprovedetail(null);
         restaurant.setRegisterdate(LocalDateTime.now());
 
-        // แก้ไข opening hours: เคลียร์ของเดิมแล้วใส่ใหม่ทั้งชุด
-        restaurant.getOpeningHours().clear();
-        restaurant.getOpeningHours().addAll(toOpeningHourEntities(openingHourDtos, restaurant));
-
         restaurantRepository.save(restaurant);
         return true;
     }
@@ -150,22 +141,6 @@ public class RestaurantServiceImpl implements RestaurantService {
         restaurant.setNotapprovedetail(null);
         restaurantRepository.save(restaurant);
     }
+    
 
-    // ---- helper: แปลง OpeningHourDto -> Restaurantopendate entity ----
-    private List<Restaurantopendate> toOpeningHourEntities(List<OpeningHourDto> dtos, Restaurant restaurant) {
-        List<Restaurantopendate> result = new ArrayList<>();
-        if (dtos == null) {
-            return result;
-        }
-        for (OpeningHourDto dto : dtos) {
-            result.add(Restaurantopendate.builder()
-                    .dayOfWeek(dto.getDayOfWeek())
-                    .opentime(dto.getOpentime())
-                    .closetime(dto.getClosetime())
-                    .open(!dto.isOpen())
-                    .restaurant(restaurant)
-                    .build());
-        }
-        return result;
-    }
 }

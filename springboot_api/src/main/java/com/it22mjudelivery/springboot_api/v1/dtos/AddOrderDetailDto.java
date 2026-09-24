@@ -1,6 +1,5 @@
 package com.it22mjudelivery.springboot_api.v1.dtos;
 
-import jakarta.persistence.Column;
 import lombok.*;
 
 import java.util.List;
@@ -15,6 +14,6 @@ public class AddOrderDetailDto {
     private int qty;
     private double subTotal;
     private String note;
-    private List<AddOrderDetailAddOnDto> addons;
+    private List<AddOrderDetailOptionDto> addons;
     private List<AddOrderDetailCurryDto> orderDetailCurries;
 }

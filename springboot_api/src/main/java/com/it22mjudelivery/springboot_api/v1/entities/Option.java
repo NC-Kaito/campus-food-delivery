@@ -8,13 +8,13 @@
     import java.util.Set;
 
     @Entity
-    @Table(name="Menuaddnodetail")
+    @Table(name="Option")
     @Getter
     @Setter
     @AllArgsConstructor
     @NoArgsConstructor
     @Builder
-    @ToString(exclude = {"orderdetailaddons", "menuaddongroup", "addonmenu"})
+    @ToString(exclude = {"orderdetailoption", "Optiongroup"})
     public class Option {
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,9 +33,6 @@
         @JoinColumn(name = "optiongroupid", nullable = true)
         private Optiongroup optiongroup;
 
-//        @ManyToOne(fetch = FetchType.LAZY)
-//        @JoinColumn(name = "addonid", nullable = false)
-//        private Addonmenu addonmenu;
 
         @Override
         public boolean equals(Object o) {

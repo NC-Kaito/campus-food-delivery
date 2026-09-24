@@ -28,10 +28,6 @@ public class Receipt {
     @Column
     private double receiptImg;
 
-//    @OneToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "paymentServiceId", nullable = false)
-//    private PaymentService paymentservice;
-
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "orderId", nullable = false)
     private Order order;
