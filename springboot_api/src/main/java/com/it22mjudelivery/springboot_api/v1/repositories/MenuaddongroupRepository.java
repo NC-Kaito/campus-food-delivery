@@ -1,7 +1,7 @@
 package com.it22mjudelivery.springboot_api.v1.repositories;
 
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
-import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
+import com.it22mjudelivery.springboot_api.v1.entities.Optiongroup;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,24 +12,24 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 
 @Repository
-public interface MenuaddongroupRepository extends JpaRepository<Menuaddongroup, Integer> {
+public interface MenuaddongroupRepository extends JpaRepository<Optiongroup, Integer> {
 
     // 🎯 จุดที่ 1: ตรวจสอบและเปลี่ยนจาก mg.menu -> mg.menus และ m.id -> m.menuid
     @Query("SELECT DISTINCT mg FROM Menuaddongroup mg " +
             "JOIN mg.menus m " +
             "WHERE m.menuid = :menuId")
-    List<Menuaddongroup> findByMenuId(@Param("menuId") Integer menuId);
+    List<Optiongroup> findByMenuId(@Param("menuId") Integer menuId);
 
     // 🎯 จุดที่ 2: ดักทาง Spring ไม่ให้เจนคำสั่งอัตโนมัติ (เปลี่ยนชื่อเมธอดหนีคำว่า findByMenu_Menuid)
     @Query("SELECT DISTINCT mg FROM Menuaddongroup mg " +
             "JOIN mg.menus m " +
             "WHERE m.menuid = :menuid")
-    List<Menuaddongroup> findGroupsByMenuId(@Param("menuid") Integer menuid);
+    List<Optiongroup> findGroupsByMenuId(@Param("menuid") Integer menuid);
 
     // แก้ — ดึงตรงจาก restaurant ที่ผูกใน Menuaddongroup โดยตรง
     @Query("SELECT mg FROM Menuaddongroup mg " +
             "WHERE mg.username.username = :username")
-    List<Menuaddongroup> findAllByRestaurantUsername(
+    List<Optiongroup> findAllByRestaurantUsername(
             @Param("username") String username);
 
     // 🎯 จุดที่ 3: คำสั่งลบความสัมพันธ์ในรูปแบบ @ManyToMany
@@ -49,5 +49,5 @@ public interface MenuaddongroupRepository extends JpaRepository<Menuaddongroup, 
     @Query(value = "DELETE FROM menu_addongroups WHERE addongroup_id = :groupId", nativeQuery = true)
     void removeAllMenuLinks(@Param("groupId") Integer groupId);
 
-    List<Menuaddongroup> findByUsername_Username(String username);
+    List<Optiongroup> findByUsername_Username(String username);
 }

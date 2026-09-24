@@ -15,44 +15,38 @@
     @NoArgsConstructor
     @Builder
     @ToString(exclude = {"orderdetailaddons", "menuaddongroup", "addonmenu"})
-    public class Menuaddondetail {
+    public class Option {
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
-        private int addondetailid;
+        private int optionid;
 
         @Column(nullable = false)
-        private double addonprice;
-
-        @Column
-        private boolean status;
-
-        @Column
-        private boolean allowqtystatus;
+        private double optionprice;
 
         @JsonIgnore
-        @OneToMany(mappedBy = "menuaddondetail", fetch = FetchType.LAZY)
+        @OneToMany(mappedBy = "menuoptiondetail", fetch = FetchType.LAZY)
         @Builder.Default
-        private Set<Orderdetailaddon> orderdetailaddons = new HashSet<>();
+        private Set<Orderdetailoption> orderdetailoptions = new HashSet<>();
 
         @JsonIgnore
         @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "addongroupid", nullable = true)
-        private Menuaddongroup menuaddongroup;
+        @JoinColumn(name = "optiongroupid", nullable = true)
+        private Optiongroup optiongroup;
 
-        @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "addonid", nullable = false)
-        private Addonmenu addonmenu;
+//        @ManyToOne(fetch = FetchType.LAZY)
+//        @JoinColumn(name = "addonid", nullable = false)
+//        private Addonmenu addonmenu;
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (!(o instanceof Menuaddondetail)) return false;
-            Menuaddondetail that = (Menuaddondetail) o;
-            return addondetailid == that.addondetailid;
+            if (!(o instanceof Option)) return false;
+            Option that = (Option) o;
+            return optionid == that.optionid;
         }
 
         @Override
         public int hashCode() {
-            return Integer.hashCode(addondetailid);
+            return Integer.hashCode(optionid);
         }
     }

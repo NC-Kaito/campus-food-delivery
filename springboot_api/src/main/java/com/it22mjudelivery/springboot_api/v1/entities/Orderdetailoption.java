@@ -8,8 +8,8 @@ import lombok.*;
 import java.util.Objects;
 
 @Entity
-@Table(name="orderdetailaddon")
-@IdClass(OrderdetailaddonId.class)
+@Table(name="orderdetailoption")
+@IdClass(OrderdetailoptionId.class)
 @Getter
 @Setter
 @AllArgsConstructor
@@ -17,7 +17,7 @@ import java.util.Objects;
 @Builder
 @ToString(exclude = {"orderDetail", "menuaddondetail"})
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class Orderdetailaddon {
+public class Orderdetailoption {
 
     @Id
     @ManyToOne(fetch = FetchType.LAZY)
@@ -27,9 +27,9 @@ public class Orderdetailaddon {
 
     @Id
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "addondetailid", nullable = false)
+    @JoinColumn(name = "optiondetailid", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private Menuaddondetail menuaddondetail;
+    private Option menuoptiondetail;
 
     @Column(nullable = false)
     private String addonNameAtOrder;
@@ -43,14 +43,14 @@ public class Orderdetailaddon {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (!(o instanceof Orderdetailaddon)) return false;
-        Orderdetailaddon that = (Orderdetailaddon) o;
+        if (!(o instanceof Orderdetailoption)) return false;
+        Orderdetailoption that = (Orderdetailoption) o;
         return Objects.equals(orderDetail, that.orderDetail) &&
-                Objects.equals(menuaddondetail, that.menuaddondetail);
+                Objects.equals(menuoptiondetail, that.menuoptiondetail);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(orderDetail, menuaddondetail);
+        return Objects.hash(orderDetail, menuoptiondetail);
     }
 }

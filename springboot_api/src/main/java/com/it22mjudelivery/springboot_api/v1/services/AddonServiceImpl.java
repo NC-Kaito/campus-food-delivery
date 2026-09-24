@@ -33,14 +33,14 @@ public class AddonServiceImpl implements AddonService {
             Restaurant restaurant = restaurantRepository.findById(request.getRestaurantUsername())
                     .orElseThrow(() -> new RuntimeException("ไม่พบข้อมูลร้านค้าในระบบ"));
 
-            Menuaddongroup group = Menuaddongroup.builder()
+            Optiongroup group = Optiongroup.builder()
                     .addongroupname(request.getAddongroupname())
                     .is_multiple_choice(request.is_multiple_choice())
                     .status(request.isStatus())
                     .username(restaurant)
                     .build();
 
-            Menuaddongroup savedGroup = menuaddongroupRepository.save(group);
+            Optiongroup savedGroup = menuaddongroupRepository.save(group);
 
             if (request.getDetails() != null && !request.getDetails().isEmpty()) {
                 for (AddonGroupRequestDTO.AddonDetailDTO detailDTO : request.getDetails()) {
@@ -57,7 +57,7 @@ public class AddonServiceImpl implements AddonService {
                         addonmenu = addonmenuRepository.save(addonmenu);
                     }
 
-                    Menuaddondetail detail = Menuaddondetail.builder()
+                    Option detail = Option.builder()
                             .addonprice(detailDTO.getAddonprice())
                             .status(detailDTO.isStatus())
                             .allowqtystatus(detailDTO.isAllowqtystatus())
@@ -91,7 +91,7 @@ public class AddonServiceImpl implements AddonService {
                 throw new RuntimeException("ไม่สามารถแก้ไขตัวเลือกเสริมได้ เนื่องจากร้านมีออเดอร์ที่กำลังดำเนินการอยู่");
             }
 
-            Menuaddongroup existingGroup = menuaddongroupRepository.findById(request.getAddongroupid())
+            Optiongroup existingGroup = menuaddongroupRepository.findById(request.getAddongroupid())
                     .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริมที่ต้องการแก้ไข"));
 
             if (!existingGroup.getUsername().getUsername().equals(request.getRestaurantUsername())) {
@@ -102,13 +102,13 @@ public class AddonServiceImpl implements AddonService {
             existingGroup.set_multiple_choice(request.is_multiple_choice());
             existingGroup.setStatus(request.isStatus());
 
-            Menuaddongroup savedGroup = menuaddongroupRepository.save(existingGroup);
+            Optiongroup savedGroup = menuaddongroupRepository.save(existingGroup);
 
-            List< Menuaddondetail > currentDetails =
+            List<Option> currentDetails =
                     menuaddondetailRepository.findByMenuaddongroup(savedGroup);
 
-            Map< Integer, Menuaddondetail > currentDetailMap = new HashMap<>();
-            for (Menuaddondetail d : currentDetails) {
+            Map< Integer, Option> currentDetailMap = new HashMap<>();
+            for (Option d : currentDetails) {
                 currentDetailMap.put(d.getAddondetailid(), d);
             }
 
@@ -127,7 +127,7 @@ public class AddonServiceImpl implements AddonService {
 
                     if (detailDTO.getAddondetailId() != null
                             && currentDetailMap.containsKey(detailDTO.getAddondetailId())) {
-                        Menuaddondetail existingDetail = currentDetailMap.get(detailDTO.getAddondetailId());
+                        Option existingDetail = currentDetailMap.get(detailDTO.getAddondetailId());
                         existingDetail.setAddonprice(detailDTO.getAddonprice());
                         existingDetail.setStatus(detailDTO.isStatus());
                         existingDetail.setAddonmenu(addonmenu);
@@ -137,21 +137,21 @@ public class AddonServiceImpl implements AddonService {
 
                         keepIds.add(detailDTO.getAddondetailId());
                     } else {
-                        Menuaddondetail newDetail = Menuaddondetail.builder()
+                        Option newDetail = Option.builder()
                                 .addonprice(detailDTO.getAddonprice())
                                 .status(detailDTO.isStatus())
                                 .allowqtystatus(detailDTO.isAllowqtystatus())
                                 .menuaddongroup(savedGroup)
                                 .addonmenu(addonmenu)
                                 .build();
-                        Menuaddondetail saved = menuaddondetailRepository.save(newDetail);
+                        Option saved = menuaddondetailRepository.save(newDetail);
 
                         keepIds.add(saved.getAddondetailid());
                     }
                 }
             }
 
-            for (Menuaddondetail d : currentDetails) {
+            for (Option d : currentDetails) {
                 if (!keepIds.contains(d.getAddondetailid())) {
                     d.setMenuaddongroup(null); // ตัดหางปล่อยวัดเช่นเดียวกัน
                     menuaddondetailRepository.save(d); // บันทึกแทนการสั่งลบทิ้ง
@@ -177,7 +177,7 @@ public class AddonServiceImpl implements AddonService {
     @Transactional
     public boolean deleteAddonGroup(Integer groupId) {
         try {
-            Menuaddongroup group = menuaddongroupRepository.findById(groupId)
+            Optiongroup group = menuaddongroupRepository.findById(groupId)
                     .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริมที่ต้องการลบ"));
 
             // 1. เช็กสถานะออเดอร์ก่อนทำการลบ Add-on
@@ -193,9 +193,9 @@ public class AddonServiceImpl implements AddonService {
             menuaddongroupRepository.removeAllMenuLinks(groupId);
 
             // 🎯 3. ตัดหางปล่อยวัด Addon ลูก (เปลี่ยนจากการใช้ deleteAll)
-            List< Menuaddondetail > details = menuaddondetailRepository.findByMenuaddongroup(group);
+            List<Option> details = menuaddondetailRepository.findByMenuaddongroup(group);
             if (details != null && !details.isEmpty()) {
-                for (Menuaddondetail detail : details) {
+                for (Option detail : details) {
                     detail.setMenuaddongroup(null); // ทำให้ตัวลูกไม่มีกลุ่ม (เพื่อรักษาประวัติใบเสร็จไว้)
                 }
                 menuaddondetailRepository.saveAll(details); // บันทึกการเปลี่ยนแปลง

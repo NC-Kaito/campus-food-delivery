@@ -2,11 +2,9 @@ package com.it22mjudelivery.springboot_api.v1.services;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
-import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public interface MenuService {
     List<Menu> getMenusByRestaurant(String username);

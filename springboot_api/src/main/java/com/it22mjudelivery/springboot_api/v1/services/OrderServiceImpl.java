@@ -13,7 +13,6 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.lang.reflect.Array;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -117,7 +116,7 @@ public class OrderServiceImpl implements OrderService {
                     if (detailDto.getAddons() != null) {
                         for (AddOrderDetailAddOnDto addOnDto : detailDto.getAddons()) {
 
-                            Menuaddondetail menuaddondetail = menuaddondetailRepo.findById(addOnDto.getAddondetailid())
+                            Option menuaddondetail = menuaddondetailRepo.findById(addOnDto.getAddondetailid())
                                     .orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัสAddOn"));
 
                             // 🎯 จัดการชื่อ Add-on และราคา Snapshot
@@ -129,7 +128,7 @@ public class OrderServiceImpl implements OrderService {
                                     ? addOnDto.getPriceAtOrder()
                                     : menuaddondetail.getAddonprice();
 
-                            Orderdetailaddon orderdetailaddon = Orderdetailaddon.builder()
+                            Orderdetailoption orderdetailaddon = Orderdetailoption.builder()
                                     .orderDetail(savdOrderDetail)
                                     .menuaddondetail(menuaddondetail)
                                     .addonNameAtOrder(resolvedAddonName) // 🎯 บันทึก Snapshot ชื่อ Add-on

@@ -3,7 +3,7 @@ package com.it22mjudelivery.springboot_api.v1.controllers.member;
 import com.it22mjudelivery.springboot_api.v1.dtos.MemberDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.ReviewDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Member;
-import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
+import com.it22mjudelivery.springboot_api.v1.entities.Optiongroup;
 import com.it22mjudelivery.springboot_api.v1.entities.Review;
 import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddongroupRepository;
 import com.it22mjudelivery.springboot_api.v1.services.MemberService;
@@ -115,7 +115,7 @@ public class MemberController {
     @GetMapping("/v1/menu-addons/{menuId}")
     public ResponseEntity<?> getMenuAddons(@PathVariable Integer menuId) {
 
-        List<Menuaddongroup> addonGroups = menuaddongroupRepo.findByMenuId(menuId);
+        List<Optiongroup> addonGroups = menuaddongroupRepo.findByMenuId(menuId);
 
         if (addonGroups.isEmpty()) {
             return ResponseEntity.ok(Collections.emptyList()); // ถ้าไม่มีส่งกล่องเปล่าไปให้ Flutter เช็ค

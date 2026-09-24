@@ -49,12 +49,5 @@ public class Menu {
     @JoinColumn(name = "typeMenuId", nullable = false)
     private TypeMenu typemenu;
 
-    @ManyToMany(fetch = FetchType.LAZY)
-    @JoinTable(
-            name = "menu_addongroups", // ชื่อตารางกลาง
-            joinColumns = @JoinColumn(name = "menu_id"),
-            inverseJoinColumns = @JoinColumn(name = "addongroup_id")
-    )
-    @JsonIgnore
-    private Set<Menuaddongroup> menuAddonGroups;
+
 }

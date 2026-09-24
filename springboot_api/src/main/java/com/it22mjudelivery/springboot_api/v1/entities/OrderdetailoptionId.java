@@ -9,7 +9,7 @@ import java.io.Serializable;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class OrderdetailaddonId implements Serializable {
+public class OrderdetailoptionId implements Serializable {
     private int orderDetail;
     private int menuaddondetail;
 }

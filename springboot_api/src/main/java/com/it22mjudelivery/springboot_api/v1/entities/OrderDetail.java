@@ -51,11 +51,11 @@ public class OrderDetail {
     @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JsonIgnoreProperties({"orderDetail", "hibernateLazyInitializer", "handler"})
     @Builder.Default
-    private Set<Orderdetailaddon> orderDetailAddons = new HashSet<>();
+    private Set<Orderdetailoption> orderDetailOptions = new HashSet<>();
 
-    // 🎯 เปลี่ยนเป็น FetchType.EAGER
-    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-    @JsonIgnoreProperties({"orderDetail", "hibernateLazyInitializer", "handler"})
-    @Builder.Default
-    private Set<Orderdetailcurry> orderDetailCurries = new HashSet<>();
+//    // 🎯 เปลี่ยนเป็น FetchType.EAGER
+//    @OneToMany(mappedBy = "orderDetail", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+//    @JsonIgnoreProperties({"orderDetail", "hibernateLazyInitializer", "handler"})
+//    @Builder.Default
+//    private Set<Orderdetailcurry> orderDetailCurries = new HashSet<>();
 }

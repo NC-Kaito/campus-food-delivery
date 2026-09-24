@@ -94,15 +94,15 @@ public class MenuServiceImpl implements MenuService {
             if (requestData.containsKey("addonGroups")) {
                 // 🎯 ระบุชนิดตัวแปร List และ Map ให้ครบถ้วน
                 List< Map< String, Object > > groupsData = (List< Map< String, Object > >) requestData.get("addonGroups");
-                Set< Menuaddongroup > addonGroupsSet = new HashSet<>();
+                Set<Optiongroup> addonGroupsSet = new HashSet<>();
 
                 for (Map< String, Object > groupMap : groupsData) {
-                    Menuaddongroup group = Menuaddongroup.builder()
+                    Optiongroup group = Optiongroup.builder()
                             .addongroupname((String) groupMap.get("addongroupname"))
                             .is_multiple_choice((boolean) groupMap.get("is_multiple_choice"))
                             .build();
 
-                    Menuaddongroup savedGroup = menuaddongroupRepository.save(group);
+                    Optiongroup savedGroup = menuaddongroupRepository.save(group);
                     addonGroupsSet.add(savedGroup);
 
                     // 🎯 ระบุชนิดตัวแปร List และ Map สำหรับ detailsData
@@ -121,7 +121,7 @@ public class MenuServiceImpl implements MenuService {
                                     .orElseThrow(() -> new RuntimeException("ไม่พบตัวเลือกเสริมช้อยส์นี้ในฐานข้อมูล"));
                         }
 
-                        Menuaddondetail detail = Menuaddondetail.builder()
+                        Option detail = Option.builder()
                                 .addonprice(Double.parseDouble(detailMap.get("addonprice").toString()))
                                 .menuaddongroup(savedGroup)
                                 .addonmenu(addonmenu)
@@ -188,18 +188,18 @@ public class MenuServiceImpl implements MenuService {
 
             menu = menuRepository.save(menu);
 
-            Set<Menuaddongroup> groupsForThisMenu = new HashSet<>();
+            Set<Optiongroup> groupsForThisMenu = new HashSet<>();
 
             if (requestData.getAddonGroupIds() != null && !requestData.getAddonGroupIds().isEmpty()) {
                 for (Integer groupId : requestData.getAddonGroupIds()) {
-                    Menuaddongroup existingGroup = menuaddongroupRepository.findById(groupId)
+                    Optiongroup existingGroup = menuaddongroupRepository.findById(groupId)
                             .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริม ID: " + groupId));
                     groupsForThisMenu.add(existingGroup);
                 }
             } else if (requestData.getAddonGroups() != null && !requestData.getAddonGroups().isEmpty()) {
                 for (var groupDto : requestData.getAddonGroups()) {
                     if (groupDto.getAddongroupid() != null) {
-                        Menuaddongroup existingGroup = menuaddongroupRepository.findById(groupDto.getAddongroupid())
+                        Optiongroup existingGroup = menuaddongroupRepository.findById(groupDto.getAddongroupid())
                                 .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริม ID: " + groupDto.getAddongroupid()));
                         groupsForThisMenu.add(existingGroup);
                     }
@@ -268,7 +268,7 @@ public class MenuServiceImpl implements MenuService {
                 if (rawIds != null && !rawIds.isEmpty()) {
                     for (Object rawId : rawIds) {
                         Integer groupId = Integer.parseInt(rawId.toString());
-                        Menuaddongroup group = menuaddongroupRepository.findById(groupId)
+                        Optiongroup group = menuaddongroupRepository.findById(groupId)
                                 .orElseThrow(() -> new RuntimeException("ไม่พบกลุ่มตัวเลือกเสริม ID: " + groupId));
                         newAddonGroups.add(group);
                     }

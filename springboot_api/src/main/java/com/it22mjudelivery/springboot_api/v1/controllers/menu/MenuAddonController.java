@@ -1,14 +1,11 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.menu;
 
 import com.it22mjudelivery.springboot_api.v1.dtos.AddonGroupRequestDTO;
-import com.it22mjudelivery.springboot_api.v1.entities.Addonmenu;
-import com.it22mjudelivery.springboot_api.v1.entities.Menuaddondetail;
-import com.it22mjudelivery.springboot_api.v1.entities.Menuaddongroup;
+import com.it22mjudelivery.springboot_api.v1.entities.Optiongroup;
 import com.it22mjudelivery.springboot_api.v1.repositories.AddonmenuRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddondetailRepository;
 import com.it22mjudelivery.springboot_api.v1.repositories.MenuaddongroupRepository;
 import com.it22mjudelivery.springboot_api.v1.services.AddonService;
-import com.it22mjudelivery.springboot_api.v1.services.MemberService;
 import com.it22mjudelivery.springboot_api.v1.services.MenuService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -39,21 +36,11 @@ public class MenuAddonController {
     @GetMapping("/{menuId}/addons")
     public ResponseEntity<?> getMenuAddons(@PathVariable Integer menuId) {
         // ดึงข้อมูลลูกผสมทุกตารางออกมารวดเดียว
-        List<Menuaddongroup> groups = menuaddongroupRepository.findGroupsByMenuId(menuId);
+        List<Optiongroup> groups = menuaddongroupRepository.findGroupsByMenuId(menuId);
 
         // 🎯 3. พ่นก้อนโครงสร้างต้นไม้ส่งคืนไปให้ Flutter แตกยอดแยกหมวดหมู่ UI ได้เลย
         return ResponseEntity.ok(groups);
     }
-
-    @GetMapping("/addons")
-    public ResponseEntity<List<Addonmenu>> getRestaurantAddons(@RequestParam("username") String username) {
-        List<Addonmenu> restaurantAddons = addonmenuRepository.findAllByRestaurantUsername(username);
-        return ResponseEntity.ok(restaurantAddons);
-    }
-
-
-
-
 
     @PostMapping("/createGroup")
     public ResponseEntity<?> createAddonGroup(@RequestBody AddonGroupRequestDTO request) {
@@ -100,32 +87,32 @@ public class MenuAddonController {
     @Autowired
     private MenuaddondetailRepository menuaddondetailRepository;
 
-    // toggle status ของรายการช้อยส์ย่อย (Menuaddondetail)
-    @PatchMapping("/details/{addonDetailId}/status")
-    public ResponseEntity<?> toggleDetailStatus(
-            @PathVariable Integer addonDetailId,
-            @RequestBody Map<String, Boolean> body) {
-        return menuaddondetailRepository.findById(addonDetailId)
-                .map(detail -> {
-                    detail.setStatus(body.get("status"));
-                    menuaddondetailRepository.save(detail);
-                    return ResponseEntity.ok("อัปเดตสถานะรายการย่อยสำเร็จ");
-                }).orElse(ResponseEntity.notFound().build());
-    }
-
-
-    @GetMapping("/searchAddonName")
-    public ResponseEntity<?> searchAddonName(@RequestParam String keyword) {
-        try {
-            List<Addonmenu> results = addonService.searchAddonByName(keyword);
-            return ResponseEntity.ok(results);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("status", "error");
-            response.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
+//    // toggle status ของรายการช้อยส์ย่อย (Menuaddondetail)
+//    @PatchMapping("/details/{addonDetailId}/status")
+//    public ResponseEntity<?> toggleDetailStatus(
+//            @PathVariable Integer addonDetailId,
+//            @RequestBody Map<String, Boolean> body) {
+//        return menuaddondetailRepository.findById(addonDetailId)
+//                .map(detail -> {
+//                    detail.setStatus(body.get("status"));
+//                    menuaddondetailRepository.save(detail);
+//                    return ResponseEntity.ok("อัปเดตสถานะรายการย่อยสำเร็จ");
+//                }).orElse(ResponseEntity.notFound().build());
+//    }
+//
+//
+//    @GetMapping("/searchAddonName")
+//    public ResponseEntity<?> searchAddonName(@RequestParam String keyword) {
+//        try {
+//            List<Addonmenu> results = addonService.searchAddonByName(keyword);
+//            return ResponseEntity.ok(results);
+//        } catch (Exception e) {
+//            Map<String, Object> response = new HashMap<>();
+//            response.put("status", "error");
+//            response.put("message", e.getMessage());
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+//        }
+//    }
 
 
     //=====================================================================
@@ -185,7 +172,7 @@ public class MenuAddonController {
     @GetMapping("/groups")
     public ResponseEntity<?> getGroupsByUsername(@RequestParam("username") String username) {
         try {
-            List<Menuaddongroup> groups = menuaddongroupRepository.findByUsername_Username(username);
+            List<Optiongroup> groups = menuaddongroupRepository.findByUsername_Username(username);
             return ResponseEntity.ok(groups);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาด: " + e.getMessage());
@@ -233,7 +220,7 @@ public class MenuAddonController {
                                 .body(Map.of("message", "ค่า status ไม่ถูกต้อง"));
                     }
 
-                    group.setStatus(status);
+//                    group.setStatus(status);
                     menuaddongroupRepository.save(group);
 
                     return ResponseEntity.ok(

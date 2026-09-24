@@ -40,6 +40,9 @@ public class Restaurant {
     @Column(nullable = false)
     private double longitude;
 
+    @Column(nullable = true)
+    private String defaultlocation;
+
     @Column(length = 50, nullable = false)
     private String ownerfirstname;
 
@@ -71,9 +74,7 @@ public class Restaurant {
     @JoinColumn(name = "typerestaurantId", nullable = false)
     private TypeRestaurant typerestaurant;
 
-    @OneToMany(mappedBy = "restaurant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
-    @Builder.Default
-    private List<Restaurantopendate> openingHours = new ArrayList<>();
+
 
 
 }
