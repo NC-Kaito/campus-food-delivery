@@ -122,6 +122,30 @@ class OrderService {
     }
   }
 
+  // 🎯 ฟังก์ชันใหม่สำหรับดึงข้อมูลเพื่อแจ้งเตือนไรเดอร์โดยเฉพาะ
+  Future<List<dynamic>> getOrdersNotifyByRider(String username) async {
+    try {
+      // 🎯 ชี้ Path ไปที่ Endpoint ใหม่ที่คุณเพิ่งสร้างใน Spring Boot
+      final response = await DioClient.dio.get(
+        "/v1/order/rider/$username/getOrdersNotifyByRider",
+      );
+
+      if (response.statusCode == 200) {
+        // ส่งกลับเป็น List<dynamic> เพื่อให้หน้า Monitor นำไป .map() เป็น OrderModel ต่อ
+        return response.data as List<dynamic>;
+      } else {
+        throw "เกิดข้อผิดพลาดในการดึงข้อมูลออเดอร์แจ้งเตือน: ${response.statusCode}";
+      }
+    } on DioException catch (e) {
+      final errorMessage =
+          e.response?.data?["message"] ??
+          "ไม่สามารถดึงข้อมูลคำสั่งซื้อเพื่อแจ้งเตือนได้ หรือเซิร์ฟเวอร์ไม่ตอบสนอง";
+      throw errorMessage;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
   Future<void> confirmOrderByRider(String studentId, int orderId) async {
     try {
       await DioClient.dio.post(

@@ -204,14 +204,25 @@ class _RegisterRestaurantState extends State<RegisterRestaurant> {
       return "ใช้ได้เฉพาะ a-z, A-Z, 0-9 และ ! # _ .";
     }
     if (value.length < 8 || value.length > 16) return "ความยาว 8-16 ตัวอักษร";
+
+    if (!RegExp(r'[a-zA-Z]').hasMatch(value)) {
+      return "รหัสผ่านต้องมีตัวอักษรอย่างน้อย 1 ตัว";
+    }
+
+    // ต้องมีตัวเลข
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return "รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว";
+    }
+
+    // ต้องมีอักขระพิเศษ
+    if (!RegExp(r'[!#_.]').hasMatch(value)) {
+      return "รหัสผ่านต้องมีอักขระพิเศษอย่างน้อย 1 ตัว (! # _ .)";
+    }
     return null;
   }
 
   String? _validateRestaurantName(String? value) {
     if (value == null || value.isEmpty) return "กรุณากรอกชื่อร้านค้า";
-    if (!RegExp(r'^[a-zA-Z\u0E00-\u0E7F0-9 ]+$').hasMatch(value)) {
-      return "ต้องเป็นภาษาไทย อังกฤษ หรือตัวเลขเท่านั้น";
-    }
     if (value.length < 8 || value.length > 50) return "ความยาว 8-50 ตัวอักษร";
     return null;
   }

@@ -22,6 +22,8 @@ public interface OrderService {
 
     List<Order> getWaitingOrders();
 
+    List<Order> getOrdersNotifyByRider(String username);
+
     List<Order> getActiveOrdersByRider(String username);
 
     boolean doConfirmOrderByRider(String studentId, int orderId);

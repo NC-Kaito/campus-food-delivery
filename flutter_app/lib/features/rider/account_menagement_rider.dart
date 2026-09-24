@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/rider_model.dart';
+import 'package:flutter_app/data/services/order_status_monitor.dart';
 import 'package:flutter_app/data/services/rider/rider_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/rider/navbar_rider.dart';
@@ -203,6 +204,7 @@ class _AccountManagementRiderState extends State<AccountManagementRider> {
 
     if (confirm == true) {
       GlobalData.usernameRider = "";
+      OrderStatusMonitor().stopMonitoring();
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(

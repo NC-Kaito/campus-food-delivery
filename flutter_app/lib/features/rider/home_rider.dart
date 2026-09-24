@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
+import 'package:flutter_app/data/services/order_status_monitor.dart';
 import 'package:flutter_app/features/rider/account_menagement_rider.dart';
 import 'package:flutter_app/features/rider/list_review_rider.dart';
 import 'package:flutter_app/features/rider/list_waiting_pickup_order.dart';
@@ -58,6 +59,7 @@ class _HomeRiderState extends State<HomeRider>
     _loadIncomeData();
     _fetchActiveOrderCount();
     _fetchRiderRating();
+    OrderStatusMonitor().startMonitoring();
   }
 
   Future _loadRiderProfile() async {

@@ -89,7 +89,29 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       } else if (_selectedTabIndex == 1) {
         orders = await _orderService.getActiveOrders(studentId);
       } else if (_selectedTabIndex == 2) {
-        orders = await _orderService.getSuccessOrdersByRider(studentId);
+        // 🎯 ดึงออเดอร์สำเร็จทั้งหมดมาก่อน
+        List rawOrders = await _orderService.getSuccessOrdersByRider(studentId);
+        // 🎯 กรองข้อมูลแบบรัดกุม 100% (Whitelist)
+        orders = rawOrders.where((o) {
+          String status = '';
+          try {
+            // แปลงเป็น Model ก่อนเพื่อให้ชัวร์ว่าดึง Field มาถูกเป๊ะๆ
+            final model = OrderModel.fromJson(o);
+            status = (model.orderStatus ?? '').trim().toLowerCase();
+          } catch (e) {
+            // สำรองเผื่อข้อมูลมาเป็น Map ตรงๆ
+            if (o is Map) {
+              status = (o['orderStatus'] ?? o['orderstatus'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+            }
+          }
+          // 🎯 คัดเฉพาะสถานะที่เกี่ยวกับการ "จัดส่งสำเร็จ" แต่ "ยังไม่รีวิว" เท่านั้นครับ
+          return status == 'success' ||
+              status == 'completed' ||
+              status == 'delivered';
+        }).toList();
       } else if (_selectedTabIndex == 3) {
         orders = await _orderService.getReviewSuccessOrders(studentId);
       } else if (_selectedTabIndex == 4) {
@@ -165,7 +187,27 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
       } else if (_selectedTabIndex == 1) {
         orders = await _orderService.getActiveOrders(studentId);
       } else if (_selectedTabIndex == 2) {
-        orders = await _orderService.getSuccessOrdersByRider(studentId);
+        // 🎯 ดึงออเดอร์สำเร็จทั้งหมดมาก่อน
+        List rawOrders = await _orderService.getSuccessOrdersByRider(studentId);
+        // 🎯 กรองข้อมูลแบบรัดกุม 100% (Whitelist) เหมือนกันกับด้านบนครับ
+        orders = rawOrders.where((o) {
+          String status = '';
+          try {
+            final model = OrderModel.fromJson(o);
+            status = (model.orderStatus ?? '').trim().toLowerCase();
+          } catch (e) {
+            if (o is Map) {
+              status = (o['orderStatus'] ?? o['orderstatus'] ?? '')
+                  .toString()
+                  .trim()
+                  .toLowerCase();
+            }
+          }
+          // 🎯 แสดงเฉพาะรายการที่รอรีวิว หรือเพิ่งส่งสำเร็จหมาดๆ
+          return status == 'success' ||
+              status == 'completed' ||
+              status == 'delivered';
+        }).toList();
       } else if (_selectedTabIndex == 3) {
         orders = await _orderService.getReviewSuccessOrders(studentId);
       } else if (_selectedTabIndex == 4) {
@@ -282,9 +324,7 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                "🚨 มีไรเดอร์ท่านอื่นกำลังพิจารณาออเดอร์นี้อยู่ครับ",
-              ),
+              content: Text("มีผู้จัดส่งท่านอื่นกำลังพิจารณาออเดอร์นี้อยู่"),
               backgroundColor: Colors.red,
             ),
           );
@@ -328,7 +368,6 @@ class _ListWaitingPickupOrderState extends State<ListWaitingPickupOrder>
     }
   }
 
-  // 🎯 หลีกเลี่ยง String Interpolation ด้วยการใช้ + เชื่อมข้อความ
   String _getFinalProfileImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;

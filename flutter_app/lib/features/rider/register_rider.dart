@@ -336,6 +336,20 @@ class _RegisterRiderState extends State<RegisterRider> {
                                 return "ใช้ได้เฉพาะ a-z, A-Z, 0-9 และ ! # _ .";
                               if (value.length < 8 || value.length > 20)
                                 return "ความยาว 8-20 ตัวอักษร";
+
+                              if (!RegExp(r'[a-zA-Z]').hasMatch(value)) {
+                                return "รหัสผ่านต้องมีตัวอักษรอย่างน้อย 1 ตัว";
+                              }
+
+                              // ต้องมีตัวเลข
+                              if (!RegExp(r'[0-9]').hasMatch(value)) {
+                                return "รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว";
+                              }
+
+                              // ต้องมีอักขระพิเศษ
+                              if (!RegExp(r'[!#_.]').hasMatch(value)) {
+                                return "รหัสผ่านต้องมีอักขระพิเศษอย่างน้อย 1 ตัว (! # _ .)";
+                              }
                               return null;
                             },
                             decoration: _inputDecoration(

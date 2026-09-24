@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
+import 'package:flutter_app/data/services/order_status_monitor.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/close_account.dart';
 import 'package:flutter_app/features/restaurant/openday_rest.dart';
@@ -271,6 +272,7 @@ class _AccountManagementState extends State<AccountManagement> {
 
     if (confirm == true) {
       GlobalData.usernameRestaurant = "";
+      OrderStatusMonitor().stopMonitoring();
 
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(

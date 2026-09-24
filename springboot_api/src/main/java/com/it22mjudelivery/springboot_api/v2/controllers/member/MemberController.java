@@ -1,0 +1,170 @@
+package com.it22mjudelivery.springboot_api.v2.controllers.member;
+
+// 🎯 Import CloudinaryService เข้ามา
+
+import com.it22mjudelivery.springboot_api.v2.dtos.MemberDto;
+import com.it22mjudelivery.springboot_api.v2.dtos.ReviewDto;
+import com.it22mjudelivery.springboot_api.v2.entities.Member;
+import com.it22mjudelivery.springboot_api.v2.entities.Menuaddongroup;
+import com.it22mjudelivery.springboot_api.v2.entities.Review;
+import com.it22mjudelivery.springboot_api.v2.repositories.MenuaddongroupRepository;
+import com.it22mjudelivery.springboot_api.v2.services.CloudinaryService;
+import com.it22mjudelivery.springboot_api.v2.services.MemberService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+
+@RestController
+@RequiredArgsConstructor
+@RequestMapping("/v1/member")
+public class MemberController {
+    private final MemberService memberService;
+
+    // 🎯 ฉีด CloudinaryService เข้ามาใช้งาน
+    private final CloudinaryService cloudinaryService;
+
+    private MenuaddongroupRepository menuaddongroupRepo;
+
+    @PostMapping("/loginMember")
+    public ResponseEntity<?> doLoginMember(@RequestBody MemberDto memberDto){
+        try {
+            Member member = memberService.doLoginMember(memberDto.getUsername(), memberDto.getPassword());
+            return ResponseEntity.ok(member);
+        }catch (RuntimeException e){
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
+        }catch (Exception e){
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    @PostMapping("/registerMember")
+    public ResponseEntity<?> doRegisterMember(@RequestBody MemberDto memberDto) {
+        try {
+            boolean isResult = memberService.doRegisterMember(memberDto);
+            if (isResult) {
+                return ResponseEntity.ok("สมัครสมาชิกสำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("สมัครสมาชิกไม่สำเร็จ");
+        } catch (RuntimeException e) {
+            // จับข้อความที่เรา throw เช่น "ชื่อผู้ใช้งานนี้ถูกใช้ไปแล้ว"
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            // กรณีเกิด Error อื่นๆ ที่ไม่ได้คาดคิด
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    @GetMapping("/getMember")
+    public ResponseEntity<?> getMemberByUsername(@RequestParam("username") String username) {
+        Member member = memberService.getMemberByUsername(username);
+        if(member != null){
+            return ResponseEntity.ok(member);
+        }else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("ไม่พบผู้ใช้งานนี้");
+        }
+    }
+
+    @PostMapping("/updateProfileMember")
+    public ResponseEntity<?> updateProfileMember(@RequestBody MemberDto memberDto){
+        try{
+            boolean isResult = memberService.doUpdateProfileMember(memberDto.getUsername(), memberDto.getFirstname(), memberDto.getLastname(), memberDto.getPhone(), memberDto.getProfileimg());
+
+            if (isResult){
+                return ResponseEntity.ok("แก้ไขโปรไฟล์สำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("แก้ไขไม่สำเร็จ ข้อมูลไม่ถูกต้อง");
+        }catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    // 🎯 เปลี่ยนมาใช้ Cloudinary อัปโหลดรูปลูกค้า
+    @PostMapping("/uploadProfileImage")
+    public ResponseEntity<?> uploadProfileImage(@RequestParam("image") MultipartFile file) {
+        try {
+            // 1. ระบุชื่อโฟลเดอร์สำหรับเก็บรูปโปรไฟล์ลูกค้า
+            String folderName = "maejo_delivery/members/profile";
+
+            // 2. เรียกใช้ CloudinaryService เพื่ออัปโหลดและรับ URL กลับมา
+            String publicUrl = cloudinaryService.uploadImage(file, folderName);
+
+            // 3. พิมพ์ Log เช็กความเรียบร้อย
+            System.out.println("=========================================");
+            System.out.println("✅ Upload Member Profile Image Success!");
+            System.out.println("📌 URL: " + publicUrl);
+            System.out.println("=========================================");
+
+            // 4. ส่ง URL กลับไปให้ Flutter
+            return ResponseEntity.ok(Map.of("url", publicUrl));
+
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("อัปโหลดไม่สำเร็จ: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/v1/menu-addons/{menuId}")
+    public ResponseEntity<?> getMenuAddons(@PathVariable Integer menuId) {
+
+        List<Menuaddongroup> addonGroups = menuaddongroupRepo.findByMenuId(menuId);
+
+        if (addonGroups.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList()); // ถ้าไม่มีส่งกล่องเปล่าไปให้ Flutter เช็ค
+        }
+
+        return ResponseEntity.ok(addonGroups);
+    }
+
+    @PostMapping("/addReview")
+    public ResponseEntity<?> addReview(@RequestBody ReviewDto reviewDto) {
+        try {
+            Review review = memberService.addReview(reviewDto);
+            return ResponseEntity.ok(review);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    @GetMapping("/getReview/{orderId}")
+    public ResponseEntity<?> getReviewByOrderId(@PathVariable int orderId) {
+        try {
+            Review review = memberService.getReviewByOrderId(orderId);
+            return ResponseEntity.ok(review);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+    @PostMapping("/updateLocationMember")
+    public ResponseEntity<?> updateLocationMember(@RequestBody MemberDto memberDto){
+        try{
+            boolean isResult = memberService.updateLocationMember(memberDto.getUsername(), memberDto.getLatitude(), memberDto.getLongitude(), memberDto.getDefaultLocation());
+
+            if (isResult){
+                return ResponseEntity.ok("แก้ไขจุดส่งสำเร็จ");
+            }
+            return ResponseEntity.badRequest().body("แก้ไขไม่สำเร็จ ข้อมูลไม่ถูกต้อง");
+        }catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            System.out.println(e);
+            return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+
+}

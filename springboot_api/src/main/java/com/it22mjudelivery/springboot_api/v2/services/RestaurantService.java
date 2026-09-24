@@ -1,0 +1,31 @@
+package com.it22mjudelivery.springboot_api.v2.services;
+
+import com.it22mjudelivery.springboot_api.v2.dtos.OpeningHourDto;
+import com.it22mjudelivery.springboot_api.v2.dtos.RestaurantDto;
+import com.it22mjudelivery.springboot_api.v2.entities.Restaurant;
+
+import java.util.List;
+
+public interface RestaurantService {
+    Restaurant doLoginRestaurant(String username, String password);
+    boolean doRegisterRestaurant(RestaurantDto restaurantDto);
+    Restaurant getRestaurantByUsername(String username);
+    boolean updateStatusOpen(String username, boolean statusopen);
+
+    boolean updateProfileRestaurant(
+            String username, String restaurantname, String restaurantimage, int typeid,
+            double latitude, double longitude,
+            List<OpeningHourDto> openingHourDtos, String ownerfirstname,
+            String ownerlastname, String email, String phone, String ownerimage
+    );
+
+    boolean updateRegisterRestaurant(
+            String username, String restaurantname, String restaurantimage, int typeid,
+            double latitude, double longitude,
+            List<OpeningHourDto> openingHourDtos, String ownerfirstname,
+            String ownerlastname, String email, String phone, String ownerimage
+    );
+
+    void doCloseAccount(String username);
+
+}

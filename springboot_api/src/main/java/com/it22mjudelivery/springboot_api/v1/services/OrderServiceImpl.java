@@ -316,6 +316,16 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    public List<Order> getOrdersNotifyByRider(String username) {
+        try {
+            List<String> order = Arrays.asList("WaitingRider", "delivery");
+            return orderRepo.findByRestaurant_UsernameAndOrderstatusInOrderByOrderidDesc(username, order);
+        } catch (Exception e) {
+            throw new RuntimeException("ไม่สามารถดึงข้อมูลออเดอร์ที่รอไรเดอร์ได้: " + e.getMessage());
+        }
+    }
+
+    @Override
     public boolean doConfirmOrderByRestaurant(int orderId) {
         try{
             Order order = orderRepo.findById(orderId).orElseThrow(() -> new RuntimeException("เกิดข้อผิดพลาด ไม่พบรายการคำสั่งซื้อในระบบ"));

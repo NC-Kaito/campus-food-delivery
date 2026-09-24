@@ -173,7 +173,7 @@ class AdminNavbar extends StatelessWidget implements PreferredSizeWidget {
               ),
               const SizedBox(width: 14),
               const Text(
-                'MJU CFD',
+                'Maejo Campus Food Delivery',
                 style: TextStyle(
                   fontSize: 26,
                   fontWeight: FontWeight.w900,

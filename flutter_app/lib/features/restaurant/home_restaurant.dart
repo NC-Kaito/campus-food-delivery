@@ -10,6 +10,7 @@ import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
+import 'package:flutter_app/data/services/order_status_monitor.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/restaurant/add_addon.dart';
@@ -88,6 +89,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     _fetchNewOrderCount();
     _startAutoRefresh();
     _startOpeningStatusRefresh();
+
+    OrderStatusMonitor().startMonitoring();
   }
 
   @override

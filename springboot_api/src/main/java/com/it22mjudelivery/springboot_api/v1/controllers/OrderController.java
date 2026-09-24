@@ -100,6 +100,19 @@ public class OrderController {
         }
     }
 
+    @GetMapping("/rider/{username}/getOrdersNotifyByRider")
+    public ResponseEntity<?> getOrdersNotifyByRider(@PathVariable String username) {
+        try {
+            List<Order> orders = orderService.getOrdersNotifyByRider(username);
+            return ResponseEntity.ok(orders);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                    "status", "error",
+                    "message", "เกิดข้อผิดพลาด: " + e.getMessage()
+            ));
+        }
+    }
+
 
     @PostMapping("/confirmOrderByRider")
     public ResponseEntity<?> confirmOrderByRider(@RequestBody Map<String, Object> data){

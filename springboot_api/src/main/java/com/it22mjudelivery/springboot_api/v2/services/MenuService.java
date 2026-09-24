@@ -1,0 +1,24 @@
+package com.it22mjudelivery.springboot_api.v2.services;
+
+import com.it22mjudelivery.springboot_api.v2.dtos.MenuDto;
+import com.it22mjudelivery.springboot_api.v2.entities.Menu;
+
+import java.util.List;
+import java.util.Map;
+
+public interface MenuService {
+    List<Menu> getMenusByRestaurant(String username);
+    List<Menu> getMenusByRestaurantAndTypeMenu(String username, Integer typeMenuId);
+    boolean updateMenuStatus(int menuId, boolean status);
+    boolean saveMenuWithAddons(Map<String, Object> requestData);
+    boolean saveMenu(MenuDto requestData);
+    //boolean updateMenu(Map<String, Object> requestData);
+    boolean updateMenuByRestaurant(Map<String, Object> requestData);
+    boolean deleteMenu(int menuId);
+
+    boolean updateMenuMapping(Integer menuId, List<Integer> addonGroupIds);
+
+//    Set<Menuaddongroup> getAddonsByTypeMenuId(int id);
+
+
+}

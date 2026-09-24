@@ -72,7 +72,6 @@ class _HomeAdminState extends State<HomeAdmin> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // ── Hero / Header Banner ──
-                          _buildHeroHeader(),
                           const SizedBox(height: 36),
 
                           // ── Active Stats Section ──
@@ -150,25 +149,6 @@ class _HomeAdminState extends State<HomeAdmin> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFF7A00).withOpacity(0.18),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        'ADMIN PORTAL',
-                        style: TextStyle(
-                          color: Color(0xFFFF9800),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ),
                     const SizedBox(width: 10),
                     Container(
                       width: 7,
