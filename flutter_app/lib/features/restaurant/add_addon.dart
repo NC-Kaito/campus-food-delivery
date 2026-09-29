@@ -2,12 +2,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/addon_menu_model.dart';
-import 'package:flutter_app/data/models/addon_group_request_model.dart';
-import 'package:flutter_app/features/restaurant/edit_addon.dart'
+import 'package:flutter_app/data/models/option_model.dart';
+import 'package:flutter_app/data/models/option_group_request_model.dart';
+import 'package:flutter_app/features/restaurant/edit_option.dart'
     show CustomAddonItem;
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/global_data.dart';
 
 // ============================================================
@@ -32,7 +32,7 @@ class AddAddon extends StatefulWidget {
 }
 
 class _AddAddonState extends State<AddAddon> {
-  final MenuAddonService _addonService = MenuAddonService();
+  final MenuOptionService _optionService = MenuOptionService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   final TextEditingController groupNameController = TextEditingController();
@@ -46,7 +46,7 @@ class _AddAddonState extends State<AddAddon> {
   final Map<CustomAddonItem, FocusNode> _nameFocusNodes = {};
   final Map<CustomAddonItem, LayerLink> _layerLinks = {};
   final Map<CustomAddonItem, OverlayEntry> _overlayEntries = {};
-  final Map<CustomAddonItem, List<AddonMenuModel>> _suggestions = {};
+  final Map<CustomAddonItem, List<OptionModel>> _suggestions = {};
   Timer? _debounce;
 
   @override
@@ -116,7 +116,7 @@ class _AddAddonState extends State<AddAddon> {
     }
 
     _debounce = Timer(const Duration(milliseconds: 350), () async {
-      final results = await _addonService.searchAddonName(value);
+      final results = await _optionService.searchAddonName(value);
       if (!mounted) return;
 
       _suggestions[addon] = results;
@@ -161,7 +161,7 @@ class _AddAddonState extends State<AddAddon> {
                         vertical: 12,
                       ),
                       child: Text(
-                        item.addonName ?? "",
+                        item.optionName ?? "",
                         style: const TextStyle(fontSize: 14),
                       ),
                     ),
@@ -183,8 +183,8 @@ class _AddAddonState extends State<AddAddon> {
     _overlayEntries.remove(addon);
   }
 
-  void _selectSuggestion(CustomAddonItem addon, AddonMenuModel item) {
-    addon.nameController.text = item.addonName ?? "";
+  void _selectSuggestion(CustomAddonItem addon, OptionModel item) {
+    addon.nameController.text = item.optionName ?? "";
     _removeOverlay(addon);
     _nameFocusNodes[addon]?.unfocus();
   }
@@ -222,13 +222,13 @@ class _AddAddonState extends State<AddAddon> {
 
     try {
       final restaurantUsername = GlobalData.usernameRestaurant ?? "";
-      final existingGroups = await _addonService.getAddonGroupsByRestaurant(
+      final existingGroups = await _optionService.getAddonGroupsByRestaurant(
         restaurantUsername,
       );
 
       final isDuplicate = existingGroups.any(
         (group) =>
-            (group.addonGroupName ?? "").trim().toLowerCase() ==
+            (group.optionGroupName ?? "").trim().toLowerCase() ==
             groupName.toLowerCase(),
       );
 
@@ -242,23 +242,20 @@ class _AddAddonState extends State<AddAddon> {
         return;
       }
 
-      final request = AddonGroupRequestModel(
-        restaurantUsername: restaurantUsername,
-        addongroupname: groupName,
-        is_multiple_choice: isMultipleChoice,
-        status: true,
-        details: selectedAddons.map((addon) {
-          return AddonDetailRequestModel(
-            addonname: addon.nameController.text.trim(),
-            addonprice:
+      final request = OptionGroupRequestModel(
+        optionGroupName: groupName,
+        isRequired: false,
+        isMultipleChoice: isMultipleChoice,
+        options: selectedAddons.map((addon) {
+          return OptionDetailRequestModel(
+            optionName: addon.nameController.text.trim(),
+            optionPrice:
                 double.tryParse(addon.priceController.text.trim()) ?? 0.0,
-            status: true,
-            allowqtystatus: addon.allowqtystatus,
           );
         }).toList(),
       );
 
-      await _addonService.createAddonGroupTemplate(request);
+      await _optionService.createAddonGroupTemplate(request);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

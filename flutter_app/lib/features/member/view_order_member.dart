@@ -1,7 +1,8 @@
 // features/member/view_order_member.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/member_model.dart';
-import 'package:flutter_app/data/models/order_detail_addon_model.dart';
+import 'package:flutter_app/data/models/order_detail_option_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/in_app_notification_service.dart';
@@ -139,68 +140,39 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     String? rawMenuImage = item.menu.menuImage;
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
-    int addonsSum = 0;
-    for (var addon in item.selectedAddons) {
-      addonsSum += addon.addonPrice?.toInt() ?? 0;
+    int optionsSum = 0;
+    for (final option in item.selectedAddons) {
+      optionsSum += option.optionPrice?.toInt() ?? 0;
     }
     int curriesSum = 0;
     for (var curry in item.selectedCurries) {
       curriesSum += (curry.price ?? 0).toInt();
     }
-    int singleItemTotal = item.unitPrice + addonsSum + curriesSum;
+    int singleItemTotal = item.unitPrice + optionsSum + curriesSum;
     int itemTotalPrice = singleItemTotal * item.quantity;
 
-    Map<String, Map<String, dynamic>> groupedAddons = {};
-    for (var addon in item.selectedAddons) {
-      String name = addon.addonMenu?.addonName ?? '';
-      int price = addon.addonPrice?.toInt() ?? 0;
-
-      bool canIncreaseQty = false;
-      try {
-        final dynamic a = addon;
-        final dynamic menu =
-            a.addonMenu ?? a.menuAddon ?? a.addonGroup ?? a.menuAddonDetail;
-
-        if (menu != null) {
-          if (menu.canIncreaseQuantity != null) {
-            canIncreaseQty = menu.canIncreaseQuantity == true;
-          } else if (menu.allowQuantity != null) {
-            canIncreaseQty = menu.allowQuantity == true;
-          } else if (menu.isMultiple != null) {
-            canIncreaseQty = menu.isMultiple == true;
-          } else if (menu.isQuantity != null) {
-            canIncreaseQty = menu.isQuantity == true;
-          } else if (menu.maxQuantity != null) {
-            canIncreaseQty = (menu.maxQuantity as num) > 1;
-          } else if (menu.maxQty != null) {
-            canIncreaseQty = (menu.maxQty as num) > 1;
-          }
-        }
-
-        if (a.canIncreaseQuantity != null) {
-          canIncreaseQty = a.canIncreaseQuantity == true;
-        } else if (a.isMultiple != null) {
-          canIncreaseQty = a.isMultiple == true;
-        }
-      } catch (_) {}
+    Map<String, Map<String, dynamic>> groupedOptions = {};
+    for (final option in item.selectedAddons) {
+      final String name = option.optionName?.trim() ?? '';
+      final int price = option.optionPrice?.toInt() ?? 0;
 
       if (name.isNotEmpty) {
-        if (groupedAddons.containsKey(name)) {
-          groupedAddons[name]!['qty'] =
-              (groupedAddons[name]!['qty'] as int) + 1;
-          groupedAddons[name]!['canIncreaseQty'] = true;
+        if (groupedOptions.containsKey(name)) {
+          groupedOptions[name]!['qty'] =
+              (groupedOptions[name]!['qty'] as int) + 1;
+          groupedOptions[name]!['canIncreaseQty'] = true;
         } else {
-          groupedAddons[name] = {
+          groupedOptions[name] = {
             'qty': 1,
             'unitPrice': price,
-            'canIncreaseQty': canIncreaseQty,
+            'canIncreaseQty': false,
           };
         }
       }
     }
 
-    final bool hasAddons =
-        groupedAddons.isNotEmpty || item.selectedCurries.isNotEmpty;
+    final bool hasOptions =
+        groupedOptions.isNotEmpty || item.selectedCurries.isNotEmpty;
 
     // 🎯 กรองข้อความ "ราดแกง: [...]" ออกจากหมายเหตุ ไม่ให้แสดงซ้ำ
     String cleanNote = item.note.trim();
@@ -316,7 +288,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                     const Divider(height: 1, color: Color(0xFFE0E0E0)),
                     const SizedBox(height: 8),
 
-                    if (hasAddons) ...[
+                    if (hasOptions) ...[
                       // 🎯 ถ้าเป็นข้าวราดแกง เปลี่ยนชื่อหัวข้อเป็น "รายการ"
                       Text(
                         isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
@@ -378,7 +350,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                         ],
                                       ),
                                     ),
-                                  for (var entry in groupedAddons.entries)
+                                  for (var entry in groupedOptions.entries)
                                     Padding(
                                       padding: const EdgeInsets.symmetric(
                                         vertical: 2,
@@ -489,15 +461,15 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   Widget build(BuildContext context) {
     int subtotalPrice = 0;
     for (var item in widget.storeItems) {
-      int addonsSum = 0;
-      for (var addon in item.selectedAddons) {
-        addonsSum += addon.addonPrice?.toInt() ?? 0;
+      int optionsSum = 0;
+      for (final option in item.selectedAddons) {
+        optionsSum += option.optionPrice?.toInt() ?? 0;
       }
       int curriesSum = 0;
       for (var curry in item.selectedCurries) {
         curriesSum += (curry.price ?? 0).toInt();
       }
-      int actualMenuPrice = item.unitPrice + addonsSum + curriesSum;
+      int actualMenuPrice = item.unitPrice + optionsSum + curriesSum;
       subtotalPrice += (actualMenuPrice * item.quantity);
     }
 
@@ -884,44 +856,53 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         itemMenuName += " (พิเศษ)";
                       }
 
-                      int currentAddonsSum = 0;
-                      Map<int, Map<String, dynamic>> groupedAddonsForApi = {};
+                      int currentOptionsSum = 0;
+                      Map<int, Map<String, dynamic>> groupedOptionsForApi = {};
 
-                      for (var addon in cartItem.selectedAddons) {
-                        int id = addon.addonDetailId ?? 0;
-                        double price = (addon.addonPrice ?? 0).toDouble();
-                        String addonName = addon.addonMenu?.addonName ?? '';
-                        currentAddonsSum += price.toInt();
+                      for (final option in cartItem.selectedAddons) {
+                        final int id = option.optionId ?? 0;
+                        final double price = (option.optionPrice ?? 0)
+                            .toDouble();
+                        final String optionName = option.optionName ?? '';
+                        currentOptionsSum += price.toInt();
 
-                        if (groupedAddonsForApi.containsKey(id)) {
-                          groupedAddonsForApi[id]!['qty'] += 1;
+                        if (groupedOptionsForApi.containsKey(id)) {
+                          groupedOptionsForApi[id]!['qty'] += 1;
                         } else {
-                          groupedAddonsForApi[id] = {
+                          groupedOptionsForApi[id] = {
                             'priceAtOrder': price,
                             'qty': 1,
-                            'name': addonName,
+                            'name': optionName,
                           };
                         }
                       }
 
                       int curriesSumItem = 0;
-                      for (var curry in cartItem.selectedCurries) {
+                      for (final curry in cartItem.selectedCurries) {
                         curriesSumItem += (curry.price ?? 0).toInt();
                       }
 
                       double actualSubTotal =
                           (cartItem.unitPrice +
-                              currentAddonsSum +
+                              currentOptionsSum +
                               curriesSumItem) *
                           cartItem.quantity.toDouble();
 
-                      List<OrderDetailAddonModel> finalAddons =
-                          groupedAddonsForApi.entries.map((e) {
-                            return OrderDetailAddonModel(
-                              addonDetailId: e.key,
-                              addonNameAtOrder: e.value['name'] ?? '',
-                              priceAtOrder: e.value['priceAtOrder'],
-                              addonQty: e.value['qty'],
+                      final List<OrderDetailOptionModel> finalOptions =
+                          groupedOptionsForApi.entries.map((entry) {
+                            return OrderDetailOptionModel(
+                              optionId: entry.key,
+                              optionNameAtOrder: entry.value['name'] ?? '',
+                              priceAtOrder: (entry.value['priceAtOrder'] as num)
+                                  .toDouble(),
+                              optionQty: entry.value['qty'] as int,
+                              menuOptionDetail: OptionModel(
+                                optionId: entry.key,
+                                optionName: entry.value['name'] ?? '',
+                                optionPrice:
+                                    (entry.value['priceAtOrder'] as num)
+                                        .toDouble(),
+                              ),
                             );
                           }).toList();
 
@@ -938,15 +919,7 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         qty: cartItem.quantity,
                         subTotal: actualSubTotal,
                         note: finalCleanNote,
-                        addons: finalAddons,
-                        orderDetailCurries: cartItem.selectedCurries.map((
-                          curry,
-                        ) {
-                          return {
-                            "menuId": curry.menuId ?? 0,
-                            "priceAtOrder": (curry.price ?? 0.0).toDouble(),
-                          };
-                        }).toList(),
+                        options: finalOptions,
                       );
                     }).toList();
 

@@ -1,8 +1,9 @@
 // features/member/add_order_member.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/features/member/view_order_member.dart';
@@ -20,17 +21,23 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   int _quantity = 1;
   final TextEditingController _noteController = TextEditingController();
 
-  final MenuAddonService _addonService = MenuAddonService();
-  List<MenuAddonDetailModel> _allAddons = [];
+  final MenuOptionService _optionService = MenuOptionService();
+  List<OptionGroupModel> _optionGroups = [];
+  List<OptionModel> _allOptions = [];
   bool _isLoading = true;
 
   // 🎯 สีเขียวหลักของระบบ
   static const Color _primaryGreen = Color(0xFF00B300);
 
-  // 🎯 เก็บจำนวนที่เลือกของแต่ละ Add-on (Key: addonDetailId, Value: จำนวนชิ้น)
-  final Map<int, int> _addonQuantities = {};
-  // 🎯 เก็บข้อมูล Add-on ตัวจริงไว้อ้างอิงราคาและชื่อ
-  final Map<int, MenuAddonDetailModel> _addonModelsIndex = {};
+  // 🎯 เก็บจำนวนที่เลือกของแต่ละ Option (Key: optionId, Value: จำนวนชิ้น)
+  final Map<int, int> _optionQuantities = {};
+
+  // 🎯 เก็บข้อมูล Option จริงไว้อ้างอิงราคาและชื่อ
+  final Map<int, OptionModel> _optionModelsIndex = {};
+
+  // 🎯 ใช้ผูก Option กับกลุ่ม เพื่อควบคุม Single / Multiple Choice
+  final Map<String, OptionGroupModel> _groupModelsIndex = {};
+  final Map<int, String> _optionGroupNameById = {};
 
   @override
   void initState() {
@@ -48,59 +55,74 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         : baseUrl + '/' + rawPath;
   }
 
-  Future _loadMenuAddons() async {
+  Future<void> _loadMenuAddons() async {
     if (widget.menuModel.menuId == null) {
       setState(() => _isLoading = false);
       return;
     }
 
     setState(() => _isLoading = true);
-    final addons = await _addonService.getAddonsByMenuId(
-      widget.menuModel.menuId!,
-    );
 
-    if (!mounted) return;
+    try {
+      final List<OptionGroupModel> groups = await _optionService
+          .getAddonsByMenuId(widget.menuModel.menuId!);
 
-    setState(() {
-      _allAddons = []; // 🎯 เตรียมตัวแปรใหม่เก็บเฉพาะอันที่ผ่านเกณฑ์
-      final Map<int, List<MenuAddonDetailModel>> groupedByGroupId =
-          {}; // 🎯 แก้ไข Syntax ของ Map ให้ถูกต้อง
+      if (!mounted) return;
 
-      for (var addon in addons) {
-        if (addon.addonDetailId != null) {
-          // 🎯 1. เช็กสถานะของกลุ่มตัวเลือกเสริมตัวแม่ (Menuaddongroup)
-          bool isGroupActive = addon.menuAddonGroup?.status ?? true;
+      setState(() {
+        _optionGroups = groups;
+        _allOptions = [];
+        _optionModelsIndex.clear();
+        _groupModelsIndex.clear();
+        _optionGroupNameById.clear();
 
-          // 🎯 2. เช็กสถานะของตัวเลือกย่อย (Menuaddondetail)
-          bool isDetailActive = addon.status ?? true;
+        for (final group in groups) {
+          final String groupName = (group.optionGroupName ?? "ตัวเลือกเสริม")
+              .trim();
 
-          // 🎯 ถ้ายกเลิก/ปิด (false) อย่างใดอย่างหนึ่ง จะข้ามไปเลย ไม่เอามาโชว์!
-          if (isGroupActive && isDetailActive) {
-            _allAddons.add(addon); // แอดเฉพาะตัวที่ใช้งานได้
-            _addonModelsIndex[addon.addonDetailId!] = addon;
+          _groupModelsIndex[groupName] = group;
 
-            int groupId = addon.menuAddonGroup?.addonGroupId ?? 0;
-            if (!groupedByGroupId.containsKey(groupId)) {
-              groupedByGroupId[groupId] = [];
+          final options = group.options ?? [];
+          for (final option in options) {
+            if (option is OptionModel && option.optionId != null) {
+              _allOptions.add(option);
+              _optionModelsIndex[option.optionId!] = option;
+              _optionGroupNameById[option.optionId!] = groupName;
             }
-            groupedByGroupId[groupId]!.add(addon);
           }
-        }
-      }
 
-      // 🎯 เลือก Default เฉพาะตัวเลือกแรกของกลุ่มที่เป็นราคาปกติ (0 บาท)
-      groupedByGroupId.forEach((groupId, items) {
-        if (items.isNotEmpty) {
-          final firstItem = items.first;
-          if ((firstItem.addonPrice ?? 0) == 0 &&
-              firstItem.addonDetailId != null) {
-            _addonQuantities[firstItem.addonDetailId!] = 1;
+          // เลือกตัวเลือกแรกที่ราคา 0 บาทเป็นค่าเริ่มต้น
+          if (options.isNotEmpty && !group.isMultipleChoice) {
+            final firstFreeOption = options.cast<OptionModel?>().firstWhere(
+              (option) =>
+                  option != null &&
+                  option.optionId != null &&
+                  (option.optionPrice ?? 0) == 0,
+              orElse: () => null,
+            );
+
+            if (firstFreeOption?.optionId != null) {
+              _optionQuantities[firstFreeOption!.optionId!] = 1;
+            }
           }
         }
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _optionGroups = [];
+        _allOptions = [];
+        _optionModelsIndex.clear();
+        _groupModelsIndex.clear();
+        _optionGroupNameById.clear();
+        _isLoading = false;
       });
 
-      _isLoading = false;
-    });
+      debugPrint("Error loading options: $e");
+    }
   }
 
   @override
@@ -109,16 +131,23 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     super.dispose();
   }
 
-  Map<String, List<MenuAddonDetailModel>> _groupAddons() {
-    Map<String, List<MenuAddonDetailModel>> grouped = {};
-    for (var addon in _allAddons) {
-      String groupName =
-          addon.menuAddonGroup?.addonGroupName ?? "ตัวเลือกเสริม";
-      if (!grouped.containsKey(groupName)) {
-        grouped[groupName] = [];
+  Map<String, List<OptionModel>> _groupOptions() {
+    final Map<String, List<OptionModel>> grouped = {};
+
+    for (final group in _optionGroups) {
+      final String groupName = (group.optionGroupName ?? "ตัวเลือกเสริม")
+          .trim();
+
+      final List<OptionModel> options = (group.options ?? [])
+          .whereType<OptionModel>()
+          .where((option) => option.optionId != null)
+          .toList();
+
+      if (options.isNotEmpty) {
+        grouped[groupName] = options;
       }
-      grouped[groupName]!.add(addon);
     }
+
     return grouped;
   }
 
@@ -127,16 +156,16 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     final int basePrice = widget.menuModel.price?.toInt() ?? 0;
 
     double addonTotalPrice = 0;
-    _addonQuantities.forEach((id, qty) {
-      final model = _addonModelsIndex[id];
+    _optionQuantities.forEach((id, qty) {
+      final model = _optionModelsIndex[id];
       if (model != null) {
-        addonTotalPrice += (model.addonPrice ?? 0) * qty;
+        addonTotalPrice += (model.optionPrice ?? 0) * qty;
       }
     });
 
     int totalPrice = (basePrice + addonTotalPrice.toInt()) * _quantity;
     String finalMenuUrl = _getFinalImageUrl(widget.menuModel.menuImage);
-    final groupedAddons = _groupAddons();
+    final groupedAddons = _groupOptions();
     final String? description =
         (widget.menuModel.description?.trim().isNotEmpty == true)
         ? widget.menuModel.description
@@ -242,81 +271,82 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                             ],
                             const SizedBox(height: 24),
                             if (groupedAddons.isNotEmpty) ...[
-                              ...groupedAddons.entries.toList().asMap().entries.map((
-                                mapEntry,
-                              ) {
-                                final isFirstGroup = mapEntry.key == 0;
-                                final entry = mapEntry.value;
+                              ...groupedAddons.entries
+                                  .toList()
+                                  .asMap()
+                                  .entries
+                                  .map((mapEntry) {
+                                    final isFirstGroup = mapEntry.key == 0;
+                                    final entry = mapEntry.value;
 
-                                String groupName = entry.key;
-                                List items = entry.value;
+                                    String groupName = entry.key;
+                                    final List<OptionModel> items = entry.value;
+                                    final bool isMultipleChoice =
+                                        _groupModelsIndex[entry.key]
+                                            ?.isMultipleChoice ??
+                                        false;
 
-                                bool isMultipleChoice =
-                                    items
-                                        .first
-                                        .menuAddonGroup
-                                        ?.is_multiple_choice ??
-                                    false;
+                                    // 🎯 สำหรับข้าวราดแกง เปลี่ยนชื่อกลุ่ม "รายการเพิ่มเติม" หรือ "ตัวเลือกเสริม" เป็น "รายการ"
+                                    String displayGroupName = groupName;
+                                    if (isCurryDish &&
+                                        (groupName == "รายการเพิ่มเติม" ||
+                                            groupName == "ตัวเลือกเสริม" ||
+                                            groupName.contains("เพิ่มเติม"))) {
+                                      displayGroupName = "รายการ";
+                                    }
 
-                                // 🎯 สำหรับข้าวราดแกง เปลี่ยนชื่อกลุ่ม "รายการเพิ่มเติม" หรือ "ตัวเลือกเสริม" เป็น "รายการ"
-                                String displayGroupName = groupName;
-                                if (isCurryDish &&
-                                    (groupName == "รายการเพิ่มเติม" ||
-                                        groupName == "ตัวเลือกเสริม" ||
-                                        groupName.contains("เพิ่มเติม"))) {
-                                  displayGroupName = "รายการ";
-                                }
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        if (!isFirstGroup)
+                                          Divider(
+                                            height: 24,
+                                            thickness: 1,
+                                            color: Colors.grey[300],
+                                          )
+                                        else
+                                          const SizedBox(height: 8),
 
-                                return Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    if (!isFirstGroup)
-                                      Divider(
-                                        height: 24,
-                                        thickness: 1,
-                                        color: Colors.grey[300],
-                                      )
-                                    else
-                                      const SizedBox(height: 8),
-
-                                    Text(
-                                      displayGroupName,
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    IntrinsicHeight(
-                                      child: Row(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.stretch,
-                                        children: [
-                                          Container(
-                                            width: 2,
-                                            color: _primaryGreen,
+                                        Text(
+                                          displayGroupName,
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
                                           ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              children: items
-                                                  .map(
-                                                    (addonDetail) =>
-                                                        _buildAddonItemOption(
-                                                          addonDetail,
-                                                          isMultipleChoice,
-                                                        ),
-                                                  )
-                                                  .toList(),
-                                            ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        IntrinsicHeight(
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.stretch,
+                                            children: [
+                                              Container(
+                                                width: 2,
+                                                color: _primaryGreen,
+                                              ),
+                                              const SizedBox(width: 12),
+                                              Expanded(
+                                                child: Column(
+                                                  children: items
+                                                      .map(
+                                                        (addonDetail) =>
+                                                            _buildOptionItem(
+                                                              addonDetail,
+                                                              isMultipleChoice,
+                                                              entry.key,
+                                                            ),
+                                                      )
+                                                      .toList(),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                  ],
-                                );
-                              }),
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+                                    );
+                                  }),
                             ],
                             const SizedBox(height: 10),
                             const Text(
@@ -488,28 +518,28 @@ class _AddOrderMemberState extends State<AddOrderMember> {
               child: ElevatedButton(
                 onPressed: () {
                   // 🎯 1. ดักการตรวจสอบ: บังคับเลือกตัวเลือกเสริมที่เป็นแบบ Radio (Single Choice)
-                  final List<MenuAddonDetailModel> finalSelectedAddonsList = [];
-                  final groupedAddonsForCheck = _groupAddons();
+                  final List<OptionModel> finalSelectedOptionsList = [];
+                  final groupedOptionsForCheck = _groupOptions();
+
                   bool isValid = true;
                   String missingGroupName = "";
 
                   // เช็กทีละกลุ่ม
-                  for (var entry in groupedAddonsForCheck.entries) {
-                    final groupName = entry.key;
-                    final items = entry.value;
-                    final isMultipleChoice =
-                        items.first.menuAddonGroup?.is_multiple_choice ?? false;
+                  for (final entry in groupedOptionsForCheck.entries) {
+                    final String groupName = entry.key;
+                    final List<OptionModel> items = entry.value;
 
-                    // ถ้ากลุ่มนี้เป็น Radio (ไม่ใช่แบบเลือกหลายอย่าง)
+                    final bool isMultipleChoice =
+                        _groupModelsIndex[groupName]?.isMultipleChoice ?? false;
+
+                    // ถ้าเป็น Single Choice ต้องเลือกอย่างน้อย 1 ตัว
                     if (!isMultipleChoice) {
-                      // ลองเช็กว่าในกลุ่มนี้ มีตัวไหนที่ผู้ใช้กดเลือกไว้ใน _addonQuantities หรือไม่
-                      bool hasSelectedInGroup = items.any(
-                        (addon) =>
-                            _addonQuantities.containsKey(addon.addonDetailId) &&
-                            (_addonQuantities[addon.addonDetailId] ?? 0) > 0,
+                      final bool hasSelectedInGroup = items.any(
+                        (option) =>
+                            option.optionId != null &&
+                            (_optionQuantities[option.optionId!] ?? 0) > 0,
                       );
 
-                      // ถ้าไม่มีตัวเลือกใดถูกเลือกเลยในกลุ่ม Radio ให้แจ้งเตือนและหยุดการทำงาน
                       if (!hasSelectedInGroup) {
                         isValid = false;
                         missingGroupName = groupName;
@@ -518,7 +548,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     }
                   }
 
-                  // 🎯 ถ้ายืนยันว่าไม่ผ่านการตรวจสอบ แจ้งเตือนแล้วหยุดทำงานทันที
                   if (!isValid) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -532,22 +561,23 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                         ),
                       ),
                     );
-                    return; // หยุดการทำงาน ไม่ให้ใส่ลงตะกร้า
+                    return;
                   }
 
-                  // ถ้าผ่านแล้ว ค่อยจัดการยัดลงตะกร้าตามปกติ
-                  _addonQuantities.forEach((id, qty) {
-                    final model = _addonModelsIndex[id];
+                  // ถ้าผ่านแล้ว ค่อยนำ Option ที่เลือกลงตะกร้า
+                  _optionQuantities.forEach((id, qty) {
+                    final model = _optionModelsIndex[id];
+
                     if (model != null && qty > 0) {
                       for (int i = 0; i < qty; i++) {
-                        finalSelectedAddonsList.add(model);
+                        finalSelectedOptionsList.add(model);
                       }
                     }
                   });
 
                   final cartItem = CartItem(
                     menu: widget.menuModel,
-                    selectedAddons: finalSelectedAddonsList,
+                    selectedAddons: finalSelectedOptionsList,
                     quantity: _quantity,
                     note: _noteController.text.trim(),
                     addonPrice: addonTotalPrice.toInt(),
@@ -612,39 +642,37 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     );
   }
 
-  Widget _buildAddonItemOption(
-    MenuAddonDetailModel detail,
+  Widget _buildOptionItem(
+    OptionModel option,
     bool isMultipleChoice,
+    String groupName,
   ) {
-    int id = detail.addonDetailId ?? 0;
-    int currentQty = _addonQuantities[id] ?? 0;
-    bool isSelected = currentQty > 0;
+    final int id = option.optionId ?? 0;
+    final int currentQty = _optionQuantities[id] ?? 0;
+    final bool isSelected = currentQty > 0;
 
-    String title = detail.addonMenu?.addonName ?? "ไม่มีชื่อ";
-    int price = detail.addonPrice?.toInt() ?? 0;
-    int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
+    final String title = option.optionName ?? "ไม่มีชื่อ";
+    final int price = (option.optionPrice ?? 0).toInt();
 
     void handleFrontTap() {
       setState(() {
         if (isSelected) {
-          _addonQuantities.remove(id);
+          _optionQuantities.remove(id);
         } else {
           if (!isMultipleChoice) {
-            _addonQuantities.removeWhere((key, value) {
-              final model = _addonModelsIndex[key];
-              return model?.menuAddonGroup?.addonGroupId == currentGroupId;
+            _optionQuantities.removeWhere((key, value) {
+              return _optionGroupNameById[key] == groupName;
             });
-            _addonQuantities[id] = 1;
-          } else {
-            _addonQuantities[id] = 1;
           }
+
+          _optionQuantities[id] = 1;
         }
       });
     }
 
     void handlePlusTap() {
       setState(() {
-        _addonQuantities[id] = currentQty + 1;
+        _optionQuantities[id] = currentQty + 1;
       });
     }
 
@@ -653,65 +681,69 @@ class _AddOrderMemberState extends State<AddOrderMember> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              InkWell(
-                onTap: handleFrontTap,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 20,
-                      height: 20,
-                      decoration: BoxDecoration(
-                        shape: isMultipleChoice
-                            ? BoxShape.rectangle
-                            : BoxShape.circle,
-                        borderRadius: isMultipleChoice
-                            ? BorderRadius.circular(4)
-                            : null,
-                        border: Border.all(color: Colors.black, width: 1.5),
-                      ),
-                      child: isSelected
-                          ? Center(
-                              child: Container(
-                                width: 10,
-                                height: 10,
-                                decoration: BoxDecoration(
-                                  shape: isMultipleChoice
-                                      ? BoxShape.rectangle
-                                      : BoxShape.circle,
-                                  borderRadius: isMultipleChoice
-                                      ? BorderRadius.circular(2)
-                                      : null,
-                                  color: Colors.orange,
+          Flexible(
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: handleFrontTap,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 20,
+                        height: 20,
+                        decoration: BoxDecoration(
+                          shape: isMultipleChoice
+                              ? BoxShape.rectangle
+                              : BoxShape.circle,
+                          borderRadius: isMultipleChoice
+                              ? BorderRadius.circular(4)
+                              : null,
+                          border: Border.all(color: Colors.black, width: 1.5),
+                        ),
+                        child: isSelected
+                            ? Center(
+                                child: Container(
+                                  width: 10,
+                                  height: 10,
+                                  decoration: BoxDecoration(
+                                    shape: isMultipleChoice
+                                        ? BoxShape.rectangle
+                                        : BoxShape.circle,
+                                    borderRadius: isMultipleChoice
+                                        ? BorderRadius.circular(2)
+                                        : null,
+                                    color: Colors.orange,
+                                  ),
                                 ),
-                              ),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.black87,
+                              )
+                            : null,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          title,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.black87,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Text(
-                price == 0 ? "(ราคาปกติ)" : "(+" + price.toString() + ")",
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500,
+                const SizedBox(width: 10),
+                Text(
+                  price == 0 ? "(ราคาปกติ)" : "(+$price)",
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-
           if (isMultipleChoice)
             Container(
               height: 32,
@@ -736,21 +768,21 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                     onPressed: isSelected
                         ? () {
                             setState(() {
-                              if (_addonQuantities[id]! <= 1) {
-                                _addonQuantities.remove(id);
+                              if (_optionQuantities[id]! <= 1) {
+                                _optionQuantities.remove(id);
                               } else {
-                                _addonQuantities[id] =
-                                    _addonQuantities[id]! - 1;
+                                _optionQuantities[id] =
+                                    _optionQuantities[id]! - 1;
                               }
                             });
                           }
                         : null,
                   ),
-                  Container(
-                    alignment: Alignment.center,
+                  SizedBox(
                     width: 20,
                     child: Text(
                       currentQty.toString(),
+                      textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,

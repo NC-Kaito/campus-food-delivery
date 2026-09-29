@@ -40,13 +40,11 @@ public class OptionGroupRequestDTO {
     @AllArgsConstructor
     @Builder
     public static class OptionDetailDTO {
-        @JsonAlias({"optionid", "optionId", "addondetailId"})
+
         private Integer optionid;
 
-        @JsonAlias({"optionname", "addonname"})
         private String optionname;
 
-        @JsonAlias({"optionprice", "addonprice"})
         private double optionprice;
     }
 }

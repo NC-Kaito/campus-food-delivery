@@ -1,11 +1,11 @@
 // data/services/menu/cart_manager.dart
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 
 // โมเดลสำหรับเก็บไอเทมที่อยู่ในตะกร้า
 class CartItem {
   final MenuModel menu;
-  final List<MenuAddonDetailModel>
+  final List<OptionModel>
   selectedAddons; // สำหรับท็อปปิ้งปกติ (เช่น ไข่ดาว, ไข่เจียว)
   final List<MenuModel>
   selectedCurries; // 🌟 เพิ่มฟิลด์นี้สำหรับเก็บกับข้าวราดแกง (ที่ชี้ไปตาราง Menu)

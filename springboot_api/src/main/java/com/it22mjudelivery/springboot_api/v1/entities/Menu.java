@@ -38,6 +38,12 @@ public class Menu {
     @Column(nullable = false)
     private double price;
 
+    @Column(name = "price2", nullable = true)
+    private Double price2;
+
+    @Column(name = "price3", nullable = true)
+    private Double price3;
+
     @Column(nullable = false)
     private boolean status;
 

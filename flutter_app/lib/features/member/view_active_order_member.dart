@@ -347,77 +347,30 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    List rawCurries = item.orderDetailCurries ?? [];
-    final bool isCurryDish = rawCurries.isNotEmpty;
-
+    // ใช้ชื่อเมนู Snapshot ที่บันทึกใน OrderDetail เพื่อระบุข้าวราดแกง
     String displayMenuName = item.menuNameAtOrder.isNotEmpty
         ? item.menuNameAtOrder
         : (item.menu?.menuName ?? "รายการเมนู");
 
-    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
-      displayMenuName =
-          "ข้าวราดแกง (" + rawCurries.length.toString() + " อย่าง)";
-    }
+    final bool isCurryDish = displayMenuName.contains("ข้าวราดแกง");
 
-    List<Map<String, dynamic>> curriesList = [];
-    for (var e in rawCurries) {
-      String name = '';
-      String img = '';
-      double price = 0.0;
+    // รวม Option ที่เหมือนกันเพื่อแสดงจำนวนในรายการอาหาร
+    Map<String, Map<String, dynamic>> groupedOptions = {};
 
-      if (e is Map) {
-        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
-        name =
-            (menuMap['menuname'] ??
-                    menuMap['menuName'] ??
-                    menuMap['name'] ??
-                    '')
-                .toString();
-        img =
-            (menuMap['imageurl'] ??
-                    menuMap['imageUrl'] ??
-                    menuMap['menuimage'] ??
-                    menuMap['menuImage'] ??
-                    '')
-                .toString();
-        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0.0).toDouble();
-      } else {
-        try {
-          name =
-              ((e as dynamic).menu?.menuName ??
-                      (e as dynamic).menu?.menuname ??
-                      '')
-                  .toString();
-          img =
-              ((e as dynamic).menu?.menuImage ??
-                      (e as dynamic).menu?.imageurl ??
-                      '')
-                  .toString();
-          price = ((e as dynamic).priceAtOrder ?? 0.0).toDouble();
-        } catch (_) {}
-      }
+    for (final option in item.options) {
+      String name = option.optionNameAtOrder.isNotEmpty
+          ? option.optionNameAtOrder
+          : (option.menuOptionDetail?.optionName ?? '');
+
+      final double price = option.priceAtOrder;
+      final int qty = option.optionQty ?? 1;
 
       if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img, 'price': price});
-      }
-    }
-
-    Map<String, Map<String, dynamic>> groupedAddons = {};
-    for (var addon in item.addons) {
-      String name = addon.addonNameAtOrder.isNotEmpty
-          ? addon.addonNameAtOrder
-          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
-
-      double price = addon.priceAtOrder;
-      int qty = addon.addonQty ?? 1;
-
-      if (name.isNotEmpty) {
-        if (groupedAddons.containsKey(name)) {
-          groupedAddons[name]!['qty'] =
-              (groupedAddons[name]!['qty'] as int) + qty;
-          groupedAddons[name]!['canIncreaseQty'] = true;
+        if (groupedOptions.containsKey(name)) {
+          groupedOptions[name]!['qty'] =
+              (groupedOptions[name]!['qty'] as int) + qty;
         } else {
-          groupedAddons[name] = {
+          groupedOptions[name] = {
             'qty': qty,
             'unitPrice': price,
             'canIncreaseQty': qty > 1,
@@ -428,26 +381,19 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
 
     double totalItemPrice = item.subTotal;
     if (totalItemPrice <= 0) {
-      double addonsSum = 0.0;
-      for (var addon in groupedAddons.values) {
-        addonsSum += (addon['unitPrice'] as double) * (addon['qty'] as int);
+      double optionsSum = 0.0;
+      for (final optionGroup in groupedOptions.values) {
+        optionsSum +=
+            (optionGroup['unitPrice'] as double) * (optionGroup['qty'] as int);
       }
-      double curriesSum = 0.0;
-      for (var curry in curriesList) {
-        curriesSum += (curry['price'] as double);
-      }
-      double basePrice = item.priceAtOrder > 0
+      final double basePrice = item.priceAtOrder > 0
           ? item.priceAtOrder
           : (item.menu?.price ?? 0.0);
-      totalItemPrice = (basePrice + curriesSum + addonsSum) * item.qty;
+      totalItemPrice = (basePrice + optionsSum) * item.qty;
     }
 
-    String rawMenuUrl = item.menu?.menuImage ?? '';
-    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] as String;
-    }
-    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
-    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
+    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage ?? '');
+    final bool hasOptions = groupedOptions.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -516,7 +462,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
                   const Divider(height: 1, color: Color(0xFFE0E0E0)),
                   const SizedBox(height: 8),
 
-                  if (hasAddons) ...[
+                  if (hasOptions) ...[
                     Text(
                       isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
                       style: const TextStyle(
@@ -542,37 +488,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                for (var curry in curriesList)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 2,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            curry['name'] as String,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          "1 จำนวน",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color.fromARGB(255, 0, 0, 0),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                for (var entry in groupedAddons.entries)
+                                for (var entry in groupedOptions.entries)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 2,

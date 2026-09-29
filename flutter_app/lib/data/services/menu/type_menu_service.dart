@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
-import 'package:flutter_app/data/models/menu_addon_group_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 
 class TypeMenuService {

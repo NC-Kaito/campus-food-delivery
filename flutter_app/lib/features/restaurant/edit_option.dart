@@ -2,11 +2,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
-import 'package:flutter_app/data/models/addon_group_request_model.dart';
-import 'package:flutter_app/data/models/addon_menu_model.dart';
+
+import 'package:flutter_app/data/models/option_group_request_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/global_data.dart';
 
 class CustomAddonItem {
@@ -58,7 +58,7 @@ class EditAddon extends StatefulWidget {
   final String? groupName;
   final bool isMultipleChoice;
   final bool groupStatus;
-  final List<MenuAddonDetailModel> details;
+  final List<OptionModel> details;
 
   const EditAddon({
     super.key,
@@ -74,7 +74,7 @@ class EditAddon extends StatefulWidget {
 }
 
 class _EditAddonState extends State<EditAddon> {
-  final MenuAddonService _addonService = MenuAddonService();
+  final MenuOptionService _addonService = MenuOptionService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   late final TextEditingController groupNameController;
@@ -89,7 +89,7 @@ class _EditAddonState extends State<EditAddon> {
   final Map<CustomAddonItem, FocusNode> _nameFocusNodes = {};
   final Map<CustomAddonItem, LayerLink> _layerLinks = {};
   final Map<CustomAddonItem, OverlayEntry> _overlayEntries = {};
-  final Map<CustomAddonItem, List<AddonMenuModel>> _suggestions = {};
+  final Map<CustomAddonItem, List<OptionModel>> _suggestions = {};
   Timer? _debounce;
 
   String _originalGroupName = "";
@@ -111,15 +111,11 @@ class _EditAddonState extends State<EditAddon> {
       _addNewCustomAddonRow();
     } else {
       selectedAddons = widget.details.map((d) {
-        final priceVal = (d.addonPrice ?? 0).toInt().toString();
+        final priceVal = (d.optionPrice ?? 0).toInt().toString();
         return CustomAddonItem(
-          nameController: TextEditingController(
-            text: d.addonMenu?.addonName ?? "",
-          ),
+          nameController: TextEditingController(text: d.optionName ?? ""),
           priceController: TextEditingController(text: priceVal),
-          addonId: d.addonDetailId,
-          allowqtystatus: d.allowqtystatus,
-          status: d.status ?? true,
+          addonId: d.optionId,
         );
       }).toList();
     }
@@ -242,11 +238,8 @@ class _EditAddonState extends State<EditAddon> {
 
     if (addon.addonId != null) {
       final detailIndex = widget.details.indexWhere(
-        (detail) => detail.addonDetailId == addon.addonId,
+        (detail) => detail.optionId == addon.addonId,
       );
-      if (detailIndex != -1) {
-        widget.details[detailIndex].status = value;
-      }
     }
 
     if (addon.addonId == null) return;
@@ -261,11 +254,8 @@ class _EditAddonState extends State<EditAddon> {
 
         if (addon.addonId != null) {
           final detailIndex = widget.details.indexWhere(
-            (detail) => detail.addonDetailId == addon.addonId,
+            (detail) => detail.optionId == addon.addonId,
           );
-          if (detailIndex != -1) {
-            widget.details[detailIndex].status = previousDetailStatus;
-          }
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -336,7 +326,7 @@ class _EditAddonState extends State<EditAddon> {
                         vertical: 12,
                       ),
                       child: Text(
-                        item.addonName ?? "",
+                        item.optionName ?? "",
                         style: const TextStyle(fontSize: 14),
                       ),
                     ),
@@ -358,8 +348,8 @@ class _EditAddonState extends State<EditAddon> {
     _overlayEntries.remove(addon);
   }
 
-  void _selectSuggestion(CustomAddonItem addon, AddonMenuModel item) {
-    addon.nameController.text = item.addonName ?? "";
+  void _selectSuggestion(CustomAddonItem addon, OptionModel item) {
+    addon.nameController.text = item.optionName ?? "";
     _removeOverlay(addon);
     _nameFocusNodes[addon]?.unfocus();
   }
@@ -389,20 +379,17 @@ class _EditAddonState extends State<EditAddon> {
     setState(() => _isLoading = true);
 
     try {
-      final request = AddonGroupRequestModel(
-        addonGroupId: widget.groupId,
-        restaurantUsername: GlobalData.usernameRestaurant ?? "",
-        addongroupname: groupNameController.text.trim(),
-        is_multiple_choice: isMultipleChoice,
-        status: groupStatus,
-        details: selectedAddons.map((addon) {
-          return AddonDetailRequestModel(
-            addonDetailId: addon.addonId,
-            addonname: addon.nameController.text.trim(),
-            addonprice:
-                (double.tryParse(addon.priceController.text.trim()) ?? 0.0),
-            status: addon.status,
-            allowqtystatus: addon.allowqtystatus,
+      final request = OptionGroupRequestModel(
+        optionGroupId: widget.groupId,
+        // หากหน้า UI นี้มีรหัสเมนู ให้ส่ง menuId: widget.menuId เข้าไปด้วย
+        optionGroupName: groupNameController.text.trim(),
+        isMultipleChoice: isMultipleChoice,
+        options: selectedAddons.map((addon) {
+          return OptionDetailRequestModel(
+            optionId: addon.addonId,
+            optionName: addon.nameController.text.trim(),
+            optionPrice:
+                double.tryParse(addon.priceController.text.trim()) ?? 0.0,
           );
         }).toList(),
       );

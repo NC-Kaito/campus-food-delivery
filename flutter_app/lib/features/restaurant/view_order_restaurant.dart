@@ -237,71 +237,27 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
   // 🎯 ดึงข้อมูลรายการอาหารจาก Snapshot
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    List<dynamic> rawCurries = item.orderDetailCurries ?? [];
-    final bool isCurryDish = rawCurries.isNotEmpty;
+    // 🎯 ในโครงสร้างใหม่ ไม่มี orderDetailCurries แล้ว
+    // ใช้ชื่อ Snapshot ของ OrderDetail เพื่อตรวจว่าเป็นเมนูข้าวราดแกงหรือไม่
+    final String orderDetailName = item.menuNameAtOrder.trim();
+    final bool isCurryDish = orderDetailName.contains("ข้าวราดแกง");
 
     // 🎯 ดึงชื่อเมนูจาก Snapshot
-    String displayMenuName = item.menuNameAtOrder.isNotEmpty
+    final String displayMenuName = item.menuNameAtOrder.isNotEmpty
         ? item.menuNameAtOrder
         : (item.menu?.menuName ?? "รายการเมนู");
 
-    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
-      displayMenuName =
-          "ข้าวราดแกง (" + rawCurries.length.toString() + " อย่าง)";
-    }
-
-    List<Map<String, dynamic>> curriesList = [];
-    for (var e in rawCurries) {
-      String name = '';
-      String img = '';
-      double price = 0.0;
-
-      if (e is Map) {
-        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
-        name =
-            (menuMap['menuname'] ??
-                    menuMap['menuName'] ??
-                    menuMap['name'] ??
-                    '')
-                .toString();
-        img =
-            (menuMap['imageurl'] ??
-                    menuMap['imageUrl'] ??
-                    menuMap['menuimage'] ??
-                    menuMap['menuImage'] ??
-                    '')
-                .toString();
-        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0.0).toDouble();
-      } else {
-        try {
-          name =
-              ((e as dynamic).menu?.menuName ??
-                      (e as dynamic).menu?.menuname ??
-                      '')
-                  .toString();
-          img =
-              ((e as dynamic).menu?.menuImage ??
-                      (e as dynamic).menu?.imageurl ??
-                      '')
-                  .toString();
-          price = ((e as dynamic).priceAtOrder ?? 0.0).toDouble();
-        } catch (_) {}
-      }
-
-      if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img, 'price': price});
-      }
-    }
-
-    // 🎯 ดึงชื่อและราคา Add-on จาก Snapshot
+    // 🎯 ดึงชื่อและราคาตัวเลือกจาก Snapshot ของ OrderDetail
     Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in item.addons) {
-      String name = addon.addonNameAtOrder.isNotEmpty
-          ? addon.addonNameAtOrder
-          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
+      String name = addon.optionNameAtOrder.trim();
 
-      double price = addon.priceAtOrder;
-      int qty = addon.addonQty ?? 1;
+      if (name.isEmpty) {
+        name = addon.menuOptionDetail?.optionName?.trim() ?? '';
+      }
+
+      final double price = addon.priceAtOrder;
+      final int qty = addon.optionQty ?? 1;
 
       if (name.isNotEmpty) {
         if (groupedAddons.containsKey(name)) {
@@ -318,29 +274,23 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
       }
     }
 
-    // 🎯 ราคารวมของรายการนี้ (subtotal)
+    // 🎯 ราคารวมของรายการนี้ ใช้ subtotal จาก OrderDetail เป็นหลัก
     double totalItemPrice = item.subTotal;
     if (totalItemPrice <= 0) {
       double addonsSum = 0.0;
       for (var addon in groupedAddons.values) {
         addonsSum += (addon['unitPrice'] as double) * (addon['qty'] as int);
       }
-      double curriesSum = 0.0;
-      for (var curry in curriesList) {
-        curriesSum += (curry['price'] as double);
-      }
-      double basePrice = item.priceAtOrder > 0
+
+      final double basePrice = item.priceAtOrder > 0
           ? item.priceAtOrder
           : (item.menu?.price ?? 0.0);
-      totalItemPrice = (basePrice + curriesSum + addonsSum) * item.qty;
+
+      totalItemPrice = (basePrice + addonsSum) * item.qty;
     }
 
-    String rawMenuUrl = item.menu?.menuImage ?? '';
-    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] as String;
-    }
-    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
-    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
+    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage ?? '');
+    final bool hasAddons = groupedAddons.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -427,36 +377,6 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                for (var curry in curriesList)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 2,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            curry['name'] as String,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                        const Text(
-                                          "1 จำนวน",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                                 for (var entry in groupedAddons.entries)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(

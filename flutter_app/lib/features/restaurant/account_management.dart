@@ -61,83 +61,6 @@ class _AccountManagementState extends State<AccountManagement> {
   void initState() {
     super.initState();
     _loadRestaurantData();
-
-    // 🎯 ตรวจสอบว่าต้องเล่น Tutorial ต่อหรือไม่
-    if (widget.showTutorial) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) _showTutorial();
-        });
-      });
-    }
-  }
-
-  // 🎯 ฟังก์ชันแสดง Tutorial ชี้ไปที่ปุ่มตั้งค่าเวลา
-  void _showTutorial() {
-    if (tutorialCoachMark != null) return;
-    tutorialCoachMark = TutorialCoachMark(
-      targets: [
-        TargetFocus(
-          identify: "opendayTarget",
-          keyTarget: opendayMenuKey,
-          alignSkip: Alignment.topRight,
-          shape: ShapeLightFocus.RRect,
-          radius: 14,
-          contents: [
-            TargetContent(
-              align: ContentAlign.bottom,
-              builder: (context, controller) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "ขั้นตอนสุดท้าย! 🕒",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        fontSize: 22,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      "แตะที่เมนูนี้เพื่อตั้งเวลาเปิด-ปิดร้าน\nเมื่อตั้งเสร็จ ร้านของคุณจะพร้อมรับออเดอร์ทันที",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                    const SizedBox(height: 20),
-                    ElevatedButton(
-                      onPressed: () {
-                        controller.skip();
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const OpendayRest(),
-                          ),
-                        ).then((_) => _loadRestaurantData());
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _AccountTheme.primary,
-                      ),
-                      child: const Text(
-                        "ไปตั้งเวลาเปิด-ปิดร้าน",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ],
-        ),
-      ],
-      colorShadow: Colors.black,
-      opacityShadow: 0.8,
-      textSkip: "ข้าม",
-      onSkip: () => true,
-    )..show(context: context);
   }
 
   Future _loadRestaurantData() async {
@@ -426,24 +349,6 @@ class _AccountManagementState extends State<AccountManagement> {
               ),
               const _MenuDivider(),
 
-              // 🎯 หุ้ม Key ไว้ที่เมนูเปิด-ปิดร้าน เพื่อให้ Tutorial ชี้มาที่นี่
-              Container(
-                key: opendayMenuKey,
-                child: _AccountMenuItem(
-                  icon: Icons.schedule_rounded,
-                  iconColor: _AccountTheme.primary,
-                  label: "ตั้งค่าวันเวลาเปิด-ปิดร้าน",
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const OpendayRest(),
-                      ),
-                    );
-                    await _loadRestaurantData();
-                  },
-                ),
-              ),
               const _MenuDivider(),
 
               _AccountMenuItem(

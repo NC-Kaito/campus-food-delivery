@@ -1,18 +1,17 @@
 // data/models/order_detail_model.dart
-import 'package:flutter_app/data/models/order_detail_addon_model.dart';
+import 'package:flutter_app/data/models/order_detail_option_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 
 class OrderDetailModel {
   final int? orderDetailId;
   final int menuId;
-  final String menuNameAtOrder; // 🎯 ชื่อเมนู Snapshot
-  final double priceAtOrder; // 🎯 ราคาเมนู Snapshot
+  final String menuNameAtOrder; // Snapshot ชื่อเมนู
+  final double priceAtOrder; // Snapshot ราคาเมนู
   final int qty;
   final double subTotal;
   final String note;
   final MenuModel? menu;
-  final List addons;
-  final List? orderDetailCurries;
+  final List options;
 
   OrderDetailModel({
     this.orderDetailId,
@@ -23,33 +22,31 @@ class OrderDetailModel {
     required this.subTotal,
     required this.note,
     this.menu,
-    required this.addons,
-    this.orderDetailCurries,
+    required this.options,
   });
 
-  factory OrderDetailModel.fromJson(Map json) {
-    var rawAddons =
+  factory OrderDetailModel.fromJson(Map rawJson) {
+    final json = Map.from(rawJson);
+
+    var rawOptions =
+        json['orderDetailOptions'] ??
+        json['orderdetailoptions'] ??
+        json['order_detail_options'] ??
+        json['options'] ??
         json['orderdetailaddons'] ??
         json['orderDetailAddons'] ??
         json['order_detail_addons'] ??
         json['addons'];
 
-    List parsedAddons = [];
-    if (rawAddons != null && rawAddons is List) {
-      parsedAddons = rawAddons
-          .map((addon) => OrderDetailAddonModel.fromJson(addon))
+    List parsedOptions = [];
+    if (rawOptions != null && rawOptions is List) {
+      parsedOptions = rawOptions
+          .map((option) => OrderDetailOptionModel.fromJson(Map.from(option)))
           .toList();
     }
 
-    var rawCurries =
-        json['orderdetailcurries'] ??
-        json['orderDetailCurries'] ??
-        json['order_detail_curries'] ??
-        json['curries'];
-
     final rawMenu = json['menu'];
 
-    // 🎯 ดึงชื่อและราคาจาก Snapshot ก่อน ถ้าไม่มีค่อย fallback หาจาก menu object
     String resolvedMenuName =
         json['menuNameAtOrder'] ??
         json['menu_name_at_order'] ??
@@ -73,26 +70,31 @@ class OrderDetailModel {
       qty: json['qty'] ?? 0,
       subTotal: (json['subtotal'] ?? json['subTotal'] ?? 0).toDouble(),
       note: json['note'] ?? "",
-      menu: rawMenu != null ? MenuModel.fromJson(rawMenu) : null,
-      addons: parsedAddons,
-      orderDetailCurries: rawCurries is List ? rawCurries : null,
+      menu: rawMenu != null ? MenuModel.fromJson(Map.from(rawMenu)) : null,
+      options: parsedOptions,
     );
   }
 
+  // 🎯 ฟังก์ชัน toJson() ที่หายไป
   Map toJson() {
     final Map data = {
       'qty': qty,
       'subTotal': subTotal,
       'note': note,
       'menuId': menuId,
-      'menuNameAtOrder':
-          menuNameAtOrder, // 🎯 ส่งชื่อ Snapshot ไปตอนสร้าง Order
-      'priceAtOrder': priceAtOrder, // 🎯 ส่งราคา Snapshot ไปตอนสร้าง Order
-      'addons': addons.map((addon) => addon.toJson()).toList(),
-      "orderDetailCurries": orderDetailCurries,
+      'menuNameAtOrder': menuNameAtOrder,
+      'priceAtOrder': priceAtOrder,
+      // ส่งทั้ง options และ addons เพื่อรองรับ Controller ทั้งแบบเก่าและใหม่
+      'options': options.map((option) => option.toJson()).toList(),
+      'addons': options.map((option) => option.toJson()).toList(),
     };
 
-    if (orderDetailId != null) data['orderdetailid'] = orderDetailId;
+    if (orderDetailId != null) {
+      data['orderdetailid'] = orderDetailId;
+    }
     return data;
   }
+
+  // Getter สำรองกรณี UI เก่าเรียก .addons
+  List get addons => options;
 }

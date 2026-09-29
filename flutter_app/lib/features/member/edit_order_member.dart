@@ -1,7 +1,8 @@
 // features/member/edit_order_member.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/models/option_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 
@@ -18,25 +19,34 @@ class _EditOrderMemberState extends State<EditOrderMember> {
   int _quantity = 1;
   final TextEditingController _noteController = TextEditingController();
 
-  final MenuAddonService _addonService = MenuAddonService();
-  List<MenuAddonDetailModel> _allAddons = [];
+  final MenuOptionService _optionService = MenuOptionService();
+
+  List<OptionGroupModel> _optionGroups = [];
+  List<OptionModel> _allOptions = [];
   bool _isLoading = true;
 
-  // สำหรับเก็บรายการ Add-on ที่ผู้ใช้เลือกจิ้ม (Key: ID ของตัวเลือกย่อย, Value: วัตถุข้อมูล)
-  final Map<int, MenuAddonDetailModel> _selectedAddons = {};
+  // เก็บ Option ที่ผู้ใช้เลือก โดยใช้ optionId เป็น key
+  final Map<int, OptionModel> _selectedOptions = {};
+
+  // เก็บชื่อกลุ่มของแต่ละ Option เพื่อใช้จัดการ Single Choice
+  final Map<int, String> _optionGroupNameById = {};
 
   @override
   void initState() {
     super.initState();
+
     _quantity = widget.cartItem.quantity;
     _noteController.text = widget.cartItem.note;
 
-    for (var addon in widget.cartItem.selectedAddons) {
-      if (addon.addonDetailId != null) {
-        _selectedAddons[addon.addonDetailId!] = addon;
+    // โหลด Option ที่เลือกไว้เดิม
+    for (final option in widget.cartItem.selectedAddons) {
+      final int? optionId = option.optionId;
+      if (optionId != null) {
+        _selectedOptions[optionId] = option;
       }
     }
-    _loadMenuAddons();
+
+    _loadMenuOptions();
   }
 
   String _getFinalImageUrl(String? rawPath) {
@@ -44,6 +54,7 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     if (rawPath.startsWith('http')) return rawPath;
 
     final String baseUrl = DioClient.dio.options.baseUrl;
+
     if (rawPath.startsWith('/')) {
       return "$baseUrl$rawPath";
     } else {
@@ -51,23 +62,66 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     }
   }
 
-  Future<void> _loadMenuAddons() async {
-    if (widget.cartItem.menu.menuId == null) {
-      setState(() => _isLoading = false);
+  Future<void> _loadMenuOptions() async {
+    final int? menuId = widget.cartItem.menu.menuId;
+
+    if (menuId == null) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
       return;
     }
 
     setState(() => _isLoading = true);
-    final addons = await _addonService.getAddonsByMenuId(
-      widget.cartItem.menu.menuId!,
-    );
 
-    if (!mounted) return;
+    try {
+      final groups = await _optionService.getOptionsByMenuId(menuId);
 
-    setState(() {
-      _allAddons = addons;
-      _isLoading = false;
-    });
+      if (!mounted) return;
+
+      final List<OptionModel> options = [];
+      final Map<int, String> groupNameByOptionId = {};
+
+      for (final group in groups) {
+        final String groupName =
+            group.optionGroupName?.trim().isNotEmpty == true
+            ? group.optionGroupName!.trim()
+            : "ตัวเลือกเสริม";
+
+        for (final option in group.options ?? <OptionModel>[]) {
+          options.add(option);
+
+          if (option.optionId != null) {
+            groupNameByOptionId[option.optionId!] = groupName;
+          }
+        }
+      }
+
+      setState(() {
+        _optionGroups = groups;
+        _allOptions = options;
+        _optionGroupNameById
+          ..clear()
+          ..addAll(groupNameByOptionId);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _optionGroups = [];
+        _allOptions = [];
+        _optionGroupNameById.clear();
+        _isLoading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("ไม่สามารถโหลดตัวเลือกอาหารได้: $e"),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
   }
 
   @override
@@ -76,33 +130,53 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     super.dispose();
   }
 
-  Map<String, List<MenuAddonDetailModel>> _groupAddons() {
-    Map<String, List<MenuAddonDetailModel>> grouped = {};
-    for (var addon in _allAddons) {
-      String groupName =
-          addon.menuAddonGroup?.addonGroupName ?? "ตัวเลือกเสริม";
-      if (!grouped.containsKey(groupName)) {
-        grouped[groupName] = [];
-      }
-      grouped[groupName]!.add(addon);
+  Map<String, List<OptionModel>> _groupOptions() {
+    final Map<String, List<OptionModel>> grouped = {};
+
+    for (final option in _allOptions) {
+      final int? optionId = option.optionId;
+
+      final String groupName = optionId != null
+          ? (_optionGroupNameById[optionId] ?? "ตัวเลือกเสริม")
+          : "ตัวเลือกเสริม";
+
+      grouped.putIfAbsent(groupName, () => []);
+      grouped[groupName]!.add(option);
     }
+
     return grouped;
+  }
+
+  bool _isMultipleChoice(String groupName) {
+    for (final group in _optionGroups) {
+      final String currentName =
+          group.optionGroupName?.trim().isNotEmpty == true
+          ? group.optionGroupName!.trim()
+          : "ตัวเลือกเสริม";
+
+      if (currentName == groupName) {
+        return group.isMultipleChoice ?? false;
+      }
+    }
+
+    return false;
   }
 
   @override
   Widget build(BuildContext context) {
     final int basePrice = widget.cartItem.menu.price?.toInt() ?? 0;
 
-    double addonTotalPrice = 0;
-    _selectedAddons.forEach((id, detail) {
-      addonTotalPrice += detail.addonPrice ?? 0;
-    });
+    double optionTotalPrice = 0;
+    for (final option in _selectedOptions.values) {
+      optionTotalPrice += option.optionPrice ?? 0;
+    }
 
-    int totalPrice = (basePrice + addonTotalPrice.toInt()) * _quantity;
+    final int totalPrice = (basePrice + optionTotalPrice.toInt()) * _quantity;
 
-    String? rawMenuImage = widget.cartItem.menu.menuImage;
-    String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
-    final groupedAddons = _groupAddons();
+    final String? rawMenuImage = widget.cartItem.menu.menuImage;
+    final String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
+
+    final groupedOptions = _groupOptions();
 
     final String? description =
         (widget.cartItem.menu.description?.trim().isNotEmpty == true)
@@ -259,26 +333,19 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                               ),
                             ],
                             const SizedBox(height: 24),
-                            if (groupedAddons.isNotEmpty) ...[
-                              ...groupedAddons.entries
+                            if (groupedOptions.isNotEmpty) ...[
+                              ...groupedOptions.entries
                                   .toList()
                                   .asMap()
                                   .entries
                                   .map((mapEntry) {
-                                    final isFirstGroup = mapEntry.key == 0;
+                                    final bool isFirstGroup = mapEntry.key == 0;
                                     final entry = mapEntry.value;
 
-                                    String groupName = entry.key;
-                                    List<MenuAddonDetailModel> items =
-                                        entry.value;
-
-                                    // 🎯 แกะสถานะ is_multiple_choice จากกลุ่ม
-                                    bool isMultipleChoice =
-                                        items
-                                            .first
-                                            .menuAddonGroup
-                                            ?.is_multiple_choice ??
-                                        false;
+                                    final String groupName = entry.key;
+                                    final List<OptionModel> items = entry.value;
+                                    final bool isMultipleChoice =
+                                        _isMultipleChoice(groupName);
 
                                     return Column(
                                       crossAxisAlignment:
@@ -292,8 +359,6 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                                           )
                                         else
                                           const SizedBox(height: 8),
-
-                                        // 🎯 แสดงเฉพาะชื่อกลุ่มเท่านั้น
                                         Text(
                                           groupName,
                                           style: const TextStyle(
@@ -302,7 +367,6 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                                           ),
                                         ),
                                         const SizedBox(height: 8),
-
                                         IntrinsicHeight(
                                           child: Row(
                                             crossAxisAlignment:
@@ -317,10 +381,11 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                                                 child: Column(
                                                   children: items
                                                       .map(
-                                                        (addonDetail) =>
-                                                            _buildAddonItemOption(
-                                                              addonDetail,
+                                                        (option) =>
+                                                            _buildOptionItem(
+                                                              option,
                                                               isMultipleChoice,
+                                                              groupName,
                                                             ),
                                                       )
                                                       .toList(),
@@ -430,7 +495,9 @@ class _EditOrderMemberState extends State<EditOrderMember> {
                                   : Colors.grey.shade400,
                             ),
                             onPressed: () {
-                              if (_quantity > 1) setState(() => _quantity--);
+                              if (_quantity > 1) {
+                                setState(() => _quantity--);
+                              }
                             },
                           ),
                           SizedBox(
@@ -503,12 +570,15 @@ class _EditOrderMemberState extends State<EditOrderMember> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
+                  final List<OptionModel> finalSelectedOptions =
+                      _selectedOptions.values.toList();
+
                   final updatedItem = CartItem(
                     menu: widget.cartItem.menu,
-                    selectedAddons: _selectedAddons.values.toList(),
+                    selectedAddons: finalSelectedOptions,
                     quantity: _quantity,
                     note: _noteController.text,
-                    addonPrice: addonTotalPrice.toInt(),
+                    addonPrice: optionTotalPrice.toInt(),
                     totalPrice: totalPrice,
                     unitPrice: basePrice,
                     isExtraPrice: false,
@@ -536,33 +606,36 @@ class _EditOrderMemberState extends State<EditOrderMember> {
     );
   }
 
-  Widget _buildAddonItemOption(
-    MenuAddonDetailModel detail,
+  Widget _buildOptionItem(
+    OptionModel option,
     bool isMultipleChoice,
+    String groupName,
   ) {
-    int id = detail.addonDetailId ?? 0;
-    bool isSelected = _selectedAddons.containsKey(id);
+    final int id = option.optionId ?? 0;
+    final bool isSelected = _selectedOptions.containsKey(id);
 
-    String title = detail.addonMenu?.addonName ?? "ไม่มีชื่อ";
-    int price = detail.addonPrice?.toInt() ?? 0;
-    int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
+    final String title = option.optionName?.trim().isNotEmpty == true
+        ? option.optionName!.trim()
+        : "ไม่มีชื่อ";
+
+    final int price = option.optionPrice?.toInt() ?? 0;
 
     return InkWell(
       onTap: () {
+        if (id == 0) return;
+
         setState(() {
           if (isSelected) {
-            _selectedAddons.remove(id);
+            _selectedOptions.remove(id);
           } else {
-            // 🎯 ถ้าเป็น Single Choice (!isMultipleChoice) ให้ถอดตัวเลือกอื่นในกลุ่มเดียวกันออกอัตโนมัติ
+            // Single Choice: เลือกได้ 1 ตัวเลือกต่อ 1 กลุ่ม
             if (!isMultipleChoice) {
-              _selectedAddons.removeWhere(
-                (key, value) =>
-                    value.menuAddonGroup?.addonGroupId == currentGroupId,
+              _selectedOptions.removeWhere(
+                (key, value) => _optionGroupNameById[key] == groupName,
               );
-              _selectedAddons[id] = detail;
-            } else {
-              _selectedAddons[id] = detail;
             }
+
+            _selectedOptions[id] = option;
           }
         });
       },

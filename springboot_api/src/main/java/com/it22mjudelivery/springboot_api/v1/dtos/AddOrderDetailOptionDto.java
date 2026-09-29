@@ -19,4 +19,6 @@ public class AddOrderDetailOptionDto {
 
     private double priceAtOrder;
 
+    private int optionQty = 1;
+
 }

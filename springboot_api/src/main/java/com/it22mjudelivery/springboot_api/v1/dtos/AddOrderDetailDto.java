@@ -14,6 +14,5 @@ public class AddOrderDetailDto {
     private int qty;
     private double subTotal;
     private String note;
-    private List<AddOrderDetailOptionDto> addons;
-    private List<AddOrderDetailCurryDto> orderDetailCurries;
+    private List<AddOrderDetailOptionDto> options;
 }

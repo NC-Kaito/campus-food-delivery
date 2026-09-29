@@ -188,193 +188,69 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
 
   // ── 🎯 การ์ดรายการอาหารสไตล์เดียวกับหน้า Member ──
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    List<dynamic> rawCurries = [];
-    if (item.orderDetailCurries != null &&
-        item.orderDetailCurries!.isNotEmpty) {
-      rawCurries = item.orderDetailCurries!;
-    } else {
-      try {
-        final jsonItem = (item as dynamic).toJson();
-        rawCurries =
-            jsonItem['orderDetailCurries'] ??
-            jsonItem['orderdetailcurries'] ??
-            [];
-      } catch (_) {}
-    }
+    // ตรวจว่าเป็นเมนูข้าวราดแกงจาก Snapshot ของ OrderDetail โดยตรง
+    final String orderDetailName = item.menuNameAtOrder.trim();
+    final bool isCurryDish = orderDetailName.contains("ข้าวราดแกง");
 
-    final bool isCurryDish = rawCurries.isNotEmpty;
-
-    String displayMenuName = item.menuNameAtOrder.isNotEmpty
+    final String displayMenuName = item.menuNameAtOrder.isNotEmpty
         ? item.menuNameAtOrder
         : (item.menu?.menuName ?? "รายการเมนู");
 
-    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
-      displayMenuName = "ข้าวราดแกง (${rawCurries.length} อย่าง)";
-    }
+    // ใช้ Option ที่อยู่ใน OrderDetail แทนข้อมูล Curry/Addon แบบเดิม
+    Map<String, Map<String, dynamic>> groupedOptions = {};
 
-    List<Map<String, dynamic>> curriesList = [];
-    for (var e in rawCurries) {
+    for (final option in item.options) {
       String name = '';
-      String img = '';
-      int price = 0;
-
-      if (e is Map) {
-        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
-        name =
-            (menuMap['menuname'] ??
-                    menuMap['menuName'] ??
-                    menuMap['name'] ??
-                    '')
-                .toString();
-        img =
-            (menuMap['imageurl'] ??
-                    menuMap['imageUrl'] ??
-                    menuMap['menuimage'] ??
-                    menuMap['menuImage'] ??
-                    '')
-                .toString();
-        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0).toInt();
-      } else {
-        try {
-          name =
-              ((e as dynamic).menu?.menuName ??
-                      (e as dynamic).menu?.menuname ??
-                      (e as dynamic).name ??
-                      '')
-                  .toString();
-          img =
-              ((e as dynamic).menu?.menuImage ??
-                      (e as dynamic).menu?.imageurl ??
-                      (e as dynamic).image ??
-                      '')
-                  .toString();
-          price = ((e as dynamic).priceAtOrder ?? 0).toInt();
-        } catch (_) {}
-      }
-
-      if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img, 'price': price});
-      }
-    }
-
-    List<dynamic> rawAddons = [];
-    if (item.addons.isNotEmpty) {
-      rawAddons = item.addons;
-    } else {
-      try {
-        rawAddons = (item as dynamic).toJson()['addons'] ?? [];
-      } catch (_) {}
-    }
-
-    Map<String, Map<String, dynamic>> groupedAddons = {};
-    for (var addon in rawAddons) {
-      String name = '';
-      int price = 0;
+      double price = 0.0;
       int qty = 1;
-      bool canIncreaseQty = false;
 
-      if (addon is Map) {
-        name =
-            addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
-            addon['addonMenu']?['addonName'] ??
-            addon['name'] ??
-            addon['addonName'] ??
-            '';
-        price =
-            (addon['priceAtOrder'] ??
-                    addon['priceatorder'] ??
-                    addon['menuAddonDetail']?['addonPrice'] ??
-                    0)
-                .toInt();
-        qty = (addon['addonQty'] ?? addon['addon_qty'] ?? 1).toInt();
+      try {
+        final dynamic opt = option;
 
-        final dynamic menu =
-            addon['menuAddonDetail']?['addonMenu'] ??
-            addon['addonMenu'] ??
-            addon['menuAddon'];
-        if (menu is Map) {
-          if (menu['canIncreaseQuantity'] != null) {
-            canIncreaseQty = menu['canIncreaseQuantity'] == true;
-          } else if (menu['allowQuantity'] != null) {
-            canIncreaseQty = menu['allowQuantity'] == true;
-          } else if (menu['isMultiple'] != null) {
-            canIncreaseQty = menu['isMultiple'] == true;
-          } else if (menu['isQuantity'] != null) {
-            canIncreaseQty = menu['isQuantity'] == true;
-          } else if (menu['maxQuantity'] != null) {
-            canIncreaseQty = (menu['maxQuantity'] as num) > 1;
-          } else if (menu['maxQty'] != null) {
-            canIncreaseQty = (menu['maxQty'] as num) > 1;
-          }
-        }
-      } else {
-        try {
-          name = (addon as dynamic).menuAddonDetail?.addonMenu?.addonName ?? '';
-          price =
-              ((addon as dynamic).priceAtOrder ??
-                      (addon as dynamic).menuAddonDetail?.addonPrice ??
-                      0)
-                  .toInt();
-          qty = ((addon as dynamic).addonQty ?? 1).toInt();
-        } catch (_) {}
-      }
+        name = (opt.optionNameAtOrder ?? opt.menuOptionDetail?.optionName ?? '')
+            .toString()
+            .trim();
+
+        price = ((opt.priceAtOrder ?? 0) as num).toDouble();
+        qty = ((opt.optionQty ?? 1) as num).toInt();
+      } catch (_) {}
 
       if (name.isNotEmpty) {
-        if (groupedAddons.containsKey(name)) {
-          groupedAddons[name]!['qty'] =
-              (groupedAddons[name]!['qty'] as int) + qty;
-          groupedAddons[name]!['canIncreaseQty'] = true;
+        if (groupedOptions.containsKey(name)) {
+          groupedOptions[name]!['qty'] =
+              (groupedOptions[name]!['qty'] as int) + qty;
+          groupedOptions[name]!['canIncreaseQty'] = true;
         } else {
-          groupedAddons[name] = {
+          groupedOptions[name] = {
             'qty': qty,
             'unitPrice': price,
-            'canIncreaseQty': canIncreaseQty,
+            'canIncreaseQty': qty > 1,
           };
         }
       }
     }
 
-    int totalItemPrice = 0;
+    // ใช้ subtotal จาก OrderDetail โดยตรง
+    int totalItemPrice = item.subTotal.toInt();
 
-    try {
-      final jsonItem = (item as dynamic).toJson();
-      final rawSubtotal = jsonItem['subtotal'] ?? jsonItem['subTotal'];
-      if (rawSubtotal != null) {
-        totalItemPrice = (rawSubtotal as num).toInt();
-      }
-    } catch (_) {}
+    if (totalItemPrice <= 0) {
+      double optionsSum = 0.0;
 
-    if (totalItemPrice == 0) {
-      int addonsSum = 0;
-      for (var addon in groupedAddons.values) {
-        addonsSum += (addon['unitPrice'] as int) * (addon['qty'] as int);
+      for (final option in groupedOptions.values) {
+        optionsSum += (option['unitPrice'] as double) * (option['qty'] as int);
       }
 
-      int baseMenuPrice =
-          item.priceAtOrder?.toInt() ?? item.menu?.price?.toInt() ?? 0;
+      final double baseMenuPrice = item.priceAtOrder > 0
+          ? item.priceAtOrder
+          : (item.menu?.price ?? 0.0);
 
-      if (baseMenuPrice == 0) {
-        try {
-          final jsonItem = (item as dynamic).toJson();
-          baseMenuPrice = (jsonItem['menu']?['price'] ?? 0).toInt();
-        } catch (_) {}
-      }
-
-      int curriesSum = 0;
-      for (var curry in curriesList) {
-        curriesSum += curry['price'] as int;
-      }
-
-      totalItemPrice = (baseMenuPrice + curriesSum + addonsSum) * item.qty;
+      totalItemPrice = ((baseMenuPrice + optionsSum) * item.qty).toInt();
     }
 
-    String rawMenuUrl = item.menu?.menuImage ?? '';
-    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] as String;
-    }
-
+    final String rawMenuUrl = item.menu?.menuImage ?? '';
     final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
-    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
+
+    final bool hasOptions = groupedOptions.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -443,7 +319,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                   const Divider(height: 1, color: Color(0xFFE0E0E0)),
                   const SizedBox(height: 8),
 
-                  if (hasAddons) ...[
+                  if (hasOptions) ...[
                     Text(
                       isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
                       style: const TextStyle(
@@ -469,37 +345,7 @@ class _ViewWaitingPickupOrderState extends State<ViewWaitingPickupOrder> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                for (var curry in curriesList)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 2,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            curry['name'] as String,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          "1 จำนวน",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                for (var entry in groupedAddons.entries)
+                                for (final entry in groupedOptions.entries)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 2,

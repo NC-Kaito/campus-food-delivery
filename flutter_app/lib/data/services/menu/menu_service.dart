@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
-import 'package:flutter_app/data/models/addon_menu_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 
@@ -123,9 +123,7 @@ class MenuService {
     }
   }
 
-  Future<List<AddonMenuModel>> getAllAddonMenus(
-    String restaurantUsername,
-  ) async {
+  Future<List<OptionModel>> getAllOptionMenus(String restaurantUsername) async {
     try {
       // 🌟 ส่ง username แนบไปเป็น Query Parameter กรองค่าหลังบ้าน
       final response = await DioClient.dio.get(
@@ -135,9 +133,7 @@ class MenuService {
 
       if (response.statusCode == 200) {
         List jsonResponse = response.data;
-        return jsonResponse
-            .map((data) => AddonMenuModel.fromJson(data))
-            .toList();
+        return jsonResponse.map((data) => OptionModel.fromJson(data)).toList();
       } else {
         throw "ไม่สามารถโหลดข้อมูลตัวเลือกเสริมได้";
       }

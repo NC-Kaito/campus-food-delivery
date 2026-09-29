@@ -258,107 +258,54 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    List rawCurries = item.orderDetailCurries ?? [];
-    final bool isCurryDish = rawCurries.isNotEmpty;
-
-    String displayMenuName = item.menuNameAtOrder.isNotEmpty
+    // ตรวจจาก Snapshot ของ OrderDetail โดยตรง
+    final String displayMenuName = item.menuNameAtOrder.isNotEmpty
         ? item.menuNameAtOrder
         : (item.menu?.menuName ?? "รายการเมนู");
 
-    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
-      displayMenuName =
-          "ข้าวราดแกง (" + rawCurries.length.toString() + " อย่าง)";
-    }
+    final bool isCurryDish = displayMenuName.contains("ข้าวราดแกง");
 
-    List<Map<String, dynamic>> curriesList = [];
-    for (var e in rawCurries) {
-      String name = '';
-      String img = '';
-      double price = 0.0;
+    // รายการตัวเลือกจาก OrderDetailModel ปัจจุบัน
+    final Map<String, Map<String, dynamic>> groupedAddons = {};
 
-      if (e is Map) {
-        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
-        name =
-            (menuMap['menuname'] ??
-                    menuMap['menuName'] ??
-                    menuMap['name'] ??
-                    '')
-                .toString();
-        img =
-            (menuMap['imageurl'] ??
-                    menuMap['imageUrl'] ??
-                    menuMap['menuimage'] ??
-                    menuMap['menuImage'] ??
-                    '')
-                .toString();
-        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0.0).toDouble();
+    for (var option in item.options) {
+      final String name = option.optionNameAtOrder.trim();
+      final double price = option.priceAtOrder;
+      final int qty = option.optionQty ?? 1;
+
+      if (name.isEmpty) continue;
+
+      if (groupedAddons.containsKey(name)) {
+        groupedAddons[name]!['qty'] =
+            (groupedAddons[name]!['qty'] as int) + qty;
+        groupedAddons[name]!['canIncreaseQty'] = true;
       } else {
-        try {
-          name =
-              ((e as dynamic).menu?.menuName ??
-                      (e as dynamic).menu?.menuname ??
-                      '')
-                  .toString();
-          img =
-              ((e as dynamic).menu?.menuImage ??
-                      (e as dynamic).menu?.imageurl ??
-                      '')
-                  .toString();
-          price = ((e as dynamic).priceAtOrder ?? 0.0).toDouble();
-        } catch (_) {}
-      }
-
-      if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img, 'price': price});
+        groupedAddons[name] = {
+          'qty': qty,
+          'unitPrice': price,
+          'canIncreaseQty': qty > 1,
+        };
       }
     }
 
-    Map<String, Map<String, dynamic>> groupedAddons = {};
-    for (var addon in item.addons) {
-      String name = addon.addonNameAtOrder.isNotEmpty
-          ? addon.addonNameAtOrder
-          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
-
-      double price = addon.priceAtOrder;
-      int qty = addon.addonQty ?? 1;
-
-      if (name.isNotEmpty) {
-        if (groupedAddons.containsKey(name)) {
-          groupedAddons[name]!['qty'] =
-              (groupedAddons[name]!['qty'] as int) + qty;
-          groupedAddons[name]!['canIncreaseQty'] = true;
-        } else {
-          groupedAddons[name] = {
-            'qty': qty,
-            'unitPrice': price,
-            'canIncreaseQty': qty > 1,
-          };
-        }
-      }
-    }
-
+    // ใช้ subtotal ที่ถูกบันทึกไว้ใน OrderDetail เป็นหลัก
     double totalItemPrice = item.subTotal;
     if (totalItemPrice <= 0) {
-      double addonsSum = 0.0;
-      for (var addon in groupedAddons.values) {
-        addonsSum += (addon['unitPrice'] as double) * (addon['qty'] as int);
+      double optionsSum = 0.0;
+
+      for (var option in groupedAddons.values) {
+        optionsSum += (option['unitPrice'] as double) * (option['qty'] as int);
       }
-      double curriesSum = 0.0;
-      for (var curry in curriesList) {
-        curriesSum += (curry['price'] as double);
-      }
-      double basePrice = item.priceAtOrder > 0
+
+      final double basePrice = item.priceAtOrder > 0
           ? item.priceAtOrder
           : (item.menu?.price ?? 0.0);
-      totalItemPrice = (basePrice + curriesSum + addonsSum) * item.qty;
+
+      totalItemPrice = (basePrice + optionsSum) * item.qty;
     }
 
-    String rawMenuUrl = item.menu?.menuImage ?? '';
-    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] as String;
-    }
-    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
-    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
+    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage ?? '');
+    final bool hasAddons = groupedAddons.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -453,36 +400,6 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                for (var curry in curriesList)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 2,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            curry['name'] as String,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Text(
-                                          "1 จำนวน",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: Color.fromARGB(255, 0, 0, 0),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                                 for (var entry in groupedAddons.entries)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -517,13 +434,12 @@ class _ViewDeliveryDetailState extends State<ViewDeliveryDetail> {
                                                   text:
                                                       (entry.value['qty']
                                                               as int)
-                                                          .toString() +
-                                                      " ",
+                                                          .toString(),
                                                   style: const TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                   ),
                                                 ),
-                                                const TextSpan(text: "จำนวน"),
+                                                const TextSpan(text: " จำนวน"),
                                               ],
                                             ),
                                           ),

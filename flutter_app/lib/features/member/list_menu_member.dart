@@ -4,8 +4,9 @@ import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/models/option_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/features/member/add_order_member.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/view_order_member.dart';
@@ -24,7 +25,7 @@ class ListMenuMember extends StatefulWidget {
 class _ListMenuMemberState extends State<ListMenuMember>
     with TickerProviderStateMixin {
   final MenuService _menuService = MenuService();
-  final MenuAddonService _addonService = MenuAddonService();
+  final MenuOptionService _optionService = MenuOptionService();
 
   TabController? _tabController;
 
@@ -41,9 +42,11 @@ class _ListMenuMemberState extends State<ListMenuMember>
   bool _isExtraRice = false;
   int _curryQty = 1;
 
-  List<MenuAddonDetailModel> _curryAddons = [];
-  final Map<int, int> _curryAddonQuantities = {};
-  final Map<int, MenuAddonDetailModel> _curryAddonModelsIndex = {};
+  List<OptionModel> _curryOptions = [];
+  final Map<int, int> _curryOptionQuantities = {};
+  final Map<int, OptionModel> _curryOptionModelsIndex = {};
+  final Map<int, String> _curryOptionGroupNameById = {};
+  final Map<String, bool> _curryOptionGroupMultipleChoice = {};
 
   @override
   void initState() {
@@ -262,8 +265,8 @@ class _ListMenuMemberState extends State<ListMenuMember>
   void _addMenuCurryToCart(
     double total,
     String note,
-    List<MenuAddonDetailModel> addons,
-    int addonPrice,
+    List<OptionModel> options,
+    int optionPrice,
     int unitPrice,
   ) {
     final MenuModel mainCurryMenu = _selectedCurries.isNotEmpty
@@ -274,11 +277,11 @@ class _ListMenuMemberState extends State<ListMenuMember>
     CartManager().addToCart(
       CartItem(
         menu: mainCurryMenu,
-        selectedAddons: addons,
+        selectedAddons: options,
         selectedCurries: List.from(_selectedCurries),
         quantity: _curryQty,
         note: note,
-        addonPrice: addonPrice,
+        addonPrice: optionPrice,
         totalPrice: total.toInt(),
         unitPrice: unitPrice,
         isExtraPrice: false,
@@ -297,7 +300,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
     // เคลียร์ state ของหน้าข้าวราดแกงก่อนออกจากหน้า
     setState(() {
       _selectedCurries.clear();
-      _curryAddonQuantities.clear();
+      _curryOptionQuantities.clear();
       _isExtraRice = false;
       _curryQty = 1;
     });
@@ -337,29 +340,34 @@ class _ListMenuMemberState extends State<ListMenuMember>
         if (cat.typemenuName != null &&
             cat.typemenuName!.contains("ข้าวราดแกง")) {
           try {
-            final addonGroups = await _addonService.getAddonGroupsByRestaurant(
-              widget.restaurantModel.username!,
-            );
+            final optionGroups = await _optionService
+                .getOptionGroupsByRestaurant(widget.restaurantModel.username!);
 
-            _curryAddons.clear();
-            _curryAddonModelsIndex.clear();
+            _curryOptions.clear();
+            _curryOptionModelsIndex.clear();
+            _curryOptionGroupNameById.clear();
+            _curryOptionGroupMultipleChoice.clear();
 
-            for (var group in addonGroups) {
-              if (group.status != false && group.details != null) {
-                for (var detail in group.details!) {
-                  if (detail.status != false) {
-                    detail.menuAddonGroup = group;
-                    _curryAddons.add(detail);
+            for (final group in optionGroups) {
+              final String groupName =
+                  group.optionGroupName?.trim().isNotEmpty == true
+                  ? group.optionGroupName!.trim()
+                  : "ตัวเลือกเสริม";
 
-                    if (detail.addonDetailId != null) {
-                      _curryAddonModelsIndex[detail.addonDetailId!] = detail;
-                    }
-                  }
+              _curryOptionGroupMultipleChoice[groupName] =
+                  group.isMultipleChoice ?? false;
+
+              for (final option in group.options ?? <OptionModel>[]) {
+                _curryOptions.add(option);
+
+                if (option.optionId != null) {
+                  _curryOptionModelsIndex[option.optionId!] = option;
+                  _curryOptionGroupNameById[option.optionId!] = groupName;
                 }
               }
             }
           } catch (e) {
-            debugPrint("Error fetching restaurant addons: $e");
+            debugPrint("Error fetching restaurant options: $e");
           }
         }
       }
@@ -388,16 +396,19 @@ class _ListMenuMemberState extends State<ListMenuMember>
     }
   }
 
-  Map<String, List<MenuAddonDetailModel>> _groupCurryAddons() {
-    Map<String, List<MenuAddonDetailModel>> grouped = {};
-    for (var addon in _curryAddons) {
-      String groupName =
-          addon.menuAddonGroup?.addonGroupName ?? "ตัวเลือกเสริม";
-      if (!grouped.containsKey(groupName)) {
-        grouped[groupName] = [];
-      }
-      grouped[groupName]!.add(addon);
+  Map<String, List<OptionModel>> _groupCurryOptions() {
+    final Map<String, List<OptionModel>> grouped = {};
+
+    for (final option in _curryOptions) {
+      final int? optionId = option.optionId;
+      final String groupName = optionId != null
+          ? (_curryOptionGroupNameById[optionId] ?? "ตัวเลือกเสริม")
+          : "ตัวเลือกเสริม";
+
+      grouped.putIfAbsent(groupName, () => []);
+      grouped[groupName]!.add(option);
     }
+
     return grouped;
   }
 
@@ -947,37 +958,38 @@ class _ListMenuMemberState extends State<ListMenuMember>
     );
   }
 
-  Widget _buildCurryAddonItemOption(
-    MenuAddonDetailModel detail,
+  Widget _buildCurryOptionItemOption(
+    OptionModel option,
     bool isMultipleChoice,
     bool isRestaurantOpen,
   ) {
-    int id = detail.addonDetailId ?? 0;
-    int currentQty = _curryAddonQuantities[id] ?? 0;
-    bool isSelected = currentQty > 0;
-
-    String title = detail.addonMenu?.addonName ?? "ไม่มีชื่อ";
-    int price = detail.addonPrice?.toInt() ?? 0;
-    int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
+    final int id = option.optionId ?? 0;
+    final int currentQty = _curryOptionQuantities[id] ?? 0;
+    final bool isSelected = currentQty > 0;
+    final String title = option.optionName?.trim().isNotEmpty == true
+        ? option.optionName!.trim()
+        : "ไม่มีชื่อ";
+    final int price = option.optionPrice?.toInt() ?? 0;
+    final String currentGroupName =
+        _curryOptionGroupNameById[id] ?? "ตัวเลือกเสริม";
 
     void handleFrontTap() {
       if (!isRestaurantOpen) {
         _showClosedWarningDialog();
         return;
       }
+
       setState(() {
         if (isSelected) {
-          _curryAddonQuantities.remove(id);
+          _curryOptionQuantities.remove(id);
         } else {
           if (!isMultipleChoice) {
-            _curryAddonQuantities.removeWhere((key, value) {
-              final model = _curryAddonModelsIndex[key];
-              return model?.menuAddonGroup?.addonGroupId == currentGroupId;
-            });
-            _curryAddonQuantities[id] = 1;
-          } else {
-            _curryAddonQuantities[id] = 1;
+            _curryOptionQuantities.removeWhere(
+              (key, value) =>
+                  _curryOptionGroupNameById[key] == currentGroupName,
+            );
           }
+          _curryOptionQuantities[id] = 1;
         }
       });
     }
@@ -988,7 +1000,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
         return;
       }
       setState(() {
-        _curryAddonQuantities[id] = currentQty + 1;
+        _curryOptionQuantities[id] = currentQty + 1;
       });
     }
 
@@ -1094,11 +1106,11 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       }
                       if (isSelected) {
                         setState(() {
-                          if (_curryAddonQuantities[id]! <= 1) {
-                            _curryAddonQuantities.remove(id);
+                          if (_curryOptionQuantities[id]! <= 1) {
+                            _curryOptionQuantities.remove(id);
                           } else {
-                            _curryAddonQuantities[id] =
-                                _curryAddonQuantities[id]! - 1;
+                            _curryOptionQuantities[id] =
+                                _curryOptionQuantities[id]! - 1;
                           }
                         });
                       }
@@ -1136,9 +1148,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
                         _showClosedWarningDialog();
                         return;
                       }
-                      if (isSelected) {
-                        handlePlusTap();
-                      }
+                      if (isSelected) handlePlusTap();
                     },
                   ),
                 ],
@@ -1163,7 +1173,7 @@ class _ListMenuMemberState extends State<ListMenuMember>
     }
 
     final int selectCount = _selectedCurries.length;
-    final groupedAddons = _groupCurryAddons();
+    final groupedOptions = _groupCurryOptions();
 
     double basePrice = 0;
     if (selectCount == 1) {
@@ -1181,16 +1191,16 @@ class _ListMenuMemberState extends State<ListMenuMember>
 
     final double optionPrice = (selectCount > 0 && _isExtraRice) ? 5.0 : 0.0;
 
-    double addonTotalPrice = 0;
-    _curryAddonQuantities.forEach((id, qty) {
-      final model = _curryAddonModelsIndex[id];
+    double optionTotalPrice = 0;
+    _curryOptionQuantities.forEach((id, qty) {
+      final model = _curryOptionModelsIndex[id];
       if (model != null) {
-        addonTotalPrice += (model.addonPrice ?? 0) * qty;
+        optionTotalPrice += (model.optionPrice ?? 0) * qty;
       }
     });
 
     final double unitPrice =
-        basePrice + totalSurchargePrice + optionPrice + addonTotalPrice;
+        basePrice + totalSurchargePrice + optionPrice + optionTotalPrice;
     final double totalPrice = unitPrice * _curryQty;
 
     return Column(
@@ -1358,19 +1368,19 @@ class _ListMenuMemberState extends State<ListMenuMember>
                 ),
                 const SizedBox(height: 8),
 
-                if (groupedAddons.isNotEmpty) ...[
+                if (groupedOptions.isNotEmpty) ...[
                   const Divider(thickness: 1, height: 32),
-                  ...groupedAddons.entries.toList().asMap().entries.map((
+                  ...groupedOptions.entries.toList().asMap().entries.map((
                     mapEntry,
                   ) {
                     final isFirstGroup = mapEntry.key == 0;
                     final entry = mapEntry.value;
 
                     String groupName = entry.key;
-                    List<MenuAddonDetailModel> items = entry.value;
+                    List<OptionModel> items = entry.value;
 
                     bool isMultipleChoice =
-                        items.first.menuAddonGroup?.is_multiple_choice ?? false;
+                        _curryOptionGroupMultipleChoice[groupName] ?? false;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1405,12 +1415,11 @@ class _ListMenuMemberState extends State<ListMenuMember>
                                 child: Column(
                                   children: items
                                       .map(
-                                        (addonDetail) =>
-                                            _buildCurryAddonItemOption(
-                                              addonDetail,
-                                              isMultipleChoice,
-                                              isRestaurantOpen,
-                                            ),
+                                        (option) => _buildCurryOptionItemOption(
+                                          option,
+                                          isMultipleChoice,
+                                          isRestaurantOpen,
+                                        ),
                                       )
                                       .toList(),
                                 ),
@@ -1615,13 +1624,12 @@ class _ListMenuMemberState extends State<ListMenuMember>
                       return;
                     }
 
-                    final List<MenuAddonDetailModel> finalSelectedAddonsList =
-                        [];
-                    _curryAddonQuantities.forEach((id, qty) {
-                      final model = _curryAddonModelsIndex[id];
+                    final List<OptionModel> finalSelectedOptionsList = [];
+                    _curryOptionQuantities.forEach((id, qty) {
+                      final model = _curryOptionModelsIndex[id];
                       if (model != null && qty > 0) {
                         for (int i = 0; i < qty; i++) {
-                          finalSelectedAddonsList.add(model);
+                          finalSelectedOptionsList.add(model);
                         }
                       }
                     });
@@ -1637,8 +1645,8 @@ class _ListMenuMemberState extends State<ListMenuMember>
                     _addMenuCurryToCart(
                       totalPrice,
                       finalNote,
-                      finalSelectedAddonsList,
-                      addonTotalPrice.toInt(),
+                      finalSelectedOptionsList,
+                      optionTotalPrice.toInt(),
                       (basePrice + totalSurchargePrice + optionPrice).toInt(),
                     );
                   },

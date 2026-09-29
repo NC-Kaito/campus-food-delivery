@@ -399,145 +399,56 @@ class _ViewReceiptOrderState extends State<ViewReceiptOrder> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: widget.order.items.map((item) {
-                            List<dynamic> rawCurries = [];
-                            if (item.orderDetailCurries != null &&
-                                item.orderDetailCurries!.isNotEmpty) {
-                              rawCurries = item.orderDetailCurries!;
-                            } else {
-                              try {
-                                final jsonItem = (item as dynamic).toJson();
-                                rawCurries =
-                                    jsonItem['orderDetailCurries'] ??
-                                    jsonItem['orderdetailcurries'] ??
-                                    [];
-                              } catch (_) {}
-                            }
+                            final String displayMenuName =
+                                item.menu?.menuName ?? item.menuNameAtOrder;
 
-                            String displayMenuName =
-                                item.menu?.menuName ?? "รายการอาหาร";
-                            if (rawCurries.isNotEmpty) {
-                              displayMenuName =
-                                  "ข้าวราดแกง (${rawCurries.length} อย่าง)";
-                            }
+                            // OrderDetailModel ปัจจุบันเก็บตัวเลือกเพิ่มเติมไว้ใน
+                            // options และมี getter สำรองชื่อ addons
+                            final List<dynamic> rawAddons = item.addons;
 
-                            List<Map<String, dynamic>> curriesList = [];
-                            for (var e in rawCurries) {
-                              String name = '';
-                              if (e is Map) {
-                                final menuMap = (e['menu'] is Map)
-                                    ? e['menu'] as Map
-                                    : e;
-                                name =
-                                    (menuMap['menuname'] ??
-                                            menuMap['menuName'] ??
-                                            menuMap['name'] ??
-                                            '')
-                                        .toString();
-                              } else {
-                                try {
-                                  name =
-                                      ((e as dynamic).menu?.menuName ??
-                                              (e as dynamic).name ??
-                                              '')
-                                          .toString();
-                                } catch (_) {}
-                              }
-                              if (name.isNotEmpty) {
-                                curriesList.add({'name': name, 'qty': 1});
-                              }
-                            }
+                            final Map<String, Map<String, dynamic>>
+                            groupedAddons = {};
 
-                            List<dynamic> rawAddons = [];
-                            if (item.addons.isNotEmpty) {
-                              rawAddons = item.addons;
-                            } else {
-                              try {
-                                rawAddons =
-                                    (item as dynamic).toJson()['addons'] ?? [];
-                              } catch (_) {}
-                            }
-
-                            Map<String, Map<String, dynamic>> groupedAddons =
-                                {};
-                            for (var addon in rawAddons) {
+                            for (final addon in rawAddons) {
                               String name = '';
                               int qty = 1;
                               bool canIncreaseQty = false;
 
                               if (addon is Map) {
                                 name =
-                                    addon['menuAddonDetail']?['addonMenu']?['addonName'] ??
-                                    addon['addonMenu']?['addonName'] ??
-                                    addon['name'] ??
-                                    '';
-                                qty =
-                                    (addon['addonQty'] ??
-                                            addon['addon_qty'] ??
-                                            1)
-                                        .toInt();
+                                    (addon['addonNameAtOrder'] ??
+                                            addon['optionNameAtOrder'] ??
+                                            addon['name'] ??
+                                            '')
+                                        .toString();
 
-                                final dynamic menu =
-                                    addon['menuAddonDetail']?['addonMenu'] ??
-                                    addon['addonMenu'] ??
-                                    addon['menuAddon'];
+                                final dynamic rawQty =
+                                    addon['addon_qty'] ??
+                                    addon['option_qty'] ??
+                                    addon['addonQty'] ??
+                                    1;
 
-                                if (menu != null) {
-                                  if (menu['canIncreaseQuantity'] != null) {
-                                    canIncreaseQty =
-                                        menu['canIncreaseQuantity'] == true;
-                                  } else if (menu['allowQuantity'] != null) {
-                                    canIncreaseQty =
-                                        menu['allowQuantity'] == true;
-                                  } else if (menu['isMultiple'] != null) {
-                                    canIncreaseQty = menu['isMultiple'] == true;
-                                  } else if (menu['isQuantity'] != null) {
-                                    canIncreaseQty = menu['isQuantity'] == true;
-                                  } else if (menu['maxQuantity'] != null) {
-                                    canIncreaseQty =
-                                        (menu['maxQuantity'] as num) > 1;
-                                  } else if (menu['maxQty'] != null) {
-                                    canIncreaseQty =
-                                        (menu['maxQty'] as num) > 1;
-                                  } else if (menu['addonType'] != null) {
-                                    final typeStr = menu['addonType']
-                                        .toString()
-                                        .toLowerCase();
-                                    canIncreaseQty =
-                                        !typeStr.contains('radio') &&
-                                        !typeStr.contains('single');
-                                  }
-                                }
+                                qty = rawQty is num
+                                    ? rawQty.toInt()
+                                    : int.tryParse(rawQty.toString()) ?? 1;
+
+                                canIncreaseQty = qty > 1;
                               } else {
                                 try {
-                                  name =
-                                      (addon as dynamic)
-                                          .menuAddonDetail
-                                          ?.addonMenu
-                                          ?.addonName ??
-                                      '';
-                                  qty = ((addon as dynamic).addonQty ?? 1)
-                                      .toInt();
+                                  final dynamic option = addon;
 
-                                  final dynamic menu =
-                                      (addon as dynamic)
-                                          .menuAddonDetail
-                                          ?.addonMenu ??
-                                      (addon as dynamic).addonMenu;
+                                  name = (option.optionNameAtOrder ?? '')
+                                      .toString();
 
-                                  if (menu != null) {
-                                    if (menu.canIncreaseQuantity != null) {
-                                      canIncreaseQty =
-                                          menu.canIncreaseQuantity == true;
-                                    } else if (menu.allowQuantity != null) {
-                                      canIncreaseQty =
-                                          menu.allowQuantity == true;
-                                    } else if (menu.isMultiple != null) {
-                                      canIncreaseQty = menu.isMultiple == true;
-                                    } else if (menu.maxQuantity != null) {
-                                      canIncreaseQty =
-                                          (menu.maxQuantity as num) > 1;
-                                    }
+                                  final dynamic rawQty = option.optionQty ?? 1;
+
+                                  if (rawQty is num) {
+                                    qty = rawQty.toInt();
+                                  } else {
+                                    qty = int.tryParse(rawQty.toString()) ?? 1;
                                   }
+
+                                  canIncreaseQty = qty > 1;
                                 } catch (_) {}
                               }
 
@@ -556,41 +467,21 @@ class _ViewReceiptOrderState extends State<ViewReceiptOrder> {
                               }
                             }
 
-                            List<Map<String, dynamic>> addonLines = [];
-                            for (var curry in curriesList) {
-                              addonLines.add({
-                                'name': curry['name'],
-                                'qty': curry['qty'],
-                                'showQty': false,
-                              });
-                            }
-                            for (var entry in groupedAddons.entries) {
+                            final List<Map<String, dynamic>> addonLines = [];
+
+                            for (final entry in groupedAddons.entries) {
                               final int q = entry.value['qty'] as int;
                               final bool canInc =
                                   entry.value['canIncreaseQty'] == true;
-                              // 🎯 ให้แสดงจำนวนเหมือนหน้าออเดอร์ (ถ้าเพิ่มจำนวนได้ หรือมีจำนวนมากกว่า 1)
-                              final bool show = canInc || q > 1;
+
                               addonLines.add({
                                 'name': entry.key,
                                 'qty': q,
-                                'showQty': show,
+                                'showQty': canInc || q > 1,
                               });
                             }
 
-                            int totalItemPrice = 0;
-                            try {
-                              final jsonItem = (item as dynamic).toJson();
-                              var rawSubtotal =
-                                  jsonItem['subtotal'] ?? jsonItem['subTotal'];
-                              if (rawSubtotal != null) {
-                                totalItemPrice = (rawSubtotal as num).toInt();
-                              }
-                            } catch (_) {}
-
-                            if (totalItemPrice == 0) {
-                              totalItemPrice =
-                                  (item.menu?.price?.toInt() ?? 0) * item.qty;
-                            }
+                            final int totalItemPrice = item.subTotal.toInt();
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 12.0),

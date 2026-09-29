@@ -3,12 +3,12 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/menu_addon_group_model.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/menu/type_menu_service.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
@@ -31,8 +31,8 @@ class _MenuTheme {
 }
 
 class _AddonGroupAggregate {
-  final MenuAddonGroupModel group;
-  final Map<int, MenuAddonDetailModel> items = {};
+  final OptionGroupModel group;
+  final Map<int, OptionModel> items = {};
 
   _AddonGroupAggregate(this.group);
 }
@@ -49,7 +49,7 @@ class _AddMenuState extends State<AddMenu> {
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final TypeMenuService typeMenuService = TypeMenuService();
   final RestaurantService restaurantService = RestaurantService();
-  final MenuAddonService _addonService = MenuAddonService();
+  final MenuOptionService _addonService = MenuOptionService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   final TextEditingController menuNameController = TextEditingController();
@@ -133,7 +133,7 @@ class _AddMenuState extends State<AddMenu> {
       setState(() {
         _allAddonGroups = groups.map((group) {
           final agg = _AddonGroupAggregate(group);
-          for (final detail in group.details ?? []) {
+          for (final detail in group.options ?? []) {
             final itemKey =
                 detail.addonMenu?.addonId ??
                 detail.addonDetailId ??
@@ -144,7 +144,7 @@ class _AddMenuState extends State<AddMenu> {
         }).toList();
 
         for (final agg in _allAddonGroups) {
-          final gid = agg.group.addonGroupId;
+          final gid = agg.group.optionGroupId;
           if (gid != null) {
             _groupExpanded.putIfAbsent(gid, () => false);
           }
@@ -229,10 +229,10 @@ class _AddMenuState extends State<AddMenu> {
   void _updateAddonSearchResults(String value) {
     final query = value.trim().toLowerCase();
     final results = _allAddonGroups.where((agg) {
-      final isLinked = _linkedGroupIds.contains(agg.group.addonGroupId);
+      final isLinked = _linkedGroupIds.contains(agg.group.optionGroupId);
       if (isLinked) return false;
       if (query.isEmpty) return true;
-      final name = agg.group.addonGroupName?.toLowerCase() ?? "";
+      final name = agg.group.optionGroupName?.toLowerCase() ?? "";
       return name.contains(query);
     }).toList();
 
@@ -272,7 +272,7 @@ class _AddMenuState extends State<AddMenu> {
                     Divider(height: 1, color: Colors.grey.shade100),
                 itemBuilder: (context, index) {
                   final agg = _addonSearchResults[index];
-                  final groupId = agg.group.addonGroupId ?? -1;
+                  final groupId = agg.group.optionGroupId ?? -1;
                   final itemCount = agg.items.length;
 
                   return InkWell(
@@ -303,7 +303,7 @@ class _AddMenuState extends State<AddMenu> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
+                                  agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
                                   style: const TextStyle(
                                     fontSize: 14.5,
                                     fontWeight: FontWeight.w700,
@@ -660,7 +660,7 @@ class _AddMenuState extends State<AddMenu> {
     final linkedGroups = _linkedGroupIds
         .map(
           (id) => _allAddonGroups
-              .where((agg) => agg.group.addonGroupId == id)
+              .where((agg) => agg.group.optionGroupId == id)
               .firstOrNull,
         )
         .whereType<_AddonGroupAggregate>()
@@ -1328,7 +1328,7 @@ class _AddMenuState extends State<AddMenu> {
                           itemBuilder: (context, index) =>
                               ReorderableDelayedDragStartListener(
                                 key: ValueKey(
-                                  linkedGroups[index].group.addonGroupId,
+                                  linkedGroups[index].group.optionGroupId,
                                 ),
                                 index: index,
                                 child: Padding(
@@ -1499,9 +1499,9 @@ class _AddMenuState extends State<AddMenu> {
   }
 
   Widget _buildActiveAddonGroupCard(_AddonGroupAggregate agg) {
-    final groupId = agg.group.addonGroupId ?? -1;
+    final groupId = agg.group.optionGroupId ?? -1;
     final isExpanded = _groupExpanded[groupId] ?? false;
-    final isMultipleChoice = agg.group.is_multiple_choice ?? false;
+    final isMultipleChoice = agg.group.isMultipleChoice ?? false;
     final items = agg.items.values.toList();
 
     return Container(
@@ -1532,7 +1532,7 @@ class _AddMenuState extends State<AddMenu> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
+                          agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
@@ -1656,12 +1656,12 @@ class _AddMenuState extends State<AddMenu> {
     );
   }
 
-  Widget _buildDetailItemRow(MenuAddonDetailModel detail) {
+  Widget _buildDetailItemRow(OptionModel detail) {
     return Row(
       children: [
         Expanded(
           child: Text(
-            detail.addonMenu?.addonName ?? "ไม่มีชื่อ",
+            detail.optionName ?? "ไม่มีชื่อ",
             style: const TextStyle(
               fontSize: 13.5,
               fontWeight: FontWeight.w500,
@@ -1671,7 +1671,7 @@ class _AddMenuState extends State<AddMenu> {
           ),
         ),
         Text(
-          "+${detail.addonPrice?.toInt() ?? 0} บาท",
+          "+${detail.optionPrice?.toInt() ?? 0} บาท",
           style: const TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,

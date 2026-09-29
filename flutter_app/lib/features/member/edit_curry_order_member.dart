@@ -1,8 +1,9 @@
 // features/member/edit_curry_order_member.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/models/option_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -23,7 +24,7 @@ class EditCurryOrderMember extends StatefulWidget {
 
 class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
   final MenuService _menuService = MenuService();
-  final MenuAddonService _addonService = MenuAddonService();
+  final MenuOptionService _optionService = MenuOptionService();
 
   bool _isLoading = true;
   List<MenuModel> _allCurryItems = [];
@@ -33,9 +34,12 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
   bool _isExtraRice = false;
   int _curryQty = 1;
 
-  List<MenuAddonDetailModel> _curryAddons = [];
-  final Map<int, int> _curryAddonQuantities = {};
-  final Map<int, MenuAddonDetailModel> _curryAddonModelsIndex = {};
+  List<OptionGroupModel> _optionGroups = [];
+  List<OptionModel> _curryOptions = [];
+  final Map<int, int> _curryOptionQuantities = {};
+  final Map<String, OptionGroupModel> _groupModelsIndex = {};
+  final Map<int, String> _optionGroupNameById = {};
+  final Map<int, OptionModel> _curryOptionModelsIndex = {};
 
   final TextEditingController _noteController = TextEditingController();
 
@@ -55,11 +59,12 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
           .trim();
     }
 
-    // ดึง Add-on เดิมที่เลือกไว้
-    for (var addon in widget.cartItem.selectedAddons) {
-      if (addon.addonDetailId != null) {
-        _curryAddonQuantities[addon.addonDetailId!] =
-            (_curryAddonQuantities[addon.addonDetailId!] ?? 0) + 1;
+    // ดึง Option เดิมที่เลือกไว้
+    for (final option in widget.cartItem.selectedAddons) {
+      final int? optionId = option.optionId;
+      if (optionId != null) {
+        _curryOptionQuantities[optionId] =
+            (_curryOptionQuantities[optionId] ?? 0) + 1;
       }
     }
 
@@ -93,19 +98,27 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
           curryTypeId,
         );
 
-        final addonGroups = await _addonService.getAddonGroupsByRestaurant(
+        final optionGroups = await _optionService.getOptionGroupsByRestaurant(
           widget.storeUsername,
         );
-        for (var group in addonGroups) {
-          if (group.status != false && group.details != null) {
-            for (var detail in group.details!) {
-              if (detail.status != false) {
-                detail.menuAddonGroup = group;
-                _curryAddons.add(detail);
-                if (detail.addonDetailId != null) {
-                  _curryAddonModelsIndex[detail.addonDetailId!] = detail;
-                }
-              }
+
+        _optionGroups = optionGroups;
+        _curryOptions = [];
+        _curryOptionModelsIndex.clear();
+        _groupModelsIndex.clear();
+        _optionGroupNameById.clear();
+
+        for (final group in optionGroups) {
+          final String groupName = (group.optionGroupName ?? 'ตัวเลือกเสริม')
+              .trim();
+          _groupModelsIndex[groupName] = group;
+
+          final options = group.options ?? [];
+          for (final option in options) {
+            if (option is OptionModel && option.optionId != null) {
+              _curryOptions.add(option);
+              _curryOptionModelsIndex[option.optionId!] = option;
+              _optionGroupNameById[option.optionId!] = groupName;
             }
           }
         }
@@ -127,16 +140,22 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  Map<String, List<MenuAddonDetailModel>> _groupCurryAddons() {
-    Map<String, List<MenuAddonDetailModel>> grouped = {};
-    for (var addon in _curryAddons) {
-      String groupName =
-          addon.menuAddonGroup?.addonGroupName ?? "ตัวเลือกเสริม";
-      if (!grouped.containsKey(groupName)) {
-        grouped[groupName] = [];
+  Map<String, List<OptionModel>> _groupCurryOptions() {
+    final Map<String, List<OptionModel>> grouped = {};
+
+    for (final group in _optionGroups) {
+      final String groupName = (group.optionGroupName ?? 'ตัวเลือกเสริม')
+          .trim();
+      final List<OptionModel> options = (group.options ?? [])
+          .whereType<OptionModel>()
+          .where((option) => option.optionId != null)
+          .toList();
+
+      if (options.isNotEmpty) {
+        grouped[groupName] = options;
       }
-      grouped[groupName]!.add(addon);
     }
+
     return grouped;
   }
 
@@ -147,17 +166,17 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
     );
   }
 
-  Widget _buildCurryAddonItemOption(
-    MenuAddonDetailModel detail,
+  Widget _buildCurryOptionItem(
+    OptionModel option,
     bool isMultipleChoice,
+    String groupName,
   ) {
-    int id = detail.addonDetailId ?? 0;
-    int currentQty = _curryAddonQuantities[id] ?? 0;
-    bool isSelected = currentQty > 0;
+    final int id = option.optionId ?? 0;
+    final int currentQty = _curryOptionQuantities[id] ?? 0;
+    final bool isSelected = currentQty > 0;
 
-    String title = detail.addonMenu?.addonName ?? "ไม่มีชื่อ";
-    int price = detail.addonPrice?.toInt() ?? 0;
-    int currentGroupId = detail.menuAddonGroup?.addonGroupId ?? 0;
+    final String title = option.optionName ?? 'ไม่มีชื่อ';
+    final int price = (option.optionPrice ?? 0).toInt();
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -170,17 +189,15 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                 onTap: () {
                   setState(() {
                     if (isSelected) {
-                      _curryAddonQuantities.remove(id);
+                      _curryOptionQuantities.remove(id);
                     } else {
                       if (!isMultipleChoice) {
-                        _curryAddonQuantities.removeWhere((key, value) {
-                          final model = _curryAddonModelsIndex[key];
-                          return model?.menuAddonGroup?.addonGroupId ==
-                              currentGroupId;
+                        _curryOptionQuantities.removeWhere((key, value) {
+                          return _optionGroupNameById[key] == groupName;
                         });
-                        _curryAddonQuantities[id] = 1;
+                        _curryOptionQuantities[id] = 1;
                       } else {
-                        _curryAddonQuantities[id] = 1;
+                        _curryOptionQuantities[id] = 1;
                       }
                     }
                   });
@@ -263,11 +280,11 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                     onPressed: isSelected
                         ? () {
                             setState(() {
-                              if (_curryAddonQuantities[id]! <= 1) {
-                                _curryAddonQuantities.remove(id);
+                              if (_curryOptionQuantities[id]! <= 1) {
+                                _curryOptionQuantities.remove(id);
                               } else {
-                                _curryAddonQuantities[id] =
-                                    _curryAddonQuantities[id]! - 1;
+                                _curryOptionQuantities[id] =
+                                    _curryOptionQuantities[id]! - 1;
                               }
                             });
                           }
@@ -300,7 +317,7 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                     ),
                     onPressed: isSelected
                         ? () => setState(
-                            () => _curryAddonQuantities[id] = currentQty + 1,
+                            () => _curryOptionQuantities[id] = currentQty + 1,
                           )
                         : null,
                   ),
@@ -322,7 +339,7 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
     }
 
     final int selectCount = _selectedCurries.length;
-    final groupedAddons = _groupCurryAddons();
+    final groupedOptions = _groupCurryOptions();
 
     double basePrice = 0;
     if (selectCount == 1)
@@ -339,10 +356,10 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
     final double optionPrice = (selectCount > 0 && _isExtraRice) ? 5.0 : 0.0;
 
     double addonTotalPrice = 0;
-    _curryAddonQuantities.forEach((id, qty) {
-      final model = _curryAddonModelsIndex[id];
+    _curryOptionQuantities.forEach((id, qty) {
+      final model = _curryOptionModelsIndex[id];
       if (model != null) {
-        addonTotalPrice += (model.addonPrice ?? 0) * qty;
+        addonTotalPrice += (model.optionPrice ?? 0) * qty;
       }
     });
 
@@ -511,17 +528,17 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                   ),
                   const SizedBox(height: 8),
 
-                  if (groupedAddons.isNotEmpty) ...[
+                  if (groupedOptions.isNotEmpty) ...[
                     const Divider(thickness: 1, height: 32),
-                    ...groupedAddons.entries.toList().asMap().entries.map((
+                    ...groupedOptions.entries.toList().asMap().entries.map((
                       mapEntry,
                     ) {
                       final isFirstGroup = mapEntry.key == 0;
                       final entry = mapEntry.value;
                       String groupName = entry.key;
-                      List<MenuAddonDetailModel> items = entry.value;
-                      bool isMultipleChoice =
-                          items.first.menuAddonGroup?.is_multiple_choice ??
+                      List<OptionModel> items = entry.value;
+                      final bool isMultipleChoice =
+                          _groupModelsIndex[groupName]?.isMultipleChoice ??
                           false;
 
                       return Column(
@@ -546,9 +563,10 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                           Column(
                             children: items
                                 .map(
-                                  (addonDetail) => _buildCurryAddonItemOption(
-                                    addonDetail,
+                                  (option) => _buildCurryOptionItem(
+                                    option,
                                     isMultipleChoice,
+                                    groupName,
                                   ),
                                 )
                                 .toList(),
@@ -721,13 +739,13 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                     onPressed: _selectedCurries.isEmpty
                         ? null
                         : () {
-                            final List<MenuAddonDetailModel>
-                            finalSelectedAddonsList = [];
-                            _curryAddonQuantities.forEach((id, qty) {
-                              final model = _curryAddonModelsIndex[id];
+                            final List<OptionModel> finalSelectedOptionsList =
+                                [];
+                            _curryOptionQuantities.forEach((id, qty) {
+                              final model = _curryOptionModelsIndex[id];
                               if (model != null && qty > 0) {
                                 for (int i = 0; i < qty; i++) {
-                                  finalSelectedAddonsList.add(model);
+                                  finalSelectedOptionsList.add(model);
                                 }
                               }
                             });
@@ -752,7 +770,7 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
 
                             final updatedItem = CartItem(
                               menu: mainCurryMenu,
-                              selectedAddons: finalSelectedAddonsList,
+                              selectedAddons: finalSelectedOptionsList,
                               selectedCurries: List.from(_selectedCurries),
                               quantity: _curryQty,
                               note: finalNote,

@@ -2,20 +2,20 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
-import 'package:flutter_app/data/models/menu_addon_group_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/order_status_monitor.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/restaurant/add_addon.dart';
 import 'package:flutter_app/features/restaurant/add_menu.dart';
-import 'package:flutter_app/features/restaurant/edit_addon.dart';
+import 'package:flutter_app/features/restaurant/edit_option.dart';
 import 'package:flutter_app/features/restaurant/edit_menu.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
 import 'package:flutter_app/features/restaurant/review_restaurant.dart';
@@ -44,7 +44,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
   final RestaurantService restaurantService = RestaurantService();
   final MenuService menuService = MenuService();
-  final MenuAddonService _addonService = MenuAddonService();
+  final MenuOptionService _optionService = MenuOptionService();
   final OrderService _orderService = OrderService();
 
   RestaurantModel? restaurantModel;
@@ -59,12 +59,11 @@ class _HomeRestaurantState extends State<HomeRestaurant>
 
   int _mainTabIndex = 0;
 
-  bool _isLoadingAddons = false;
-  bool _addonsLoaded = false;
-  List<_AddonGroupAggregate> _addonGroups = [];
+  bool _isLoadingOptions = false;
+  bool _optionsLoaded = false;
+  List<_OptionGroupAggregate> _optionGroups = [];
   final Map<int, bool> _groupEnabled = {};
   final Map<int, bool> _groupExpanded = {};
-  final Map<int, bool> _itemChecked = {};
 
   final Map<int, int> _menuAddonGroupCounts = {};
 
@@ -194,89 +193,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         _needsOpeningHoursSetup = !hoursSetup;
       });
 
-      if (_needsOpeningHoursSetup) {
-        Future.delayed(const Duration(milliseconds: 600), () {
-          if (mounted) _showTutorial();
-        });
-      }
-
       await loadTypeMenus();
     }
-  }
-
-  void _showTutorial() {
-    if (tutorialCoachMark != null) return;
-
-    List<TargetFocus> targets = [
-      TargetFocus(
-        identify: "ProfileTarget",
-        keyTarget: _profileKey,
-        alignSkip: Alignment.bottomRight,
-        shape: ShapeLightFocus.Circle,
-        contents: [
-          TargetContent(
-            align: ContentAlign.bottom,
-            builder: (context, controller) {
-              return Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  const Text(
-                    "เริ่มต้นตั้งค่าร้านค้า 🏪",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    "ร้านของคุณยังไม่เปิดรับออเดอร์ แตะที่ไอคอนโปรไฟล์\nเพื่อไปตั้งค่าเวลาเปิด-ปิดร้านค้าของคุณครับ",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
-                    textAlign: TextAlign.right,
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: () {
-                      controller.skip();
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const AccountManagement(showTutorial: true),
-                        ),
-                      ).then((_) => loadRestaurantData());
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: _primary,
-                    ),
-                    child: const Text(
-                      "ไปตั้งค่ากันเลย",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
-    ];
-
-    tutorialCoachMark = TutorialCoachMark(
-      targets: targets,
-      colorShadow: Colors.black,
-      textSkip: "ข้าม",
-      paddingFocus: 10,
-      opacityShadow: 0.85,
-      onFinish: () {},
-      onClickTarget: (target) {},
-      onSkip: () => true,
-    )..show(context: context);
   }
 
   Future loadTypeMenus() async {
@@ -411,10 +329,10 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     final results = await Future.wait(
       idsToLoad.map((id) async {
         try {
-          final details = await _addonService.getAddonsByMenuId(id);
-          final groupIds = details
-              .map((d) => d.menuAddonGroup?.addonGroupId)
-              .whereType()
+          final groups = await _optionService.getOptionsByMenuId(id);
+          final groupIds = groups
+              .map((group) => group.optionGroupId)
+              .whereType<int>()
               .toSet();
           return MapEntry(id, groupIds.length);
         } catch (e) {
@@ -464,28 +382,26 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     await loadMenusByType(typeMenuId);
   }
 
-  Future _goToEditAddon(_AddonGroupAggregate agg) async {
-    final isMultipleChoice = agg.group.is_multiple_choice ?? false;
-    final List<MenuAddonDetailModel> items = agg.items.values
-        .toList()
-        .cast<MenuAddonDetailModel>();
+  Future _goToEditOptionGroup(_OptionGroupAggregate agg) async {
+    final bool isMultipleChoice = agg.group.isMultipleChoice;
+    final List<OptionModel> options = agg.items.values.toList();
 
     final updated = await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => EditAddon(
-          groupId: agg.group.addonGroupId,
-          groupName: agg.group.addonGroupName,
+          groupId: agg.group.optionGroupId,
+          groupName: agg.group.optionGroupName,
           isMultipleChoice: isMultipleChoice,
-          groupStatus: agg.group.status ?? true,
-          details: items,
+          groupStatus: _groupEnabled[agg.group.optionGroupId ?? -1] ?? true,
+          details: options,
         ),
       ),
     );
 
     if (updated == true) {
-      _addonsLoaded = false;
-      await _loadAddonOptions();
+      _optionsLoaded = false;
+      await _loadOptionGroups();
     }
   }
 
@@ -550,41 +466,41 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     }
   }
 
-  // 🎯 ดัก Error จอแดง ตรงการลบตัวเลือกเสริม
-  Future confirmDeleteAddonGroup(_AddonGroupAggregate agg) async {
-    final groupId = agg.group.addonGroupId;
+  // 🎯 ดัก Error จอแดง ตรงการลบตัวเลือก
+  Future confirmDeleteOptionGroup(_OptionGroupAggregate agg) async {
+    final groupId = agg.group.optionGroupId;
     if (groupId == null) return;
 
     int usedCount = 0;
     try {
-      usedCount = await _addonService.getMenuCountUsingGroup(groupId);
+      usedCount = await _optionService.getMenuCountUsingOptionGroup(groupId);
     } catch (_) {
       usedCount = 0;
     }
 
     final confirmed = await _showConfirmDialog(
-      title: "ยืนยันการลบตัวเลือกเสริม",
-      itemName: agg.group.addonGroupName ?? '',
+      title: "ยืนยันการลบตัวเลือก",
+      itemName: agg.group.optionGroupName ?? '',
       usedCount: usedCount,
     );
 
     if (confirmed != true) return;
 
     try {
-      final success = await _addonService.deleteAddonGroup(groupId);
+      final success = await _optionService.deleteOptionGroup(groupId);
       if (success) {
-        _addonsLoaded = false;
-        await _loadAddonOptions();
+        _optionsLoaded = false;
+        await _loadOptionGroups();
 
         if (mounted) {
           await loadRestaurantData();
         }
 
         if (mounted) {
-          _showSuccessSnackBar("ลบกลุ่มตัวเลือกเสริมสำเร็จ");
+          _showSuccessSnackBar("ลบกลุ่มตัวเลือกสำเร็จ");
         }
       } else if (mounted) {
-        _showErrorSnackBar("ไม่สามารถลบตัวเลือกเสริมได้");
+        _showErrorSnackBar("ไม่สามารถลบตัวเลือกได้");
       }
     } catch (e) {
       if (mounted) {
@@ -612,7 +528,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                 ],
               ),
               content: const Text(
-                "ไม่สามารถลบตัวเลือกเสริมได้ เนื่องจากร้านมีออเดอร์ที่กำลังดำเนินการอยู่ครับ",
+                "ไม่สามารถลบตัวเลือกได้ เนื่องจากร้านมีออเดอร์ที่กำลังดำเนินการอยู่ครับ",
                 style: TextStyle(fontSize: 14.5, height: 1.4),
               ),
               actions: [
@@ -638,7 +554,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   }
 
   // 🎯 ฟังก์ชันสำหรับสลับสถานะเปิด/ปิดของ Addon Group
-  Future _toggleGroupStatusUI(int groupId, bool currentStatus) async {
+  Future _toggleOptionGroupStatusUI(int groupId, bool currentStatus) async {
     final newStatus = !currentStatus;
 
     // อัปเดต UI ทันทีเพื่อให้ดูเร็ว (Optimistic UI)
@@ -647,7 +563,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     });
 
     try {
-      final success = await _addonService.toggleAddonGroupStatus(
+      final success = await _optionService.toggleOptionGroupStatus(
         groupId,
         newStatus,
       );
@@ -831,52 +747,52 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  Future _loadAddonOptions() async {
-    if (_isLoadingAddons) return;
-    setState(() => _isLoadingAddons = true);
+  Future _loadOptionGroups() async {
+    if (_isLoadingOptions) return;
+    setState(() => _isLoadingOptions = true);
 
     try {
-      final groups = await _addonService.getAddonGroupsByRestaurant(
+      final groups = await _optionService.getOptionGroupsByRestaurant(
         GlobalData.usernameRestaurant,
       );
 
       if (!mounted) return;
 
       setState(() {
-        _addonGroups = groups.map((group) {
-          final agg = _AddonGroupAggregate(group);
+        _optionGroups = groups.map((group) {
+          final agg = _OptionGroupAggregate(group);
 
-          for (final detail in group.details ?? []) {
-            final itemKey =
-                detail.addonMenu?.addonId ??
-                detail.addonDetailId ??
-                detail.hashCode;
-            agg.items.putIfAbsent(itemKey, () => detail);
+          final rawOptions = group.options;
+          if (rawOptions is List) {
+            for (final rawOption in rawOptions) {
+              if (rawOption is! OptionModel) continue;
+
+              final int itemKey = rawOption.optionId ?? rawOption.hashCode;
+
+              agg.items.putIfAbsent(itemKey, () => rawOption);
+            }
           }
 
           return agg;
         }).toList();
 
-        for (final agg in _addonGroups) {
-          final gid = agg.group.addonGroupId;
+        for (final agg in _optionGroups) {
+          final int? gid = agg.group.optionGroupId;
+
           if (gid != null) {
-            _groupEnabled.putIfAbsent(gid, () => agg.group.status ?? true);
+            // OptionGroupModel ไม่มี status จึงเก็บสถานะไว้ใน UI state
+            _groupEnabled.putIfAbsent(gid, () => true);
             _groupExpanded[gid] = false;
-          }
-          for (final MenuAddonDetailModel item in agg.items.values) {
-            final int key =
-                item.addonMenu?.addonId ?? item.addonDetailId ?? item.hashCode;
-            _itemChecked.putIfAbsent(key, () => item.status ?? true);
           }
         }
 
-        _isLoadingAddons = false;
-        _addonsLoaded = true;
+        _isLoadingOptions = false;
+        _optionsLoaded = true;
       });
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoadingAddons = false);
-        _showErrorSnackBar("โหลดตัวเลือกเสริมไม่สำเร็จ: " + e.toString());
+        setState(() => _isLoadingOptions = false);
+        _showErrorSnackBar("โหลดกลุ่มตัวเลือกไม่สำเร็จ: " + e.toString());
       }
     }
   }
@@ -1013,11 +929,11 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       _mainTabIndex = index;
       _groupExpanded.updateAll((key, value) => false);
     });
-    if (index == 1 && !_addonsLoaded) {
+    if (index == 1 && !_optionsLoaded) {
       while (categoryLoading.values.any((v) => v == true)) {
         await Future.delayed(const Duration(milliseconds: 200));
       }
-      await _loadAddonOptions();
+      await _loadOptionGroups();
     } else if (index == 2) {
       await _loadIncomeData();
     }
@@ -1386,7 +1302,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           }).toList(),
                   )
                 : _mainTabIndex == 1
-                ? _buildAddonOptionsBody()
+                ? _buildOptionGroupsBody()
                 : _buildSalesDashboardBody(),
           ),
 
@@ -1439,8 +1355,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                 ),
                               );
                               if (saved == true) {
-                                _addonsLoaded = false;
-                                await _loadAddonOptions();
+                                _optionsLoaded = false;
+                                await _loadOptionGroups();
                               }
                             }
                           },
@@ -1448,7 +1364,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           label: Text(
                             _mainTabIndex == 0
                                 ? "เพิ่มเมนู"
-                                : "เพิ่มกลุ่มตัวเลือกเสริม",
+                                : "เพิ่มกลุ่มตัวเลือก",
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w700,
@@ -1592,7 +1508,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                                     ? "มี " +
                                           addonCount.toString() +
                                           " กลุ่มตัวเลือก"
-                                    : "ไม่มีตัวเลือกเสริม",
+                                    : "ไม่มีตัวเลือก",
                                 style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
@@ -1828,15 +1744,15 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  Widget _buildAddonOptionsBody() {
-    if (_isLoadingAddons) {
+  Widget _buildOptionGroupsBody() {
+    if (_isLoadingOptions) {
       return const Center(child: CircularProgressIndicator(color: _primary));
     }
 
-    if (_addonGroups.isEmpty) {
+    if (_optionGroups.isEmpty) {
       return const Center(
         child: Text(
-          "ยังไม่มีตัวเลือกเสริม",
+          "ยังไม่มีตัวเลือก",
           style: TextStyle(fontSize: 15, color: _textMuted),
         ),
       );
@@ -1845,8 +1761,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     return RefreshIndicator(
       color: _primary,
       onRefresh: () {
-        _addonsLoaded = false;
-        return _loadAddonOptions();
+        _optionsLoaded = false;
+        return _loadOptionGroups();
       },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -1854,7 +1770,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
             child: Text(
-              _addonGroups.length.toString() + " รายการ",
+              _optionGroups.length.toString() + " กลุ่ม",
               style: const TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
@@ -1866,10 +1782,10 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 90),
               physics: const AlwaysScrollableScrollPhysics(),
-              itemCount: _addonGroups.length,
+              itemCount: _optionGroups.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                return _buildAddonGroupCard(_addonGroups[index]);
+                return _buildOptionGroupCard(_optionGroups[index]);
               },
             ),
           ),
@@ -2300,7 +2216,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  Widget _buildAddonMetaBadge({
+  Widget _buildOptionMetaBadge({
     required IconData icon,
     required String label,
     required Color color,
@@ -2356,12 +2272,12 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  Widget _buildAddonGroupCard(_AddonGroupAggregate agg) {
-    final int groupId = agg.group.addonGroupId ?? -1;
+  Widget _buildOptionGroupCard(_OptionGroupAggregate agg) {
+    final int groupId = agg.group.optionGroupId ?? -1;
     final bool enabled = _groupEnabled[groupId] ?? true;
     final bool expanded = _groupExpanded[groupId] ?? false;
-    final bool isMultipleChoice = agg.group.is_multiple_choice ?? false;
-    final List<MenuAddonDetailModel> items = agg.items.values.toList();
+    final bool isMultipleChoice = agg.group.isMultipleChoice;
+    final List<OptionModel> items = agg.items.values.toList();
 
     return GestureDetector(
       onTap: () {
@@ -2400,7 +2316,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
+                              agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
                               style: TextStyle(
                                 fontSize: 15.5,
                                 fontWeight: FontWeight.w700,
@@ -2424,7 +2340,8 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                       // 🎯 แทรกปุ่มเปิด-ปิดตรงนี้ครับ!
                       _buildInlineStatusButton(
                         isAvailable: enabled,
-                        onTap: () => _toggleGroupStatusUI(groupId, enabled),
+                        onTap: () =>
+                            _toggleOptionGroupStatusUI(groupId, enabled),
                       ),
                       const SizedBox(width: 12),
 
@@ -2443,7 +2360,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                   const SizedBox(height: 12),
                   Row(
                     children: [
-                      _buildAddonMetaBadge(
+                      _buildOptionMetaBadge(
                         icon: isMultipleChoice
                             ? Icons.check_box_outlined
                             : Icons.radio_button_checked_rounded,
@@ -2456,13 +2373,13 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                       _buildIconAction(
                         icon: Icons.edit_rounded,
                         color: _accent,
-                        onTap: () => _goToEditAddon(agg),
+                        onTap: () => _goToEditOptionGroup(agg),
                       ),
                       const SizedBox(width: 16),
                       _buildIconAction(
                         icon: Icons.delete_outline_rounded,
                         color: _danger,
-                        onTap: () => confirmDeleteAddonGroup(agg),
+                        onTap: () => confirmDeleteOptionGroup(agg),
                       ),
                     ],
                   ),
@@ -2487,7 +2404,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                   child: Column(
                     children: [
                       for (int i = 0; i < items.length; i++) ...[
-                        _buildAddonItemRow(items[i]),
+                        _buildOptionItemRow(items[i]),
                         if (i < items.length - 1) const SizedBox(height: 8),
                       ],
                     ],
@@ -2501,14 +2418,14 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
-  Widget _buildAddonItemRow(MenuAddonDetailModel detail) {
+  Widget _buildOptionItemRow(OptionModel option) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Expanded(
             child: Text(
-              detail.addonMenu?.addonName ?? "ไม่มีชื่อ",
+              option.optionName ?? "ไม่มีชื่อ",
               style: const TextStyle(
                 fontSize: 14,
                 color: _textDark,
@@ -2518,7 +2435,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
             ),
           ),
           Text(
-            "ราคา " + (detail.addonPrice?.toInt() ?? 0).toString() + " บาท",
+            "ราคา " + (option.optionPrice?.toInt() ?? 0).toString() + " บาท",
             style: const TextStyle(fontSize: 13, color: _textMuted),
           ),
         ],
@@ -2590,11 +2507,11 @@ class _HomeRestaurantState extends State<HomeRestaurant>
   );
 }
 
-class _AddonGroupAggregate {
-  final MenuAddonGroupModel group;
-  final Map<int, MenuAddonDetailModel> items = {};
+class _OptionGroupAggregate {
+  final OptionGroupModel group;
+  final Map<int, OptionModel> items = {};
 
-  _AddonGroupAggregate(this.group);
+  _OptionGroupAggregate(this.group);
 }
 
 class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {

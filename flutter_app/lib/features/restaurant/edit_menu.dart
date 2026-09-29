@@ -3,12 +3,12 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/menu_addon_group_model.dart';
-import 'package:flutter_app/data/models/menu_addon_detail_model.dart';
+import 'package:flutter_app/data/models/menu_option_group_model.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/menu/type_menu_service.dart';
-import 'package:flutter_app/data/services/menu/menu_addon_service.dart';
+import 'package:flutter_app/data/services/menu/menu_option_service.dart';
 import 'package:flutter_app/data/services/restaurant/restaurant_service.dart';
 import 'package:flutter_app/data/services/restaurant/type_restaurant_service.dart';
 import 'package:flutter_app/features/restaurant/restaurant_navbar.dart';
@@ -32,8 +32,8 @@ class _MenuTheme {
 }
 
 class _AddonGroupAggregate {
-  final MenuAddonGroupModel group;
-  final Map<int, MenuAddonDetailModel> items = {};
+  final OptionGroupModel group;
+  final Map<int, OptionModel> items = {};
 
   _AddonGroupAggregate(this.group);
 }
@@ -52,7 +52,7 @@ class _EditMenuState extends State<EditMenu> {
   final TypeRestaurantService typeRestaurantService = TypeRestaurantService();
   final TypeMenuService typeMenuService = TypeMenuService();
   final RestaurantService restaurantService = RestaurantService();
-  final MenuAddonService _addonService = MenuAddonService();
+  final MenuOptionService _optionService = MenuOptionService();
   final GlobalKey<FormState> formKey = GlobalKey<FormState>();
 
   final TextEditingController menuNameController = TextEditingController();
@@ -157,15 +157,15 @@ class _EditMenuState extends State<EditMenu> {
     try {
       final types = await typeMenuService.getAllTypeMenu();
 
-      final groups = await _addonService.getAddonGroupsByRestaurant(
+      final groups = await _optionService.getAddonGroupsByRestaurant(
         GlobalData.usernameRestaurant ?? "",
       );
 
-      final linkedDetails = await _addonService.getAddonsByMenuId(
+      final linkedDetails = await _optionService.getAddonsByMenuId(
         widget.menuModel.menuId!,
       );
       final Set<int> linkedGroupIds = linkedDetails
-          .map((d) => d.menuAddonGroup?.addonGroupId)
+          .map((d) => d.optionGroupId)
           .whereType<int>()
           .toSet();
 
@@ -196,7 +196,7 @@ class _EditMenuState extends State<EditMenu> {
 
         _allAddonGroups = groups.map((group) {
           final agg = _AddonGroupAggregate(group);
-          for (final detail in group.details ?? []) {
+          for (final detail in group.options ?? []) {
             final itemKey =
                 detail.addonMenu?.addonId ??
                 detail.addonDetailId ??
@@ -210,7 +210,7 @@ class _EditMenuState extends State<EditMenu> {
         _originalLinkedGroupIds = List.from(_linkedGroupIds);
 
         for (final agg in _allAddonGroups) {
-          final gid = agg.group.addonGroupId;
+          final gid = agg.group.optionGroupId;
           if (gid != null) {
             _groupExpanded[gid] = false;
           }
@@ -236,10 +236,10 @@ class _EditMenuState extends State<EditMenu> {
   void _updateAddonSearchResults(String value) {
     final query = value.trim().toLowerCase();
     final results = _allAddonGroups.where((agg) {
-      final isLinked = _linkedGroupIds.contains(agg.group.addonGroupId);
+      final isLinked = _linkedGroupIds.contains(agg.group.optionGroupId);
       if (isLinked) return false;
       if (query.isEmpty) return true;
-      final name = agg.group.addonGroupName?.toLowerCase() ?? "";
+      final name = agg.group.optionGroupName?.toLowerCase() ?? "";
       return name.contains(query);
     }).toList();
 
@@ -279,7 +279,7 @@ class _EditMenuState extends State<EditMenu> {
                     Divider(height: 1, color: Colors.grey.shade100),
                 itemBuilder: (context, index) {
                   final agg = _addonSearchResults[index];
-                  final groupId = agg.group.addonGroupId ?? -1;
+                  final groupId = agg.group.optionGroupId ?? -1;
                   final itemCount = agg.items.length;
 
                   return InkWell(
@@ -310,7 +310,7 @@ class _EditMenuState extends State<EditMenu> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
+                                  agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
                                   style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w700,
@@ -699,7 +699,7 @@ class _EditMenuState extends State<EditMenu> {
     final linkedGroups = _linkedGroupIds
         .map(
           (id) => _allAddonGroups
-              .where((agg) => agg.group.addonGroupId == id)
+              .where((agg) => agg.group.optionGroupId == id)
               .firstOrNull,
         )
         .whereType<_AddonGroupAggregate>()
@@ -1343,7 +1343,7 @@ class _EditMenuState extends State<EditMenu> {
                                 itemBuilder: (context, index) =>
                                     ReorderableDelayedDragStartListener(
                                       key: ValueKey(
-                                        linkedGroups[index].group.addonGroupId,
+                                        linkedGroups[index].group.optionGroupId,
                                       ),
                                       index: index,
                                       child: Padding(
@@ -1705,9 +1705,9 @@ class _EditMenuState extends State<EditMenu> {
   }
 
   Widget _buildActiveAddonGroupCard(_AddonGroupAggregate agg) {
-    final groupId = agg.group.addonGroupId ?? -1;
+    final groupId = agg.group.optionGroupId ?? -1;
     final isExpanded = _groupExpanded[groupId] ?? false;
-    final isMultipleChoice = agg.group.is_multiple_choice ?? false;
+    final isMultipleChoice = agg.group.isMultipleChoice ?? false;
     final items = agg.items.values.toList();
 
     return Container(
@@ -1732,7 +1732,7 @@ class _EditMenuState extends State<EditMenu> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          agg.group.addonGroupName ?? "ไม่มีชื่อกลุ่ม",
+                          agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
                           style: const TextStyle(
                             fontSize: 14.5,
                             fontWeight: FontWeight.w700,
@@ -1852,12 +1852,12 @@ class _EditMenuState extends State<EditMenu> {
     );
   }
 
-  Widget _buildDetailItemRow(MenuAddonDetailModel detail) {
+  Widget _buildDetailItemRow(OptionModel detail) {
     return Row(
       children: [
         Expanded(
           child: Text(
-            detail.addonMenu?.addonName ?? "ไม่มีชื่อ",
+            detail.optionName ?? "ไม่มีชื่อ",
             style: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w500,
@@ -1867,7 +1867,7 @@ class _EditMenuState extends State<EditMenu> {
           ),
         ),
         Text(
-          "+" + (detail.addonPrice?.toInt() ?? 0).toString() + " บาท",
+          "+" + (detail.optionPrice?.toInt() ?? 0).toString() + " บาท",
           style: const TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,

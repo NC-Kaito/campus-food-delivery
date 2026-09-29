@@ -90,60 +90,13 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
 
   // 🎯 ใช้ฟังก์ชันการ์ดอาหารที่มีโครงสร้างเหมือนฝั่ง Rider และ Member
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    List<dynamic> rawCurries = item.orderDetailCurries ?? [];
-    final bool isCurryDish = rawCurries.isNotEmpty;
-
+    // ตรวจสอบประเภทเมนูจาก Snapshot ของ OrderDetail โดยตรง
+    // ตรวจจาก Snapshot ชื่อเมนูใน OrderDetail แทน
     String displayMenuName = item.menuNameAtOrder.isNotEmpty
         ? item.menuNameAtOrder
         : (item.menu?.menuName ?? "รายการเมนู");
 
-    if (isCurryDish && !displayMenuName.contains("ข้าวราดแกง")) {
-      displayMenuName =
-          "ข้าวราดแกง (" + rawCurries.length.toString() + " อย่าง)";
-    }
-
-    List<Map<String, dynamic>> curriesList = [];
-    for (var e in rawCurries) {
-      String name = '';
-      String img = '';
-      double price = 0.0;
-
-      if (e is Map) {
-        final menuMap = (e['menu'] is Map) ? e['menu'] as Map : e;
-        name =
-            (menuMap['menuname'] ??
-                    menuMap['menuName'] ??
-                    menuMap['name'] ??
-                    '')
-                .toString();
-        img =
-            (menuMap['imageurl'] ??
-                    menuMap['imageUrl'] ??
-                    menuMap['menuimage'] ??
-                    menuMap['menuImage'] ??
-                    '')
-                .toString();
-        price = (e['priceAtOrder'] ?? e['priceatorder'] ?? 0.0).toDouble();
-      } else {
-        try {
-          name =
-              ((e as dynamic).menu?.menuName ??
-                      (e as dynamic).menu?.menuname ??
-                      '')
-                  .toString();
-          img =
-              ((e as dynamic).menu?.menuImage ??
-                      (e as dynamic).menu?.imageurl ??
-                      '')
-                  .toString();
-          price = ((e as dynamic).priceAtOrder ?? 0.0).toDouble();
-        } catch (_) {}
-      }
-
-      if (name.isNotEmpty) {
-        curriesList.add({'name': name, 'image': img, 'price': price});
-      }
-    }
+    final bool isCurryDish = displayMenuName.contains("ข้าวราดแกง");
 
     Map<String, Map<String, dynamic>> groupedAddons = {};
     for (var addon in item.addons) {
@@ -169,33 +122,28 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
       }
     }
 
+    // OrderDetail มี subtotal อยู่แล้ว จึงใช้ Snapshot นี้โดยตรง
     double totalItemPrice = item.subTotal;
     if (totalItemPrice <= 0) {
       double addonsSum = 0.0;
       for (var addon in groupedAddons.values) {
         addonsSum += (addon['unitPrice'] as double) * (addon['qty'] as int);
       }
-      double curriesSum = 0.0;
-      for (var curry in curriesList) {
-        curriesSum += (curry['price'] as double);
-      }
+
       double basePrice = item.priceAtOrder > 0
           ? item.priceAtOrder
           : (item.menu?.price ?? 0.0);
-      totalItemPrice = (basePrice + curriesSum + addonsSum) * item.qty;
+
+      totalItemPrice = (basePrice + addonsSum) * item.qty;
     }
 
-    String rawMenuUrl = item.menu?.menuImage ?? '';
-    if (rawMenuUrl.isEmpty && curriesList.isNotEmpty) {
-      rawMenuUrl = curriesList.first['image'] as String;
-    }
-    final String finalMenuUrl = _getFinalImageUrl(rawMenuUrl);
-    final bool hasAddons = groupedAddons.isNotEmpty || curriesList.isNotEmpty;
+    final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage ?? '');
+    final bool hasAddons = groupedAddons.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF5F5F5), // 🎯 พื้นเทาอ่อนแบบ Rider
+        color: const Color(0xFFF5F5F5),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Padding(
@@ -242,7 +190,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: primaryGreen, // 🎯 ปรับให้เข้ากับร้านค้า
+                          color: primaryGreen,
                         ),
                       ),
                     ],
@@ -268,7 +216,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                           Container(
                             width: 3.5,
                             decoration: BoxDecoration(
-                              color: primaryGreen, // 🎯 เส้นขีดแนวตั้ง
+                              color: primaryGreen,
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
@@ -277,36 +225,6 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                for (var curry in curriesList)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 2,
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            curry['name'] as String,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                        const Text(
-                                          "1 จำนวน",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.black87,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
                                 for (var entry in groupedAddons.entries)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
@@ -381,7 +299,7 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: primaryGreen, // 🎯 ปรับให้เข้ากับร้านค้า
+                        color: primaryGreen,
                       ),
                     ),
                   ),

@@ -36,6 +36,11 @@ public class OrderServiceImpl implements OrderService {
     public boolean memberConfirmOrder(AddOrderDto addOrderDto) {
 
         try {
+            // ป้องกัน Null Pointer ก่อนสั่ง .trim()
+            if (addOrderDto.getMemberUsername() == null || addOrderDto.getRestaurantUsername() == null) {
+                throw new RuntimeException("ข้อมูลผู้ใช้หรือร้านค้าไม่ถูกต้อง (Username เป็นค่าว่าง)");
+            }
+
             String memberUser = addOrderDto.getMemberUsername().trim();
             String restUser = addOrderDto.getRestaurantUsername().trim();
 
@@ -70,12 +75,13 @@ public class OrderServiceImpl implements OrderService {
                             .orElseThrow(() -> new RuntimeException(
                                     "เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัส Menu: " + detailDto.getMenuId()));
 
-                    // Snapshot ชื่อเมนูและราคา ณ เวลาสั่ง
+                    // Snapshot ชื่อเมนู ณ เวลาสั่ง
                     String resolvedMenuName = (detailDto.getMenuNameAtOrder() != null
                             && !detailDto.getMenuNameAtOrder().trim().isEmpty())
                             ? detailDto.getMenuNameAtOrder()
                             : menu.getMenuname();
 
+                    // Snapshot ราคาเมนู (รองรับทั้งราคาปกติ และราคาข้าวแกง 2-3 อย่างที่ Flutter คำนวณส่งมา)
                     double resolvedPrice = detailDto.getPriceAtOrder() > 0
                             ? detailDto.getPriceAtOrder()
                             : menu.getPrice();
@@ -90,13 +96,15 @@ public class OrderServiceImpl implements OrderService {
                             .menu(menu)
                             .build();
 
-                    OrderDetail savedOrderDetail = (OrderDetail) orderDetailRepo.save(orderDetail);
+                    // 🎯 ตัด Cast (OrderDetail) ออก
+                    OrderDetail savedOrderDetail = orderDetailRepo.save(orderDetail);
 
-                    // 3. บันทึกตัวเลือกเสริม (Orderdetailoption)
-                    if (detailDto.getAddons() != null) {
-                        for (AddOrderDetailOptionDto optionDto : detailDto.getAddons()) {
+                    List<AddOrderDetailOptionDto> optionsList = detailDto.getOptions();
 
-                            Option option = (Option) optionRepo.findById(optionDto.getOptionId())
+                    if (optionsList != null) {
+                        for (AddOrderDetailOptionDto optionDto : optionsList) {
+
+                            Option option = optionRepo.findById(optionDto.getOptionId())
                                     .orElseThrow(() -> new RuntimeException(
                                             "เกิดข้อผิดพลาดที่ระบบ ไม่พบรหัส Option: " + optionDto.getOptionId()));
 
@@ -109,25 +117,28 @@ public class OrderServiceImpl implements OrderService {
                                     ? optionDto.getPriceAtOrder()
                                     : option.getOptionprice();
 
+                            // 🎯 ดึงจำนวนจาก DTO (ถ้าไม่มีหรือน้อยกว่า 1 ให้ตั้งเป็น 1)
+                            int resolvedQty = optionDto.getOptionQty() > 0 ? optionDto.getOptionQty() : 1;
+
                             Orderdetailoption orderDetailOption = Orderdetailoption.builder()
                                     .orderDetail(savedOrderDetail)
                                     .menuoptiondetail(option)
                                     .addonNameAtOrder(resolvedOptionName)
                                     .priceAtOrder(resolvedOptionPrice)
-                                    .addon_qty(1)
+                                    .addon_qty(resolvedQty) // 🎯 บันทึกจำนวนลง DB ป้องกันค่าเป็น null
                                     .build();
 
                             orderDetailOptionRepo.save(orderDetailOption);
                         }
-                    }
-                }
+                    }}
             }
 
             return true;
 
-        } catch (Throwable e) {
+        } catch (Exception e) {
             System.err.println("🚨 เกิดข้อผิดพลาดในระบบ Service: " + e.getMessage());
             e.printStackTrace();
+            // สั่งให้ Spring Rollback ข้อมูลใน Transaction ทันทีเมื่อเกิดข้อผิดพลาด
             TransactionAspectSupport.currentTransactionStatus().setRollbackOnly();
             return false;
         }
