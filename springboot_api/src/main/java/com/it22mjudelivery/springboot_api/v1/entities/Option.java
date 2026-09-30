@@ -21,6 +21,9 @@
         private int optionid;
 
         @Column(nullable = false)
+        private  String optionname;
+
+        @Column(nullable = false)
         private double optionprice;
 
         @JsonIgnore

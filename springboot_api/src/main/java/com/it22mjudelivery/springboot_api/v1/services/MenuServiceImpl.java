@@ -163,28 +163,71 @@ public class MenuServiceImpl implements MenuService {
                     .menuname(requestData.getMenuname())
                     .description(requestData.getDescription())
                     .price(requestData.getPrice() != null ? requestData.getPrice() : 0.0)
+                    .price2(requestData.getPrice2())
+                    .price3(requestData.getPrice3())
                     .imageurl(finalImageUrl)
                     .status(requestData.isStatus())
                     .restaurant(restaurant)
                     .typemenu(typeMenu)
                     .build();
 
-            menuRepository.save(menu);
+            // 1. บันทึกเมนูก่อนเพื่อสร้าง menuid
+            Menu savedMenu = menuRepository.save(menu);
 
-            // หมายเหตุ: โครงสร้างใหม่ Optiongroup เป็นของเมนูเดียว จึงไม่มีการ "ผูกกลุ่มเดิม" (addonGroupIds)
-            // กลุ่มตัวเลือกให้สร้างผ่าน saveMenuWithAddons หรือ endpoint สร้างกลุ่มโดยตรง
+            // 2. 🎯 บันทึก Optiongroup และ Option โดยใช้ Repository ที่มีอยู่แล้ว
+            if (requestData.getOptionGroups() != null && !requestData.getOptionGroups().isEmpty()) {
+                for (com.it22mjudelivery.springboot_api.v1.dtos.OptionGroupRequestDTO groupDto : requestData.getOptionGroups()) {
+                    Optiongroup group = Optiongroup.builder()
+                            .optiongroupname(groupDto.getOptiongroupname())
+                            .is_required(groupDto.is_required())
+                            .is_multiple_choice(groupDto.is_multiple_choice())
+                            .menu(savedMenu) // ผูกกับเมนู
+                            .build();
+
+                    Optiongroup savedGroup = optionGroupRepository.save(group);
+
+                    if (groupDto.getOptions() != null) {
+                        for (Object rawOpt : groupDto.getOptions()) {
+                            String optName = "";
+                            double optPrice = 0.0;
+
+                            if (rawOpt instanceof com.it22mjudelivery.springboot_api.v1.dtos.OptionGroupRequestDTO.OptionDetailDTO) {
+                                var optDto = (com.it22mjudelivery.springboot_api.v1.dtos.OptionGroupRequestDTO.OptionDetailDTO) rawOpt;
+                                optName = optDto.getOptionname();
+                                optPrice = optDto.getOptionprice();
+                            } else if (rawOpt instanceof java.util.Map) {
+                                var map = (java.util.Map<?, ?>) rawOpt;
+                                optName = map.get("optionname") != null ? map.get("optionname").toString() : "";
+                                optPrice = map.get("optionprice") != null ? Double.parseDouble(map.get("optionprice").toString()) : 0.0;
+                            }
+
+                            Option option = Option.builder()
+                                    .optionname(optName)
+                                    .optionprice(optPrice)
+                                    .optiongroup(savedGroup)
+                                    .build();
+
+                            optionRepository.save(option);
+                        }
+                    }
+                }
+            }
+
             return true;
         } catch (Exception e) {
-            System.out.println("เกิดข้อผิดพลาดในการบันทึกเมนู " + e);
+            System.out.println("เกิดข้อผิดพลาดในการบันทึกเมนู: " + e);
             throw new RuntimeException("เกิดข้อผิดพลาดในการบันทึกข้อมูล: " + e.getMessage());
         }
     }
 
     @Override
     @Transactional
+    @SuppressWarnings("unchecked")
     public boolean updateMenuByRestaurant(Map<String, Object> requestData) {
         try {
-            Integer menuId = Integer.parseInt(requestData.get("menuId").toString());
+            Integer menuId = Integer.parseInt(
+                    requestData.containsKey("menuId") ? requestData.get("menuId").toString() : requestData.get("menuid").toString()
+            );
             Menu menu = menuRepository.findById(menuId)
                     .orElseThrow(() -> new RuntimeException("ไม่พบเมนูที่ต้องการอัปเดต"));
 
@@ -206,15 +249,51 @@ public class MenuServiceImpl implements MenuService {
             menu.setTypemenu(resolveTypeMenu(typeMenuId, (String) requestData.get("typeMenuName")));
 
             menuRepository.save(menu);
+
+            // 🎯 จัดการอัปเดต Option Groups และ Options ตอนแก้ไข
+            if (requestData.containsKey("optionGroups") && requestData.get("optionGroups") != null) {
+                // ลบของเดิมออกก่อน
+                List<Optiongroup> oldGroups = optionGroupRepository.findByMenu(menu);
+                for (Optiongroup og : oldGroups) {
+                    optionRepository.deleteByOptiongroup(og);
+                }
+                optionGroupRepository.deleteAll(oldGroups);
+
+                // บันทึกชุดใหม่เข้าไป
+                List<Map<String, Object>> groupsData = (List<Map<String, Object>>) requestData.get("optionGroups");
+                for (Map<String, Object> grpMap : groupsData) {
+                    Optiongroup newGroup = Optiongroup.builder()
+                            .optiongroupname((String) grpMap.get("optiongroupname"))
+                            .is_required(grpMap.get("is_required") != null && (boolean) grpMap.get("is_required"))
+                            .is_multiple_choice(grpMap.get("is_multiple_choice") != null && (boolean) grpMap.get("is_multiple_choice"))
+                            .menu(menu)
+                            .build();
+
+                    Optiongroup savedGroup = optionGroupRepository.save(newGroup);
+
+                    List<Map<String, Object>> optionsList = (List<Map<String, Object>>) grpMap.get("options");
+                    if (optionsList != null) {
+                        for (Map<String, Object> optMap : optionsList) {
+                            Option option = Option.builder()
+                                    .optionname((String) optMap.get("optionname"))
+                                    .optionprice(Double.parseDouble(optMap.get("optionprice").toString()))
+                                    .optiongroup(savedGroup)
+                                    .build();
+
+                            optionRepository.save(option);
+                        }
+                    }
+                }
+            }
+
             return true;
         } catch (RuntimeException e) {
-            throw e; // ให้ Controller ส่งกลับไปยัง Flutter
+            throw e;
         } catch (Exception e) {
             System.out.println("เกิดข้อผิดพลาดในการอัปเดตเมนู: " + e);
             throw new RuntimeException("อัปเดตข้อมูลล้มเหลว: " + e.getMessage());
         }
     }
-
     @Override
     @Transactional
     public boolean deleteMenu(int menuId) {

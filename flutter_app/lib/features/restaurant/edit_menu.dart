@@ -3,8 +3,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/menu_option_group_model.dart';
-import 'package:flutter_app/data/models/option_model.dart';
+import 'package:flutter_app/data/models/option_group_request_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/menu/type_menu_service.dart';
@@ -21,7 +20,7 @@ const String _riceCurryTypeName = "ข้าวราดแกง";
 class _MenuTheme {
   static const Color primary = Color(0xFFFF8A00);
   static const Color accent = Color(0xFF2FB86A);
-  static const Color danger = Color(0xFFE5484D); // 🎯 สีแดงสำหรับแจ้งเตือน
+  static const Color danger = Color(0xFFE5484D);
   static const Color surface = Colors.white;
   static const Color pageBg = Color(0xFFF6F7F9);
   static const Color textPrimary = Color(0xFF1F2430);
@@ -31,11 +30,52 @@ class _MenuTheme {
   static const Color linkBlue = Color(0xFF2F80ED);
 }
 
-class _AddonGroupAggregate {
-  final OptionGroupModel group;
-  final Map<int, OptionModel> items = {};
+// 🎯 คลาสเก็บข้อมูลกลุ่มตัวเลือก (Option Group)
+class DraftOptionGroup {
+  int? optionGroupId;
+  TextEditingController nameController = TextEditingController();
+  bool isRequired = false;
+  bool isMultipleChoice = false;
+  List<DraftOption> options = [];
 
-  _AddonGroupAggregate(this.group);
+  DraftOptionGroup({
+    this.optionGroupId,
+    String name = "",
+    this.isRequired = false,
+    this.isMultipleChoice = false,
+    List<DraftOption>? initialOptions,
+  }) {
+    nameController.text = name;
+    if (initialOptions != null) {
+      options.addAll(initialOptions);
+    }
+  }
+
+  void dispose() {
+    nameController.dispose();
+    for (var opt in options) {
+      opt.dispose();
+    }
+  }
+}
+
+// 🎯 คลาสเก็บข้อมูลตัวเลือกย่อย (Option)
+class DraftOption {
+  int? optionId;
+  TextEditingController nameController = TextEditingController();
+  TextEditingController priceController = TextEditingController();
+
+  DraftOption({this.optionId, String name = "", double price = 0.0}) {
+    nameController.text = name;
+    priceController.text = price % 1 == 0
+        ? price.toInt().toString()
+        : price.toString();
+  }
+
+  void dispose() {
+    nameController.dispose();
+    priceController.dispose();
+  }
 }
 
 class EditMenu extends StatefulWidget {
@@ -61,18 +101,7 @@ class _EditMenuState extends State<EditMenu> {
   final TextEditingController _newTypeNameController = TextEditingController();
   final FocusNode _newTypeFocusNode = FocusNode();
 
-  final TextEditingController _addonSearchController = TextEditingController();
-  final FocusNode _addonSearchFocusNode = FocusNode();
-  final LayerLink _addonSearchLayerLink = LayerLink();
-  OverlayEntry? _addonOverlayEntry;
-  Timer? _addonDebounce;
-
-  List<_AddonGroupAggregate> _allAddonGroups = [];
-  List<_AddonGroupAggregate> _addonSearchResults = [];
-
-  List<int> _linkedGroupIds = [];
-  List<int> _originalLinkedGroupIds = [];
-  final Map<int, bool> _groupExpanded = {};
+  final List<DraftOptionGroup> _draftOptionGroups = [];
 
   bool _isLoading = false;
   bool _isInitialLoading = true;
@@ -98,20 +127,16 @@ class _EditMenuState extends State<EditMenu> {
     super.initState();
     _initializeFromMenuModel();
     _initializeData();
-
-    _addonSearchFocusNode.addListener(() {
-      if (_addonSearchFocusNode.hasFocus && _isEditable) {
-        _updateAddonSearchResults(_addonSearchController.text);
-      } else {
-        _removeAddonSearchOverlay();
-      }
-    });
   }
 
   void _initializeFromMenuModel() {
     menuNameController.text = widget.menuModel.menuName ?? "";
     descriptionController.text = widget.menuModel.description ?? "";
-    priceController.text = widget.menuModel.price?.toStringAsFixed(0) ?? "";
+    priceController.text = widget.menuModel.price != null
+        ? (widget.menuModel.price! % 1 == 0
+              ? widget.menuModel.price!.toInt().toString()
+              : widget.menuModel.price!.toString())
+        : "";
     _existingImageUrl = widget.menuModel.menuImage;
     _selectedTypeMenuId = widget.menuModel.typeMenuId;
     _selectedTypeMenuName = widget.menuModel.typeMenuName;
@@ -119,16 +144,15 @@ class _EditMenuState extends State<EditMenu> {
 
   @override
   void dispose() {
-    _addonDebounce?.cancel();
-    _removeAddonSearchOverlay();
-    _addonSearchController.dispose();
-    _addonSearchFocusNode.dispose();
-
     menuNameController.dispose();
     descriptionController.dispose();
     priceController.dispose();
     _newTypeNameController.dispose();
     _newTypeFocusNode.dispose();
+
+    for (var group in _draftOptionGroups) {
+      group.dispose();
+    }
     super.dispose();
   }
 
@@ -148,7 +172,7 @@ class _EditMenuState extends State<EditMenu> {
             typeName.contains("ข้าวแกง") || typeName.contains("ข้าวราดแกง");
       });
     } catch (e) {
-      debugPrint("ตรวจสอบประเภทร้านค้าผิดพลาด: " + e.toString());
+      debugPrint("ตรวจสอบประเภทร้านค้าผิดพลาด: $e");
     }
   }
 
@@ -157,17 +181,38 @@ class _EditMenuState extends State<EditMenu> {
     try {
       final types = await typeMenuService.getAllTypeMenu();
 
-      final groups = await _optionService.getAddonGroupsByRestaurant(
-        GlobalData.usernameRestaurant ?? "",
-      );
+      // 🎯 ดึงกลุ่มตัวเลือกเดิมของเมนูนี้มาจาก API
+      List<DraftOptionGroup> loadedDraftGroups = [];
+      final int? menuId = widget.menuModel.menuId;
 
-      final linkedDetails = await _optionService.getAddonsByMenuId(
-        widget.menuModel.menuId!,
-      );
-      final Set<int> linkedGroupIds = linkedDetails
-          .map((d) => d.optionGroupId)
-          .whereType<int>()
-          .toSet();
+      if (menuId != null) {
+        final existingGroups = await _optionService.getOptionsByMenuId(menuId);
+
+        for (var grp in existingGroups) {
+          final List<DraftOption> groupOptions = [];
+          if (grp.options != null) {
+            for (var opt in grp.options!) {
+              groupOptions.add(
+                DraftOption(
+                  optionId: opt.optionId,
+                  name: opt.optionName ?? "",
+                  price: opt.optionPrice ?? 0.0,
+                ),
+              );
+            }
+          }
+
+          loadedDraftGroups.add(
+            DraftOptionGroup(
+              optionGroupId: grp.optionGroupId,
+              name: grp.optionGroupName ?? "",
+              isRequired: grp.isRequired,
+              isMultipleChoice: grp.isMultipleChoice,
+              initialOptions: groupOptions,
+            ),
+          );
+        }
+      }
 
       if (!mounted) return;
 
@@ -194,185 +239,46 @@ class _EditMenuState extends State<EditMenu> {
           }
         }
 
-        _allAddonGroups = groups.map((group) {
-          final agg = _AddonGroupAggregate(group);
-          for (final detail in group.options ?? []) {
-            final itemKey =
-                detail.addonMenu?.addonId ??
-                detail.addonDetailId ??
-                detail.hashCode;
-            agg.items.putIfAbsent(itemKey, () => detail);
-          }
-          return agg;
-        }).toList();
-
-        _linkedGroupIds = linkedGroupIds.toList();
-        _originalLinkedGroupIds = List.from(_linkedGroupIds);
-
-        for (final agg in _allAddonGroups) {
-          final gid = agg.group.optionGroupId;
-          if (gid != null) {
-            _groupExpanded[gid] = false;
-          }
+        // นำกลุ่มตัวเลือกที่โหลดได้มาใส่ State
+        for (var g in _draftOptionGroups) {
+          g.dispose();
         }
+        _draftOptionGroups.clear();
+        _draftOptionGroups.addAll(loadedDraftGroups);
 
         _isInitialLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() => _isInitialLoading = false);
-      debugPrint("EditMenu _loadAllData error: " + e.toString());
+      debugPrint("EditMenu _loadAllData error: $e");
     }
   }
 
-  void _onAddonSearchChanged(String value) {
-    if (!_isEditable) return;
-    _addonDebounce?.cancel();
-    _addonDebounce = Timer(const Duration(milliseconds: 250), () {
-      _updateAddonSearchResults(value);
-    });
-  }
-
-  void _updateAddonSearchResults(String value) {
-    final query = value.trim().toLowerCase();
-    final results = _allAddonGroups.where((agg) {
-      final isLinked = _linkedGroupIds.contains(agg.group.optionGroupId);
-      if (isLinked) return false;
-      if (query.isEmpty) return true;
-      final name = agg.group.optionGroupName?.toLowerCase() ?? "";
-      return name.contains(query);
-    }).toList();
-
-    if (!mounted) return;
-    setState(() => _addonSearchResults = results);
-
-    if (results.isEmpty) {
-      _removeAddonSearchOverlay();
-    } else {
-      _showAddonSearchOverlay();
-    }
-  }
-
-  void _showAddonSearchOverlay() {
-    _removeAddonSearchOverlay();
-
-    final overlay = OverlayEntry(
-      builder: (context) => Positioned(
-        width: MediaQuery.of(context).size.width - 72,
-        child: CompositedTransformFollower(
-          link: _addonSearchLayerLink,
-          showWhenUnlinked: false,
-          offset: const Offset(0, 52),
-          child: Material(
-            elevation: 8,
-            shadowColor: Colors.black.withOpacity(0.15),
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240),
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: _addonSearchResults.length,
-                separatorBuilder: (context, index) =>
-                    Divider(height: 1, color: Colors.grey.shade100),
-                itemBuilder: (context, index) {
-                  final agg = _addonSearchResults[index];
-                  final groupId = agg.group.optionGroupId ?? -1;
-                  final itemCount = agg.items.length;
-
-                  return InkWell(
-                    onTap: () => _selectAddonGroupToUse(groupId),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: _MenuTheme.primary.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.tune_rounded,
-                              size: 18,
-                              color: _MenuTheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: _MenuTheme.textPrimary,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  itemCount.toString() + " ตัวเลือกย่อย",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: _MenuTheme.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: _MenuTheme.accent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.add_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    Overlay.of(context).insert(overlay);
-    _addonOverlayEntry = overlay;
-  }
-
-  void _removeAddonSearchOverlay() {
-    _addonOverlayEntry?.remove();
-    _addonOverlayEntry = null;
-  }
-
-  void _selectAddonGroupToUse(int groupId) {
+  void _addNewOptionGroup() {
     setState(() {
-      if (!_linkedGroupIds.contains(groupId)) {
-        _linkedGroupIds.add(groupId);
-      }
-      _groupExpanded[groupId] = false;
+      _draftOptionGroups.add(DraftOptionGroup());
     });
-    _addonSearchController.clear();
-    _removeAddonSearchOverlay();
-    _addonSearchFocusNode.unfocus();
+  }
+
+  void _removeOptionGroup(int index) {
+    setState(() {
+      _draftOptionGroups[index].dispose();
+      _draftOptionGroups.removeAt(index);
+    });
+  }
+
+  void _addNewOptionToGroup(DraftOptionGroup group) {
+    setState(() {
+      group.options.add(DraftOption());
+    });
+  }
+
+  void _removeOptionFromGroup(DraftOptionGroup group, int optionIndex) {
+    setState(() {
+      group.options[optionIndex].dispose();
+      group.options.removeAt(optionIndex);
+    });
   }
 
   Future<void> pickImage() async {
@@ -411,7 +317,7 @@ class _EditMenuState extends State<EditMenu> {
                 if (image != null) {
                   setState(() {
                     _selectedImage = File(image.path);
-                    _imageError = null; // 🎯 เคลียร์ error ตอนเลือกรูป
+                    _imageError = null;
                   });
                 }
               },
@@ -431,7 +337,7 @@ class _EditMenuState extends State<EditMenu> {
                 if (image != null) {
                   setState(() {
                     _selectedImage = File(image.path);
-                    _imageError = null; // 🎯 เคลียร์ error ตอนเลือกรูป
+                    _imageError = null;
                   });
                 }
               },
@@ -453,23 +359,49 @@ class _EditMenuState extends State<EditMenu> {
   }
 
   Future<void> _doSaveMenu() async {
-    // 🎯 ตรวจสอบฟอร์มทั้งหมดตอนกดปุ่มบันทึก
     final isFormValid = formKey.currentState!.validate();
 
     setState(() {
       _imageError =
           (_selectedImage == null &&
               (_existingImageUrl == null || _existingImageUrl!.isEmpty))
-          ? "กรุณาเลือกรูปภาพอาหารประกอบด้วย"
+          ? "กรุณาเลือกรูปภาพอาหารประกอบด้วยนะครับ"
           : null;
       _typeMenuError =
           (_selectedTypeMenuId == null &&
               (_newTypeName == null || _newTypeName!.isEmpty))
-          ? "กรุณาเลือกหรือกรอกประเภทหมวดหมู่เมนู"
+          ? "กรุณาเลือกหรือกรอกประเภทหมวดหมู่เมนูนะ"
           : null;
     });
 
-    if (!isFormValid || _imageError != null || _typeMenuError != null) return;
+    bool hasOptionError = false;
+    for (var group in _draftOptionGroups) {
+      if (group.nameController.text.trim().isEmpty) hasOptionError = true;
+      for (var opt in group.options) {
+        if (opt.nameController.text.trim().isEmpty) hasOptionError = true;
+      }
+    }
+
+    if (!isFormValid ||
+        _imageError != null ||
+        _typeMenuError != null ||
+        hasOptionError) {
+      if (hasOptionError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              "กรุณากรอกชื่อกลุ่มและชื่อตัวเลือกเสริมให้ครบถ้วนด้วยนะครับ",
+            ),
+            backgroundColor: _MenuTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -487,22 +419,44 @@ class _EditMenuState extends State<EditMenu> {
           ? ""
           : descriptionController.text.trim();
 
-      final selectedGroupIds = _linkedGroupIds;
+      // 🎯 เตรียมข้อมูล Option Groups แบบ Model Request ส่งไป Backend
+      final List<Map<dynamic, dynamic>> optionGroupsData = _draftOptionGroups
+          .map((group) {
+            final requestGroup = OptionGroupRequestModel(
+              optionGroupId: group.optionGroupId,
+              menuId: widget.menuModel.menuId,
+              optionGroupName: group.nameController.text.trim(),
+              isRequired: group.isRequired,
+              isMultipleChoice: group.isMultipleChoice,
+              options: group.options.map((opt) {
+                return OptionDetailRequestModel(
+                  optionId: opt.optionId,
+                  optionName: opt.nameController.text.trim(),
+                  optionPrice: double.tryParse(opt.priceController.text) ?? 0.0,
+                );
+              }).toList(),
+            );
+            return requestGroup.toJson();
+          })
+          .toList();
 
       final Map<String, dynamic> requestData = {
+        "menuid": widget.menuModel.menuId,
         "menuId": widget.menuModel.menuId,
         "menuname": menuNameController.text.trim(),
         "description": finalDesc,
         "price": finalPrice,
         "extraprice": 0.0,
         "status": widget.menuModel.status ?? true,
+        "imageurl": imageUrl ?? "",
         "imageUrl": imageUrl ?? "",
+        "username": GlobalData.usernameRestaurant,
         "restaurantId": GlobalData.usernameRestaurant,
         "isRiceCurry": _isRiceCurryRestaurant,
         if (_selectedTypeMenuId != null) "typeMenuId": _selectedTypeMenuId,
         if (_newTypeName != null && _newTypeName!.isNotEmpty)
           "typeMenuName": _newTypeName,
-        "addonGroupIds": selectedGroupIds,
+        if (optionGroupsData.isNotEmpty) "optionGroups": optionGroupsData,
       };
 
       await menuService.updateMenuByRestaurant(requestData);
@@ -510,7 +464,9 @@ class _EditMenuState extends State<EditMenu> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("อัปเดตเมนูสำเร็จ"),
+            content: const Text(
+              "อัปเดตเมนูและตัวเลือกเสริมสำเร็จเรียบร้อยครับ!",
+            ),
             backgroundColor: _MenuTheme.accent,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -525,70 +481,23 @@ class _EditMenuState extends State<EditMenu> {
             _existingImageUrl = imageUrl;
             _selectedImage = null;
           }
-          _originalLinkedGroupIds.clear();
-          _originalLinkedGroupIds.addAll(_linkedGroupIds);
         });
+
+        await _loadAllData();
       }
     } catch (e) {
       if (mounted) {
         String errorMsg = e.toString().replaceAll("Exception: ", "");
-
-        if (errorMsg.contains("กำลังดำเนินการอยู่")) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Row(
-                children: [
-                  const Icon(
-                    Icons.warning_rounded,
-                    color: _MenuTheme.danger,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      "ไม่สามารถแก้ไขได้",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              content: Text(
-                errorMsg,
-                style: const TextStyle(fontSize: 14.5, height: 1.4),
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _MenuTheme.danger,
-                  ),
-                  child: const Text(
-                    "ตกลง",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("เกิดข้อผิดพลาด: $errorMsg"),
+            backgroundColor: _MenuTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("เกิดข้อผิดพลาด: " + errorMsg),
-              backgroundColor: _MenuTheme.danger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -611,15 +520,14 @@ class _EditMenuState extends State<EditMenu> {
           ? (fillColor ?? _MenuTheme.fieldBg)
           : const Color(0xFFF0F1F3),
       suffixIcon: suffixIcon,
-      // 🎯 เพิ่มสีแดงเวลาเกิด Error
       errorStyle: const TextStyle(color: _MenuTheme.danger, fontSize: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.black, width: 0),
+        borderSide: const BorderSide(color: Colors.transparent, width: 0),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.black, width: 0),
+        borderSide: const BorderSide(color: Colors.transparent, width: 0),
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -629,7 +537,6 @@ class _EditMenuState extends State<EditMenu> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.6),
       ),
-      // 🎯 ปรับเส้นขอบ Error เป็นสีแดง
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.2),
@@ -695,16 +602,6 @@ class _EditMenuState extends State<EditMenu> {
 
   @override
   Widget build(BuildContext context) {
-    final linkedCount = _linkedGroupIds.length;
-    final linkedGroups = _linkedGroupIds
-        .map(
-          (id) => _allAddonGroups
-              .where((agg) => agg.group.optionGroupId == id)
-              .firstOrNull,
-        )
-        .whereType<_AddonGroupAggregate>()
-        .toList();
-
     return Scaffold(
       backgroundColor: _MenuTheme.pageBg,
       extendBodyBehindAppBar: true,
@@ -715,7 +612,6 @@ class _EditMenuState extends State<EditMenu> {
             )
           : Form(
               key: formKey,
-              // 🎯 เปิดโหมด Realtime Validation ตรงนี้ครับ
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
@@ -723,8 +619,6 @@ class _EditMenuState extends State<EditMenu> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 100),
-
-                    // ── Hero header ────────────────────────────────
                     Row(
                       children: [
                         Container(
@@ -765,7 +659,7 @@ class _EditMenuState extends State<EditMenu> {
                                 ),
                               ),
                               Text(
-                                "ปรับปรุงรายละเอียดเมนูให้ตรงกับข้อมูลล่าสุด",
+                                "ปรับปรุงรายละเอียดเมนูและตัวเลือกให้ตรงกับล่าสุด",
                                 style: TextStyle(
                                   fontSize: 12.5,
                                   color: _MenuTheme.textSecondary,
@@ -776,10 +670,9 @@ class _EditMenuState extends State<EditMenu> {
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 22),
 
-                    // ── Section: หมวดหมู่เมนู (ประเภทเมนู) ───────────
+                    // ── หมวดหมู่เมนู ──────────────────────────────
                     _sectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -815,8 +708,7 @@ class _EditMenuState extends State<EditMenu> {
                                           _selectedTypeMenuId = null;
                                           _selectedTypeMenuName = null;
                                         }
-                                        _typeMenuError =
-                                            null; // 🎯 เคลียร์ error ทันที
+                                        _typeMenuError = null;
                                       });
                                       if (_isAddingNewType) {
                                         FocusScope.of(context).unfocus();
@@ -882,10 +774,6 @@ class _EditMenuState extends State<EditMenu> {
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF0F1F3),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.black,
-                                  width: 0,
-                                ),
                               ),
                               child: Row(
                                 children: [
@@ -924,8 +812,7 @@ class _EditMenuState extends State<EditMenu> {
                                               (e) => e.typemenuName == val,
                                             )
                                             .typemenuId;
-                                        _typeMenuError =
-                                            null; // 🎯 เคลียร์ error ทันที
+                                        _typeMenuError = null;
                                         _newTypeName = null;
                                       });
                                     }
@@ -936,7 +823,6 @@ class _EditMenuState extends State<EditMenu> {
                               controller: _newTypeNameController,
                               focusNode: _newTypeFocusNode,
                               enabled: _isEditable,
-                              // 🎯 ดักจับช่องกรอกชื่อประเภทอาหารใหม่
                               validator: (value) {
                                 if (_isAddingNewType &&
                                     (value == null || value.trim().isEmpty)) {
@@ -976,7 +862,7 @@ class _EditMenuState extends State<EditMenu> {
                       ),
                     ),
 
-                    // ── Section: รูปภาพเมนู ──────────────────────────
+                    // ── รูปภาพเมนู ───────────────────────────────
                     _sectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -998,7 +884,6 @@ class _EditMenuState extends State<EditMenu> {
                                       color: _MenuTheme.fieldBg,
                                       borderRadius: BorderRadius.circular(20),
                                       border: Border.all(
-                                        // 🎯 เปลี่ยนขอบเป็นสีแดงถ้าลืมใส่รูป
                                         color: _imageError != null
                                             ? _MenuTheme.danger
                                             : _MenuTheme.border,
@@ -1048,7 +933,7 @@ class _EditMenuState extends State<EditMenu> {
                       ),
                     ),
 
-                    // ── Section: ข้อมูลเมนู ──────────────────────────
+                    // ── ข้อมูลเมนู ───────────────────────────────
                     _sectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1071,7 +956,6 @@ class _EditMenuState extends State<EditMenu> {
                           TextFormField(
                             controller: menuNameController,
                             enabled: _isEditable,
-                            // 🎯 ดักจับชื่อเมนูห้ามว่าง
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
                                 ? "กรุณากรอกชื่อเมนู"
@@ -1100,7 +984,6 @@ class _EditMenuState extends State<EditMenu> {
                               controller: descriptionController,
                               maxLines: 2,
                               enabled: _isEditable,
-
                               style: const TextStyle(fontSize: 14),
                               decoration: _inputDecoration(
                                 hint: "รายละเอียดอาหารเพิ่มเติม...",
@@ -1171,7 +1054,6 @@ class _EditMenuState extends State<EditMenu> {
                               controller: priceController,
                               enabled: _isEditable,
                               keyboardType: TextInputType.number,
-                              // 🎯 ดักจับราคาห้ามว่าง และต้องเป็นตัวเลข
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
                                   return "กรุณากรอกราคาเมนู";
@@ -1205,163 +1087,82 @@ class _EditMenuState extends State<EditMenu> {
                       ),
                     ),
 
-                    // ── Section: ตัวเลือกเสริม (Add-on) ──────────────────────────
+                    // ── ตัวเลือกเสริม (Option Groups) ───────────────
                     if (!_isRiceCurryRestaurant)
                       _sectionCard(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _sectionHeader(
-                              icon: Icons.playlist_add_check_rounded,
+                              icon: Icons.tune_rounded,
                               title: "ตัวเลือกเสริม (Add-on)",
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _MenuTheme.linkBlue.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  linkedCount.toString() + " กลุ่มที่ผูก",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: _MenuTheme.linkBlue,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            CompositedTransformTarget(
-                              link: _addonSearchLayerLink,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _isEditable
-                                      ? Colors.white
-                                      : const Color(0xFFF0F1F3),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: _isEditable
-                                      ? [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.04,
-                                            ),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 3),
+                              trailing: _isEditable
+                                  ? ElevatedButton.icon(
+                                      onPressed: _addNewOptionGroup,
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: _MenuTheme.linkBlue
+                                            .withOpacity(0.1),
+                                        foregroundColor: _MenuTheme.linkBlue,
+                                        elevation: 0,
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                          vertical: 0,
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
                                           ),
-                                        ]
-                                      : null,
-                                ),
-                                child: TextField(
-                                  controller: _addonSearchController,
-                                  focusNode: _addonSearchFocusNode,
-                                  onChanged: _onAddonSearchChanged,
-                                  enabled: _isEditable,
-                                  style: const TextStyle(fontSize: 14.5),
-                                  decoration: InputDecoration(
-                                    hintText: _isEditable
-                                        ? "ค้นหากลุ่มตัวเลือกเสริมเพื่อนำมาผูก..."
-                                        : "ค้นหากลุ่มตัวเลือกเสริม...",
-                                    hintStyle: const TextStyle(
-                                      color: _MenuTheme.textSecondary,
-                                      fontSize: 13.5,
-                                    ),
-                                    prefixIcon: const Icon(
-                                      Icons.search_rounded,
-                                      color: _MenuTheme.textSecondary,
-                                      size: 20,
-                                    ),
-                                    suffixIcon:
-                                        _addonSearchController
-                                                .text
-                                                .isNotEmpty &&
-                                            _isEditable
-                                        ? IconButton(
-                                            icon: const Icon(
-                                              Icons.close_rounded,
-                                              color: _MenuTheme.textSecondary,
-                                              size: 18,
-                                            ),
-                                            onPressed: () {
-                                              _addonSearchController.clear();
-                                              _updateAddonSearchResults('');
-                                              setState(() {});
-                                            },
-                                          )
-                                        : null,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                        color: Colors.black,
-                                        width: 0,
+                                        ),
                                       ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                        color: Colors.black,
-                                        width: 0,
+                                      icon: const Icon(
+                                        Icons.add_rounded,
+                                        size: 16,
                                       ),
-                                    ),
-                                    filled: true,
-                                    fillColor: _isEditable
-                                        ? Colors.white
-                                        : const Color(0xFFF0F1F3),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                                      label: const Text(
+                                        "เพิ่มกลุ่มตัวเลือก",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    )
+                                  : null,
                             ),
                             const SizedBox(height: 16),
 
-                            if (linkedGroups.isEmpty)
-                              _buildEmptyAddonState()
-                            else if (_isEditable)
-                              ReorderableListView.builder(
-                                shrinkWrap: true,
-                                primary: false,
-                                physics: const NeverScrollableScrollPhysics(),
-                                padding: EdgeInsets.zero,
-                                buildDefaultDragHandles: false,
-                                itemCount: linkedGroups.length,
-                                onReorder: (oldIndex, newIndex) {
-                                  setState(() {
-                                    if (newIndex > oldIndex) {
-                                      newIndex -= 1;
-                                    }
-                                    final item = _linkedGroupIds.removeAt(
-                                      oldIndex,
-                                    );
-                                    _linkedGroupIds.insert(newIndex, item);
-                                  });
-                                },
-                                itemBuilder: (context, index) =>
-                                    ReorderableDelayedDragStartListener(
-                                      key: ValueKey(
-                                        linkedGroups[index].group.optionGroupId,
+                            if (_draftOptionGroups.isEmpty)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 20,
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Icon(
+                                        Icons.style_outlined,
+                                        size: 32,
+                                        color: Colors.grey.shade400,
                                       ),
-                                      index: index,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 10,
-                                        ),
-                                        child: _buildActiveAddonGroupCard(
-                                          linkedGroups[index],
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        _isEditable
+                                            ? "ยังไม่มีกลุ่มตัวเลือกเสริมครับ\nกดปุ่ม 'เพิ่มกลุ่มตัวเลือก' ด้านบนได้เลยนะ"
+                                            : "ไม่มีกลุ่มตัวเลือกเสริมสำหรับเมนูนี้",
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.grey.shade500,
+                                          fontSize: 13,
                                         ),
                                       ),
-                                    ),
-                              )
-                            else
-                              ...linkedGroups.map(
-                                (agg) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _buildActiveAddonGroupCard(agg),
+                                    ],
+                                  ),
                                 ),
+                              ),
+
+                            for (int i = 0; i < _draftOptionGroups.length; i++)
+                              _buildDraftOptionGroupCard(
+                                _draftOptionGroups[i],
+                                i,
                               ),
                           ],
                         ),
@@ -1371,7 +1172,7 @@ class _EditMenuState extends State<EditMenu> {
               ),
             ),
 
-      // ── แผงปุ่มควบคุมด้านล่าง (ตามสไตล์หน้า Profile ร้านค้า) ─────
+      // ── แผงปุ่มด้านล่าง ───────────────────────────
       bottomNavigationBar: _isInitialLoading
           ? null
           : Container(
@@ -1389,14 +1190,9 @@ class _EditMenuState extends State<EditMenu> {
                                   setState(() {
                                     _isEditable = false;
                                     _selectedImage = null;
-                                    _linkedGroupIds.clear();
-                                    _linkedGroupIds.addAll(
-                                      _originalLinkedGroupIds,
-                                    );
                                   });
                                   _initializeFromMenuModel();
-                                  _addonSearchController.clear();
-                                  _removeAddonSearchOverlay();
+                                  _loadAllData();
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: _MenuTheme.textSecondary,
@@ -1515,6 +1311,192 @@ class _EditMenuState extends State<EditMenu> {
     );
   }
 
+  Widget _buildDraftOptionGroupCard(DraftOptionGroup group, int groupIndex) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _isEditable ? _MenuTheme.fieldBg : const Color(0xFFF0F1F3),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.grey.shade300, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                "กลุ่มที่ ${groupIndex + 1}",
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                  color: _MenuTheme.primary,
+                ),
+              ),
+              if (_isEditable)
+                InkWell(
+                  onTap: () => _removeOptionGroup(groupIndex),
+                  child: const Icon(
+                    Icons.delete_outline_rounded,
+                    color: _MenuTheme.danger,
+                    size: 20,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          TextFormField(
+            controller: group.nameController,
+            enabled: _isEditable,
+            validator: (value) => (value == null || value.trim().isEmpty)
+                ? "กรุณาตั้งชื่อกลุ่มด้วยนะครับ"
+                : null,
+            style: const TextStyle(fontSize: 14),
+            decoration: _inputDecoration(
+              hint: "ชื่อกลุ่มตัวเลือก (เช่น ระดับความหวาน, เพิ่มท็อปปิ้ง)",
+              fillColor: Colors.white,
+              enabled: _isEditable,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: CheckboxListTile(
+                  title: const Text(
+                    "จำเป็นต้องเลือก",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  value: group.isRequired,
+                  onChanged: _isEditable
+                      ? (val) => setState(() => group.isRequired = val ?? false)
+                      : null,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  activeColor: _MenuTheme.accent,
+                ),
+              ),
+              Expanded(
+                child: CheckboxListTile(
+                  title: const Text(
+                    "เลือกได้หลายอย่าง",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  value: group.isMultipleChoice,
+                  onChanged: _isEditable
+                      ? (val) => setState(
+                          () => group.isMultipleChoice = val ?? false,
+                        )
+                      : null,
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  activeColor: _MenuTheme.accent,
+                ),
+              ),
+            ],
+          ),
+          const Divider(height: 24),
+
+          const Text(
+            "ตัวเลือกย่อย",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          for (int j = 0; j < group.options.length; j++)
+            _buildDraftOptionRow(group, j),
+
+          if (_isEditable) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => _addNewOptionToGroup(group),
+                icon: const Icon(
+                  Icons.add_circle_outline_rounded,
+                  size: 16,
+                  color: _MenuTheme.primary,
+                ),
+                label: const Text(
+                  "เพิ่มตัวเลือกย่อย",
+                  style: TextStyle(
+                    color: _MenuTheme.primary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDraftOptionRow(DraftOptionGroup group, int optionIndex) {
+    final DraftOption option = group.options[optionIndex];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 2,
+            child: TextFormField(
+              controller: option.nameController,
+              enabled: _isEditable,
+              validator: (value) => (value == null || value.trim().isEmpty)
+                  ? "กรอกชื่อตัวเลือก"
+                  : null,
+              style: const TextStyle(fontSize: 13),
+              decoration: _inputDecoration(
+                hint: "ชื่อ (เช่น ไข่ดาว)",
+                fillColor: Colors.white,
+                enabled: _isEditable,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 1,
+            child: TextFormField(
+              controller: option.priceController,
+              enabled: _isEditable,
+              keyboardType: TextInputType.number,
+              style: const TextStyle(fontSize: 13),
+              decoration: _inputDecoration(
+                hint: "+ ราคา",
+                fillColor: Colors.white,
+                enabled: _isEditable,
+              ),
+            ),
+          ),
+          if (_isEditable) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              onPressed: () => _removeOptionFromGroup(group, optionIndex),
+              icon: const Icon(
+                Icons.remove_circle_outline_rounded,
+                color: Colors.grey,
+                size: 20,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildImagePreview() {
     if (_selectedImage != null) {
       return Image.file(_selectedImage!, fit: BoxFit.cover);
@@ -1575,9 +1557,10 @@ class _EditMenuState extends State<EditMenu> {
         color: _isEditable ? _MenuTheme.fieldBg : const Color(0xFFF0F1F3),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          // 🎯 ถ้ามี error ให้ขอบเป็นสีแดง
-          color: _typeMenuError != null ? _MenuTheme.danger : Colors.black,
-          width: _typeMenuError != null ? 1.2 : 0.3,
+          color: _typeMenuError != null
+              ? _MenuTheme.danger
+              : Colors.transparent,
+          width: _typeMenuError != null ? 1.2 : 0,
         ),
       ),
       child: DropdownButtonHideUnderline(
@@ -1600,281 +1583,6 @@ class _EditMenuState extends State<EditMenu> {
           onChanged: _isEditable && !isEmpty ? onChanged : null,
         ),
       ),
-    );
-  }
-
-  Widget _buildEmptyAddonState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: BoxDecoration(
-        color: _MenuTheme.fieldBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _MenuTheme.border),
-      ),
-      child: Column(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _MenuTheme.primary.withOpacity(0.12),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.tune_rounded,
-              color: _MenuTheme.primary,
-              size: 22,
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            "ยังไม่ได้ผูกกลุ่มตัวเลือกเสริมสำหรับเมนูนี้",
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              color: _MenuTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          if (_isEditable)
-            const Text(
-              "พิมพ์ค้นหาในช่องด้านบนแล้วกด + เพื่อผูกกลุ่มตัวเลือกเสริม",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: _MenuTheme.textSecondary),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddonMetaBadge({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCircleExpandButton({
-    required bool expanded,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: _MenuTheme.primary.withOpacity(0.12),
-          shape: BoxShape.circle,
-        ),
-        child: AnimatedRotation(
-          turns: expanded ? 0.5 : 0,
-          duration: const Duration(milliseconds: 200),
-          child: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: _MenuTheme.primary,
-            size: 20,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActiveAddonGroupCard(_AddonGroupAggregate agg) {
-    final groupId = agg.group.optionGroupId ?? -1;
-    final isExpanded = _groupExpanded[groupId] ?? false;
-    final isMultipleChoice = agg.group.isMultipleChoice ?? false;
-    final items = agg.items.values.toList();
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _MenuTheme.fieldBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _MenuTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => setState(() => _groupExpanded[groupId] = !isExpanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: _MenuTheme.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          items.length.toString() + " ตัวเลือกย่อย",
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _MenuTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        _buildAddonMetaBadge(
-                          icon: isMultipleChoice
-                              ? Icons.check_box_outlined
-                              : Icons.radio_button_checked_rounded,
-                          label: isMultipleChoice
-                              ? "เลือกได้หลายอย่าง"
-                              : "เลือกได้ 1 อย่าง",
-                          color: isMultipleChoice
-                              ? _MenuTheme.linkBlue
-                              : _MenuTheme.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildCircleExpandButton(
-                        expanded: isExpanded,
-                        onTap: () => setState(
-                          () => _groupExpanded[groupId] = !isExpanded,
-                        ),
-                      ),
-                      if (_isEditable) ...[
-                        const SizedBox(height: 8),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () =>
-                              setState(() => _linkedGroupIds.remove(groupId)),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: _MenuTheme.danger.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: _MenuTheme.danger,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 200),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            firstChild: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-              child: Column(
-                children: [
-                  Divider(height: 1, thickness: 1, color: _MenuTheme.border),
-                  const SizedBox(height: 10),
-                  if (items.isNotEmpty)
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
-                            color: _MenuTheme.primary.withOpacity(0.7),
-                            width: 3,
-                          ),
-                        ),
-                      ),
-                      padding: const EdgeInsets.only(left: 10),
-                      child: Column(
-                        children: [
-                          for (int i = 0; i < items.length; i++) ...[
-                            _buildDetailItemRow(items[i]),
-                            if (i < items.length - 1) const SizedBox(height: 8),
-                          ],
-                        ],
-                      ),
-                    ),
-                  if (items.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 6),
-                      child: Text(
-                        "กลุ่มนี้ยังไม่มีตัวเลือกย่อย",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _MenuTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            secondChild: const SizedBox(width: double.infinity, height: 0),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailItemRow(OptionModel detail) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            detail.optionName ?? "ไม่มีชื่อ",
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: _MenuTheme.textPrimary,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        Text(
-          "+" + (detail.optionPrice?.toInt() ?? 0).toString() + " บาท",
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: _MenuTheme.textSecondary,
-          ),
-        ),
-      ],
     );
   }
 }
