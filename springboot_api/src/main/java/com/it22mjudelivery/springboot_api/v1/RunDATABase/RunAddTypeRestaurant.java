@@ -22,6 +22,7 @@ public class RunAddTypeRestaurant implements CommandLineRunner {
             List<TypeRestaurant> types = Arrays.asList(
                     TypeRestaurant.builder().typerestaurantName("อาหารตามสั่ง").build(),
                     TypeRestaurant.builder().typerestaurantName("เส้น").build(),
+                    TypeRestaurant.builder().typerestaurantName("ข้าวราดแกง").build(),
                     TypeRestaurant.builder().typerestaurantName("เครื่องดื่ม").build(),
                     TypeRestaurant.builder().typerestaurantName("ของหวาน").build(),
                     TypeRestaurant.builder().typerestaurantName("อาหารฮาลาล").build(),

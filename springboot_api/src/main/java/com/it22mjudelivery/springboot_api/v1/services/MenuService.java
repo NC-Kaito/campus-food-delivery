@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.services;
 
+import com.it22mjudelivery.springboot_api.v1.dtos.CurryPriceDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
 
@@ -17,7 +18,9 @@ public interface MenuService {
     boolean deleteMenu(int menuId);
 
     boolean updateMenuMapping(Integer menuId, List<Integer> addonGroupIds);
+    CurryPriceDto getCurryPrice(String restaurantId, Integer typeMenuId);
 
+    CurryPriceDto saveCurryPrice(String restaurantId, Integer typeMenuId, CurryPriceDto request);
 //    Set<Menuaddongroup> getAddonsByTypeMenuId(int id);
 
 

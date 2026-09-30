@@ -30,6 +30,10 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
   List<MenuModel> _allCurryItems = [];
 
   final int _maxCurrySelect = 3;
+  double? _curryPrice1;
+  double? _curryPrice2;
+  double? _curryPrice3;
+
   List<MenuModel> _selectedCurries = [];
   bool _isExtraRice = false;
   int _curryQty = 1;
@@ -38,6 +42,7 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
   List<OptionModel> _curryOptions = [];
   final Map<int, int> _curryOptionQuantities = {};
   final Map<String, OptionGroupModel> _groupModelsIndex = {};
+
   final Map<int, String> _optionGroupNameById = {};
   final Map<int, OptionModel> _curryOptionModelsIndex = {};
 
@@ -48,8 +53,12 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
     super.initState();
     // 🎯 ดึงข้อมูลเดิมจากตะกร้ามาตั้งค่าเริ่มต้น
     _curryQty = widget.cartItem.quantity;
-    _isExtraRice = widget.cartItem.note.contains('(เพิ่มข้าว)');
-    _selectedCurries = List.from(widget.cartItem.selectedCurries);
+
+    // เช็ค "เพิ่มข้าว" เฉพาะบรรทัดแรก (ส่วนที่ระบบ gen) กันไปชนกับข้อความที่ลูกค้าพิมพ์เอง
+    final String firstLine = widget.cartItem.note.split('\n').first;
+    _isExtraRice = firstLine.contains('เพิ่มข้าว');
+
+    _selectedCurries = List<MenuModel>.from(widget.cartItem.selectedCurries);
 
     // แกะข้อความ note เดิมออกมา (ตัดส่วนที่ระบบ gen ให้ออก)
     if (widget.cartItem.note.contains("เพิ่มเติม: ")) {
@@ -84,7 +93,7 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
       );
       int? curryTypeId;
 
-      for (var cat in categories) {
+      for (final cat in categories) {
         if (cat.typemenuName != null &&
             cat.typemenuName!.contains("ข้าวราดแกง")) {
           curryTypeId = cat.typemenuId;
@@ -97,6 +106,19 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
           widget.storeUsername,
           curryTypeId,
         );
+
+        // 🎯 ดึงราคามาตรฐาน 1/2/3 อย่างของร้านนี้ (เหมือนในหน้า ListMenuMember)
+        try {
+          final prices = await _menuService.getCurryPrice(
+            restaurantId: widget.storeUsername,
+            typeMenuId: curryTypeId,
+          );
+          _curryPrice1 = (prices?['price'] as num?)?.toDouble();
+          _curryPrice2 = (prices?['price2'] as num?)?.toDouble();
+          _curryPrice3 = (prices?['price3'] as num?)?.toDouble();
+        } catch (e) {
+          debugPrint("ไม่สามารถโหลดราคามาตรฐานข้าวราดแกงได้: $e");
+        }
 
         final optionGroups = await _optionService.getOptionGroupsByRestaurant(
           widget.storeUsername,
@@ -342,29 +364,26 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
     final groupedOptions = _groupCurryOptions();
 
     double basePrice = 0;
-    if (selectCount == 1)
-      basePrice = 30;
-    else if (selectCount == 2)
-      basePrice = 35;
-    else if (selectCount >= 3)
-      basePrice = 40;
+    if (selectCount == 1) {
+      basePrice = _curryPrice1 ?? 0.0;
+    } else if (selectCount == 2) {
+      basePrice = _curryPrice2 ?? 0.0;
+    } else if (selectCount >= 3) {
+      basePrice = _curryPrice3 ?? 0.0;
+    }
 
-    final double totalSurchargePrice = _selectedCurries.fold(
-      0.0,
-      (sum, curry) => sum + (curry.price ?? 0.0),
-    );
+    // 🎯 ไม่นำ curry.price ของแต่ละเมนูมาบวกซ้ำ ใช้เฉพาะราคา 1/2/3 อย่างของร้าน
     final double optionPrice = (selectCount > 0 && _isExtraRice) ? 5.0 : 0.0;
 
     double addonTotalPrice = 0;
     _curryOptionQuantities.forEach((id, qty) {
       final model = _curryOptionModelsIndex[id];
       if (model != null) {
-        addonTotalPrice += (model.optionPrice ?? 0) * qty;
+        addonTotalPrice += (model.optionPrice ?? 0).toDouble() * qty;
       }
     });
 
-    final double unitPrice =
-        basePrice + totalSurchargePrice + optionPrice + addonTotalPrice;
+    final double unitPrice = basePrice + optionPrice + addonTotalPrice;
     final double totalPrice = unitPrice * _curryQty;
 
     return Scaffold(
@@ -432,16 +451,11 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                     itemCount: _allCurryItems.length,
                     itemBuilder: (context, index) {
                       final curry = _allCurryItems[index];
-                      final isAvailable = curry.status ?? true;
-                      final isSelected = _selectedCurries.any(
+                      final bool isAvailable = curry.status ?? true;
+                      final bool isSelected = _selectedCurries.any(
                         (element) => element.menuId == curry.menuId,
                       );
-                      final imgUrl = _getFinalImageUrl(
-                        curry.menuImage ?? (curry as dynamic).imageUrl,
-                      );
-                      final double storedPrice = curry.price ?? 0.0;
-                      final bool isSpecialItem = storedPrice > 0.0;
-                      final double displayItemPrice = storedPrice + 5.0;
+                      final String imgUrl = _getFinalImageUrl(curry.menuImage);
 
                       return AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
@@ -489,17 +503,10 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                           subtitle: Padding(
                             padding: const EdgeInsets.only(top: 4),
                             child: Text(
-                              isSpecialItem
-                                  ? "เมนูพิเศษ +${displayItemPrice.toStringAsFixed(0)} บาท"
-                                  : "รวมในราคาฐานแล้ว",
+                              "รวมในราคาข้าวราดแกงแล้ว",
                               style: TextStyle(
-                                color: isSpecialItem
-                                    ? Colors.orange.shade800
-                                    : Colors.grey.shade500,
+                                color: Colors.grey.shade500,
                                 fontSize: 12,
-                                fontWeight: isSpecialItem
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
                               ),
                             ),
                           ),
@@ -535,8 +542,8 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                     ) {
                       final isFirstGroup = mapEntry.key == 0;
                       final entry = mapEntry.value;
-                      String groupName = entry.key;
-                      List<OptionModel> items = entry.value;
+                      final String groupName = entry.key;
+                      final List<OptionModel> items = entry.value;
                       final bool isMultipleChoice =
                           _groupModelsIndex[groupName]?.isMultipleChoice ??
                           false;
@@ -750,37 +757,36 @@ class _EditCurryOrderMemberState extends State<EditCurryOrderMember> {
                               }
                             });
 
-                            final curriesNames = _selectedCurries
+                            final String curriesNames = _selectedCurries
                                 .map((c) => c.menuName ?? "-")
                                 .join(', ');
-                            final additions = _isExtraRice ? 'เพิ่มข้าว' : '';
-                            String extraNote = _noteController.text.trim();
+                            final String additions = _isExtraRice
+                                ? 'เพิ่มข้าว'
+                                : '';
+                            final String extraNote = _noteController.text
+                                .trim();
 
                             String finalNote =
-                                "ราดแกง: [$curriesNames] ${additions.isNotEmpty ? '($additions)' : ''}"
+                                "ราดแกง: [$curriesNames]${additions.isNotEmpty ? '($additions)' : ''}"
                                     .trim();
                             if (extraNote.isNotEmpty) {
                               finalNote += "\nเพิ่มเติม: $extraNote";
                             }
 
                             final MenuModel mainCurryMenu =
-                                _selectedCurries.isNotEmpty
-                                ? _selectedCurries.first
-                                : MenuModel(menuName: "ข้าวเปล่า", price: 20.0);
+                                _selectedCurries.first;
 
                             final updatedItem = CartItem(
                               menu: mainCurryMenu,
                               selectedAddons: finalSelectedOptionsList,
-                              selectedCurries: List.from(_selectedCurries),
+                              selectedCurries: List<MenuModel>.from(
+                                _selectedCurries,
+                              ),
                               quantity: _curryQty,
                               note: finalNote,
                               addonPrice: addonTotalPrice.toInt(),
                               totalPrice: totalPrice.toInt(),
-                              unitPrice:
-                                  (basePrice +
-                                          totalSurchargePrice +
-                                          optionPrice)
-                                      .toInt(),
+                              unitPrice: unitPrice.toInt(),
                               isExtraPrice: false,
                             );
 

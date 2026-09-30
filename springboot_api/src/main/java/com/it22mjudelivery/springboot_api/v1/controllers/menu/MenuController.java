@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.menu;
 
+import com.it22mjudelivery.springboot_api.v1.dtos.CurryPriceDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
 import com.it22mjudelivery.springboot_api.v1.services.MenuService;
@@ -126,6 +127,62 @@ public class MenuController {
         } catch (Exception e) {
             System.out.println(e);
             return ResponseEntity.internalServerError().body("เกิดข้อผิดพลาดที่ระบบ");
+        }
+    }
+
+
+    @GetMapping("/curry-price")
+    public ResponseEntity<?> getCurryPrice(
+            @RequestParam String restaurantId,
+            @RequestParam Integer typeMenuId) {
+
+        CurryPriceDto result =
+                menuService.getCurryPrice(
+                        restaurantId,
+                        typeMenuId
+                );
+
+        if (result == null) {
+
+            return ResponseEntity.ok(
+                    new java.util.HashMap<>()
+            );
+        }
+
+        return ResponseEntity.ok(result);
+    }
+
+    @PutMapping("/curry-price")
+    public ResponseEntity<?> saveCurryPrice(
+            @RequestParam String restaurantId,
+            @RequestParam Integer typeMenuId,
+            @RequestBody CurryPriceDto request
+    ) {
+        try {
+
+            CurryPriceDto result =
+                    menuService.saveCurryPrice(
+                            restaurantId,
+                            typeMenuId,
+                            request
+                    );
+
+            return ResponseEntity.ok(result);
+
+        } catch (RuntimeException e) {
+
+            return ResponseEntity.badRequest()
+                    .body(Map.of("message", e.getMessage()));
+
+        } catch (Exception e) {
+
+            e.printStackTrace();
+
+            return ResponseEntity.internalServerError()
+                    .body(Map.of(
+                            "message",
+                            "เกิดข้อผิดพลาดที่ระบบ: " + e.getMessage()
+                    ));
         }
     }
 }

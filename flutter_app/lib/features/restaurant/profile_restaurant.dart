@@ -279,9 +279,6 @@ class _ProfileRestaurantState extends State<ProfileRestaurant> {
           "latitude": _restaurantLatLng?.latitude ?? restaurantModel?.latitude,
           "longitude":
               _restaurantLatLng?.longitude ?? restaurantModel?.longitude,
-          "openingHours":
-              restaurantModel?.openingHours?.map((e) => e.toJson()).toList() ??
-              [],
           "typeid": _selectedTypeId ?? restaurantModel?.typerestaurantId,
           "ownerfirstname": ownerfirstnameController.text,
           "ownerlastname": ownerlastnameController.text,

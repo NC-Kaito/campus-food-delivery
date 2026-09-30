@@ -10,7 +10,6 @@ import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/features/user/list_menu_user.dart';
-import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/main_login.dart';
 
@@ -159,103 +158,8 @@ class _HomeUserState extends State<HomeUser> {
     }
   }
 
-  String _formatTime(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-  String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
-      return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
-    }
-
-    const shortDayNames = {
-      RestaurantDayOfWeek.monday: "จ.",
-      RestaurantDayOfWeek.tuesday: "อ.",
-      RestaurantDayOfWeek.wednesday: "พ.",
-      RestaurantDayOfWeek.thursday: "พฤ.",
-      RestaurantDayOfWeek.friday: "ศ.",
-      RestaurantDayOfWeek.saturday: "ส.",
-      RestaurantDayOfWeek.sunday: "อา.",
-    };
-
-    final Map<String, List<String>> timeGroups = {};
-
-    for (var d in RestaurantDayOfWeek.values) {
-      final hour = hours.firstWhere(
-        (h) => h.dayOfWeek == d,
-        orElse: () => RestaurantOpeningHourModel(
-          dayOfWeek: d,
-          opentime: const TimeOfDay(hour: 0, minute: 0),
-          closetime: const TimeOfDay(hour: 0, minute: 0),
-          open: false,
-        ),
-      );
-
-      if (hour.open) {
-        final String timeString =
-            "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
-        if (!timeGroups.containsKey(timeString)) {
-          timeGroups[timeString] = [];
-        }
-        timeGroups[timeString]!.add(shortDayNames[d]!);
-      }
-    }
-
-    if (timeGroups.isEmpty) return "ปิดทำการทุกวัน";
-
-    final List<String> resultLines = [];
-    timeGroups.forEach((time, daysList) {
-      resultLines.add("${daysList.join(', ')} ($time)");
-    });
-
-    return resultLines.join(" | ");
-  }
-
-  String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาทำการ";
-
-    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
-    final today = hours.firstWhere(
-      (h) => h.dayOfWeek == todayEnum,
-      orElse: () => RestaurantOpeningHourModel(
-        dayOfWeek: todayEnum,
-        opentime: const TimeOfDay(hour: 8, minute: 0),
-        closetime: const TimeOfDay(hour: 18, minute: 0),
-        open: false,
-      ),
-    );
-
-    if (!today.open) return "วันนี้ร้านปิดทำการ";
-    return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
-  }
-
   bool _isCurrentlyOpen(RestaurantModel item) {
-    if (item.statusOpen == false) return false;
-
-    final hours = item.openingHours;
-    if (hours == null || hours.isEmpty) return false;
-
-    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
-    final today = hours.firstWhere(
-      (h) => h.dayOfWeek == todayEnum,
-      orElse: () => RestaurantOpeningHourModel(
-        dayOfWeek: todayEnum,
-        opentime: const TimeOfDay(hour: 0, minute: 0),
-        closetime: const TimeOfDay(hour: 0, minute: 0),
-        open: false,
-      ),
-    );
-
-    if (!today.open) return false;
-
-    final now = TimeOfDay.now();
-    final nowMinutes = now.hour * 60 + now.minute;
-    final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
-    final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
-
-    if (openMinutes <= closeMinutes) {
-      return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
-    }
-    return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+    return item.statusOpen == true;
   }
 
   String _getFinalImageUrl(String? rawPath) {
@@ -844,81 +748,6 @@ class _HomeUserState extends State<HomeUser> {
                     ],
                   ),
                   const SizedBox(height: 14),
-
-                  // ── แถววันทำการภาพรวมทั้งสัปดาห์ ──
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 15,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _getGroupedOpeningHoursText(item.openingHours),
-                          style: TextStyle(
-                            color: Colors.grey.shade700,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  // ── แถวเวลาของวันนี้โดยเฉพาะ ──
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time_rounded,
-                              size: 16,
-                              color: primaryGreen,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _getTodayHoursText(item.openingHours),
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      if (item.phone != null && item.phone!.isNotEmpty)
-                        Expanded(
-                          flex: 5,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Icon(
-                                Icons.phone_in_talk_rounded,
-                                size: 15,
-                                color: Colors.orange.shade700,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                "${item.phone}",
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
                 ],
               ),
             ),

@@ -1,6 +1,5 @@
 package com.it22mjudelivery.springboot_api.v1.services;
 
-import com.it22mjudelivery.springboot_api.v1.dtos.OpeningHourDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
 
@@ -15,14 +14,14 @@ public interface RestaurantService {
     boolean updateProfileRestaurant(
             String username, String restaurantname, String restaurantimage, int typeid,
             double latitude, double longitude,
-            List<OpeningHourDto> openingHourDtos, String ownerfirstname,
+            String ownerfirstname,
             String ownerlastname, String email, String phone, String ownerimage
     );
 
     boolean updateRegisterRestaurant(
             String username, String restaurantname, String restaurantimage, int typeid,
             double latitude, double longitude,
-            List<OpeningHourDto> openingHourDtos, String ownerfirstname,
+           String ownerfirstname,
             String ownerlastname, String email, String phone, String ownerimage
     );
 

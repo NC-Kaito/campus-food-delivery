@@ -20,7 +20,6 @@ import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/features/member/profile_member.dart';
 import 'package:flutter_app/features/member/view_restaurant_member.dart';
-import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/global_data.dart';
@@ -215,75 +214,6 @@ class _HomeMemberState extends State<HomeMember> {
     }
   }
 
-  String _formatTime(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-  String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
-      return "ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ";
-    }
-
-    const shortDayNames = {
-      RestaurantDayOfWeek.monday: "จ.",
-      RestaurantDayOfWeek.tuesday: "อ.",
-      RestaurantDayOfWeek.wednesday: "พ.",
-      RestaurantDayOfWeek.thursday: "พฤ.",
-      RestaurantDayOfWeek.friday: "ศ.",
-      RestaurantDayOfWeek.saturday: "ส.",
-      RestaurantDayOfWeek.sunday: "อา.",
-    };
-
-    final Map<String, List<String>> timeGroups = {};
-
-    for (var d in RestaurantDayOfWeek.values) {
-      final hour = hours.firstWhere(
-        (h) => h.dayOfWeek == d,
-        orElse: () => RestaurantOpeningHourModel(
-          dayOfWeek: d,
-          opentime: const TimeOfDay(hour: 0, minute: 0),
-          closetime: const TimeOfDay(hour: 0, minute: 0),
-          open: false,
-        ),
-      );
-
-      if (hour.open) {
-        final String timeString =
-            "${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.";
-        if (!timeGroups.containsKey(timeString)) {
-          timeGroups[timeString] = [];
-        }
-        timeGroups[timeString]!.add(shortDayNames[d]!);
-      }
-    }
-
-    if (timeGroups.isEmpty) return "ปิดทำการทุกวัน";
-
-    final List<String> resultLines = [];
-    timeGroups.forEach((time, daysList) {
-      resultLines.add("${daysList.join(', ')} ($time)");
-    });
-
-    return resultLines.join(" | ");
-  }
-
-  String _getTodayHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty) return "ไม่ระบุเวลาทำการ";
-
-    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
-    final today = hours.firstWhere(
-      (h) => h.dayOfWeek == todayEnum,
-      orElse: () => RestaurantOpeningHourModel(
-        dayOfWeek: todayEnum,
-        opentime: const TimeOfDay(hour: 8, minute: 0),
-        closetime: const TimeOfDay(hour: 18, minute: 0),
-        open: false,
-      ),
-    );
-
-    if (!today.open) return "วันนี้ร้านปิดทำการ";
-    return "${_formatTime(today.opentime)} - ${_formatTime(today.closetime)} น.";
-  }
-
   String _getFinalImageUrl(String? rawPath) {
     if (rawPath == null || rawPath.isEmpty) return "";
     if (rawPath.startsWith('http')) return rawPath;
@@ -292,74 +222,36 @@ class _HomeMemberState extends State<HomeMember> {
     return rawPath.startsWith('/') ? "$baseUrl$rawPath" : "$baseUrl/$rawPath";
   }
 
-  Map<String, dynamic> _getRestaurantStatusInfo(RestaurantModel item) {
-    bool isScheduledOpen = false;
-    final hours = item.openingHours;
-
-    if (hours != null && hours.isNotEmpty) {
-      final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
-      final today = hours.firstWhere(
-        (h) => h.dayOfWeek == todayEnum,
-        orElse: () => RestaurantOpeningHourModel(
-          dayOfWeek: todayEnum,
-          opentime: const TimeOfDay(hour: 0, minute: 0),
-          closetime: const TimeOfDay(hour: 0, minute: 0),
-          open: false,
-        ),
-      );
-
-      if (today.open) {
-        final now = TimeOfDay.now();
-        final nowMinutes = now.hour * 60 + now.minute;
-        final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
-        final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
-
-        if (openMinutes <= closeMinutes) {
-          isScheduledOpen =
-              nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
-        } else {
-          isScheduledOpen =
-              nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
-        }
-      }
-    }
-
-    bool isMasterOpen = item.statusOpen ?? true;
-
-    if (isMasterOpen == true && isScheduledOpen == true) {
-      return {
-        'text': 'เปิดอยู่',
-        'color': const Color(0xFF00B300),
-        'bgColor': const Color(0xFF00B300).withOpacity(0.15),
-        'isOpen': true,
-      };
-    } else if (isMasterOpen == false && isScheduledOpen == true) {
-      return {
-        'text': 'ปิดชั่วคราว',
-        'color': Colors.orange.shade800,
-        'bgColor': Colors.orange.shade50,
-        'isOpen': false,
-      };
-    } else {
-      return {
-        'text': 'ปิดทำการ',
-        'color': Colors.grey.shade600,
-        'bgColor': Colors.grey.shade200,
-        'isOpen': false,
-      };
-    }
+  bool _isCurrentlyOpen(RestaurantModel item) {
+    return item.statusOpen == true;
   }
 
   void _refreshBadges() {
     _fetchActiveOrderCount();
-    if (mounted) setState(() {});
+    _reloadRestaurantsSilently();
+  }
+
+  Future<void> _reloadRestaurantsSilently() async {
+    try {
+      var data = await _restaurantService.searchRestaurant(
+        searchController.text,
+      );
+
+      if (_selectedTypeIds.isNotEmpty) {
+        data = data
+            .where((r) => _selectedTypeIds.contains(r.typerestaurantId))
+            .toList();
+      }
+
+      if (mounted) setState(() => _results = data);
+    } catch (e) {
+      debugPrint("รีเฟรชสถานะร้านไม่สำเร็จ: $e");
+    }
   }
 
   void _showClosedRestaurantDialog(RestaurantModel item) {
-    final bool manuallyClosedByOwner = item.statusOpen == false;
-    final String message = manuallyClosedByOwner
-        ? "ร้าน \"${item.restaurantName ?? 'นี้'}\" ปิดชั่วคราวในขณะนี้"
-        : "ร้าน \"${item.restaurantName ?? 'นี้'}\" อยู่นอกเวลาทำการในขณะนี้ (${_getTodayHoursText(item.openingHours)})";
+    final String message =
+        "ร้าน \"${item.restaurantName ?? 'นี้'}\" ปิดอยู่ในขณะนี้";
 
     showDialog(
       context: context,
@@ -828,9 +720,7 @@ class _HomeMemberState extends State<HomeMember> {
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: () {
-          final statusInfo = _getRestaurantStatusInfo(item);
-
-          if (statusInfo['isOpen'] == false) {
+          if (!_isCurrentlyOpen(item)) {
             _showClosedRestaurantDialog(item);
             return;
           }
@@ -1023,10 +913,13 @@ class _HomeMemberState extends State<HomeMember> {
                       const SizedBox(width: 8),
                       Builder(
                         builder: (context) {
-                          final statusInfo = _getRestaurantStatusInfo(item);
-                          final Color statusColor = statusInfo['color'];
-                          final Color statusBg = statusInfo['bgColor'];
-                          final String statusText = statusInfo['text'];
+                          final bool isOpen = _isCurrentlyOpen(item);
+                          final Color statusColor = isOpen
+                              ? const Color(0xFF2E7D32)
+                              : Colors.grey.shade600;
+                          final Color statusBg = isOpen
+                              ? primaryGreen.withOpacity(0.15)
+                              : Colors.grey.shade200;
 
                           return Container(
                             padding: const EdgeInsets.symmetric(
@@ -1050,7 +943,7 @@ class _HomeMemberState extends State<HomeMember> {
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  statusText,
+                                  isOpen ? "เปิดอยู่" : "ปิดอยู่",
                                   style: TextStyle(
                                     color: statusColor,
                                     fontSize: 11,
@@ -1066,78 +959,25 @@ class _HomeMemberState extends State<HomeMember> {
                   ),
                   const SizedBox(height: 12),
 
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.calendar_today_rounded,
-                        size: 15,
-                        color: Colors.grey.shade500,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _getGroupedOpeningHoursText(item.openingHours),
+                  if (item.phone != null && item.phone!.isNotEmpty)
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.phone_in_talk_rounded,
+                          size: 15,
+                          color: Colors.orange.shade700,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          "${item.phone}",
                           style: TextStyle(
                             color: Colors.grey.shade700,
                             fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.access_time_rounded,
-                              size: 16,
-                              color: primaryGreen,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              _getTodayHoursText(item.openingHours),
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      if (item.phone != null && item.phone!.isNotEmpty)
-                        Expanded(
-                          flex: 5,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Icon(
-                                Icons.phone_in_talk_rounded,
-                                size: 15,
-                                color: Colors.orange.shade700,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                "${item.phone}",
-                                style: TextStyle(
-                                  color: Colors.grey.shade700,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
                 ],
               ),
             ),

@@ -360,7 +360,7 @@ class _RegisterOwnerInfoState extends State<RegisterOwnerInfo> {
           restaurantImage:
               restaurantImageUrl, // อาจจะ null ได้ถ้าไม่ได้บังคับใส่รูปหน้าร้าน
           imagecardid: imagecardIdUrl, // มั่นใจได้ว่าตอนนี้ไม่ null แน่นอน
-          openingHours: [],
+
           latitude: widget.latitude,
           longitude: widget.longitude,
           ownerFirstName: ownerFirstNameController.text,

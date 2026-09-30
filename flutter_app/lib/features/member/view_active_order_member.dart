@@ -347,7 +347,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
   }
 
   Widget _buildOrderItemCard(OrderDetailModel item) {
-    // ใช้ชื่อเมนู Snapshot ที่บันทึกใน OrderDetail เพื่อระบุข้าวราดแกง
+    // ตรวจว่าเป็นข้าวราดแกงจากชื่อ Snapshot ของ OrderDetail
     String displayMenuName = item.menuNameAtOrder.isNotEmpty
         ? item.menuNameAtOrder
         : (item.menu?.menuName ?? "รายการเมนู");
@@ -355,22 +355,23 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
     final bool isCurryDish = displayMenuName.contains("ข้าวราดแกง");
 
     // รวม Option ที่เหมือนกันเพื่อแสดงจำนวนในรายการอาหาร
-    Map<String, Map<String, dynamic>> groupedOptions = {};
+    Map<String, Map<String, dynamic>> groupedAddons = {};
 
-    for (final option in item.options) {
-      String name = option.optionNameAtOrder.isNotEmpty
-          ? option.optionNameAtOrder
-          : (option.menuOptionDetail?.optionName ?? '');
+    for (final addon in item.addons) {
+      String name = addon.addonNameAtOrder.isNotEmpty
+          ? addon.addonNameAtOrder
+          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
 
-      final double price = option.priceAtOrder;
-      final int qty = option.optionQty ?? 1;
+      double price = addon.priceAtOrder;
+      int qty = addon.addonQty ?? 1;
 
       if (name.isNotEmpty) {
-        if (groupedOptions.containsKey(name)) {
-          groupedOptions[name]!['qty'] =
-              (groupedOptions[name]!['qty'] as int) + qty;
+        if (groupedAddons.containsKey(name)) {
+          groupedAddons[name]!['qty'] =
+              (groupedAddons[name]!['qty'] as int) + qty;
+          groupedAddons[name]!['canIncreaseQty'] = true;
         } else {
-          groupedOptions[name] = {
+          groupedAddons[name] = {
             'qty': qty,
             'unitPrice': price,
             'canIncreaseQty': qty > 1,
@@ -381,19 +382,21 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
 
     double totalItemPrice = item.subTotal;
     if (totalItemPrice <= 0) {
-      double optionsSum = 0.0;
-      for (final optionGroup in groupedOptions.values) {
-        optionsSum +=
-            (optionGroup['unitPrice'] as double) * (optionGroup['qty'] as int);
+      double addonsSum = 0.0;
+      for (var addon in groupedAddons.values) {
+        addonsSum += (addon['unitPrice'] as double) * (addon['qty'] as int);
       }
-      final double basePrice = item.priceAtOrder > 0
+
+      double basePrice = item.priceAtOrder > 0
           ? item.priceAtOrder
           : (item.menu?.price ?? 0.0);
-      totalItemPrice = (basePrice + optionsSum) * item.qty;
+
+      // ข้าวราดแกงเก็บราคาที่คำนวณเสร็จแล้วไว้ใน priceAtOrder/subTotal
+      totalItemPrice = (basePrice + addonsSum) * item.qty;
     }
 
     final String finalMenuUrl = _getFinalImageUrl(item.menu?.menuImage ?? '');
-    final bool hasOptions = groupedOptions.isNotEmpty;
+    final bool hasAddons = groupedAddons.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -462,7 +465,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
                   const Divider(height: 1, color: Color(0xFFE0E0E0)),
                   const SizedBox(height: 8),
 
-                  if (hasOptions) ...[
+                  if (hasAddons) ...[
                     Text(
                       isCurryDish ? "รายการ" : "รายการเพิ่มเติม",
                       style: const TextStyle(
@@ -488,7 +491,7 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                for (var entry in groupedOptions.entries)
+                                for (var entry in groupedAddons.entries)
                                   Padding(
                                     padding: const EdgeInsets.symmetric(
                                       vertical: 2,
@@ -547,11 +550,17 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
 
                   if (item.note.isNotEmpty) ...[
                     Text(
-                      "หมายเหตุ: " + item.note,
+                      isCurryDish
+                          ? "เมนู: ${item.note}"
+                          : "หมายเหตุ: ${item.note}",
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey.shade600,
-                        fontStyle: FontStyle.italic,
+                        color: isCurryDish
+                            ? Colors.black
+                            : Colors.grey.shade600,
+                        fontStyle: isCurryDish
+                            ? FontStyle.normal
+                            : FontStyle.italic,
                       ),
                     ),
                     const SizedBox(height: 6),

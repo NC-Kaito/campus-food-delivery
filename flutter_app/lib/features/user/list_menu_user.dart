@@ -1,10 +1,8 @@
-import 'dart:async';
 // features/member/list_menu_user.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_app/data/models/restaurant_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
-import 'package:flutter_app/data/models/restaurant_opening_hour_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 // import 'package:flutter_app/features/member/login_member.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
@@ -35,20 +33,20 @@ class _ListMenuUserState extends State<ListMenuUser>
   final List<MenuModel> _selectedCurries = [];
   bool _isExtraRice = false;
   int _curryQty = 1;
-  Timer? _statusRefreshTimer;
 
+  // ราคามาตรฐานข้าวราดแกง
+  double? _curryPrice1;
+  double? _curryPrice2;
+  double? _curryPrice3;
+  bool _isLoadingCurryPrice = false;
   @override
   void initState() {
     super.initState();
     _loadAllMenuData();
-    _statusRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
   void dispose() {
-    _statusRefreshTimer?.cancel();
     _tabController?.dispose();
     super.dispose();
   }
@@ -83,6 +81,17 @@ class _ListMenuUserState extends State<ListMenuUser>
         }
       }
 
+      final curryType = categories.cast<TypeMenuModel?>().firstWhere(
+        (type) =>
+            type?.typemenuName != null &&
+            type!.typemenuName!.contains('ข้าวราดแกง'),
+        orElse: () => null,
+      );
+
+      if (curryType?.typemenuId != null) {
+        await _fetchCurryPrices(curryType!.typemenuId!);
+      }
+
       final newController = TabController(
         length: categories.isEmpty ? 1 : categories.length,
         vsync: this,
@@ -105,6 +114,131 @@ class _ListMenuUserState extends State<ListMenuUser>
       debugPrint("Error fetching user menus data: $e");
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _fetchCurryPrices(int typeMenuId) async {
+    final username = widget.restaurantModel.username;
+    if (username == null || username.isEmpty) return;
+
+    if (mounted) {
+      setState(() => _isLoadingCurryPrice = true);
+    }
+
+    try {
+      final prices = await _menuService.getCurryPrice(
+        restaurantId: username,
+        typeMenuId: typeMenuId,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _curryPrice1 = prices?['price'];
+        _curryPrice2 = prices?['price2'];
+        _curryPrice3 = prices?['price3'];
+        _isLoadingCurryPrice = false;
+      });
+    } catch (e) {
+      debugPrint("ไม่สามารถโหลดราคามาตรฐานข้าวราดแกงได้: $e");
+      if (!mounted) return;
+      setState(() {
+        _curryPrice1 = null;
+        _curryPrice2 = null;
+        _curryPrice3 = null;
+        _isLoadingCurryPrice = false;
+      });
+    }
+  }
+
+  String _formatCurryPrice(double? price) {
+    if (price == null || price <= 0) return "ยังไม่ได้กำหนดราคา";
+
+    final value = price % 1 == 0 ? price.toInt().toString() : price.toString();
+
+    return "$value บาท";
+  }
+
+  Widget _buildCurryPriceRow({required String label, required double? price}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green.withOpacity(0.18)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Colors.black87,
+              ),
+            ),
+          ),
+          Text(
+            _formatCurryPrice(price),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: price == null || price <= 0
+                  ? Colors.grey.shade600
+                  : Colors.green.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCurryPriceSummary() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FFF8),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.withOpacity(0.22)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ราคาข้าวราดแกง',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'ราคามาตรฐานของร้าน',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 10),
+          if (_isLoadingCurryPrice)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: CircularProgressIndicator(
+                  color: Colors.green,
+                  strokeWidth: 2.2,
+                ),
+              ),
+            )
+          else ...[
+            _buildCurryPriceRow(label: '1 อย่าง', price: _curryPrice1),
+            const SizedBox(height: 8),
+            _buildCurryPriceRow(label: '2 อย่าง', price: _curryPrice2),
+            const SizedBox(height: 8),
+            _buildCurryPriceRow(label: '3 อย่าง', price: _curryPrice3),
+          ],
+        ],
+      ),
+    );
   }
 
   void _showLoginWarningDialog() {
@@ -342,7 +476,7 @@ class _ListMenuUserState extends State<ListMenuUser>
                                           Text(
                                             isRestaurantOpen
                                                 ? 'เปิดอยู่'
-                                                : 'ปิดชั่วคราว',
+                                                : 'ปิดอยู่',
                                             style: TextStyle(
                                               color: isRestaurantOpen
                                                   ? Colors.green.shade700
@@ -357,36 +491,6 @@ class _ListMenuUserState extends State<ListMenuUser>
                                   ],
                                 ),
                                 const SizedBox(height: 14),
-                                if ((widget.restaurantModel.openingHours ?? [])
-                                    .isNotEmpty)
-                                  Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Icon(
-                                        Icons.calendar_today_outlined,
-                                        size: 18,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: Text(
-                                          _getGroupedOpeningHoursText(
-                                            widget.restaurantModel.openingHours,
-                                          ),
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            color: Colors.grey.shade700,
-                                            height: 1.4,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                if ((widget.restaurantModel.openingHours ?? [])
-                                    .isNotEmpty)
-                                  const SizedBox(height: 10),
                                 Row(
                                   children: [
                                     Icon(
@@ -690,28 +794,37 @@ class _ListMenuUserState extends State<ListMenuUser>
 
   Widget _buildCurrySpecialLayout(List<MenuModel> curryItems) {
     if (curryItems.isEmpty) {
-      return const Center(
-        child: Text(
-          'ไม่มีเมนูกับข้าวพร้อมจำหน่ายในขณะนี้',
-          style: TextStyle(color: Colors.grey, fontSize: 15),
-        ),
+      return ListView(
+        padding: const EdgeInsets.only(bottom: 24),
+        children: [
+          _buildCurryPriceSummary(),
+          const SizedBox(height: 120),
+          const Center(
+            child: Text(
+              'ไม่มีเมนูกับข้าวพร้อมจำหน่ายในขณะนี้',
+              style: TextStyle(color: Colors.grey, fontSize: 15),
+            ),
+          ),
+        ],
       );
     }
 
-    // หน้ารายการข้าวราดแกงสำหรับ User:
-    // แสดงเฉพาะเมนูเท่านั้น ไม่มี checkbox / เพิ่มข้าว / จำนวน / ปุ่มสั่ง
-    // เมื่อแตะเมนู ให้แสดง Popup เข้าสู่ระบบ
+    // ร้านข้าวราดแกง: แสดงราคามาตรฐาน 1/2/3 อย่างด้านบน
+    // ส่วนการ์ดเมนูจะแสดงเฉพาะชื่อและสถานะ ไม่แสดงราคาต่อเมนู
     return ListView.builder(
-      itemCount: curryItems.length,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      itemCount: curryItems.length + 1,
+      padding: const EdgeInsets.only(bottom: 24),
       itemBuilder: (context, index) {
-        final curry = curryItems[index];
+        if (index == 0) {
+          return _buildCurryPriceSummary();
+        }
+
+        final curry = curryItems[index - 1];
         final finalMenuUrl = _getFinalImageUrl(curry.menuImage);
         final bool isAvailable = curry.status ?? true;
-        final double price = curry.price ?? 0.0;
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
           decoration: BoxDecoration(
             color: isAvailable ? Colors.white : Colors.grey.shade200,
             borderRadius: BorderRadius.circular(16),
@@ -724,12 +837,7 @@ class _ListMenuUserState extends State<ListMenuUser>
             boxShadow: isAvailable
                 ? [
                     BoxShadow(
-                      color: const Color.fromARGB(
-                        255,
-                        0,
-                        0,
-                        0,
-                      ).withOpacity(0.05),
+                      color: const Color.fromARGB(0, 0, 0, 0).withOpacity(0.05),
                       spreadRadius: 1,
                       blurRadius: 4,
                       offset: const Offset(0, 2),
@@ -790,31 +898,15 @@ class _ListMenuUserState extends State<ListMenuUser>
                   ),
                   const SizedBox(width: 15),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          curry.menuName ?? 'ไม่มีชื่อกับข้าว',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                            color: isAvailable
-                                ? Colors.black87
-                                : Colors.grey.shade700,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'ราคา ${price.toStringAsFixed(0)} บาท',
-                          style: TextStyle(
-                            color: isAvailable
-                                ? Colors.green
-                                : Colors.grey.shade600,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      curry.menuName ?? 'ไม่มีชื่อกับข้าว',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: isAvailable
+                            ? Colors.black87
+                            : Colors.grey.shade700,
+                      ),
                     ),
                   ),
                 ],
@@ -826,83 +918,8 @@ class _ListMenuUserState extends State<ListMenuUser>
     );
   }
 
-  String _formatTime(TimeOfDay t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-  String _getGroupedOpeningHoursText(List<RestaurantOpeningHourModel>? hours) {
-    if (hours == null || hours.isEmpty || hours.every((h) => !h.open)) {
-      return 'ปิดทำการทุกวัน / ไม่ระบุเวลาทำการ';
-    }
-
-    const shortDayNames = {
-      RestaurantDayOfWeek.monday: 'จ.',
-      RestaurantDayOfWeek.tuesday: 'อ.',
-      RestaurantDayOfWeek.wednesday: 'พ.',
-      RestaurantDayOfWeek.thursday: 'พฤ.',
-      RestaurantDayOfWeek.friday: 'ศ.',
-      RestaurantDayOfWeek.saturday: 'ส.',
-      RestaurantDayOfWeek.sunday: 'อา.',
-    };
-
-    final Map<String, List<String>> timeGroups = {};
-
-    for (final day in RestaurantDayOfWeek.values) {
-      final hour = hours.firstWhere(
-        (h) => h.dayOfWeek == day,
-        orElse: () => RestaurantOpeningHourModel(
-          dayOfWeek: day,
-          opentime: const TimeOfDay(hour: 0, minute: 0),
-          closetime: const TimeOfDay(hour: 0, minute: 0),
-          open: false,
-        ),
-      );
-
-      if (hour.open) {
-        final timeString =
-            '${_formatTime(hour.opentime)} - ${_formatTime(hour.closetime)} น.';
-        timeGroups.putIfAbsent(timeString, () => []).add(shortDayNames[day]!);
-      }
-    }
-
-    if (timeGroups.isEmpty) return 'ปิดทำการทุกวัน';
-
-    final resultLines = <String>[];
-    timeGroups.forEach((time, days) {
-      resultLines.add('${days.join(', ')} ($time)');
-    });
-    return resultLines.join(' | ');
-  }
-
   bool _isCurrentlyOpen(RestaurantModel item) {
-    if (item.statusOpen == false) return false;
-
-    final hours = item.openingHours;
-    if (hours == null || hours.isEmpty) return false;
-
-    final todayEnum = RestaurantDayOfWeek.values[DateTime.now().weekday - 1];
-    final today = hours.firstWhere(
-      (h) => h.dayOfWeek == todayEnum,
-      orElse: () => RestaurantOpeningHourModel(
-        dayOfWeek: todayEnum,
-        opentime: const TimeOfDay(hour: 0, minute: 0),
-        closetime: const TimeOfDay(hour: 0, minute: 0),
-        open: false,
-      ),
-    );
-
-    if (!today.open) return false;
-
-    final now = TimeOfDay.now();
-    final nowMinutes = now.hour * 60 + now.minute;
-    final openMinutes = today.opentime.hour * 60 + today.opentime.minute;
-    final closeMinutes = today.closetime.hour * 60 + today.closetime.minute;
-
-    if (openMinutes <= closeMinutes) {
-      return nowMinutes >= openMinutes && nowMinutes <= closeMinutes;
-    }
-
-    // รองรับร้านที่เปิดข้ามเที่ยงคืน เช่น 18:00 - 02:00
-    return nowMinutes >= openMinutes || nowMinutes <= closeMinutes;
+    return item.statusOpen == true;
   }
 
   Widget _buildPlaceholderIcon() {

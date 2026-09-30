@@ -44,6 +44,9 @@ public class Menu {
     @Column(name = "price3", nullable = true)
     private Double price3;
 
+    @Column(name = "is_curry_price_template", nullable = false)
+    private boolean curryPriceTemplate;
+
     @Column(nullable = false)
     private boolean status;
 

@@ -78,6 +78,12 @@ class _AddMenuState extends State<AddMenu> {
   bool _isLoadingRestaurant = true;
   bool _isRiceCurryRestaurant = false;
 
+  // ราคามาตรฐานข้าวราดแกงที่บันทึกไว้จากหน้า Home Restaurant
+  double? _curryPrice1;
+  double? _curryPrice2;
+  double? _curryPrice3;
+  bool _isLoadingCurryPrice = false;
+
   List<TypeMenuModel> typeMenuList = [];
   List<MenuModel> existingMenuList = [];
 
@@ -106,8 +112,114 @@ class _AddMenuState extends State<AddMenu> {
   Future<void> _initializeData() async {
     await _checkRestaurantType();
     await fetchTypeMenus();
+
+    // ร้านข้าวราดแกงใช้ราคามาตรฐานที่บันทึกไว้ใน Home Restaurant
+    if (_isRiceCurryRestaurant) {
+      await _fetchCurryPrices();
+    }
+
     await _fetchExistingMenus();
     await _fetchAddonGroups();
+  }
+
+  Future<void> _fetchCurryPrices() async {
+    final username = GlobalData.usernameRestaurant ?? "";
+
+    if (username.isEmpty) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoadingCurryPrice = true;
+      });
+    }
+
+    final int? typeMenuId = _selectedTypeMenuId;
+
+    // สำหรับร้านข้าวราดแกง ต้องมี TypeMenu ข้าวราดแกงก่อน
+    if (typeMenuId == null) {
+      debugPrint("ไม่พบ TypeMenu ข้าวราดแกง จึงยังไม่สามารถโหลดราคาได้");
+      return;
+    }
+
+    try {
+      final prices = await menuService.getCurryPrice(
+        restaurantId: username,
+        typeMenuId: typeMenuId,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _curryPrice1 = prices?['price'];
+        _curryPrice2 = prices?['price2'];
+        _curryPrice3 = prices?['price3'];
+      });
+    } catch (e) {
+      debugPrint("ไม่สามารถโหลดราคาข้าวราดแกงได้: $e");
+
+      if (!mounted) return;
+
+      setState(() {
+        _curryPrice1 = null;
+        _curryPrice2 = null;
+        _curryPrice3 = null;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingCurryPrice = false;
+        });
+      }
+    }
+  }
+
+  String _formatCurryPrice(double? price) {
+    if (price == null || price <= 0) {
+      return "ยังไม่ได้กำหนดราคา";
+    }
+
+    final rounded = price % 1 == 0
+        ? price.toInt().toString()
+        : price.toString();
+
+    return "$rounded บาท";
+  }
+
+  Widget _buildCurryPriceRow({required String label, required double? price}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _MenuTheme.accent.withOpacity(0.18)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _MenuTheme.textPrimary,
+              ),
+            ),
+          ),
+          Text(
+            _formatCurryPrice(price),
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: price == null || price <= 0
+                  ? _MenuTheme.textSecondary
+                  : _MenuTheme.accent,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _fetchExistingMenus() async {
@@ -1126,51 +1238,7 @@ class _AddMenuState extends State<AddMenu> {
                     const SizedBox(height: 8),
 
                     if (_isRiceCurryRestaurant)
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: _MenuTheme.accent.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _MenuTheme.accent.withOpacity(0.3),
-                          ),
-                        ),
-                        child: const Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Icon(
-                              Icons.info_outline_rounded,
-                              color: _MenuTheme.accent,
-                              size: 20,
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    "ราคาข้าวราดแกง",
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: _MenuTheme.textPrimary,
-                                    ),
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    "• 1 อย่าง 30 บาท\n• 2 อย่าง 35 บาท\n• 3 อย่าง 40 บาท",
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: _MenuTheme.textSecondary,
-                                      height: 1.6,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
+                      _buildCurryPriceCard()
                     else
                       TextFormField(
                         controller: priceController,
@@ -1679,6 +1747,109 @@ class _AddMenuState extends State<AddMenu> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildCurryPriceCard() {
+    if (_isLoadingCurryPrice) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: _MenuTheme.accent.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: _MenuTheme.accent.withOpacity(0.25)),
+        ),
+        child: const Row(
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: _MenuTheme.accent,
+              ),
+            ),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                "กำลังโหลดราคามาตรฐานจากร้าน...",
+                style: TextStyle(fontSize: 13, color: _MenuTheme.textSecondary),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final hasPrices =
+        (_curryPrice1 != null && _curryPrice1! > 0) ||
+        (_curryPrice2 != null && _curryPrice2! > 0) ||
+        (_curryPrice3 != null && _curryPrice3! > 0);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _MenuTheme.accent.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _MenuTheme.accent.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.info_outline_rounded,
+                color: _MenuTheme.accent,
+                size: 20,
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "ราคาข้าวราดแกง",
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: _MenuTheme.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      "ใช้ราคามาตรฐานที่ร้านกำหนดไว้จากหน้า Home Restaurant",
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: _MenuTheme.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildCurryPriceRow(label: "1 อย่าง", price: _curryPrice1),
+          const SizedBox(height: 8),
+          _buildCurryPriceRow(label: "2 อย่าง", price: _curryPrice2),
+          const SizedBox(height: 8),
+          _buildCurryPriceRow(label: "3 อย่าง", price: _curryPrice3),
+          if (!hasPrices) ...[
+            const SizedBox(height: 10),
+            const Text(
+              "ยังไม่มีราคามาตรฐาน กรุณากำหนดราคาที่หน้า Home Restaurant ก่อน",
+              style: TextStyle(
+                fontSize: 12,
+                color: _MenuTheme.danger,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

@@ -1,8 +1,8 @@
 // features/member/view_order_member.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/data/models/member_model.dart';
 import 'package:flutter_app/data/models/order_detail_option_model.dart';
-import 'package:flutter_app/data/models/option_model.dart';
 import 'package:flutter_app/data/models/order_detail_model.dart';
 import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/in_app_notification_service.dart';
@@ -113,6 +113,26 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     super.dispose();
   }
 
+  /// ราคาต่อ 1 ชิ้น
+  /// ข้าวราดแกงใช้ unitPrice ที่คำนวณเสร็จแล้ว ห้ามบวก curry.price หรือ Option ซ้ำ
+  /// เมนูทั่วไปจึงค่อยบวก Option เพิ่มจาก unitPrice
+  int _getItemUnitTotal(CartItem item) {
+    final bool isCurryDish = item.selectedCurries.isNotEmpty;
+
+    if (isCurryDish) {
+      return item.unitPrice;
+    }
+
+    int optionsSum = 0;
+    for (final option in item.selectedAddons) {
+      if (option is OptionModel) {
+        optionsSum += option.optionPrice?.toInt() ?? 0;
+      }
+    }
+
+    return item.unitPrice + optionsSum;
+  }
+
   Widget _buildPlaceholderIcon() {
     return Container(
       width: 70,
@@ -140,43 +160,35 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
     String? rawMenuImage = item.menu.menuImage;
     String finalMenuUrl = _getFinalImageUrl(rawMenuImage);
 
-    int optionsSum = 0;
-    for (final option in item.selectedAddons) {
-      optionsSum += option.optionPrice?.toInt() ?? 0;
-    }
-    int curriesSum = 0;
-    for (var curry in item.selectedCurries) {
-      curriesSum += (curry.price ?? 0).toInt();
-    }
-    int singleItemTotal = item.unitPrice + optionsSum + curriesSum;
-    int itemTotalPrice = singleItemTotal * item.quantity;
+    final int singleItemTotal = _getItemUnitTotal(item);
+    final int itemTotalPrice = singleItemTotal * item.quantity;
 
-    Map<String, Map<String, dynamic>> groupedOptions = {};
+    final Map<String, Map<String, dynamic>> groupedOptions = {};
     for (final option in item.selectedAddons) {
+      if (option is! OptionModel) continue;
+
       final String name = option.optionName?.trim() ?? '';
       final int price = option.optionPrice?.toInt() ?? 0;
+      if (name.isEmpty) continue;
 
-      if (name.isNotEmpty) {
-        if (groupedOptions.containsKey(name)) {
-          groupedOptions[name]!['qty'] =
-              (groupedOptions[name]!['qty'] as int) + 1;
-          groupedOptions[name]!['canIncreaseQty'] = true;
-        } else {
-          groupedOptions[name] = {
-            'qty': 1,
-            'unitPrice': price,
-            'canIncreaseQty': false,
-          };
-        }
+      if (groupedOptions.containsKey(name)) {
+        groupedOptions[name]!['qty'] =
+            (groupedOptions[name]!['qty'] as int) + 1;
+      } else {
+        groupedOptions[name] = {'qty': 1, 'unitPrice': price};
       }
     }
 
     final bool hasOptions =
         groupedOptions.isNotEmpty || item.selectedCurries.isNotEmpty;
 
-    // 🎯 กรองข้อความ "ราดแกง: [...]" ออกจากหมายเหตุ ไม่ให้แสดงซ้ำ
+    // หมายเหตุของลูกค้าเพิ่มเติม
     String cleanNote = item.note.trim();
     cleanNote = cleanNote
+        .replaceAll(
+          RegExp(r'เมนูที่ลูกค้าเลือก:\s*.*?(?=\s*\|\s*หมายเหตุลูกค้า:|$)'),
+          '',
+        )
         .replaceAll(RegExp(r'ราดแกง:\s*\[.*?\]\s*'), '')
         .trim();
 
@@ -368,10 +380,8 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                                               ),
                                             ),
                                           ),
-                                          if (entry.value['canIncreaseQty'] ==
-                                                  true ||
-                                              (entry.value['qty'] as int) >
-                                                  1) ...[
+                                          if ((entry.value['qty'] as int) >
+                                              1) ...[
                                             const SizedBox(width: 8),
                                             RichText(
                                               text: TextSpan(
@@ -460,17 +470,9 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
   @override
   Widget build(BuildContext context) {
     int subtotalPrice = 0;
-    for (var item in widget.storeItems) {
-      int optionsSum = 0;
-      for (final option in item.selectedAddons) {
-        optionsSum += option.optionPrice?.toInt() ?? 0;
-      }
-      int curriesSum = 0;
-      for (var curry in item.selectedCurries) {
-        curriesSum += (curry.price ?? 0).toInt();
-      }
-      int actualMenuPrice = item.unitPrice + optionsSum + curriesSum;
-      subtotalPrice += (actualMenuPrice * item.quantity);
+    for (final item in widget.storeItems) {
+      final int actualMenuPrice = _getItemUnitTotal(item);
+      subtotalPrice += actualMenuPrice * item.quantity;
     }
 
     int deliveryFee = 10;
@@ -857,13 +859,17 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       }
 
                       int currentOptionsSum = 0;
-                      Map<int, Map<String, dynamic>> groupedOptionsForApi = {};
+                      final Map<int, Map<String, dynamic>>
+                      groupedOptionsForApi = {};
 
                       for (final option in cartItem.selectedAddons) {
+                        if (option is! OptionModel) continue;
+
                         final int id = option.optionId ?? 0;
                         final double price = (option.optionPrice ?? 0)
                             .toDouble();
                         final String optionName = option.optionName ?? '';
+
                         currentOptionsSum += price.toInt();
 
                         if (groupedOptionsForApi.containsKey(id)) {
@@ -877,15 +883,8 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         }
                       }
 
-                      int curriesSumItem = 0;
-                      for (final curry in cartItem.selectedCurries) {
-                        curriesSumItem += (curry.price ?? 0).toInt();
-                      }
-
-                      double actualSubTotal =
-                          (cartItem.unitPrice +
-                              currentOptionsSum +
-                              curriesSumItem) *
+                      final double actualSubTotal =
+                          _getItemUnitTotal(cartItem) *
                           cartItem.quantity.toDouble();
 
                       final List<OrderDetailOptionModel> finalOptions =
@@ -906,11 +905,13 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                             );
                           }).toList();
 
-                      // 🎯 บันทึก note โดยตัด string ราดแกง ออก
-                      String rawNote = cartItem.note.trim();
-                      String finalCleanNote = rawNote
-                          .replaceAll(RegExp(r'ราดแกง:\s*\[.*?\]\s*'), '')
-                          .trim();
+                      // ข้าวราดแกง: เก็บชื่อเมนูที่ลูกค้าเลือกจาก selectedCurries ลง OrderDetail.note โดยตรง
+                      final String finalCleanNote = isCurryDishItem
+                          ? cartItem.selectedCurries
+                                .map((curry) => (curry.menuName ?? '').trim())
+                                .where((name) => name.isNotEmpty)
+                                .join(', ')
+                          : cartItem.note.trim();
 
                       return OrderDetailModel(
                         menuId: cartItem.menu.menuId ?? 0,

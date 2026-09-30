@@ -129,7 +129,7 @@ public class RestaurantController {
             boolean isResult = restaurantService.updateProfileRestaurant(
                     restaurantDto.getUsername(), restaurantDto.getRestaurantname(), restaurantDto.getRestaurantimage(), restaurantDto.getTypeid(),
                     restaurantDto.getLatitude(), restaurantDto.getLongitude(),
-                    restaurantDto.getOpeningHours(),
+
                     restaurantDto.getOwnerfirstname(),
                     restaurantDto.getOwnerlastname(), restaurantDto.getEmail(), restaurantDto.getPhone(), restaurantDto.getImagecardid());
             if (isResult) {
@@ -150,7 +150,7 @@ public class RestaurantController {
             boolean isResult = restaurantService.updateRegisterRestaurant(
                     restaurantDto.getUsername(), restaurantDto.getRestaurantname(), restaurantDto.getRestaurantimage(), restaurantDto.getTypeid(),
                     restaurantDto.getLatitude(), restaurantDto.getLongitude(),
-                    restaurantDto.getOpeningHours(),
+             
                     restaurantDto.getOwnerfirstname(),
                     restaurantDto.getOwnerlastname(), restaurantDto.getEmail(), restaurantDto.getPhone(), restaurantDto.getImagecardid());
             if (isResult) {

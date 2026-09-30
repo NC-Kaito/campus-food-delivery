@@ -32,5 +32,4 @@ public class RestaurantDto {
     private String verificationstatus;
     private Integer typeid;
 
-    private List<OpeningHourDto> openingHours;
 }

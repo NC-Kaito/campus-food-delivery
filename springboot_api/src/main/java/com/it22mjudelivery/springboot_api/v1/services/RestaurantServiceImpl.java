@@ -1,6 +1,5 @@
 package com.it22mjudelivery.springboot_api.v1.services;
 
-import com.it22mjudelivery.springboot_api.v1.dtos.OpeningHourDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.RestaurantDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Restaurant;
 
@@ -11,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -76,7 +74,7 @@ public class RestaurantServiceImpl implements RestaurantService {
     public boolean updateProfileRestaurant(String username, String restaurantname, String restaurantimage,
                                            int typeid,
                                            double latitude, double longitude,
-                                           List<OpeningHourDto> openingHourDtos,
+
                                            String ownerfirstname,
                                            String ownerlastname, String email, String phone, String ownerimage) {
 
@@ -106,7 +104,7 @@ public class RestaurantServiceImpl implements RestaurantService {
     public boolean updateRegisterRestaurant(String username, String restaurantname, String restaurantimage,
                                            int typeid,
                                            double latitude, double longitude,
-                                           List<OpeningHourDto> openingHourDtos,
+
                                            String ownerfirstname,
                                            String ownerlastname, String email, String phone, String ownerimage) {
 

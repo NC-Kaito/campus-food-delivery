@@ -1,11 +1,9 @@
-import 'restaurant_opening_hour_model.dart'; // import ตัวที่สร้างไว้ก่อนหน้า
-
 class RestaurantModel {
   String? username;
   String? password;
   String? restaurantName;
   String? restaurantImage;
-  List<RestaurantOpeningHourModel>? openingHours;
+
   double? latitude;
   double? longitude;
   String? imagecardid;
@@ -26,7 +24,6 @@ class RestaurantModel {
     this.password,
     this.restaurantName,
     this.restaurantImage,
-    this.openingHours,
     this.latitude,
     this.longitude,
     this.imagecardid,
@@ -49,7 +46,6 @@ class RestaurantModel {
       'password': password,
       'restaurantname': restaurantName,
       'restaurantimage': restaurantImage,
-      'openingHours': openingHours?.map((e) => e.toJson()).toList(),
       'latitude': latitude,
       'longitude': longitude,
       'imagecardid': imagecardid,
@@ -71,12 +67,6 @@ class RestaurantModel {
       password: json['password'],
       restaurantName: json['restaurantname'] ?? json['restaurantName'],
       restaurantImage: json['restaurantimage'] ?? json['restaurantImage'],
-      openingHours: (json['openingHours'] as List?)
-          ?.map(
-            (e) =>
-                RestaurantOpeningHourModel.fromJson(e as Map<String, dynamic>),
-          )
-          .toList(),
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
       imagecardid: json['imagecardid'],
