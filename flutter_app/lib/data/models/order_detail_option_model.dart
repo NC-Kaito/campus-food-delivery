@@ -16,70 +16,57 @@ class OrderDetailOptionModel {
   });
 
   factory OrderDetailOptionModel.fromJson(Map json) {
-    // 🎯 ดึง Object ตัวเลือกลูก (Entity ใน Spring Boot เปลี่ยนเป็น menuoptiondetail)
-    final rawDetail = json['menuoptiondetail'] ?? json['menuaddondetail'];
+    final rawDetail =
+        json['menuoptiondetail'] ?? json['menuOptionDetail'] ?? json['option'];
 
-    // 🎯 ดึงชื่อตัวเลือกจาก Snapshot ก่อน ถ้าไม่มีจึง fallback ไปดึงจาก Entity Option
-    String name =
-        json['addonNameAtOrder'] ??
-        json['optionNameAtOrder'] ??
-        json['addon_name_at_order'] ??
+    final int resolvedOptionId =
+        json['optionId'] ??
+        json['optionid'] ??
         (rawDetail != null
-            ? (rawDetail['optionname'] ??
-                  rawDetail['optionName'] ??
-                  rawDetail['addonname'] ??
-                  'ตัวเลือกเสริม')
-            : 'ตัวเลือกเสริม');
+            ? (rawDetail['optionId'] ?? rawDetail['optionid'] ?? 0)
+            : 0);
+
+    final String resolvedOptionName =
+        json['optionNameAtOrder'] ??
+        json['option_name_at_order'] ??
+        (rawDetail != null
+            ? (rawDetail['optionName'] ?? rawDetail['optionname'] ?? 'ตัวเลือก')
+            : 'ตัวเลือก');
+
+    final double resolvedPrice = json['priceAtOrder'] != null
+        ? (json['priceAtOrder'] as num).toDouble()
+        : (json['price_at_order'] != null
+              ? (json['price_at_order'] as num).toDouble()
+              : (rawDetail != null
+                    ? (rawDetail['optionPrice'] ??
+                              rawDetail['optionprice'] ??
+                              0)
+                          .toDouble()
+                    : 0.0));
+
+    final int resolvedQty = json['optionQty'] != null
+        ? (json['optionQty'] as num).toInt()
+        : (json['option_qty'] != null
+              ? (json['option_qty'] as num).toInt()
+              : 1);
 
     return OrderDetailOptionModel(
-      // รองรับทั้ง optionId จากฝั่ง Entity Option และ addondetailid เดิม
-      optionId: rawDetail != null
-          ? (rawDetail['optionid'] ??
-                rawDetail['optionId'] ??
-                rawDetail['addondetailid'] ??
-                0)
-          : (json['optionid'] ??
-                json['optionId'] ??
-                json['addondetailid'] ??
-                0),
-
-      optionNameAtOrder: name,
-
-      priceAtOrder: json['priceAtOrder'] != null
-          ? (json['priceAtOrder'] as num).toDouble()
-          : (json['price_at_order'] != null
-                ? (json['price_at_order'] as num).toDouble()
-                : (rawDetail != null
-                      ? (rawDetail['optionprice'] ??
-                                rawDetail['addonprice'] ??
-                                0)
-                            .toDouble()
-                      : 0.0)),
-
-      optionQty: json['addon_qty'] != null
-          ? (json['addon_qty'] as num).toInt()
-          : (json['addonQty'] != null
-                ? (json['addonQty'] as num).toInt()
-                : (json['option_qty'] != null
-                      ? (json['option_qty'] as num).toInt()
-                      : 1)),
-
+      optionId: resolvedOptionId,
+      optionNameAtOrder: resolvedOptionName,
+      priceAtOrder: resolvedPrice,
+      optionQty: resolvedQty,
       menuOptionDetail: rawDetail != null
-          ? OptionModel.fromJson(rawDetail as Map)
+          ? OptionModel.fromJson(Map.from(rawDetail))
           : null,
     );
   }
 
-  Map toJson() {
+  Map<String, dynamic> toJson() {
     return {
       'optionId': optionId,
-      'addondetailid': optionId, // แนบ key เดิมไว้รองรับ DTO เก่า
-      'addonNameAtOrder':
-          optionNameAtOrder, // ส่ง Snapshot ชื่อตัวเลือกให้ตรงกับ Entity
       'optionNameAtOrder': optionNameAtOrder,
       'priceAtOrder': priceAtOrder,
-      'addon_qty': optionQty ?? 1,
-      'option_qty': optionQty ?? 1,
+      'optionQty': optionQty ?? 1,
     };
   }
 }

@@ -174,11 +174,10 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         _isRiceCurryRestaurant = false;
       });
 
-      // ตรวจจากประเภทของร้านค้า
+      // ตรวจจากประเภท "ร้านค้า" ที่ backend ส่งมา
       await _loadRestaurantType();
 
-      // ร้านข้าวราดแกงต้องหา TypeMenu จากตาราง TypeMenu โดยตรง
-      // ไม่อาศัยการมี Menu ก่อน เพราะร้านสามารถตั้งราคาได้ก่อนเพิ่มเมนู
+      // ร้านข้าวราดแกงต้องหา TypeMenu โดยตรง เพราะอาจยังไม่มี Menu
       if (_isRiceCurryRestaurant) {
         await _loadCurryTypeMenuId();
       } else {
@@ -261,8 +260,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       restaurantModel!.username!,
     );
 
-    // ตรวจจากประเภทร้านที่โหลดไว้แล้ว
-    // ไม่ใช้ TypeMenu เป็นตัวตัดสินหลักอีกต่อไป
+    // ใช้ประเภท "ร้านค้า" ที่ตรวจไว้แล้วเป็นตัวตัดสินหลัก
     final bool isRiceCurry = _isRiceCurryRestaurant;
 
     final List<MapEntry<TypeMenuModel, List<MenuModel>>> entries =
@@ -278,7 +276,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                 type,
                 List<MenuModel>.from(menuData),
               );
-            } catch (e) {
+            } catch (_) {
               return MapEntry<TypeMenuModel, List<MenuModel>>(
                 type,
                 <MenuModel>[],
@@ -288,7 +286,7 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         );
 
     // ร้านทั่วไป: แสดงเฉพาะหมวดที่มีเมนู
-    // ร้านข้าวราดแกง: ถ้ามี TypeMenu อยู่ ให้เก็บไว้แม้เมนูในหมวดนั้นจะยังว่าง
+    // ร้านข้าวราดแกง: เก็บ TypeMenu ไว้ได้แม้หมวดนั้นยังไม่มี Menu
     final validEntries = isRiceCurry
         ? entries
         : entries.where((e) => e.value.isNotEmpty).toList();
@@ -317,9 +315,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       _tabController = newController;
     });
 
-    // ไม่หา _curryTypeMenuId จาก Menu อีกต่อไป
-    // เพราะร้านอาจยังไม่มี Menu ขณะตั้งราคาครั้งแรก
-
     final allMenus = validEntries.expand((e) => e.value).toList();
     _loadAddonCountsFor(allMenus);
 
@@ -329,6 +324,44 @@ class _HomeRestaurantState extends State<HomeRestaurant>
       _curryPrice1 = null;
       _curryPrice2 = null;
       _curryPrice3 = null;
+    }
+  }
+
+  Future _loadCurryTypeMenuId() async {
+    try {
+      final allTypes = await typeMenuService.getAllTypeMenu();
+
+      TypeMenuModel? curryType;
+
+      for (final type in allTypes) {
+        final name = (type.typemenuName ?? '').trim();
+        if (name.contains('ข้าวราดแกง') || name.contains('ข้าวแกง')) {
+          curryType = type;
+          break;
+        }
+      }
+
+      // Fallback: ตรวจจาก TypeMenu ของร้านโดยตรง
+      if (curryType == null && restaurantModel?.username != null) {
+        final restTypes = await menuService.getTypeMenuByRestaurant(
+          restaurantModel!.username!,
+        );
+        for (final type in restTypes) {
+          final name = (type.typemenuName ?? '').trim();
+          if (name.contains('ข้าวราดแกง') || name.contains('ข้าวแกง')) {
+            curryType = type;
+            break;
+          }
+        }
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _curryTypeMenuId = curryType?.typemenuId;
+      });
+    } catch (e) {
+      debugPrint('โหลด TypeMenu ข้าวราดแกงไม่สำเร็จ: $e');
     }
   }
 
@@ -425,138 +458,6 @@ class _HomeRestaurantState extends State<HomeRestaurant>
         _menuAddonGroupCounts[entry.key] = entry.value;
       }
     });
-  }
-
-  Future _loadCurryTypeMenuId() async {
-    try {
-      final allTypes = await typeMenuService.getAllTypeMenu();
-
-      TypeMenuModel? curryType;
-
-      for (final type in allTypes) {
-        final name = (type.typemenuName ?? '').trim();
-        if (name.contains('ข้าวราดแกง') || name.contains('ข้าวแกง')) {
-          curryType = type;
-          break;
-        }
-      }
-
-      // Fallback: ถ้าไม่เจอใน getAllTypeMenu ให้เช็กจากหมวดหมู่ของร้านที่มีอยู่
-      if (curryType == null && restaurantModel?.username != null) {
-        final restTypes = await menuService.getTypeMenuByRestaurant(
-          restaurantModel!.username!,
-        );
-        for (final type in restTypes) {
-          final name = (type.typemenuName ?? '').trim();
-          if (name.contains('ข้าวราดแกง') || name.contains('ข้าวแกง')) {
-            curryType = type;
-            break;
-          }
-        }
-      }
-
-      if (!mounted) return;
-
-      setState(() {
-        _curryTypeMenuId = curryType?.typemenuId;
-      });
-    } catch (e) {
-      debugPrint('โหลด TypeMenu ข้าวราดแกงไม่สำเร็จ: $e');
-    }
-  }
-
-  Future _loadCurryPrice() async {
-    final String? username = restaurantModel?.username;
-
-    if (!_isRiceCurryRestaurant || username == null) {
-      return;
-    }
-
-    if (mounted) {
-      setState(() => _isLoadingCurryPrice = true);
-    }
-
-    try {
-      // 🎯 ส่ง _curryTypeMenuId ?? 0 เพื่อให้ดึงราคาได้แม้ยังไม่ได้ผูก typeMenuId
-      final data = await menuService.getCurryPrice(
-        restaurantId: username,
-        typeMenuId: _curryTypeMenuId ?? 0,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _curryPrice1 = data?['price'];
-        _curryPrice2 = data?['price2'];
-        _curryPrice3 = data?['price3'];
-        _isLoadingCurryPrice = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoadingCurryPrice = false);
-      debugPrint('โหลดราคาข้าวราดแกงไม่สำเร็จ: $e');
-    }
-  }
-
-  Future _confirmCurryPrice() async {
-    final price1 = _parseCurryPrice(_curryPrice1Controller.text);
-    final price2 = _parseCurryPrice(_curryPrice2Controller.text);
-    final price3 = _parseCurryPrice(_curryPrice3Controller.text);
-
-    if (price1 == null || price2 == null || price3 == null) {
-      _showErrorSnackBar(
-        "กรุณากรอกราคา 1, 2 และ 3 อย่างให้ครบ และมากกว่า 0 บาท",
-      );
-      return;
-    }
-
-    final String? username = restaurantModel?.username;
-
-    if (username == null) {
-      _showErrorSnackBar("ไม่พบข้อมูลร้านค้า กรุณาลองใหม่อีกครั้ง");
-      return;
-    }
-
-    // ลองโหลดอีกรอบถ้ายังเป็น null
-    if (_curryTypeMenuId == null) {
-      await _loadCurryTypeMenuId();
-    }
-
-    if (mounted) {
-      setState(() => _isSavingCurryPrice = true);
-    }
-
-    try {
-      // 🎯 หากยังไม่มีประเภทเมนูข้าวราดแกงใน DB ให้ส่ง 0 ไปเพื่อให้ Backend สร้างให้อัตโนมัติ
-      await menuService.saveCurryPrice(
-        restaurantId: username,
-        typeMenuId: _curryTypeMenuId ?? 0,
-        price: price1,
-        price2: price2,
-        price3: price3,
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _curryPrice1 = price1;
-        _curryPrice2 = price2;
-        _curryPrice3 = price3;
-        _isEditingCurryPrice = false;
-        _isSavingCurryPrice = false;
-      });
-
-      _showSuccessSnackBar("บันทึกราคามาตรฐานเรียบร้อย");
-
-      // โหลด TypeMenuId และรายการเมนูใหม่เพื่ออัปเดตข้อมูลล่าสุดจากฐานข้อมูล
-      await _loadCurryTypeMenuId();
-      await loadTypeMenus();
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() => _isSavingCurryPrice = false);
-      _showErrorSnackBar(e.toString().replaceFirst('Exception: ', ''));
-    }
   }
 
   Future toggleStatus(int typeMenuId, int index) async {
@@ -1750,6 +1651,38 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     );
   }
 
+  Future<void> _loadCurryPrice() async {
+    final String? username = restaurantModel?.username;
+
+    if (!_isRiceCurryRestaurant || username == null) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() => _isLoadingCurryPrice = true);
+    }
+
+    try {
+      final data = await menuService.getCurryPrice(
+        restaurantId: username,
+        typeMenuId: _curryTypeMenuId ?? 0,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _curryPrice1 = data?['price'];
+        _curryPrice2 = data?['price2'];
+        _curryPrice3 = data?['price3'];
+        _isLoadingCurryPrice = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoadingCurryPrice = false);
+      debugPrint('โหลดราคาข้าวราดแกงไม่สำเร็จ: $e');
+    }
+  }
+
   void _prepareCurryPriceControllers() {
     String valueOf(double? value) {
       if (value == null || value <= 0) return "";
@@ -1779,6 +1712,64 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     setState(() {
       _isEditingCurryPrice = false;
     });
+  }
+
+  Future<void> _confirmCurryPrice() async {
+    final price1 = _parseCurryPrice(_curryPrice1Controller.text);
+    final price2 = _parseCurryPrice(_curryPrice2Controller.text);
+    final price3 = _parseCurryPrice(_curryPrice3Controller.text);
+
+    if (price1 == null || price2 == null || price3 == null) {
+      _showErrorSnackBar(
+        "กรุณากรอกราคา 1, 2 และ 3 อย่างให้ครบ และมากกว่า 0 บาท",
+      );
+      return;
+    }
+
+    final String? username = restaurantModel?.username;
+
+    if (username == null) {
+      _showErrorSnackBar("ไม่พบข้อมูลร้านค้า กรุณาลองใหม่อีกครั้ง");
+      return;
+    }
+
+    // ถ้ายังไม่มี TypeMenu ให้ลองค้นหาอีกครั้งก่อนบันทึก
+    if (_curryTypeMenuId == null) {
+      await _loadCurryTypeMenuId();
+    }
+
+    if (mounted) {
+      setState(() => _isSavingCurryPrice = true);
+    }
+
+    try {
+      await menuService.saveCurryPrice(
+        restaurantId: username,
+        typeMenuId: _curryTypeMenuId ?? 0,
+        price: price1,
+        price2: price2,
+        price3: price3,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _curryPrice1 = price1;
+        _curryPrice2 = price2;
+        _curryPrice3 = price3;
+        _isEditingCurryPrice = false;
+        _isSavingCurryPrice = false;
+      });
+
+      _showSuccessSnackBar("บันทึกราคามาตรฐานเรียบร้อย");
+
+      await _loadCurryTypeMenuId();
+      await loadTypeMenus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSavingCurryPrice = false);
+      _showErrorSnackBar(e.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   Widget _buildCurryPriceRow({
@@ -2075,7 +2066,9 @@ class _HomeRestaurantState extends State<HomeRestaurant>
     required bool isAvailable,
     required String finalMenuImgUrl,
   }) {
-    final bool isRiceCurry = _isRiceCurryRestaurant;
+    final bool isRiceCurry = typeMenus.any(
+      (t) => t.typemenuId == typeId && t.typemenuName == "ข้าวราดแกง",
+    );
 
     final double storedPrice = menu.price ?? 0.0;
     final bool shouldShowPrice = !isRiceCurry || (storedPrice != 0.0);
@@ -2154,6 +2147,19 @@ class _HomeRestaurantState extends State<HomeRestaurant>
                       color: _primary,
                     ),
                   ),
+
+                if (isRiceCurry) ...[
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      _buildPriceChip("1 อย่าง", menu.price),
+                      _buildPriceChip("2 อย่าง", menu.price2),
+                      _buildPriceChip("3 อย่าง", menu.price3),
+                    ],
+                  ),
+                ],
 
                 const SizedBox(height: 6),
 

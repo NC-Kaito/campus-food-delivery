@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_app/core/network/dio_client.dart';
 import 'package:flutter_app/data/models/option_group_request_model.dart';
 import 'package:flutter_app/data/models/option_model.dart';
@@ -7,14 +8,14 @@ import 'package:flutter_app/data/models/menu_option_group_model.dart';
 class MenuOptionService {
   Future<List<OptionGroupModel>> getOptionsByMenuId(int menuId) async {
     try {
-      final response = await DioClient.dio.get('/v1/menuAddon/$menuId/addons');
+      // ต้องยิงมาที่ /v1/menu/$menuId/options
+      final response = await DioClient.dio.get('/v1/menu/$menuId/options');
 
       if (response.statusCode != 200 || response.data == null) {
         return [];
       }
 
       final dynamic rawData = response.data;
-
       if (rawData is! List) {
         return [];
       }
@@ -23,11 +24,8 @@ class MenuOptionService {
           .whereType<Map>()
           .map((json) => OptionGroupModel.fromJson(json))
           .toList();
-    } on DioException catch (e) {
-      print('Error getOptionsByMenuId: ${e.message}');
-      return [];
     } catch (e) {
-      print('Error getOptionsByMenuId: $e');
+      debugPrint('Error getOptionsByMenuId: $e');
       return [];
     }
   }

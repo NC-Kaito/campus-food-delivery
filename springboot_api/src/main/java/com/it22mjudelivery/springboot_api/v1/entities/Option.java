@@ -21,7 +21,7 @@
         private int optionid;
 
         @Column(nullable = false)
-        private String optionname;
+        private  String optionname;
 
         @Column(nullable = false)
         private double optionprice;

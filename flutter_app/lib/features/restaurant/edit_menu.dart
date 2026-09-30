@@ -2,9 +2,9 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
-import 'package:flutter_app/data/models/menu_option_group_model.dart';
-import 'package:flutter_app/data/models/option_model.dart';
+import 'package:flutter_app/data/models/option_group_request_model.dart';
 import 'package:flutter_app/data/models/type_menu_model.dart';
 import 'package:flutter_app/data/services/menu/menu_service.dart';
 import 'package:flutter_app/data/services/menu/type_menu_service.dart';
@@ -20,22 +20,64 @@ const String _riceCurryTypeName = "ข้าวราดแกง";
 
 class _MenuTheme {
   static const Color primary = Color(0xFFFF8A00);
-  static const Color accent = Color(0xFF2FB86A);
-  static const Color danger = Color(0xFFE5484D); // 🎯 สีแดงสำหรับแจ้งเตือน
+  static const Color primaryLight = Color(0xFFFFF3E0);
+  static const Color accent = Color(0xFF10B981); // Emerald Green
+  static const Color danger = Color(0xFFEF4444); // Soft Red
   static const Color surface = Colors.white;
-  static const Color pageBg = Color(0xFFF6F7F9);
-  static const Color textPrimary = Color(0xFF1F2430);
-  static const Color textSecondary = Color(0xFF8A8F98);
-  static const Color fieldBg = Color(0xFFF4F5F7);
+  static const Color pageBg = Color(0xFFF3F4F6); // Soft Light Gray
+  static const Color textPrimary = Color(0xFF111827); // Dark Gray
+  static const Color textSecondary = Color(0xFF6B7280); // Medium Gray
+  static const Color fieldBg = Color(0xFFF9FAFB); // Very Light Gray
   static const Color border = Color(0xFFE7E8EC);
-  static const Color linkBlue = Color(0xFF2F80ED);
 }
 
-class _AddonGroupAggregate {
-  final OptionGroupModel group;
-  final Map<int, OptionModel> items = {};
+// 🎯 คลาสเก็บข้อมูลกลุ่มตัวเลือก (Option Group)
+class DraftOptionGroup {
+  int? optionGroupId;
+  TextEditingController nameController = TextEditingController();
 
-  _AddonGroupAggregate(this.group);
+  bool isRequired = false;
+  bool isMultipleChoice = false;
+  List<DraftOption> options = [];
+
+  DraftOptionGroup({
+    this.optionGroupId,
+    String name = "",
+    this.isRequired = false,
+    this.isMultipleChoice = false,
+    List<DraftOption>? initialOptions,
+  }) {
+    nameController.text = name;
+    if (initialOptions != null) {
+      options.addAll(initialOptions);
+    }
+  }
+
+  void dispose() {
+    nameController.dispose();
+    for (var opt in options) {
+      opt.dispose();
+    }
+  }
+}
+
+// 🎯 คลาสเก็บข้อมูลตัวเลือกย่อย (Option)
+class DraftOption {
+  int? optionId;
+  TextEditingController nameController = TextEditingController();
+  TextEditingController priceController = TextEditingController();
+
+  DraftOption({this.optionId, String name = "", double price = 0.0}) {
+    nameController.text = name;
+    priceController.text = price % 1 == 0
+        ? price.toInt().toString()
+        : price.toString();
+  }
+
+  void dispose() {
+    nameController.dispose();
+    priceController.dispose();
+  }
 }
 
 class EditMenu extends StatefulWidget {
@@ -61,24 +103,15 @@ class _EditMenuState extends State<EditMenu> {
   final TextEditingController _newTypeNameController = TextEditingController();
   final FocusNode _newTypeFocusNode = FocusNode();
 
-  final TextEditingController _addonSearchController = TextEditingController();
-  final FocusNode _addonSearchFocusNode = FocusNode();
-  final LayerLink _addonSearchLayerLink = LayerLink();
-  OverlayEntry? _addonOverlayEntry;
-  Timer? _addonDebounce;
-
-  List<_AddonGroupAggregate> _allAddonGroups = [];
-  List<_AddonGroupAggregate> _addonSearchResults = [];
-
-  List<int> _linkedGroupIds = [];
-  List<int> _originalLinkedGroupIds = [];
-  final Map<int, bool> _groupExpanded = {};
+  final List<DraftOptionGroup> _draftOptionGroups = [];
 
   bool _isLoading = false;
   bool _isInitialLoading = true;
   bool _isAddingNewType = false;
   bool _isEditable = false;
   bool _isRiceCurryRestaurant = false;
+
+  bool _isAddonEnabled = false;
 
   List<TypeMenuModel> typeMenuList = [];
 
@@ -98,20 +131,16 @@ class _EditMenuState extends State<EditMenu> {
     super.initState();
     _initializeFromMenuModel();
     _initializeData();
-
-    _addonSearchFocusNode.addListener(() {
-      if (_addonSearchFocusNode.hasFocus && _isEditable) {
-        _updateAddonSearchResults(_addonSearchController.text);
-      } else {
-        _removeAddonSearchOverlay();
-      }
-    });
   }
 
   void _initializeFromMenuModel() {
     menuNameController.text = widget.menuModel.menuName ?? "";
     descriptionController.text = widget.menuModel.description ?? "";
-    priceController.text = widget.menuModel.price?.toStringAsFixed(0) ?? "";
+    priceController.text = widget.menuModel.price != null
+        ? (widget.menuModel.price! % 1 == 0
+              ? widget.menuModel.price!.toInt().toString()
+              : widget.menuModel.price!.toString())
+        : "";
     _existingImageUrl = widget.menuModel.menuImage;
     _selectedTypeMenuId = widget.menuModel.typeMenuId;
     _selectedTypeMenuName = widget.menuModel.typeMenuName;
@@ -119,16 +148,15 @@ class _EditMenuState extends State<EditMenu> {
 
   @override
   void dispose() {
-    _addonDebounce?.cancel();
-    _removeAddonSearchOverlay();
-    _addonSearchController.dispose();
-    _addonSearchFocusNode.dispose();
-
     menuNameController.dispose();
     descriptionController.dispose();
     priceController.dispose();
     _newTypeNameController.dispose();
     _newTypeFocusNode.dispose();
+
+    for (var group in _draftOptionGroups) {
+      group.dispose();
+    }
     super.dispose();
   }
 
@@ -148,7 +176,7 @@ class _EditMenuState extends State<EditMenu> {
             typeName.contains("ข้าวแกง") || typeName.contains("ข้าวราดแกง");
       });
     } catch (e) {
-      debugPrint("ตรวจสอบประเภทร้านค้าผิดพลาด: " + e.toString());
+      debugPrint("ตรวจสอบประเภทร้านค้าผิดพลาด: $e");
     }
   }
 
@@ -157,17 +185,37 @@ class _EditMenuState extends State<EditMenu> {
     try {
       final types = await typeMenuService.getAllTypeMenu();
 
-      final groups = await _optionService.getAddonGroupsByRestaurant(
-        GlobalData.usernameRestaurant ?? "",
-      );
+      List<DraftOptionGroup> loadedDraftGroups = [];
+      final int? menuId = widget.menuModel.menuId;
 
-      final linkedDetails = await _optionService.getAddonsByMenuId(
-        widget.menuModel.menuId!,
-      );
-      final Set<int> linkedGroupIds = linkedDetails
-          .map((d) => d.optionGroupId)
-          .whereType<int>()
-          .toSet();
+      if (menuId != null) {
+        final existingGroups = await _optionService.getOptionsByMenuId(menuId);
+
+        for (var grp in existingGroups) {
+          final List<DraftOption> groupOptions = [];
+          if (grp.options != null) {
+            for (var opt in grp.options!) {
+              groupOptions.add(
+                DraftOption(
+                  optionId: opt.optionId,
+                  name: opt.optionName ?? "",
+                  price: opt.optionPrice ?? 0.0,
+                ),
+              );
+            }
+          }
+
+          loadedDraftGroups.add(
+            DraftOptionGroup(
+              optionGroupId: grp.optionGroupId,
+              name: grp.optionGroupName ?? "",
+              isRequired: grp.isRequired,
+              isMultipleChoice: grp.isMultipleChoice,
+              initialOptions: groupOptions,
+            ),
+          );
+        }
+      }
 
       if (!mounted) return;
 
@@ -194,250 +242,139 @@ class _EditMenuState extends State<EditMenu> {
           }
         }
 
-        _allAddonGroups = groups.map((group) {
-          final agg = _AddonGroupAggregate(group);
-          for (final detail in group.options ?? []) {
-            final itemKey =
-                detail.addonMenu?.addonId ??
-                detail.addonDetailId ??
-                detail.hashCode;
-            agg.items.putIfAbsent(itemKey, () => detail);
-          }
-          return agg;
-        }).toList();
-
-        _linkedGroupIds = linkedGroupIds.toList();
-        _originalLinkedGroupIds = List.from(_linkedGroupIds);
-
-        for (final agg in _allAddonGroups) {
-          final gid = agg.group.optionGroupId;
-          if (gid != null) {
-            _groupExpanded[gid] = false;
-          }
+        for (var g in _draftOptionGroups) {
+          g.dispose();
         }
+        _draftOptionGroups.clear();
+        _draftOptionGroups.addAll(loadedDraftGroups);
+
+        _isAddonEnabled = _draftOptionGroups.isNotEmpty;
 
         _isInitialLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() => _isInitialLoading = false);
-      debugPrint("EditMenu _loadAllData error: " + e.toString());
+      debugPrint("EditMenu _loadAllData error: $e");
     }
   }
 
-  void _onAddonSearchChanged(String value) {
-    if (!_isEditable) return;
-    _addonDebounce?.cancel();
-    _addonDebounce = Timer(const Duration(milliseconds: 250), () {
-      _updateAddonSearchResults(value);
-    });
-  }
-
-  void _updateAddonSearchResults(String value) {
-    final query = value.trim().toLowerCase();
-    final results = _allAddonGroups.where((agg) {
-      final isLinked = _linkedGroupIds.contains(agg.group.optionGroupId);
-      if (isLinked) return false;
-      if (query.isEmpty) return true;
-      final name = agg.group.optionGroupName?.toLowerCase() ?? "";
-      return name.contains(query);
-    }).toList();
-
-    if (!mounted) return;
-    setState(() => _addonSearchResults = results);
-
-    if (results.isEmpty) {
-      _removeAddonSearchOverlay();
-    } else {
-      _showAddonSearchOverlay();
-    }
-  }
-
-  void _showAddonSearchOverlay() {
-    _removeAddonSearchOverlay();
-
-    final overlay = OverlayEntry(
-      builder: (context) => Positioned(
-        width: MediaQuery.of(context).size.width - 72,
-        child: CompositedTransformFollower(
-          link: _addonSearchLayerLink,
-          showWhenUnlinked: false,
-          offset: const Offset(0, 52),
-          child: Material(
-            elevation: 8,
-            shadowColor: Colors.black.withOpacity(0.15),
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            clipBehavior: Clip.antiAlias,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 240),
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                itemCount: _addonSearchResults.length,
-                separatorBuilder: (context, index) =>
-                    Divider(height: 1, color: Colors.grey.shade100),
-                itemBuilder: (context, index) {
-                  final agg = _addonSearchResults[index];
-                  final groupId = agg.group.optionGroupId ?? -1;
-                  final itemCount = agg.items.length;
-
-                  return InkWell(
-                    onTap: () => _selectAddonGroupToUse(groupId),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 34,
-                            height: 34,
-                            decoration: BoxDecoration(
-                              color: _MenuTheme.primary.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.tune_rounded,
-                              size: 18,
-                              color: _MenuTheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: _MenuTheme.textPrimary,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  itemCount.toString() + " ตัวเลือกย่อย",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: _MenuTheme.textSecondary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: _MenuTheme.accent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.add_rounded,
-                              color: Colors.white,
-                              size: 16,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    Overlay.of(context).insert(overlay);
-    _addonOverlayEntry = overlay;
-  }
-
-  void _removeAddonSearchOverlay() {
-    _addonOverlayEntry?.remove();
-    _addonOverlayEntry = null;
-  }
-
-  void _selectAddonGroupToUse(int groupId) {
+  void _addNewOptionGroup() {
     setState(() {
-      if (!_linkedGroupIds.contains(groupId)) {
-        _linkedGroupIds.add(groupId);
-      }
-      _groupExpanded[groupId] = false;
+      final newGroup = DraftOptionGroup();
+      newGroup.options.add(DraftOption());
+      _draftOptionGroups.add(newGroup);
     });
-    _addonSearchController.clear();
-    _removeAddonSearchOverlay();
-    _addonSearchFocusNode.unfocus();
+  }
+
+  void _removeOptionGroup(int index) {
+    setState(() {
+      _draftOptionGroups[index].dispose();
+      _draftOptionGroups.removeAt(index);
+    });
+  }
+
+  void _addNewOptionToGroup(DraftOptionGroup group) {
+    setState(() {
+      group.options.add(DraftOption());
+    });
+  }
+
+  void _removeOptionFromGroup(DraftOptionGroup group, int optionIndex) {
+    setState(() {
+      group.options[optionIndex].dispose();
+      group.options.removeAt(optionIndex);
+    });
   }
 
   Future<void> pickImage() async {
     if (!_isEditable) return;
     showModalBottomSheet(
       context: context,
+      backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 48,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(
-                Icons.camera_alt_rounded,
-                color: _MenuTheme.accent,
+              const SizedBox(height: 16),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: _MenuTheme.primaryLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt_rounded,
+                    color: _MenuTheme.primary,
+                  ),
+                ),
+                title: const Text(
+                  "ถ่ายรูปด้วยกล้อง",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final XFile? image = await _picker.pickImage(
+                    source: ImageSource.camera,
+                    imageQuality: 80,
+                  );
+                  if (image != null) {
+                    setState(() {
+                      _selectedImage = File(image.path);
+                      _imageError = null;
+                    });
+                  }
+                },
               ),
-              title: const Text("ถ่ายรูปด้วยกล้อง"),
-              onTap: () async {
-                Navigator.pop(context);
-                final XFile? image = await _picker.pickImage(
-                  source: ImageSource.camera,
-                  imageQuality: 80,
-                );
-                if (image != null) {
-                  setState(() {
-                    _selectedImage = File(image.path);
-                    _imageError = null; // 🎯 เคลียร์ error ตอนเลือกรูป
-                  });
-                }
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.photo_library_rounded,
-                color: _MenuTheme.accent,
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(
+                    color: _MenuTheme.primaryLight,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.photo_library_rounded,
+                    color: _MenuTheme.primary,
+                  ),
+                ),
+                title: const Text(
+                  "เลือกจากแกลเลอรี่",
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                onTap: () async {
+                  Navigator.pop(context);
+                  final XFile? image = await _picker.pickImage(
+                    source: ImageSource.gallery,
+                    imageQuality: 80,
+                  );
+                  if (image != null) {
+                    setState(() {
+                      _selectedImage = File(image.path);
+                      _imageError = null;
+                    });
+                  }
+                },
               ),
-              title: const Text("เลือกจากแกลเลอรี่"),
-              onTap: () async {
-                Navigator.pop(context);
-                final XFile? image = await _picker.pickImage(
-                  source: ImageSource.gallery,
-                  imageQuality: 80,
-                );
-                if (image != null) {
-                  setState(() {
-                    _selectedImage = File(image.path);
-                    _imageError = null; // 🎯 เคลียร์ error ตอนเลือกรูป
-                  });
-                }
-              },
-            ),
-            const SizedBox(height: 8),
-          ],
+              const SizedBox(height: 8),
+            ],
+          ),
         ),
       ),
     );
@@ -453,23 +390,51 @@ class _EditMenuState extends State<EditMenu> {
   }
 
   Future<void> _doSaveMenu() async {
-    // 🎯 ตรวจสอบฟอร์มทั้งหมดตอนกดปุ่มบันทึก
     final isFormValid = formKey.currentState!.validate();
 
     setState(() {
       _imageError =
           (_selectedImage == null &&
               (_existingImageUrl == null || _existingImageUrl!.isEmpty))
-          ? "กรุณาเลือกรูปภาพอาหารประกอบด้วย"
+          ? "กรุณาเลือกรูปภาพอาหารประกอบด้วยนะครับ"
           : null;
       _typeMenuError =
           (_selectedTypeMenuId == null &&
               (_newTypeName == null || _newTypeName!.isEmpty))
-          ? "กรุณาเลือกหรือกรอกประเภทหมวดหมู่เมนู"
+          ? "กรุณาเลือกหรือกรอกประเภทหมวดหมู่เมนูนะ"
           : null;
     });
 
-    if (!isFormValid || _imageError != null || _typeMenuError != null) return;
+    bool hasOptionError = false;
+    if (_isAddonEnabled) {
+      for (var group in _draftOptionGroups) {
+        if (group.nameController.text.trim().isEmpty) hasOptionError = true;
+        for (var opt in group.options) {
+          if (opt.nameController.text.trim().isEmpty) hasOptionError = true;
+        }
+      }
+    }
+
+    if (!isFormValid ||
+        _imageError != null ||
+        _typeMenuError != null ||
+        hasOptionError) {
+      if (hasOptionError) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              "กรุณากรอกชื่อกลุ่มและชื่อตัวเลือกเสริมให้ครบถ้วนด้วยนะครับ",
+            ),
+            backgroundColor: _MenuTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() => _isLoading = true);
 
@@ -479,6 +444,7 @@ class _EditMenuState extends State<EditMenu> {
         imageUrl = await menuService.uploadMenuImage(_selectedImage);
       }
 
+      // 🎯 ถ้าเป็นข้าวราดแกงให้ราคาเป็น 0 อัตโนมัติ
       final double finalPrice = _isRiceCurryRestaurant
           ? 0.0
           : (double.tryParse(priceController.text) ?? 0.0);
@@ -487,22 +453,45 @@ class _EditMenuState extends State<EditMenu> {
           ? ""
           : descriptionController.text.trim();
 
-      final selectedGroupIds = _linkedGroupIds;
+      final List<Map<dynamic, dynamic>> optionGroupsData = _isAddonEnabled
+          ? _draftOptionGroups.map((group) {
+              final requestGroup = OptionGroupRequestModel(
+                optionGroupId: group.optionGroupId,
+                menuId: widget.menuModel.menuId,
+                optionGroupName: group.nameController.text.trim(),
+                isRequired: group.isRequired,
+                isMultipleChoice: group.isMultipleChoice,
+                options: group.options.map((opt) {
+                  return OptionDetailRequestModel(
+                    optionId: opt.optionId,
+                    optionName: opt.nameController.text.trim(),
+                    optionPrice:
+                        double.tryParse(opt.priceController.text) ?? 0.0,
+                  );
+                }).toList(),
+              );
+              return requestGroup.toJson();
+            }).toList()
+          : [];
 
       final Map<String, dynamic> requestData = {
+        "menuid": widget.menuModel.menuId,
         "menuId": widget.menuModel.menuId,
         "menuname": menuNameController.text.trim(),
         "description": finalDesc,
         "price": finalPrice,
         "extraprice": 0.0,
         "status": widget.menuModel.status ?? true,
+        "imageurl": imageUrl ?? "",
         "imageUrl": imageUrl ?? "",
+        "username": GlobalData.usernameRestaurant,
         "restaurantId": GlobalData.usernameRestaurant,
         "isRiceCurry": _isRiceCurryRestaurant,
         if (_selectedTypeMenuId != null) "typeMenuId": _selectedTypeMenuId,
         if (_newTypeName != null && _newTypeName!.isNotEmpty)
           "typeMenuName": _newTypeName,
-        "addonGroupIds": selectedGroupIds,
+        if (optionGroupsData.isNotEmpty || !_isAddonEnabled)
+          "optionGroups": optionGroupsData,
       };
 
       await menuService.updateMenuByRestaurant(requestData);
@@ -510,7 +499,9 @@ class _EditMenuState extends State<EditMenu> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text("อัปเดตเมนูสำเร็จ"),
+            content: const Text(
+              "อัปเดตเมนูและตัวเลือกเสริมสำเร็จเรียบร้อยครับ!",
+            ),
             backgroundColor: _MenuTheme.accent,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -525,118 +516,62 @@ class _EditMenuState extends State<EditMenu> {
             _existingImageUrl = imageUrl;
             _selectedImage = null;
           }
-          _originalLinkedGroupIds.clear();
-          _originalLinkedGroupIds.addAll(_linkedGroupIds);
         });
+
+        await _loadAllData();
       }
     } catch (e) {
       if (mounted) {
         String errorMsg = e.toString().replaceAll("Exception: ", "");
-
-        if (errorMsg.contains("กำลังดำเนินการอยู่")) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Row(
-                children: [
-                  const Icon(
-                    Icons.warning_rounded,
-                    color: _MenuTheme.danger,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      "ไม่สามารถแก้ไขได้",
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-              content: Text(
-                errorMsg,
-                style: const TextStyle(fontSize: 14.5, height: 1.4),
-              ),
-              actions: [
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _MenuTheme.danger,
-                  ),
-                  child: const Text(
-                    "ตกลง",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("เกิดข้อผิดพลาด: $errorMsg"),
+            backgroundColor: _MenuTheme.danger,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("เกิดข้อผิดพลาด: " + errorMsg),
-              backgroundColor: _MenuTheme.danger,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-          );
-        }
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  InputDecoration _inputDecoration({
+  InputDecoration _cleanInputDecoration({
     String hint = "",
+    Widget? prefixIcon,
     Widget? suffixIcon,
-    Color? fillColor,
     bool enabled = true,
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: _MenuTheme.textSecondary, fontSize: 14),
-      isDense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      filled: true,
-      fillColor: enabled
-          ? (fillColor ?? _MenuTheme.fieldBg)
-          : const Color(0xFFF0F1F3),
+      hintStyle: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 14),
+      prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
-      // 🎯 เพิ่มสีแดงเวลาเกิด Error
-      errorStyle: const TextStyle(color: _MenuTheme.danger, fontSize: 12),
+      filled: true,
+      fillColor: enabled ? _MenuTheme.fieldBg : const Color(0xFFF0F1F3),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.black, width: 0),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.black, width: 0),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide.none,
       ),
       disabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide.none,
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFF00B300), width: 1.6),
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: _MenuTheme.primary, width: 1.5),
       ),
-      // 🎯 ปรับเส้นขอบ Error เป็นสีแดง
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.2),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: _MenuTheme.danger, width: 1.6),
       ),
     );
   }
@@ -644,16 +579,16 @@ class _EditMenuState extends State<EditMenu> {
   Widget _sectionCard({required Widget child}) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: _MenuTheme.surface,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -661,50 +596,32 @@ class _EditMenuState extends State<EditMenu> {
     );
   }
 
-  Widget _sectionHeader({
-    required IconData icon,
-    required String title,
-    Widget? trailing,
-  }) {
+  Widget _sectionHeader({required IconData icon, required String title}) {
     return Row(
       children: [
         Container(
-          width: 30,
-          height: 30,
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 196, 196, 196).withOpacity(0.12),
-            borderRadius: BorderRadius.circular(9),
+            color: _MenuTheme.primaryLight,
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(icon, size: 17, color: const Color(0xFF00B300)),
+          child: Icon(icon, size: 18, color: _MenuTheme.primary),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: _MenuTheme.textPrimary,
-            ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: _MenuTheme.textPrimary,
           ),
         ),
-        if (trailing != null) trailing,
       ],
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final linkedCount = _linkedGroupIds.length;
-    final linkedGroups = _linkedGroupIds
-        .map(
-          (id) => _allAddonGroups
-              .where((agg) => agg.group.optionGroupId == id)
-              .firstOrNull,
-        )
-        .whereType<_AddonGroupAggregate>()
-        .toList();
-
     return Scaffold(
       backgroundColor: _MenuTheme.pageBg,
       extendBodyBehindAppBar: true,
@@ -715,28 +632,27 @@ class _EditMenuState extends State<EditMenu> {
             )
           : Form(
               key: formKey,
-              // 🎯 เปิดโหมด Realtime Validation ตรงนี้ครับ
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: 100),
+                    const SizedBox(height: 110),
 
-                    // ── Hero header ────────────────────────────────
+                    // ── Header ──
                     Row(
                       children: [
                         Container(
-                          width: 46,
-                          height: 46,
+                          width: 52,
+                          height: 52,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color(0xFF00B300), Color(0xFF00B300)],
+                              colors: [_MenuTheme.primary, Color(0xFFFFB13D)],
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                             ),
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
                                 color: _MenuTheme.primary.withOpacity(0.3),
@@ -751,7 +667,7 @@ class _EditMenuState extends State<EditMenu> {
                             size: 24,
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 16),
                         const Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -759,15 +675,16 @@ class _EditMenuState extends State<EditMenu> {
                               Text(
                                 "แก้ไขเมนู",
                                 style: TextStyle(
-                                  fontSize: 20,
+                                  fontSize: 22,
                                   fontWeight: FontWeight.w800,
                                   color: _MenuTheme.textPrimary,
                                 ),
                               ),
+                              SizedBox(height: 2),
                               Text(
-                                "ปรับปรุงรายละเอียดเมนูให้ตรงกับข้อมูลล่าสุด",
+                                "ปรับปรุงรายละเอียดเมนูและตัวเลือกให้ตรงกับล่าสุด",
                                 style: TextStyle(
-                                  fontSize: 12.5,
+                                  fontSize: 13,
                                   color: _MenuTheme.textSecondary,
                                 ),
                               ),
@@ -776,16 +693,15 @@ class _EditMenuState extends State<EditMenu> {
                         ),
                       ],
                     ),
+                    const SizedBox(height: 24),
 
-                    const SizedBox(height: 22),
-
-                    // ── Section: หมวดหมู่เมนู (ประเภทเมนู) ───────────
+                    // ── 1. หมวดหมู่เมนู ──
                     _sectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _sectionHeader(
-                            icon: Icons.category_rounded,
+                            icon: Icons.grid_view_rounded,
                             title: "หมวดหมู่เมนู",
                           ),
                           const SizedBox(height: 16),
@@ -793,81 +709,76 @@ class _EditMenuState extends State<EditMenu> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text(
-                                "ประเภทเมนู",
+                                "เลือกประเภทเมนู",
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.w600,
-                                  color: _MenuTheme.textSecondary,
+                                  color: _MenuTheme.textPrimary,
                                 ),
                               ),
                               if (!_isRiceCurryRestaurant && _isEditable)
-                                Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    borderRadius: BorderRadius.circular(9),
-                                    onTap: () {
-                                      setState(() {
-                                        _isAddingNewType = !_isAddingNewType;
-                                        if (!_isAddingNewType) {
-                                          _newTypeNameController.clear();
-                                          _newTypeName = null;
-                                        } else {
-                                          _selectedTypeMenuId = null;
-                                          _selectedTypeMenuName = null;
-                                        }
-                                        _typeMenuError =
-                                            null; // 🎯 เคลียร์ error ทันที
-                                      });
-                                      if (_isAddingNewType) {
-                                        FocusScope.of(context).unfocus();
-                                        WidgetsBinding.instance
-                                            .addPostFrameCallback((_) {
-                                              if (mounted) {
-                                                FocusScope.of(
-                                                  context,
-                                                ).requestFocus(
-                                                  _newTypeFocusNode,
-                                                );
-                                              }
-                                            });
+                                InkWell(
+                                  borderRadius: BorderRadius.circular(8),
+                                  onTap: () {
+                                    setState(() {
+                                      _isAddingNewType = !_isAddingNewType;
+                                      if (!_isAddingNewType) {
+                                        _newTypeNameController.clear();
+                                        _newTypeName = null;
+                                      } else {
+                                        _selectedTypeMenuId = null;
+                                        _selectedTypeMenuName = null;
                                       }
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 3,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: _isAddingNewType
-                                            ? _MenuTheme.primary
-                                            : _MenuTheme.fieldBg,
-                                        borderRadius: BorderRadius.circular(9),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            _isAddingNewType
-                                                ? Icons.close_rounded
-                                                : Icons.add_rounded,
-                                            size: 14,
+                                      _typeMenuError = null;
+                                    });
+                                    if (_isAddingNewType) {
+                                      FocusScope.of(context).unfocus();
+                                      WidgetsBinding.instance
+                                          .addPostFrameCallback((_) {
+                                            if (mounted) {
+                                              FocusScope.of(
+                                                context,
+                                              ).requestFocus(_newTypeFocusNode);
+                                            }
+                                          });
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: _isAddingNewType
+                                          ? _MenuTheme.primary
+                                          : _MenuTheme.fieldBg,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _isAddingNewType
+                                              ? Icons.close_rounded
+                                              : Icons.add_rounded,
+                                          size: 14,
+                                          color: _isAddingNewType
+                                              ? Colors.white
+                                              : _MenuTheme.primary,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          _isAddingNewType
+                                              ? "ยกเลิก"
+                                              : "เพิ่มใหม่",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
                                             color: _isAddingNewType
                                                 ? Colors.white
-                                                : _MenuTheme.textSecondary,
+                                                : _MenuTheme.primary,
                                           ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            "เพิ่มใหม่",
-                                            style: TextStyle(
-                                              fontSize: 12.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: _isAddingNewType
-                                                  ? Colors.white
-                                                  : _MenuTheme.textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -877,15 +788,10 @@ class _EditMenuState extends State<EditMenu> {
 
                           if (_isRiceCurryRestaurant)
                             Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(14),
+                              padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF0F1F3),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.black,
-                                  width: 0,
-                                ),
+                                color: _MenuTheme.fieldBg,
+                                borderRadius: BorderRadius.circular(14),
                               ),
                               child: Row(
                                 children: [
@@ -899,7 +805,7 @@ class _EditMenuState extends State<EditMenu> {
                                     _selectedTypeMenuName ?? _riceCurryTypeName,
                                     style: const TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w600,
                                       color: _MenuTheme.textSecondary,
                                     ),
                                   ),
@@ -924,8 +830,7 @@ class _EditMenuState extends State<EditMenu> {
                                               (e) => e.typemenuName == val,
                                             )
                                             .typemenuId;
-                                        _typeMenuError =
-                                            null; // 🎯 เคลียร์ error ทันที
+                                        _typeMenuError = null;
                                         _newTypeName = null;
                                       });
                                     }
@@ -936,14 +841,11 @@ class _EditMenuState extends State<EditMenu> {
                               controller: _newTypeNameController,
                               focusNode: _newTypeFocusNode,
                               enabled: _isEditable,
-                              // 🎯 ดักจับช่องกรอกชื่อประเภทอาหารใหม่
-                              validator: (value) {
-                                if (_isAddingNewType &&
-                                    (value == null || value.trim().isEmpty)) {
-                                  return "กรุณากรอกชื่อประเภทอาหารใหม่";
-                                }
-                                return null;
-                              },
+                              validator: (value) =>
+                                  (_isAddingNewType &&
+                                      (value == null || value.trim().isEmpty))
+                                  ? "ช่วยกรอกชื่อประเภทอาหารด้วยนะครับ"
+                                  : null,
                               onChanged: (val) {
                                 setState(() {
                                   _newTypeName = val.trim().isEmpty
@@ -955,15 +857,16 @@ class _EditMenuState extends State<EditMenu> {
                                 });
                               },
                               style: const TextStyle(fontSize: 14),
-                              decoration: _inputDecoration(
-                                hint: "ชื่อประเภทอาหารใหม่...",
+                              decoration: _cleanInputDecoration(
+                                hint:
+                                    "พิมพ์หมวดหมู่ใหม่ เช่น ยำ, เครื่องดื่ม...",
                                 enabled: _isEditable,
                               ),
                             ),
 
                           if (_typeMenuError != null)
                             Padding(
-                              padding: const EdgeInsets.only(top: 6, left: 14),
+                              padding: const EdgeInsets.only(top: 8, left: 4),
                               child: Text(
                                 _typeMenuError!,
                                 style: const TextStyle(
@@ -976,58 +879,58 @@ class _EditMenuState extends State<EditMenu> {
                       ),
                     ),
 
-                    // ── Section: รูปภาพเมนู ──────────────────────────
+                    // ── 3. ข้อมูลเมนู ──
                     _sectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _sectionHeader(
-                            icon: Icons.image_rounded,
-                            title: "รูปภาพเมนู",
+                            icon: Icons.receipt_long_rounded,
+                            title: "ข้อมูลเมนู",
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 15),
                           Center(
                             child: GestureDetector(
                               onTap: _isEditable ? pickImage : null,
-                              child: Stack(
-                                children: [
-                                  Container(
-                                    height: 190,
-                                    width: 190,
-                                    decoration: BoxDecoration(
-                                      color: _MenuTheme.fieldBg,
-                                      borderRadius: BorderRadius.circular(20),
-                                      border: Border.all(
-                                        // 🎯 เปลี่ยนขอบเป็นสีแดงถ้าลืมใส่รูป
-                                        color: _imageError != null
-                                            ? _MenuTheme.danger
-                                            : _MenuTheme.border,
-                                      ),
-                                    ),
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                height: 160,
+                                width: 160,
+                                decoration: BoxDecoration(
+                                  color: _MenuTheme.fieldBg,
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: _imageError != null
+                                        ? _MenuTheme.danger
+                                        : Colors.transparent,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(24),
                                       child: _buildImagePreview(),
                                     ),
-                                  ),
-                                  if (_isEditable)
-                                    Positioned(
-                                      bottom: 6,
-                                      right: 6,
-                                      child: Container(
-                                        width: 32,
-                                        height: 32,
-                                        decoration: const BoxDecoration(
-                                          color: _MenuTheme.primary,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.edit_rounded,
-                                          size: 16,
-                                          color: Colors.white,
+                                    if (_isEditable)
+                                      Positioned(
+                                        bottom: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(6),
+                                          decoration: const BoxDecoration(
+                                            color: _MenuTheme.primary,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.edit_rounded,
+                                            size: 14,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ),
@@ -1044,51 +947,60 @@ class _EditMenuState extends State<EditMenu> {
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
 
-                    // ── Section: ข้อมูลเมนู ──────────────────────────
-                    _sectionCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _sectionHeader(
-                            icon: Icons.receipt_long_rounded,
-                            title: "ข้อมูลเมนู",
-                          ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 15),
 
                           const Text(
                             "ชื่อเมนู",
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 13.5,
                               fontWeight: FontWeight.w600,
-                              color: _MenuTheme.textSecondary,
+                              color: _MenuTheme.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: menuNameController,
                             enabled: _isEditable,
-                            // 🎯 ดักจับชื่อเมนูห้ามว่าง
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
-                                ? "กรุณากรอกชื่อเมนู"
+                                ? "อย่าลืมตั้งชื่อเมนูนะครับ"
                                 : null,
                             style: const TextStyle(fontSize: 14),
-                            decoration: _inputDecoration(
+                            decoration: _cleanInputDecoration(
                               hint: _isRiceCurryRestaurant
-                                  ? "เช่น แกงไก่, ผัดผัก หรือ ไข่ดาว"
+                                  ? "เช่น แกงไก่, ผัดผัก"
                                   : "เช่น ข้าวผัด, ผัดซีอิ๊ว",
                               enabled: _isEditable,
                             ),
                           ),
                           const SizedBox(height: 16),
 
+                          // 🎯 ซ่อนรายละเอียดและราคาถ้าเป็นข้าวราดแกง
                           if (!_isRiceCurryRestaurant) ...[
                             const Text(
-                              "รายละเอียด",
+                              "รายละเอียด (ตัวเลือก)",
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: _MenuTheme.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: descriptionController,
+                              maxLines: 3,
+                              enabled: _isEditable,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: _cleanInputDecoration(
+                                hint: "อธิบายความอร่อยของเมนูนี้ซักหน่อย...",
+                                enabled: _isEditable,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            const Text(
+                              "ราคา",
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -1097,286 +1009,132 @@ class _EditMenuState extends State<EditMenu> {
                             ),
                             const SizedBox(height: 8),
                             TextFormField(
-                              controller: descriptionController,
-                              maxLines: 2,
-                              enabled: _isEditable,
-
-                              style: const TextStyle(fontSize: 14),
-                              decoration: _inputDecoration(
-                                hint: "รายละเอียดอาหารเพิ่มเติม...",
-                                enabled: _isEditable,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                          ],
-
-                          const Text(
-                            "ราคา",
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: _MenuTheme.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (_isRiceCurryRestaurant)
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: _MenuTheme.accent.withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: _MenuTheme.accent.withOpacity(0.3),
-                                ),
-                              ),
-                              child: const Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Icon(
-                                    Icons.info_outline_rounded,
-                                    color: _MenuTheme.accent,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          "ราคาข้าวราดแกง",
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w700,
-                                            color: _MenuTheme.textPrimary,
-                                          ),
-                                        ),
-                                        SizedBox(height: 6),
-                                        Text(
-                                          "• 1 อย่าง 30 บาท\n• 2 อย่าง 35 บาท\n• 3 อย่าง 40 บาท",
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            color: _MenuTheme.textSecondary,
-                                            height: 1.6,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          else
-                            TextFormField(
                               controller: priceController,
                               enabled: _isEditable,
                               keyboardType: TextInputType.number,
-                              // 🎯 ดักจับราคาห้ามว่าง และต้องเป็นตัวเลข
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return "กรุณากรอกราคาเมนู";
-                                }
-                                if (double.tryParse(value) == null) {
-                                  return "กรุณากรอกเป็นตัวเลขเท่านั้นครับ";
+                                  return "กรุณากรอกราคาเมนูครับ";
                                 }
                                 return null;
                               },
                               style: const TextStyle(fontSize: 14),
-                              decoration: _inputDecoration(
-                                hint: "0",
-                                enabled: _isEditable,
-                                suffixIcon: const Padding(
-                                  padding: EdgeInsets.only(right: 12),
-                                  child: Center(
-                                    widthFactor: 1,
-                                    child: Text(
-                                      "บาท",
-                                      style: TextStyle(
-                                        color: _MenuTheme.textSecondary,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 13,
+                              decoration:
+                                  _cleanInputDecoration(
+                                    hint: "0",
+                                    enabled: _isEditable,
+                                  ).copyWith(
+                                    suffixIcon: const Padding(
+                                      padding: EdgeInsets.only(right: 12),
+                                      child: Center(
+                                        widthFactor: 1,
+                                        child: Text(
+                                          "บาท",
+                                          style: TextStyle(
+                                            color: _MenuTheme.textSecondary,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ),
                             ),
+                          ],
                         ],
                       ),
                     ),
 
-                    // ── Section: ตัวเลือกเสริม (Add-on) ──────────────────────────
-                    if (!_isRiceCurryRestaurant)
-                      _sectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                    // ── 4. ตัวเลือกเสริม ──
+                    if (!_isRiceCurryRestaurant) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: 4,
+                          right: 4,
+                          bottom: 12,
+                          top: 8,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            _sectionHeader(
-                              icon: Icons.playlist_add_check_rounded,
-                              title: "ตัวเลือกเสริม (Add-on)",
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: _MenuTheme.linkBlue.withOpacity(0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  linkedCount.toString() + " กลุ่มที่ผูก",
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: _MenuTheme.linkBlue,
-                                  ),
-                                ),
+                            const Text(
+                              "ตัวเลือกเสริม (Add-on)",
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: _MenuTheme.textPrimary,
                               ),
                             ),
-                            const SizedBox(height: 16),
-
-                            CompositedTransformTarget(
-                              link: _addonSearchLayerLink,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: _isEditable
-                                      ? Colors.white
-                                      : const Color(0xFFF0F1F3),
-                                  borderRadius: BorderRadius.circular(16),
-                                  boxShadow: _isEditable
-                                      ? [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(
-                                              0.04,
-                                            ),
-                                            blurRadius: 10,
-                                            offset: const Offset(0, 3),
-                                          ),
-                                        ]
-                                      : null,
-                                ),
-                                child: TextField(
-                                  controller: _addonSearchController,
-                                  focusNode: _addonSearchFocusNode,
-                                  onChanged: _onAddonSearchChanged,
-                                  enabled: _isEditable,
-                                  style: const TextStyle(fontSize: 14.5),
-                                  decoration: InputDecoration(
-                                    hintText: _isEditable
-                                        ? "ค้นหากลุ่มตัวเลือกเสริมเพื่อนำมาผูก..."
-                                        : "ค้นหากลุ่มตัวเลือกเสริม...",
-                                    hintStyle: const TextStyle(
-                                      color: _MenuTheme.textSecondary,
-                                      fontSize: 13.5,
-                                    ),
-                                    prefixIcon: const Icon(
-                                      Icons.search_rounded,
-                                      color: _MenuTheme.textSecondary,
-                                      size: 20,
-                                    ),
-                                    suffixIcon:
-                                        _addonSearchController
-                                                .text
-                                                .isNotEmpty &&
-                                            _isEditable
-                                        ? IconButton(
-                                            icon: const Icon(
-                                              Icons.close_rounded,
-                                              color: _MenuTheme.textSecondary,
-                                              size: 18,
-                                            ),
-                                            onPressed: () {
-                                              _addonSearchController.clear();
-                                              _updateAddonSearchResults('');
-                                              setState(() {});
-                                            },
-                                          )
-                                        : null,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                        color: Colors.black,
-                                        width: 0,
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: const BorderSide(
-                                        color: Colors.black,
-                                        width: 0,
-                                      ),
-                                    ),
-                                    filled: true,
-                                    fillColor: _isEditable
-                                        ? Colors.white
-                                        : const Color(0xFFF0F1F3),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-
-                            if (linkedGroups.isEmpty)
-                              _buildEmptyAddonState()
-                            else if (_isEditable)
-                              ReorderableListView.builder(
-                                shrinkWrap: true,
-                                primary: false,
-                                physics: const NeverScrollableScrollPhysics(),
-                                padding: EdgeInsets.zero,
-                                buildDefaultDragHandles: false,
-                                itemCount: linkedGroups.length,
-                                onReorder: (oldIndex, newIndex) {
-                                  setState(() {
-                                    if (newIndex > oldIndex) {
-                                      newIndex -= 1;
+                            Switch(
+                              value: _isAddonEnabled,
+                              activeColor: Colors.white,
+                              activeTrackColor: const Color(0xFF65C466),
+                              inactiveThumbColor: Colors.white,
+                              inactiveTrackColor: Colors.grey.shade300,
+                              onChanged: _isEditable
+                                  ? (val) {
+                                      setState(() {
+                                        _isAddonEnabled = val;
+                                        if (val && _draftOptionGroups.isEmpty) {
+                                          _addNewOptionGroup();
+                                        }
+                                      });
                                     }
-                                    final item = _linkedGroupIds.removeAt(
-                                      oldIndex,
-                                    );
-                                    _linkedGroupIds.insert(newIndex, item);
-                                  });
-                                },
-                                itemBuilder: (context, index) =>
-                                    ReorderableDelayedDragStartListener(
-                                      key: ValueKey(
-                                        linkedGroups[index].group.optionGroupId,
-                                      ),
-                                      index: index,
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 10,
-                                        ),
-                                        child: _buildActiveAddonGroupCard(
-                                          linkedGroups[index],
-                                        ),
-                                      ),
-                                    ),
-                              )
-                            else
-                              ...linkedGroups.map(
-                                (agg) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _buildActiveAddonGroupCard(agg),
-                                ),
-                              ),
+                                  : null,
+                            ),
                           ],
                         ),
                       ),
+
+                      if (_isAddonEnabled) ...[
+                        for (int i = 0; i < _draftOptionGroups.length; i++)
+                          _buildOptionGroupSection(_draftOptionGroups[i], i),
+
+                        if (_isEditable) ...[
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _addNewOptionGroup,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: _MenuTheme.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              icon: const Icon(Icons.add_rounded, size: 20),
+                              label: const Text(
+                                "เพิ่มกลุ่มตัวเลือก",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ],
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
 
-      // ── แผงปุ่มควบคุมด้านล่าง (ตามสไตล์หน้า Profile ร้านค้า) ─────
+      // ── แผงปุ่มด้านล่าง ──
       bottomNavigationBar: _isInitialLoading
           ? null
           : Container(
-              color: _MenuTheme.pageBg,
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: SafeArea(
                 child: _isEditable
                     ? Row(
@@ -1389,20 +1147,15 @@ class _EditMenuState extends State<EditMenu> {
                                   setState(() {
                                     _isEditable = false;
                                     _selectedImage = null;
-                                    _linkedGroupIds.clear();
-                                    _linkedGroupIds.addAll(
-                                      _originalLinkedGroupIds,
-                                    );
                                   });
                                   _initializeFromMenuModel();
-                                  _addonSearchController.clear();
-                                  _removeAddonSearchOverlay();
+                                  _loadAllData();
                                 },
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: _MenuTheme.textSecondary,
                                   side: BorderSide(color: Colors.grey.shade300),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(30),
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
                                 ),
                                 child: const Text(
@@ -1419,53 +1172,32 @@ class _EditMenuState extends State<EditMenu> {
                           Expanded(
                             child: SizedBox(
                               height: 52,
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(30),
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      _MenuTheme.accent,
-                                      Color(0xFF239E56),
-                                    ],
+                              child: ElevatedButton(
+                                onPressed: _isLoading ? null : _doSaveMenu,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _MenuTheme.accent,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(14),
                                   ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: _MenuTheme.accent.withOpacity(
-                                        0.35,
-                                      ),
-                                      blurRadius: 14,
-                                      offset: const Offset(0, 6),
-                                    ),
-                                  ],
                                 ),
-                                child: ElevatedButton(
-                                  onPressed: _isLoading ? null : _doSaveMenu,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    foregroundColor: Colors.white,
-                                    elevation: 0,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
-                                    ),
-                                  ),
-                                  child: _isLoading
-                                      ? const SizedBox(
-                                          height: 20,
-                                          width: 20,
-                                          child: CircularProgressIndicator(
-                                            color: Colors.white,
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      : const Text(
-                                          "บันทึกการแก้ไข",
-                                          style: TextStyle(
-                                            fontSize: 15.5,
-                                            fontWeight: FontWeight.w700,
-                                          ),
+                                child: _isLoading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
                                         ),
-                                ),
+                                      )
+                                    : const Text(
+                                        "บันทึกการแก้ไข",
+                                        style: TextStyle(
+                                          fontSize: 15.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
@@ -1474,44 +1206,394 @@ class _EditMenuState extends State<EditMenu> {
                     : SizedBox(
                         width: double.infinity,
                         height: 54,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(30),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF00B300), Color(0xFF00B300)],
+                        child: ElevatedButton.icon(
+                          onPressed: () => setState(() => _isEditable = true),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _MenuTheme.primary,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _MenuTheme.primary.withOpacity(0.35),
-                                blurRadius: 16,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
                           ),
-                          child: ElevatedButton.icon(
-                            onPressed: () => setState(() => _isEditable = true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.transparent,
-                              shadowColor: Colors.transparent,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                            ),
-                            icon: const Icon(Icons.edit_outlined, size: 20),
-                            label: const Text(
-                              "แก้ไขข้อมูล",
-                              style: TextStyle(
-                                fontSize: 16.5,
-                                fontWeight: FontWeight.w700,
-                              ),
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          label: const Text(
+                            "แก้ไขข้อมูล",
+                            style: TextStyle(
+                              fontSize: 16.5,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
                       ),
               ),
             ),
+    );
+  }
+
+  Widget _buildDropdown(
+    List<String> items,
+    String? value,
+    Function(String?)? onChanged,
+  ) {
+    final String? safeValue = (value != null && items.contains(value))
+        ? value
+        : null;
+    final bool isEmpty = items.isEmpty;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        color: _isEditable ? _MenuTheme.fieldBg : const Color(0xFFF0F1F3),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _typeMenuError != null
+              ? _MenuTheme.danger
+              : Colors.transparent,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String>(
+          value: safeValue,
+          isExpanded: true,
+          icon: const Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: _MenuTheme.textSecondary,
+          ),
+          hint: Text(
+            isEmpty ? "ยังไม่มีประเภท" : "เลือกประเภทหมวดหมู่",
+            style: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+          ),
+          items: items.toSet().map((String e) {
+            return DropdownMenuItem<String>(
+              value: e,
+              child: Text(
+                e,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: _MenuTheme.textPrimary,
+                ),
+              ),
+            );
+          }).toList(),
+          onChanged: _isEditable && !isEmpty ? onChanged : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionGroupSection(DraftOptionGroup group, int groupIndex) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 15,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: _MenuTheme.primaryLight,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.list_alt_rounded,
+                      size: 16,
+                      color: _MenuTheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    "กลุ่มตัวเลือกที่ ${groupIndex + 1}",
+                    style: const TextStyle(
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                      color: _MenuTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              if (_isEditable)
+                InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () => _removeOptionGroup(groupIndex),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: _MenuTheme.danger,
+                      size: 18,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          const Text(
+            "ชื่อกลุ่มตัวเลือก",
+            style: TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: _MenuTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextFormField(
+            controller: group.nameController,
+            enabled: _isEditable,
+            validator: (value) => (value == null || value.trim().isEmpty)
+                ? "กรุณากรอกชื่อกลุ่ม"
+                : null,
+            style: const TextStyle(fontSize: 14),
+            decoration: _cleanInputDecoration(
+              hint: "ชื่อกลุ่ม เช่น ระดับความหวาน, ท็อปปิ้ง",
+              enabled: _isEditable,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Row(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: group.isRequired,
+                  activeColor: _MenuTheme.primary,
+                  onChanged: _isEditable
+                      ? (val) => setState(() => group.isRequired = val ?? false)
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "จำเป็นต้องเลือกไหม",
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: _MenuTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: Checkbox(
+                  value: group.isMultipleChoice,
+                  activeColor: _MenuTheme.primary,
+                  onChanged: _isEditable
+                      ? (val) => setState(
+                          () => group.isMultipleChoice = val ?? false,
+                        )
+                      : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "ลูกค้าเลือกได้หลายอย่าง",
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: _MenuTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Divider(height: 1, thickness: 1, color: Color(0xFFF3F4F6)),
+          ),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                "รายการย่อย",
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _MenuTheme.textPrimary,
+                ),
+              ),
+              if (_isEditable)
+                InkWell(
+                  onTap: () => _addNewOptionToGroup(group),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.grey.shade600,
+                        width: 1.2,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(
+                          Icons.add,
+                          size: 16,
+                          color: _MenuTheme.textSecondary,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          "เพิ่มรายการ",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: _MenuTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              const Expanded(
+                flex: 5,
+                child: Text(
+                  "ชื่อตัวเลือก",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _MenuTheme.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Expanded(
+                flex: 3,
+                child: Text(
+                  "ราคา",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: _MenuTheme.textPrimary,
+                  ),
+                ),
+              ),
+              if (_isEditable) const SizedBox(width: 56),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          for (int j = 0; j < group.options.length; j++)
+            _buildDraftOptionItemRow(group, j),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDraftOptionItemRow(DraftOptionGroup group, int optionIndex) {
+    final DraftOption option = group.options[optionIndex];
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 5,
+            child: TextFormField(
+              controller: option.nameController,
+              enabled: _isEditable,
+              validator: (value) =>
+                  (value == null || value.trim().isEmpty) ? "กรอกชื่อ" : null,
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: _MenuTheme.textPrimary,
+              ),
+              decoration: _cleanInputDecoration(
+                hint: "ชื่อตัวเลือก",
+                enabled: _isEditable,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 3,
+            child: TextFormField(
+              controller: option.priceController,
+              enabled: _isEditable,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              style: const TextStyle(
+                fontSize: 13.5,
+                color: _MenuTheme.textPrimary,
+              ),
+              decoration: _cleanInputDecoration(hint: "", enabled: _isEditable)
+                  .copyWith(
+                    suffixIcon: const Padding(
+                      padding: EdgeInsets.only(right: 12),
+                      child: Center(
+                        widthFactor: 1,
+                        child: Text(
+                          "บาท",
+                          style: TextStyle(
+                            color: _MenuTheme.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+            ),
+          ),
+          if (_isEditable) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () => _removeOptionFromGroup(group, optionIndex),
+              child: Container(
+                height: 48,
+                width: 48,
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: _MenuTheme.danger,
+                  size: 20,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 
@@ -1537,344 +1619,33 @@ class _EditMenuState extends State<EditMenu> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.add_photo_alternate_rounded,
-            size: 40,
-            color: _imageError != null
-                ? _MenuTheme.danger.withOpacity(0.6)
-                : _MenuTheme.textSecondary.withOpacity(0.6),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            "ไม่มีรูปภาพ",
-            style: TextStyle(
-              fontSize: 12.5,
-              color: _imageError != null
-                  ? _MenuTheme.danger
-                  : _MenuTheme.textSecondary.withOpacity(0.8),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDropdown(
-    List<String> items,
-    String? value,
-    Function(String?)? onChanged,
-  ) {
-    final String? safeValue = (value != null && items.contains(value))
-        ? value
-        : null;
-    final bool isEmpty = items.isEmpty;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: _isEditable ? _MenuTheme.fieldBg : const Color(0xFFF0F1F3),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          // 🎯 ถ้ามี error ให้ขอบเป็นสีแดง
-          color: _typeMenuError != null ? _MenuTheme.danger : Colors.black,
-          width: _typeMenuError != null ? 1.2 : 0.3,
-        ),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: safeValue,
-          isExpanded: true,
-          hint: Text(
-            isEmpty ? "ยังไม่มีประเภท" : "เลือกประเภท",
-            style: const TextStyle(
-              fontSize: 14,
-              color: _MenuTheme.textSecondary,
-            ),
-          ),
-          items: items.toSet().map((String e) {
-            return DropdownMenuItem<String>(
-              value: e,
-              child: Text(e, style: const TextStyle(fontSize: 14)),
-            );
-          }).toList(),
-          onChanged: _isEditable && !isEmpty ? onChanged : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyAddonState() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-      decoration: BoxDecoration(
-        color: _MenuTheme.fieldBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _MenuTheme.border),
-      ),
-      child: Column(
-        children: [
           Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: _MenuTheme.primary.withOpacity(0.12),
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.tune_rounded,
-              color: _MenuTheme.primary,
-              size: 22,
+            child: Icon(
+              Icons.add_photo_alternate_rounded,
+              size: 28,
+              color: _imageError != null
+                  ? _MenuTheme.danger.withOpacity(0.6)
+                  : _MenuTheme.textSecondary,
             ),
           ),
           const SizedBox(height: 10),
-          const Text(
-            "ยังไม่ได้ผูกกลุ่มตัวเลือกเสริมสำหรับเมนูนี้",
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w700,
-              color: _MenuTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          if (_isEditable)
-            const Text(
-              "พิมพ์ค้นหาในช่องด้านบนแล้วกด + เพื่อผูกกลุ่มตัวเลือกเสริม",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: _MenuTheme.textSecondary),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAddonMetaBadge({
-    required IconData icon,
-    required String label,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 12, color: color),
-          const SizedBox(width: 4),
           Text(
-            label,
+            "แตะเพื่อเลือกรูป",
             style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: color,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: _imageError != null
+                  ? _MenuTheme.danger
+                  : _MenuTheme.textSecondary,
             ),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildCircleExpandButton({
-    required bool expanded,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      customBorder: const CircleBorder(),
-      child: Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: _MenuTheme.primary.withOpacity(0.12),
-          shape: BoxShape.circle,
-        ),
-        child: AnimatedRotation(
-          turns: expanded ? 0.5 : 0,
-          duration: const Duration(milliseconds: 200),
-          child: const Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: _MenuTheme.primary,
-            size: 20,
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActiveAddonGroupCard(_AddonGroupAggregate agg) {
-    final groupId = agg.group.optionGroupId ?? -1;
-    final isExpanded = _groupExpanded[groupId] ?? false;
-    final isMultipleChoice = agg.group.isMultipleChoice ?? false;
-    final items = agg.items.values.toList();
-
-    return Container(
-      decoration: BoxDecoration(
-        color: _MenuTheme.fieldBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: _MenuTheme.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: () => setState(() => _groupExpanded[groupId] = !isExpanded),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          agg.group.optionGroupName ?? "ไม่มีชื่อกลุ่ม",
-                          style: const TextStyle(
-                            fontSize: 14.5,
-                            fontWeight: FontWeight.w700,
-                            color: _MenuTheme.textPrimary,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          items.length.toString() + " ตัวเลือกย่อย",
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: _MenuTheme.textSecondary,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-
-                        _buildAddonMetaBadge(
-                          icon: isMultipleChoice
-                              ? Icons.check_box_outlined
-                              : Icons.radio_button_checked_rounded,
-                          label: isMultipleChoice
-                              ? "เลือกได้หลายอย่าง"
-                              : "เลือกได้ 1 อย่าง",
-                          color: isMultipleChoice
-                              ? _MenuTheme.linkBlue
-                              : _MenuTheme.primary,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildCircleExpandButton(
-                        expanded: isExpanded,
-                        onTap: () => setState(
-                          () => _groupExpanded[groupId] = !isExpanded,
-                        ),
-                      ),
-                      if (_isEditable) ...[
-                        const SizedBox(height: 8),
-                        InkWell(
-                          borderRadius: BorderRadius.circular(10),
-                          onTap: () =>
-                              setState(() => _linkedGroupIds.remove(groupId)),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: _MenuTheme.danger.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline_rounded,
-                              color: _MenuTheme.danger,
-                              size: 18,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedCrossFade(
-            duration: const Duration(milliseconds: 200),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showFirst
-                : CrossFadeState.showSecond,
-            firstChild: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
-              child: Column(
-                children: [
-                  Divider(height: 1, thickness: 1, color: _MenuTheme.border),
-                  const SizedBox(height: 10),
-                  if (items.isNotEmpty)
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          left: BorderSide(
-                            color: _MenuTheme.primary.withOpacity(0.7),
-                            width: 3,
-                          ),
-                        ),
-                      ),
-                      padding: const EdgeInsets.only(left: 10),
-                      child: Column(
-                        children: [
-                          for (int i = 0; i < items.length; i++) ...[
-                            _buildDetailItemRow(items[i]),
-                            if (i < items.length - 1) const SizedBox(height: 8),
-                          ],
-                        ],
-                      ),
-                    ),
-                  if (items.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 6),
-                      child: Text(
-                        "กลุ่มนี้ยังไม่มีตัวเลือกย่อย",
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _MenuTheme.textSecondary,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            secondChild: const SizedBox(width: double.infinity, height: 0),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailItemRow(OptionModel detail) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            detail.optionName ?? "ไม่มีชื่อ",
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: _MenuTheme.textPrimary,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        Text(
-          "+" + (detail.optionPrice?.toInt() ?? 0).toString() + " บาท",
-          style: const TextStyle(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: _MenuTheme.textSecondary,
-          ),
-        ),
-      ],
     );
   }
 }

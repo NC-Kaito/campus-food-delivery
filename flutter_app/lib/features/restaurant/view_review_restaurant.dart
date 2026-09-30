@@ -99,13 +99,13 @@ class _ViewReviewRestaurantState extends State<ViewReviewRestaurant> {
     final bool isCurryDish = displayMenuName.contains("ข้าวราดแกง");
 
     Map<String, Map<String, dynamic>> groupedAddons = {};
-    for (var addon in item.addons) {
-      String name = addon.addonNameAtOrder.isNotEmpty
-          ? addon.addonNameAtOrder
-          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
+    for (var option in item.options) {
+      String name = option.optionNameAtOrder.isNotEmpty
+          ? option.optionNameAtOrder
+          : (option.menuOptionDetail?.optionName ?? '');
 
-      double price = addon.priceAtOrder;
-      int qty = addon.addonQty ?? 1;
+      double price = option.priceAtOrder;
+      int qty = option.optionQty ?? 1;
 
       if (name.isNotEmpty) {
         if (groupedAddons.containsKey(name)) {

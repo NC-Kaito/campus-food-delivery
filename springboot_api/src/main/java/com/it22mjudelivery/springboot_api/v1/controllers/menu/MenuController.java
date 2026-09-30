@@ -1,8 +1,10 @@
 package com.it22mjudelivery.springboot_api.v1.controllers.menu;
 
-import com.it22mjudelivery.springboot_api.v1.dtos.CurryPriceDto;
 import com.it22mjudelivery.springboot_api.v1.dtos.MenuDto;
 import com.it22mjudelivery.springboot_api.v1.entities.Menu;
+import com.it22mjudelivery.springboot_api.v1.entities.Optiongroup;
+import com.it22mjudelivery.springboot_api.v1.repositories.OptionGroupRepository;
+import com.it22mjudelivery.springboot_api.v1.repositories.OptionRepository;
 import com.it22mjudelivery.springboot_api.v1.services.MenuService;
 // 🎯 Import CloudinaryService เข้ามา (เช็ก Package ให้ตรงกับของคุณด้วยนะครับ)
 import com.it22mjudelivery.springboot_api.v1.services.CloudinaryService;
@@ -12,6 +14,8 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +27,9 @@ public class MenuController {
     private final MenuService menuService;
     // 🎯 ฉีด CloudinaryService เข้ามาใช้งาน
     private final CloudinaryService cloudinaryService;
+
+    private final OptionGroupRepository optionGroupRepository;
+    private final OptionRepository optionRepository;
 
     @GetMapping("/restaurant/{username}")
     public ResponseEntity<List<Menu>> getMenusByRestaurant(@PathVariable String username) {
@@ -130,59 +137,24 @@ public class MenuController {
         }
     }
 
+    @GetMapping("/{menuId}/options")
+    public ResponseEntity<?> getMenuOptions(@PathVariable Integer menuId) {
+        // ✅ แก้ไข Type ให้เป็น List<Optiongroup>
+        List<Optiongroup> groups = optionGroupRepository.findByMenu_Menuid(menuId);
 
-    @GetMapping("/curry-price")
-    public ResponseEntity<?> getCurryPrice(
-            @RequestParam String restaurantId,
-            @RequestParam Integer typeMenuId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Optiongroup grp : groups) {
+            var options = optionRepository.findByOptiongroup(grp);
 
-        CurryPriceDto result =
-                menuService.getCurryPrice(
-                        restaurantId,
-                        typeMenuId
-                );
+            Map<String, Object> groupMap = new HashMap<>();
+            groupMap.put("optiongroupid", grp.getOptiongroupid());
+            groupMap.put("optiongroupname", grp.getOptiongroupname());
+            groupMap.put("is_required", grp.is_required());
+            groupMap.put("is_multiple_choice", grp.is_multiple_choice());
+            groupMap.put("options", options);
 
-        if (result == null) {
-
-            return ResponseEntity.ok(
-                    new java.util.HashMap<>()
-            );
+            result.add(groupMap);
         }
-
         return ResponseEntity.ok(result);
-    }
-
-    @PutMapping("/curry-price")
-    public ResponseEntity<?> saveCurryPrice(
-            @RequestParam String restaurantId,
-            @RequestParam Integer typeMenuId,
-            @RequestBody CurryPriceDto request
-    ) {
-        try {
-
-            CurryPriceDto result =
-                    menuService.saveCurryPrice(
-                            restaurantId,
-                            typeMenuId,
-                            request
-                    );
-
-            return ResponseEntity.ok(result);
-
-        } catch (RuntimeException e) {
-
-            return ResponseEntity.badRequest()
-                    .body(Map.of("message", e.getMessage()));
-
-        } catch (Exception e) {
-
-            e.printStackTrace();
-
-            return ResponseEntity.internalServerError()
-                    .body(Map.of(
-                            "message",
-                            "เกิดข้อผิดพลาดที่ระบบ: " + e.getMessage()
-                    ));
-        }
     }
 }

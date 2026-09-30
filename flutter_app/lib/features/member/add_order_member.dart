@@ -21,7 +21,6 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   int _quantity = 1;
   final TextEditingController _noteController = TextEditingController();
 
-  final MenuOptionService _optionService = MenuOptionService();
   List<OptionGroupModel> _optionGroups = [];
   List<OptionModel> _allOptions = [];
   bool _isLoading = true;
@@ -56,16 +55,93 @@ class _AddOrderMemberState extends State<AddOrderMember> {
   }
 
   Future<void> _loadMenuAddons() async {
-    if (widget.menuModel.menuId == null) {
-      setState(() => _isLoading = false);
+    final int? menuId = widget.menuModel.menuId;
+
+    if (menuId == null) {
+      if (mounted) {
+        setState(() {
+          _optionGroups = [];
+          _allOptions = [];
+          _isLoading = false;
+        });
+      }
       return;
     }
 
-    setState(() => _isLoading = true);
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
 
     try {
-      final List<OptionGroupModel> groups = await _optionService
-          .getAddonsByMenuId(widget.menuModel.menuId!);
+      // ใช้ endpoint ใหม่ของระบบ Option โดยตรง
+      // GET /v1/menu/{menuId}/options
+      final response = await DioClient.dio.get('/v1/menu/$menuId/options');
+
+      if (response.statusCode != 200 || response.data is! List) {
+        throw Exception('ไม่สามารถโหลด OptionGroup ของเมนูได้');
+      }
+
+      final List rawGroups = response.data as List;
+      final List<OptionGroupModel> groups = [];
+
+      for (final rawGroup in rawGroups) {
+        if (rawGroup is! Map) continue;
+
+        final Map<String, dynamic> groupJson = Map<String, dynamic>.from(
+          rawGroup,
+        );
+
+        // รองรับทั้งชื่อ field ที่ backend ส่งออกมา และชื่อที่ Model ใช้
+        groupJson['optiongroupid'] =
+            groupJson['optiongroupid'] ?? groupJson['optionGroupId'];
+        groupJson['optiongroupname'] =
+            groupJson['optiongroupname'] ??
+            groupJson['optionGroupName'] ??
+            'ตัวเลือก';
+        groupJson['is_required'] =
+            groupJson['is_required'] ?? groupJson['isRequired'] ?? false;
+        groupJson['is_multiple_choice'] =
+            groupJson['is_multiple_choice'] ??
+            groupJson['isMultipleChoice'] ??
+            false;
+
+        final dynamic rawOptions = groupJson['options'];
+        final List<Map<String, dynamic>> normalizedOptions = [];
+
+        if (rawOptions is List) {
+          for (final rawOption in rawOptions) {
+            if (rawOption is! Map) continue;
+
+            final Map<String, dynamic> optionJson = Map<String, dynamic>.from(
+              rawOption,
+            );
+
+            final dynamic optionId =
+                optionJson['optionid'] ?? optionJson['optionId'];
+            if (optionId == null) continue;
+
+            optionJson['optionid'] = optionId is num
+                ? optionId.toInt()
+                : int.tryParse(optionId.toString());
+            optionJson['optionname'] =
+                optionJson['optionname'] ??
+                optionJson['optionName'] ??
+                'ไม่มีชื่อ';
+
+            final dynamic optionPrice =
+                optionJson['optionprice'] ?? optionJson['optionPrice'] ?? 0;
+            optionJson['optionprice'] = optionPrice is num
+                ? optionPrice.toDouble()
+                : double.tryParse(optionPrice.toString()) ?? 0.0;
+
+            normalizedOptions.add(optionJson);
+          }
+        }
+
+        groupJson['options'] = normalizedOptions;
+
+        groups.add(OptionGroupModel.fromJson(groupJson));
+      }
 
       if (!mounted) return;
 
@@ -75,41 +151,53 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         _optionModelsIndex.clear();
         _groupModelsIndex.clear();
         _optionGroupNameById.clear();
+        _optionQuantities.clear();
 
         for (final group in groups) {
-          final String groupName = (group.optionGroupName ?? "ตัวเลือกเสริม")
-              .trim();
+          final String groupName = (group.optionGroupName ?? 'ตัวเลือก').trim();
 
           _groupModelsIndex[groupName] = group;
 
-          final options = group.options ?? [];
+          final List<OptionModel> options = (group.options ?? [])
+              .whereType<OptionModel>()
+              .where((option) => option.optionId != null)
+              .toList();
+
           for (final option in options) {
-            if (option is OptionModel && option.optionId != null) {
-              _allOptions.add(option);
-              _optionModelsIndex[option.optionId!] = option;
-              _optionGroupNameById[option.optionId!] = groupName;
-            }
+            _allOptions.add(option);
+            _optionModelsIndex[option.optionId!] = option;
+            _optionGroupNameById[option.optionId!] = groupName;
           }
 
-          // เลือกตัวเลือกแรกที่ราคา 0 บาทเป็นค่าเริ่มต้น
+          // Single choice: ให้เลือกตัวเลือกแรกที่ราคา 0 เป็นค่าเริ่มต้น
           if (options.isNotEmpty && !group.isMultipleChoice) {
-            final firstFreeOption = options.cast<OptionModel?>().firstWhere(
-              (option) =>
-                  option != null &&
-                  option.optionId != null &&
-                  (option.optionPrice ?? 0) == 0,
-              orElse: () => null,
-            );
+            OptionModel? defaultOption;
 
-            if (firstFreeOption?.optionId != null) {
-              _optionQuantities[firstFreeOption!.optionId!] = 1;
+            for (final option in options) {
+              if ((option.optionPrice ?? 0) == 0) {
+                defaultOption = option;
+                break;
+              }
+            }
+
+            defaultOption ??= options.first;
+
+            if (defaultOption.optionId != null) {
+              _optionQuantities[defaultOption.optionId!] = 1;
             }
           }
         }
 
         _isLoading = false;
       });
+
+      debugPrint(
+        'โหลด OptionGroup/Option สำเร็จ: '
+        '${groups.length} กลุ่ม / ${_allOptions.length} ตัวเลือก',
+      );
     } catch (e) {
+      debugPrint('Error loading OptionGroup/Option: $e');
+
       if (!mounted) return;
 
       setState(() {
@@ -118,10 +206,9 @@ class _AddOrderMemberState extends State<AddOrderMember> {
         _optionModelsIndex.clear();
         _groupModelsIndex.clear();
         _optionGroupNameById.clear();
+        _optionQuantities.clear();
         _isLoading = false;
       });
-
-      debugPrint("Error loading options: $e");
     }
   }
 
@@ -135,8 +222,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
     final Map<String, List<OptionModel>> grouped = {};
 
     for (final group in _optionGroups) {
-      final String groupName = (group.optionGroupName ?? "ตัวเลือกเสริม")
-          .trim();
+      final String groupName = (group.optionGroupName ?? "ตัวเลือก").trim();
 
       final List<OptionModel> options = (group.options ?? [])
           .whereType<OptionModel>()
@@ -286,11 +372,11 @@ class _AddOrderMemberState extends State<AddOrderMember> {
                                             ?.isMultipleChoice ??
                                         false;
 
-                                    // 🎯 สำหรับข้าวราดแกง เปลี่ยนชื่อกลุ่ม "รายการเพิ่มเติม" หรือ "ตัวเลือกเสริม" เป็น "รายการ"
+                                    // 🎯 สำหรับข้าวราดแกง เปลี่ยนชื่อกลุ่ม "รายการเพิ่มเติม" หรือ "ตัวเลือก" เป็น "รายการ"
                                     String displayGroupName = groupName;
                                     if (isCurryDish &&
                                         (groupName == "รายการเพิ่มเติม" ||
-                                            groupName == "ตัวเลือกเสริม" ||
+                                            groupName == "ตัวเลือก" ||
                                             groupName.contains("เพิ่มเติม"))) {
                                       displayGroupName = "รายการ";
                                     }
@@ -517,7 +603,7 @@ class _AddOrderMemberState extends State<AddOrderMember> {
               height: 50,
               child: ElevatedButton(
                 onPressed: () {
-                  // 🎯 1. ดักการตรวจสอบ: บังคับเลือกตัวเลือกเสริมที่เป็นแบบ Radio (Single Choice)
+                  // 🎯 1. ดักการตรวจสอบ: บังคับเลือกตัวเลือกที่เป็นแบบ Radio (Single Choice)
                   final List<OptionModel> finalSelectedOptionsList = [];
                   final groupedOptionsForCheck = _groupOptions();
 
@@ -684,52 +770,55 @@ class _AddOrderMemberState extends State<AddOrderMember> {
           Flexible(
             child: Row(
               children: [
-                InkWell(
-                  onTap: handleFrontTap,
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          shape: isMultipleChoice
-                              ? BoxShape.rectangle
-                              : BoxShape.circle,
-                          borderRadius: isMultipleChoice
-                              ? BorderRadius.circular(4)
-                              : null,
-                          border: Border.all(color: Colors.black, width: 1.5),
-                        ),
-                        child: isSelected
-                            ? Center(
-                                child: Container(
-                                  width: 10,
-                                  height: 10,
-                                  decoration: BoxDecoration(
-                                    shape: isMultipleChoice
-                                        ? BoxShape.rectangle
-                                        : BoxShape.circle,
-                                    borderRadius: isMultipleChoice
-                                        ? BorderRadius.circular(2)
-                                        : null,
-                                    color: Colors.orange,
+                Expanded(
+                  child: InkWell(
+                    onTap: handleFrontTap,
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            shape: isMultipleChoice
+                                ? BoxShape.rectangle
+                                : BoxShape.circle,
+                            borderRadius: isMultipleChoice
+                                ? BorderRadius.circular(4)
+                                : null,
+                            border: Border.all(color: Colors.black, width: 1.5),
+                          ),
+                          child: isSelected
+                              ? Center(
+                                  child: Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      shape: isMultipleChoice
+                                          ? BoxShape.rectangle
+                                          : BoxShape.circle,
+                                      borderRadius: isMultipleChoice
+                                          ? BorderRadius.circular(2)
+                                          : null,
+                                      color: Colors.orange,
+                                    ),
                                   ),
-                                ),
-                              )
-                            : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Flexible(
-                        child: Text(
-                          title,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Colors.black87,
+                                )
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            title,
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(width: 10),

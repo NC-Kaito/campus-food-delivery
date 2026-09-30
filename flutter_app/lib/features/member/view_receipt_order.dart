@@ -404,7 +404,7 @@ class _ViewReceiptOrderState extends State<ViewReceiptOrder> {
 
                             // OrderDetailModel ปัจจุบันเก็บตัวเลือกเพิ่มเติมไว้ใน
                             // options และมี getter สำรองชื่อ addons
-                            final List<dynamic> rawAddons = item.addons;
+                            final List<dynamic> rawAddons = item.options;
 
                             final Map<String, Map<String, dynamic>>
                             groupedAddons = {};

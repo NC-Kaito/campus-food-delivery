@@ -8,7 +8,6 @@ import 'package:flutter_app/data/models/order_model.dart';
 import 'package:flutter_app/data/services/in_app_notification_service.dart';
 import 'package:flutter_app/data/services/member/member_service.dart';
 import 'package:flutter_app/data/services/order_status_monitor.dart';
-import 'package:flutter_app/data/services/order_service.dart';
 import 'package:flutter_app/features/member/cart_manager_member.dart';
 import 'package:flutter_app/features/member/edit_order_member.dart';
 import 'package:flutter_app/features/member/edit_curry_order_member.dart';
@@ -858,7 +857,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         itemMenuName += " (พิเศษ)";
                       }
 
-                      int currentOptionsSum = 0;
                       final Map<int, Map<String, dynamic>>
                       groupedOptionsForApi = {};
 
@@ -869,8 +867,6 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                         final double price = (option.optionPrice ?? 0)
                             .toDouble();
                         final String optionName = option.optionName ?? '';
-
-                        currentOptionsSum += price.toInt();
 
                         if (groupedOptionsForApi.containsKey(id)) {
                           groupedOptionsForApi[id]!['qty'] += 1;
@@ -924,18 +920,60 @@ class _ViewOrderMemberState extends State<ViewOrderMember> {
                       );
                     }).toList();
 
-                    OrderModel finalOrder = OrderModel(
-                      deliveryFee: deliveryFee.toDouble(),
-                      totalPrice: totalPrice.toDouble(),
-                      latitude: _selectedUserLocation!.latitude,
-                      longitude: _selectedUserLocation!.longitude,
-                      addressDetail: _addressNoteController.text,
-                      memberUsername: GlobalData.usernameMember,
-                      restaurantUsername: widget.storeUsername,
-                      items: orderItems,
+                    // สร้าง JSON สำหรับ endpoint confirmMemberOrder โดยตรง
+                    // Backend AddOrderDto รับ items และภายใน item ใช้ชื่อ field "addons"
+                    // จึงไม่ส่ง "options" ซ้ำ และไม่ส่งค่า null เช่น canceldetail/cancelimage
+                    final List<Map<String, dynamic>> itemPayload = orderItems
+                        .map((item) {
+                          final List<Map<String, dynamic>> optionPayload = item
+                              .options
+                              .whereType<OrderDetailOptionModel>()
+                              .map((option) {
+                                return {
+                                  'optionId': option.optionId,
+                                  'optionNameAtOrder': option.optionNameAtOrder,
+                                  'priceAtOrder': option.priceAtOrder,
+                                  'optionQty': option.optionQty ?? 1,
+                                };
+                              })
+                              .toList();
+
+                          return {
+                            'qty': item.qty,
+                            'subTotal': item.subTotal,
+                            'note': item.note,
+                            'menuId': item.menuId,
+                            'menuNameAtOrder': item.menuNameAtOrder,
+                            'priceAtOrder': item.priceAtOrder,
+                            'options': optionPayload,
+                          };
+                        })
+                        .toList();
+
+                    final Map<String, dynamic> orderPayload = {
+                      'deliveryFee': deliveryFee.toDouble(),
+                      'totalPrice': totalPrice.toDouble(),
+                      'latitude': _selectedUserLocation!.latitude,
+                      'longitude': _selectedUserLocation!.longitude,
+                      'addressDetail': _addressNoteController.text,
+                      'memberUsername': GlobalData.usernameMember,
+                      'restaurantUsername': widget.storeUsername,
+                      'items': itemPayload,
+                    };
+
+                    debugPrint('[CONFIRM ORDER PAYLOAD] $orderPayload');
+
+                    final response = await DioClient.dio.post(
+                      '/v1/order/confirmMemberOrder',
+                      data: orderPayload,
                     );
 
-                    await OrderService().memberConfirmOrder(finalOrder);
+                    if (response.statusCode != 200 &&
+                        response.statusCode != 201) {
+                      throw Exception(
+                        'ยืนยันคำสั่งซื้อไม่สำเร็จ (HTTP ${response.statusCode})',
+                      );
+                    }
 
                     // เริ่มติดตามสถานะออเดอร์หลังสั่งซื้อสำเร็จ
                     // เพื่อให้ Notify ทำงานเมื่อสถานะเปลี่ยน เช่น ร้านรับออเดอร์ / ไรเดอร์รับงาน

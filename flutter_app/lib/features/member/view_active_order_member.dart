@@ -357,13 +357,13 @@ class _ViewActiveOrderMemberState extends State<ViewActiveOrderMember>
     // รวม Option ที่เหมือนกันเพื่อแสดงจำนวนในรายการอาหาร
     Map<String, Map<String, dynamic>> groupedAddons = {};
 
-    for (final addon in item.addons) {
-      String name = addon.addonNameAtOrder.isNotEmpty
-          ? addon.addonNameAtOrder
-          : (addon.menuAddonDetail?.addonMenu?.addonName ?? '');
+    for (final option in item.options) {
+      String name = option.optionNameAtOrder.isNotEmpty
+          ? option.optionNameAtOrder
+          : (option.menuOptionDetail?.optionName ?? '');
 
-      double price = addon.priceAtOrder;
-      int qty = addon.addonQty ?? 1;
+      double price = option.priceAtOrder;
+      int qty = option.optionQty ?? 1;
 
       if (name.isNotEmpty) {
         if (groupedAddons.containsKey(name)) {

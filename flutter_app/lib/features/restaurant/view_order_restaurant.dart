@@ -249,15 +249,15 @@ class _ViewOrderRestaurantState extends State<ViewOrderRestaurant> {
 
     // 🎯 ดึงชื่อและราคาตัวเลือกจาก Snapshot ของ OrderDetail
     Map<String, Map<String, dynamic>> groupedAddons = {};
-    for (var addon in item.addons) {
-      String name = addon.optionNameAtOrder.trim();
+    for (var option in item.options) {
+      String name = option.optionNameAtOrder.trim();
 
       if (name.isEmpty) {
-        name = addon.menuOptionDetail?.optionName?.trim() ?? '';
+        name = option.menuOptionDetail?.optionName?.trim() ?? '';
       }
 
-      final double price = addon.priceAtOrder;
-      final int qty = addon.optionQty ?? 1;
+      final double price = option.priceAtOrder;
+      final int qty = option.optionQty ?? 1;
 
       if (name.isNotEmpty) {
         if (groupedAddons.containsKey(name)) {

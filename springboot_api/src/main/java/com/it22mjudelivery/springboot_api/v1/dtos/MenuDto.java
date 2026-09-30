@@ -1,5 +1,6 @@
 package com.it22mjudelivery.springboot_api.v1.dtos;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -23,21 +24,22 @@ public class MenuDto {
     private Integer typeMenuId;
     private String typeMenuName;
 
-    // 🎯 เพิ่มเข้ามา: สำหรับรับ List ของ ID กลุ่มตัวเลือกที่นำมาผูกกับเมนู
     private List<Integer> addonGroupIds;
-
     private List<AddonGroupDto> addonGroups;
+
+    // 🎯 เพิ่มฟิลด์นี้เพื่อให้รองรับก้อน optionGroups จาก Flutter
+    @JsonAlias({"optionGroups", "optiongroups"})
+    private List<OptionGroupRequestDTO> optionGroups;
 
     @Getter
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
     public static class AddonGroupDto {
-        // 🎯 เพิ่มเข้ามา: สำหรับรับ ID กรณีส่งมาเป็นรูปแบบ Object
         private Integer addongroupid;
         private String addongroupname;
         private boolean is_multiple_choice;
-        private boolean status; // 🎯 เพิ่มเข้ามารองรับค่าที่ส่งมาจาก Flutter
+        private boolean status;
         private List<AddonDetailDto> details;
     }
 

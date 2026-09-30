@@ -1,4 +1,3 @@
-// data/models/order_detail_model.dart
 import 'package:flutter_app/data/models/order_detail_option_model.dart';
 import 'package:flutter_app/data/models/menu_model.dart';
 
@@ -11,7 +10,7 @@ class OrderDetailModel {
   final double subTotal;
   final String note;
   final MenuModel? menu;
-  final List options;
+  final List<OrderDetailOptionModel> options;
 
   OrderDetailModel({
     this.orderDetailId,
@@ -28,18 +27,14 @@ class OrderDetailModel {
   factory OrderDetailModel.fromJson(Map rawJson) {
     final json = Map.from(rawJson);
 
-    var rawOptions =
+    final rawOptions =
         json['orderDetailOptions'] ??
         json['orderdetailoptions'] ??
-        json['order_detail_options'] ??
-        json['options'] ??
-        json['orderdetailaddons'] ??
-        json['orderDetailAddons'] ??
-        json['order_detail_addons'] ??
-        json['addons'];
+        json['options'];
 
-    List parsedOptions = [];
-    if (rawOptions != null && rawOptions is List) {
+    List<OrderDetailOptionModel> parsedOptions = [];
+
+    if (rawOptions is List) {
       parsedOptions = rawOptions
           .map((option) => OrderDetailOptionModel.fromJson(Map.from(option)))
           .toList();
@@ -47,14 +42,14 @@ class OrderDetailModel {
 
     final rawMenu = json['menu'];
 
-    String resolvedMenuName =
+    final String resolvedMenuName =
         json['menuNameAtOrder'] ??
         json['menu_name_at_order'] ??
         (rawMenu != null
-            ? (rawMenu['menuname'] ?? rawMenu['menuName'] ?? '')
-            : 'เมนู (ถูกลบหรือแก้ไข)');
+            ? (rawMenu['menuName'] ?? rawMenu['menuname'] ?? '')
+            : '');
 
-    double resolvedPrice = json['priceAtOrder'] != null
+    final double resolvedPrice = json['priceAtOrder'] != null
         ? (json['priceAtOrder'] as num).toDouble()
         : (json['price_at_order'] != null
               ? (json['price_at_order'] as num).toDouble()
@@ -62,39 +57,44 @@ class OrderDetailModel {
 
     return OrderDetailModel(
       orderDetailId: json['orderdetailid'] ?? json['orderDetailId'],
-      menuId: rawMenu != null
-          ? (rawMenu['menuid'] ?? rawMenu['menuId'] ?? 0)
-          : (json['menuId'] ?? json['menu_id'] ?? 0),
+
+      menuId:
+          json['menuId'] ??
+          json['menu_id'] ??
+          (rawMenu != null ? (rawMenu['menuid'] ?? rawMenu['menuId'] ?? 0) : 0),
+
       menuNameAtOrder: resolvedMenuName,
       priceAtOrder: resolvedPrice,
+
       qty: json['qty'] ?? 0,
-      subTotal: (json['subtotal'] ?? json['subTotal'] ?? 0).toDouble(),
-      note: json['note'] ?? "",
+
+      subTotal: (json['subTotal'] ?? json['subtotal'] ?? 0).toDouble(),
+
+      note: json['note'] ?? '',
+
       menu: rawMenu != null ? MenuModel.fromJson(Map.from(rawMenu)) : null,
+
       options: parsedOptions,
     );
   }
 
-  // 🎯 ฟังก์ชัน toJson() ที่หายไป
-  Map toJson() {
-    final Map data = {
+  Map<String, dynamic> toJson() {
+    final Map<String, dynamic> data = {
       'qty': qty,
       'subTotal': subTotal,
       'note': note,
       'menuId': menuId,
       'menuNameAtOrder': menuNameAtOrder,
       'priceAtOrder': priceAtOrder,
-      // ส่งทั้ง options และ addons เพื่อรองรับ Controller ทั้งแบบเก่าและใหม่
+
+      // ส่งเฉพาะ Option
       'options': options.map((option) => option.toJson()).toList(),
-      'addons': options.map((option) => option.toJson()).toList(),
     };
 
     if (orderDetailId != null) {
       data['orderdetailid'] = orderDetailId;
     }
+
     return data;
   }
-
-  // Getter สำรองกรณี UI เก่าเรียก .addons
-  List get addons => options;
 }
